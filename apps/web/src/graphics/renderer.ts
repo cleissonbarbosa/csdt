@@ -76,7 +76,7 @@ export async function createRenderer(
     (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend === true
       ? 'webgpu'
       : 'webgl2';
-  renderer.toneMapping = THREE.AgXToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  // Colours are design tokens, shown as chosen: no tone mapping, no grading.
+  renderer.toneMapping = THREE.NoToneMapping;
   return { renderer, backend };
 }

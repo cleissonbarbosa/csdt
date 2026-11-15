@@ -2,6 +2,11 @@
  * Text atlas: every label is drawn once into a single canvas texture and
  * rendered as instanced billboards, so hundreds of labels cost one draw call
  * and no DOM.
+ *
+ * Each label is drawn twice, as a map does it: a wide halo first, the letters
+ * on top. The red channel holds the letters and alpha holds letters plus
+ * halo, so the shader can give the halo the colour of the plate and keep a
+ * name readable whatever it happens to stand in front of.
  */
 import * as THREE from 'three/webgpu';
 
@@ -25,10 +30,12 @@ export interface LabelAtlas {
 
 const WIDTH = 2048;
 const PADDING = 6;
+/** Width of the halo stroke, in atlas pixels (half of it lies outside the glyph). */
+const HALO = 9;
 
 const STYLE: Record<LabelStyle, { font: string; height: number; spacing: string }> = {
-  node: { font: '600 27px "Chakra Petch", sans-serif', height: 40, spacing: '1.5px' },
-  region: { font: '600 46px "Chakra Petch", sans-serif', height: 66, spacing: '6px' },
+  node: { font: '400 28px "B612", sans-serif', height: 40, spacing: '0px' },
+  region: { font: '700 44px "B612", sans-serif', height: 62, spacing: '0px' },
 };
 
 const key = (text: string, style: LabelStyle) => `${style}\u0000${text}`;
@@ -60,7 +67,10 @@ export function buildLabelAtlas(labels: { text: string; style: LabelStyle }[]): 
     const style = STYLE[label.style];
     measure.font = style.font;
     measure.letterSpacing = style.spacing;
-    const w = Math.min(WIDTH - 2 * PADDING, Math.ceil(measure.measureText(label.text).width) + 10);
+    const w = Math.min(
+      WIDTH - 2 * PADDING,
+      Math.ceil(measure.measureText(label.text).width) + 10 + HALO,
+    );
     if (x + w + PADDING > WIDTH) {
       x = PADDING;
       y += rowHeight + PADDING;
@@ -77,15 +87,21 @@ export function buildLabelAtlas(labels: { text: string; style: LabelStyle }[]): 
   canvas.width = WIDTH;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = HALO;
+  ctx.strokeStyle = '#0000ff';
+  ctx.fillStyle = '#ff0000';
   const rects = new Map<string, LabelRect>();
   for (const item of placed) {
     const style = STYLE[item.style];
     if (item.y + style.height > height) continue; // Atlas full: label is skipped.
     ctx.font = style.font;
     ctx.letterSpacing = style.spacing;
-    ctx.fillText(item.text, item.x + 4, item.y + style.height / 2 + 1);
+    const x = item.x + 4 + HALO / 2;
+    const y = item.y + style.height / 2 + 1;
+    ctx.strokeText(item.text, x, y);
+    ctx.fillText(item.text, x, y);
     rects.set(item.id, {
       u: item.x / WIDTH,
       v: 1 - (item.y + style.height) / height,

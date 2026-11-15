@@ -5,13 +5,16 @@
  * fallback, so there is exactly one implementation of every effect. Nothing
  * here uses compute shaders or storage buffers, which the fallback cannot
  * provide: animation is a pure function of time and per-instance data.
+ *
+ * The look is a scale model on a table: matte pieces under one fixed light,
+ * no glow, no additive blending. Materials are unlit in the engine's sense
+ * and compute their own shading, so a surface facing the light shows exactly
+ * the palette colour and both backends, and both themes, agree.
  */
 import {
   abs,
-  atan,
   attribute,
   cameraPosition,
-  cos,
   cross,
   dot,
   float,
@@ -21,17 +24,15 @@ import {
   ivec2,
   length,
   max,
-  min,
   mix,
-  normalView,
+  normalLocal,
+  normalWorld,
   normalize,
   oneMinus,
   positionGeometry,
-  positionViewDirection,
-  positionWorld,
-  pow,
   saturate,
   sin,
+  cos,
   smoothstep,
   step,
   texture,
@@ -45,9 +46,7 @@ import {
 } from 'three/tsl';
 import * as THREE from 'three/webgpu';
 
-import { COLOR, TRAFFIC_COLOR } from '@/lib/palette';
-
-const TAU = Math.PI * 2;
+import { BEAD_SHAPE_ID, type ScenePalette } from '@/lib/palette';
 
 /**
  * TSL nodes are composed dynamically; the generated typings cannot follow a
@@ -62,17 +61,74 @@ export interface Uniform<T> {
   value: T;
 }
 
-function rgb(hex: string): ShaderNode {
-  const c = new THREE.Color(hex);
-  return vec3(c.r, c.g, c.b);
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+
+const THEME_COLORS = [
+  'table',
+  'plate',
+  'plateSide',
+  'plateLine',
+  'piece',
+  'pieceCore',
+  'ghost',
+  'ink',
+  'inkDim',
+  'track',
+  'shadow',
+  'warning',
+  'critical',
+  'hostile',
+] as const satisfies readonly (keyof ScenePalette)[];
+
+type ThemeColor = (typeof THEME_COLORS)[number];
+
+/**
+ * The palette as uniforms shared by every material, so switching between the
+ * light and night themes is a matter of writing new values: nothing is
+ * rebuilt or recompiled.
+ */
+export type SceneTheme = Record<ThemeColor, ShaderNode & Uniform<THREE.Color>> & {
+  shadowOpacity: ShaderNode & Uniform<number>;
+};
+
+export function createSceneTheme(palette: ScenePalette): SceneTheme {
+  const theme = { shadowOpacity: uniform(palette.shadowOpacity) } as SceneTheme;
+  for (const name of THEME_COLORS) theme[name] = uniform(new THREE.Color(palette[name]));
+  return theme;
 }
 
-function additive<M extends THREE.NodeMaterial>(material: M): M {
-  material.transparent = true;
-  material.depthWrite = false;
-  material.blending = THREE.AdditiveBlending;
+export function applyPalette(theme: SceneTheme, palette: ScenePalette): void {
+  for (const name of THEME_COLORS) theme[name].value.set(palette[name]);
+  theme.shadowOpacity.value = palette.shadowOpacity;
+}
+
+function flat<M extends THREE.NodeMaterial>(material: M): M {
+  // Colours are chosen, not graded: keep the tone mapper away from them.
   material.toneMapped = false;
   return material;
+}
+
+function blended<M extends THREE.NodeMaterial>(material: M): M {
+  material.transparent = true;
+  material.depthWrite = false;
+  material.blending = THREE.NormalBlending;
+  return flat(material);
+}
+
+/** The one light of the scene: high, from the front-left. */
+const KEY_LIGHT = new THREE.Vector3(-0.42, 0.82, 0.38).normalize();
+
+/**
+ * Matte shading for a world-space normal: 1 where the surface faces the
+ * light, falling to about two thirds in shade. Never black: this is a model
+ * under studio light, not a scene with drama.
+ */
+function shade(normal: ShaderNode): ShaderNode {
+  const key = saturate(dot(normal, vec3(KEY_LIGHT.x, KEY_LIGHT.y, KEY_LIGHT.z)));
+  const sky = normal.y.mul(0.5).add(0.5);
+  return float(0.64).add(key.mul(0.3)).add(sky.mul(0.1));
 }
 
 /** Quadratic Bézier `a → c → b` evaluated at `t`. */
@@ -84,51 +140,70 @@ function bezier(a: ShaderNode, c: ShaderNode, b: ShaderNode, t: ShaderNode): Sha
     .add(b.mul(t.mul(t)));
 }
 
+/** Coverage of a shape from its signed distance, antialiased over one pixel. */
+function coverage(distance: ShaderNode): ShaderNode {
+  const edge = max(fwidth(distance), float(0.0001));
+  return oneMinus(smoothstep(edge.negate(), edge, distance));
+}
+
+/** Premultiplied "source over destination" for layers built in one shader. */
+interface Layer {
+  rgb: ShaderNode;
+  alpha: ShaderNode;
+}
+function over(below: Layer, color: ShaderNode, alpha: ShaderNode): Layer {
+  return {
+    rgb: color.mul(alpha).add(below.rgb.mul(oneMinus(alpha))),
+    alpha: alpha.add(below.alpha.mul(oneMinus(alpha))),
+  };
+}
+
 // ---------------------------------------------------------------------------
-// Service nodes
+// Service pieces
 // ---------------------------------------------------------------------------
 
 /**
- * Dark, glassy structural parts with luminous accents.
+ * A solid, matte piece.
  *
- * Geometry: `aPart` (0 body, 1 accent, 2 core).
- * Instance: `aTint` rgb, `aFx` = (glow, pulse Hz, visibility, selected).
+ * Geometry: `aPart` (0 body, 1 lighter detail, 2 mark) and `aAo`, how open
+ *           each vertex is to the sky, baked when the piece was modelled.
+ * Instance: `aTint` rgb — the piece colour, already decided by the scene
+ *           (neutral when healthy, a signal colour when not) — and
+ *           `aFx` = (_, _, visibility, _).
  */
-export function createNodeMaterial(): THREE.MeshStandardNodeMaterial {
-  const material = new THREE.MeshStandardNodeMaterial();
+export function createPieceMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
+  const material = flat(new THREE.MeshBasicNodeMaterial());
   const tint = attribute('aTint', 'vec3');
-  const fx = attribute('aFx', 'vec4');
+  const visibility = attribute('aFx', 'vec4').z;
   const part = attribute('aPart', 'float');
-  const glow = fx.x;
-  const pulseHz = fx.y;
-  const visibility = fx.z;
-  const selected = fx.w;
+  const detail = saturate(part);
+  const mark = saturate(part.sub(1));
 
-  const wave = sin(time.mul(pulseHz).mul(TAU)).mul(0.5).add(0.5);
-  const pulse = mix(float(1), wave.mul(0.82).add(0.18), step(0.001, pulseHz));
-  const accent = saturate(part);
-  const core = saturate(part.sub(1));
-  // Fresnel rim: silhouettes stay readable against the dark scene.
-  const rim = pow(oneMinus(saturate(dot(normalView, positionViewDirection))), 2.6);
-  const dim = mix(float(0.16), float(1), visibility);
+  // Details are a slightly lighter tone of the same piece; marks take the
+  // contrasting "core" colour so a silhouette's defining feature stays readable.
+  const surface = mix(mix(tint, tint.mul(1.22), detail), theme.pieceCore, mark);
+  // A little more modelling than the plates get: the key light does more of
+  // the work, and the baked occlusion darkens what the piece itself shades,
+  // which is what turns a silhouette into a solid.
+  const key = saturate(dot(normalWorld, vec3(KEY_LIGHT.x, KEY_LIGHT.y, KEY_LIGHT.z)));
+  const sky = normalWorld.y.mul(0.5).add(0.5);
+  const light = float(0.56).add(key.mul(0.34)).add(sky.mul(0.1));
+  const occlusion = mix(float(0.4), float(1), attribute('aAo', 'float'));
+  const lit = surface.mul(light).mul(occlusion);
+  // Filtered-out pieces recede into the plate instead of going dark.
+  material.colorNode = mix(theme.plate, lit, mix(float(0.14), float(1), visibility));
+  return material;
+}
 
-  material.colorNode = mix(vec3(0.04, 0.062, 0.105), tint.mul(0.42), accent).mul(dim);
-  material.emissiveNode = tint
-    .mul(
-      accent
-        .mul(glow)
-        .mul(pulse)
-        .mul(mix(float(1), float(2.4), core))
-        .add(rim.mul(float(0.5).add(selected.mul(2.2)))),
-    )
-    .mul(dim);
-  material.roughness = 0.36;
-  material.metalness = 0.62;
+/** Thin supports under pieces that are raised above their plate. */
+export function createStemMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
+  const material = flat(new THREE.MeshBasicNodeMaterial());
+  material.colorNode = theme.track.mul(shade(normalWorld));
   return material;
 }
 
 // ---------------------------------------------------------------------------
-// Edges
+// Connections
 // ---------------------------------------------------------------------------
 
 export interface EdgeUniforms {
@@ -137,18 +212,21 @@ export interface EdgeUniforms {
 }
 
 /**
- * Camera-facing ribbons along quadratic curves, with light flowing source →
- * target. One instanced draw call for every edge.
+ * Camera-facing hairlines along quadratic curves. One instanced draw call
+ * for every connection. Direction and volume are shown by the beads that
+ * travel along them, so the line itself is still.
  *
  * Geometry: `position` = (t, side, 0), t ∈ [0,1], side ∈ {-1, +1}.
  * Instance: `aStart`, `aEnd`, `aCtrl`, `aColor`,
- *           `aEdgeFx` = (intensity, flow speed, width px, visibility).
+ *           `aEdgeFx` = (opacity, drawn 0…1, width px, drawn from: +1 the
+ *           start, -1 the end). A connection draws itself along its length
+ *           when the model is assembled and when it joins a selection.
  */
 export function createEdgeMaterial(): {
   material: THREE.MeshBasicNodeMaterial;
   uniforms: EdgeUniforms;
 } {
-  const material = additive(new THREE.MeshBasicNodeMaterial());
+  const material = blended(new THREE.MeshBasicNodeMaterial());
   material.side = THREE.DoubleSide;
   const pixelScale = uniform(0.001);
 
@@ -169,26 +247,25 @@ export function createEdgeMaterial(): {
   );
   const toCamera = cameraPosition.sub(point);
   const sideways = normalize(cross(tangent, normalize(toCamera)));
-  // Constant on-screen width regardless of distance.
-  const width = max(length(toCamera).mul(pixelScale).mul(fx.z), float(0.012));
-  material.positionNode = point.add(sideways.mul(side).mul(width));
+  // Constant on-screen width regardless of distance. One extra pixel is added
+  // and spent on the antialiased edge.
+  const halfWidth = max(length(toCamera).mul(pixelScale).mul(fx.z.add(1)).mul(0.5), float(0.004));
+  material.positionNode = point.add(sideways.mul(side).mul(halfWidth));
 
   const across = oneMinus(abs(side));
-  const flow = fract(t.mul(5).sub(time.mul(fx.y)));
-  const dash = smoothstep(0, 0.3, flow).mul(oneMinus(smoothstep(0.5, 1, flow)));
-  // Fade out where the ribbon meets a node so shapes stay clean.
-  const ends = smoothstep(0, 0.07, t).mul(oneMinus(smoothstep(0.93, 1, t)));
+  const feather = saturate(across.mul(fx.z.add(1)).mul(0.5));
+  // Stop short of the pieces at either end so their shapes stay clean.
+  const ends = smoothstep(0.02, 0.07, t).mul(oneMinus(smoothstep(0.93, 0.98, t)));
   material.colorNode = attribute('aColor', 'vec3');
-  material.opacityNode = pow(across, 1.6)
-    .mul(mix(float(0.3), float(1), dash))
-    .mul(fx.x)
-    .mul(ends)
-    .mul(fx.w);
+  const along = mix(oneMinus(t), t, step(0, fx.w));
+  const reach = fx.y.mul(1.06);
+  const drawn = oneMinus(smoothstep(reach.sub(0.05), reach, along));
+  material.opacityNode = feather.mul(fx.x).mul(ends).mul(drawn);
   return { material, uniforms: { pixelScale } };
 }
 
 // ---------------------------------------------------------------------------
-// Traffic particles
+// Traffic
 // ---------------------------------------------------------------------------
 
 /** Rows of the per-edge data texture read by the particle shader. */
@@ -200,15 +277,48 @@ export interface ParticleUniforms {
   size: Uniform<number>;
 }
 
+const SHAPE = BEAD_SHAPE_ID;
+/** Share of a connection's traffic above which errors are drawn in red. */
+export const ERROR_SIGNAL = 0.01;
+/** Share above which rejections are drawn in amber rather than ink. */
+export const REJECT_SIGNAL = 0.1;
+
+/** Signed distance to each bead shape in sprite space, `p` ∈ [-1, 1]². */
+function beadDistance(p: ShaderNode, shape: ShaderNode): ShaderNode {
+  const r = length(p);
+  const box = max(abs(p.x), abs(p.y));
+  const is = (id: number) => oneMinus(step(0.5, abs(shape.sub(id))));
+  const disc = r.sub(0.66);
+  const ring = abs(r.sub(0.58)).sub(0.2);
+  const diamond = abs(p.x).add(abs(p.y)).sub(0.88);
+  const square = box.sub(0.6);
+  const frame = abs(box.sub(0.56)).sub(0.19);
+  const bar = max(abs(p.x).sub(0.92), abs(p.y).sub(0.3));
+  const triangle = max(abs(p.x).mul(0.866).add(p.y.mul(0.5)), p.y.negate()).sub(0.46);
+  return disc
+    .mul(is(SHAPE.disc))
+    .add(ring.mul(is(SHAPE.ring)))
+    .add(diamond.mul(is(SHAPE.diamond)))
+    .add(square.mul(is(SHAPE.square)))
+    .add(frame.mul(is(SHAPE.frame)))
+    .add(bar.mul(is(SHAPE.bar)))
+    .add(triangle.mul(is(SHAPE.triangle)));
+}
+
 /**
- * Every request in flight, as stateless GPU particles.
+ * Every request in flight, as stateless GPU beads on the connections.
  *
- * A particle owns only static data: which edge it lives on and four random
- * seeds. Everything that changes — how many particles an edge shows, how fast
- * they move, what share is errors, rejections or suspicious — lives in a tiny
- * float texture with one column per edge. The CPU touches that texture, never
- * the particles; position, category, colour and size are derived in the vertex
+ * A bead owns only static data: which edge it lives on and four random seeds.
+ * Everything that changes — how many beads an edge shows, how fast they move,
+ * what share is errors, rejections or suspicious — lives in a tiny float
+ * texture with one column per edge. The CPU touches that texture, never the
+ * beads; position, category, shape and colour are derived in the vertex
  * shader from `time`.
+ *
+ * Ordinary traffic is ink and is told apart by shape (see `TRAFFIC_LEGEND`).
+ * Only traffic that went wrong has a hue, and only where it amounts to
+ * something: every platform rejects a little junk and fails a request now
+ * and then, and that routine trickle keeps its shape but stays ink.
  *
  * Texture rows (per edge column):
  *   0: start.xyz, density      1: end.xyz, speed
@@ -216,13 +326,16 @@ export interface ParticleUniforms {
  *
  * Instance: `aEdge` (column), `aSeed` (phase, speed jitter, lane, roll).
  */
-export function createParticleMaterial(data: THREE.DataTexture): {
+export function createParticleMaterial(
+  data: THREE.DataTexture,
+  theme: SceneTheme,
+): {
   material: THREE.SpriteNodeMaterial;
   uniforms: ParticleUniforms;
 } {
-  const material = additive(new THREE.SpriteNodeMaterial());
+  const material = blended(new THREE.SpriteNodeMaterial());
   const density = uniform(1);
-  const size = uniform(0.34);
+  const size = uniform(0.21);
 
   const column = int(attribute('aEdge', 'float'));
   const seed = attribute('aSeed', 'vec4');
@@ -243,46 +356,52 @@ export function createParticleMaterial(data: THREE.DataTexture): {
     .mul(oneMinus(isSuspicious))
     .mul(oneMinus(isRejected));
   const isNormal = oneMinus(isSuspicious).mul(oneMinus(isRejected)).mul(oneMinus(isError));
-  // On synchronous edges a share of the normal particles are responses
+  // On synchronous edges a share of the normal beads are responses
   // travelling back to the caller.
   const isResponse = isNormal.mul(step(0.66, fract(seed.z.mul(7.31)))).mul(step(kind, 2.5));
+  // Replication and telemetry: background chatter, drawn smaller and paler.
+  const isBackground = step(3.5, kind).mul(isNormal);
 
   const progress = fract(seed.x.add(time.mul(row1.w).mul(seed.y.mul(0.6).add(0.7))));
-  // Rejected traffic never arrives: it stops short of the target and flares.
+  // Rejected traffic never arrives: it stops short of the target.
   const forward = mix(progress, progress.mul(0.9), isRejected);
   const t = mix(forward, oneMinus(progress), isResponse);
-  const lane = vec3(sin(seed.x.mul(41.3)), cos(seed.y.mul(57.9)), sin(seed.z.mul(33.7))).mul(0.17);
+  // Beads ride the line like beads on a wire, with just enough spread that
+  // a busy connection reads as a stream rather than a single file.
+  const lane = vec3(sin(seed.x.mul(41.3)), cos(seed.y.mul(57.9)), sin(seed.z.mul(33.7))).mul(0.04);
   material.positionNode = bezier(row0.xyz, row2.xyz, row1.xyz, t).add(lane);
 
   const visible = step(fract(seed.x.mul(13.7).add(seed.y.mul(3.1))), row0.w.mul(density));
   const grow = smoothstep(0, 0.06, progress).mul(oneMinus(smoothstep(0.94, 1, progress)));
-  const flare = mix(float(1), smoothstep(0.7, 1, progress).mul(2.2).add(1), isRejected);
   const scale = size
     .mul(visible)
     .mul(grow)
-    .mul(flare)
-    .mul(float(1).add(isError.mul(0.7)).add(isSuspicious.mul(0.35)))
-    .mul(mix(float(1), float(0.72), isResponse))
-    .mul(mix(float(0.62), float(1), seed.y));
+    .mul(float(1).add(isError.mul(0.3)).add(isSuspicious.mul(0.45)).add(isRejected.mul(0.4)))
+    .mul(mix(float(1), float(0.62), isBackground))
+    .mul(mix(float(0.82), float(1), seed.y));
   material.scaleNode = varying(vec2(scale, scale));
 
-  let tone: ShaderNode = rgb(TRAFFIC_COLOR.request);
-  tone = mix(tone, rgb(TRAFFIC_COLOR.authentication), step(0.5, kind));
-  tone = mix(tone, rgb(TRAFFIC_COLOR.authorization), step(1.5, kind));
-  tone = mix(tone, rgb(TRAFFIC_COLOR.queue), step(2.5, kind));
-  tone = mix(tone, rgb(TRAFFIC_COLOR.background), step(3.5, kind));
-  tone = mix(tone, rgb(TRAFFIC_COLOR.response), isResponse);
-  tone = mix(tone, rgb(TRAFFIC_COLOR.error), isError);
-  tone = mix(tone, rgb(TRAFFIC_COLOR.rejected), isRejected);
-  tone = mix(tone, rgb(TRAFFIC_COLOR.suspicious), isSuspicious);
-  const brightness = mix(float(0.55), float(1), step(kind, 3.5)).mul(row3.w);
+  let shape: ShaderNode = float(SHAPE.disc);
+  shape = mix(shape, float(SHAPE.diamond), step(0.5, kind));
+  shape = mix(shape, float(SHAPE.square), step(1.5, kind));
+  shape = mix(shape, float(SHAPE.frame), step(2.5, kind));
+  shape = mix(shape, float(SHAPE.disc), step(3.5, kind));
+  shape = mix(shape, float(SHAPE.ring), isResponse);
+  shape = mix(shape, float(SHAPE.disc), isError);
+  shape = mix(shape, float(SHAPE.bar), isRejected);
+  shape = mix(shape, float(SHAPE.triangle), isSuspicious);
 
-  const radial = length(uv().sub(0.5)).mul(2);
-  const halo = oneMinus(smoothstep(0, 1, radial));
-  const hot = pow(oneMinus(saturate(radial)), 4);
+  let tone: ShaderNode = mix(theme.inkDim, theme.track, isBackground);
+  tone = mix(tone, theme.critical, isError.mul(step(ERROR_SIGNAL, errorShare)));
+  tone = mix(tone, theme.warning, isRejected.mul(step(REJECT_SIGNAL, rejectShare)));
+  tone = mix(tone, theme.hostile, isSuspicious);
+
+  const p = uv().sub(0.5).mul(2);
   const vTone: ShaderNode = varying(tone);
-  material.colorNode = vTone.mul(halo.add(hot.mul(1.6)));
-  material.opacityNode = halo.mul(varying(brightness));
+  const vShape: ShaderNode = varying(shape);
+  const vDim: ShaderNode = varying(row3.w);
+  material.colorNode = vTone;
+  material.opacityNode = coverage(beadDistance(p, vShape)).mul(vDim);
   return { material, uniforms: { density, size } };
 }
 
@@ -294,203 +413,192 @@ export interface LabelUniforms {
   fadeNear: Uniform<number>;
   fadeFar: Uniform<number>;
   opacity: Uniform<number>;
+  /** `2·tan(fov/2) / viewportHeight`: turns pixels into sprite scale. */
+  pixelScale: Uniform<number>;
 }
 
 /**
  * Billboarded text from a canvas atlas: every label in one draw call.
  *
- * Instance: `aPos`, `aSize` (world width, height), `aRect` (u, v, w, h),
- *           `aLabelFx` = (visibility, always-on boost, tint mix, _).
+ * Labels keep one size on screen however far the camera is, like the names
+ * on a map: text is for reading and should not grow into the picture. Which
+ * labels are shown at all is decided by distance.
+ *
+ * Instance: `aPos`, `aSize` (width, height in pixels), `aRect` (u, v, w, h),
+ *           `aLabelFx` = (visibility, always shown, alarm, _).
  */
-export function createLabelMaterial(atlas: THREE.Texture): {
+export function createLabelMaterial(
+  atlas: THREE.Texture,
+  theme: SceneTheme,
+): {
   material: THREE.SpriteNodeMaterial;
   uniforms: LabelUniforms;
 } {
-  const material = new THREE.SpriteNodeMaterial();
-  material.transparent = true;
-  material.depthWrite = false;
-  material.toneMapped = false;
+  const material = blended(new THREE.SpriteNodeMaterial());
+  // Names are read, not looked at: nothing in the model may cover them.
+  material.depthTest = false;
+  material.sizeAttenuation = false;
   const fadeNear = uniform(40);
   const fadeFar = uniform(80);
   const opacity = uniform(1);
+  const pixelScale = uniform(0.001);
 
   const position = attribute('aPos', 'vec3');
   const rect = attribute('aRect', 'vec4');
   const fx = attribute('aLabelFx', 'vec4');
   material.positionNode = position;
-  material.scaleNode = attribute('aSize', 'vec2');
+  material.scaleNode = attribute('aSize', 'vec2').mul(pixelScale);
 
   const texel = texture(atlas, rect.xy.add(uv().mul(rect.zw)));
   const distance = length(cameraPosition.sub(position));
   const fade = max(oneMinus(smoothstep(fadeNear, fadeFar, distance)), fx.y);
-  material.colorNode = mix(rgb(COLOR.inkDim), rgb(COLOR.ink), fx.y).mul(
-    mix(float(1), float(1.5), fx.z),
-  );
+  // Red is the letters, alpha is letters plus halo (see `labels.ts`).
+  const letters = mix(mix(theme.inkDim, theme.ink, fx.y), theme.critical, fx.z);
+  material.colorNode = mix(theme.plate, letters, texel.r);
   material.opacityNode = texel.a.mul(varying(fade)).mul(fx.x).mul(opacity);
-  return { material, uniforms: { fadeNear, fadeFar, opacity } };
+  return { material, uniforms: { fadeNear, fadeFar, opacity, pixelScale } };
 }
 
 // ---------------------------------------------------------------------------
-// Ground rings (health, selection, impact shockwaves)
+// Ground marks: contact shadow, status lamp, selection
 // ---------------------------------------------------------------------------
 
 /**
- * A flat ring under every node.
+ * What lies on the plate under every piece.
+ *
+ * A soft contact shadow is always there: it is what makes a piece stand on
+ * its plate instead of floating in front of it. A lamp lights up under a
+ * piece that is not in its normal state. A ring marks the selection.
  *
  * Geometry: unit quad lying in XZ.
- * Instance: `aPos`, `aColor`,
- *           `aRing` = (radius, intensity, shockwave start time, selected).
+ * Instance: `aPos`, `aColor` (lamp colour),
+ *           `aRing` = (radius, lamp, change time, selected).
  */
-export function createRingMaterial(): THREE.MeshBasicNodeMaterial {
-  const material = additive(new THREE.MeshBasicNodeMaterial());
+export function createGroundMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
+  const material = blended(new THREE.MeshBasicNodeMaterial());
   material.side = THREE.DoubleSide;
   const ring = attribute('aRing', 'vec4');
+  const lampColor = attribute('aColor', 'vec3');
   material.positionNode = attribute('aPos', 'vec3').add(positionGeometry.mul(ring.x.mul(4.4)));
 
-  const centered = uv().sub(0.5).mul(2);
-  const d = length(centered);
-  const band = (radius: number, width: number) =>
-    smoothstep(radius - width, radius, d).mul(oneMinus(smoothstep(radius, radius + width, d)));
-  const base = band(0.46, 0.03);
-  const disc = pow(oneMinus(saturate(d.div(0.46))), 2).mul(0.22);
-  // Selection: a second, dashed ring that rotates.
-  const angle = atan(centered.y, centered.x).div(TAU).add(time.mul(0.06));
-  const dashes = step(0.5, fract(angle.mul(18)));
-  const selection = band(0.62, 0.022).mul(dashes).mul(ring.w).mul(1.6);
-  // Impact: a ring that expands and fades once from `ring.z`.
-  const age = time.sub(ring.z);
-  const alive = step(0, age).mul(oneMinus(smoothstep(0.0, 1.4, age)));
-  const front = saturate(age.div(1.4)).mul(0.52).add(0.46);
-  const shock = smoothstep(front.sub(0.07), front, d)
-    .mul(oneMinus(smoothstep(front, front.add(0.03), d)))
-    .mul(alive)
-    .mul(1.8);
+  const d = length(uv().sub(0.5).mul(2));
+  const band = (radius: ShaderNode | number, half: number) =>
+    coverage(abs(d.sub(radius)).sub(half));
 
-  material.colorNode = attribute('aColor', 'vec3');
-  material.opacityNode = base.add(disc).mul(ring.y).add(selection).add(shock);
+  // Contact shadow: darkest under the piece, gone by the edge of the quad.
+  const shadow = oneMinus(smoothstep(0.18, 0.74, d));
+  let layer: Layer = { rgb: theme.shadow.mul(0), alpha: float(0) };
+  layer = over(layer, theme.shadow, shadow.mul(shadow).mul(theme.shadowOpacity));
+  // Lamp: a tinted disc with a firm edge, only when there is a state to show.
+  layer = over(layer, lampColor, coverage(d.sub(0.62)).mul(0.2).mul(ring.y));
+  layer = over(layer, lampColor, band(0.62, 0.018).mul(ring.y));
+  // A change of state sends one ring outward, once.
+  const age = time.sub(ring.z);
+  const alive = step(0, age).mul(oneMinus(smoothstep(0, 1.1, age)));
+  layer = over(
+    layer,
+    lampColor,
+    band(saturate(age.div(1.1)).mul(0.34).add(0.62), 0.014).mul(alive),
+  );
+  // Selection: a plain ink ring.
+  layer = over(layer, theme.ink, band(0.74, 0.028).mul(ring.w));
+
+  material.colorNode = layer.rgb.div(max(layer.alpha, float(0.0001)));
+  material.opacityNode = layer.alpha;
   return material;
 }
 
 // ---------------------------------------------------------------------------
-// Region platforms
+// Plates, the board and what they rest on
 // ---------------------------------------------------------------------------
 
 export interface PlateUniforms {
-  tint: Uniform<THREE.Color>;
-  /** 0 = healthy calm … 1 = alarmed. */
+  /** Signal colour of the region's state. */
+  tone: Uniform<THREE.Color>;
+  /** 0 = normal … 1 = the region is in that state. */
   alarm: Uniform<number>;
-  visibility: Uniform<number>;
+  /** 1 when the region is down: the plate goes dark. */
+  off: Uniform<number>;
 }
 
-/** A translucent disc with a lit rim, range rings and a slow radar sweep. */
-export function createPlateMaterial(halo: boolean): {
+/**
+ * A region plate or the dependency board: a low solid with a top face.
+ *
+ * Geometry: a unit cylinder (round plates) or a unit box (the board), scaled
+ * by the mesh. `round` selects how the outline on the top face is measured.
+ */
+export function createPlateMaterial(
+  theme: SceneTheme,
+  round: boolean,
+): {
   material: THREE.MeshBasicNodeMaterial;
   uniforms: PlateUniforms;
 } {
-  const material = additive(new THREE.MeshBasicNodeMaterial());
-  material.side = THREE.DoubleSide;
-  const tint = uniform(new THREE.Color(COLOR.blue));
+  const material = flat(new THREE.MeshBasicNodeMaterial());
+  const tone = uniform(new THREE.Color('#ffffff'));
   const alarm = uniform(0);
-  const visibility = uniform(1);
+  const off = uniform(0);
 
+  const top = step(0.5, normalLocal.y);
+  const d = round
+    ? length(positionGeometry.xz)
+    : max(abs(positionGeometry.x), abs(positionGeometry.z)).mul(2);
+  // The outline is a hairline normally and a firm band in an abnormal state.
+  const outline = round
+    ? smoothstep(mix(float(0.988), float(0.955), alarm), mix(float(0.992), float(0.96), alarm), d)
+    : float(0);
+  const lineColor = mix(mix(theme.plateLine, tone, alarm), theme.ink, off);
+  const fill = mix(mix(theme.plate, tone, alarm.mul(0.055)), theme.table, off.mul(0.7));
+  const face = mix(fill, lineColor, outline);
+  const side = theme.plateSide.mul(shade(normalWorld).mul(1.08));
+  material.colorNode = mix(side, face, top);
+  return { material, uniforms: { tone, alarm, off } };
+}
+
+/** The column that carries the raised edge plate. */
+export function createSupportMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
+  const material = flat(new THREE.MeshBasicNodeMaterial());
+  material.colorNode = theme.plateSide.mul(shade(normalWorld).mul(1.08));
+  return material;
+}
+
+/**
+ * The soft shadow a plate casts on whatever is below it.
+ * Geometry: unit disc or unit square lying in XZ, larger than the plate.
+ */
+export function createCastShadowMaterial(
+  theme: SceneTheme,
+  round: boolean,
+  strength: number,
+): THREE.MeshBasicNodeMaterial {
+  const material = blended(new THREE.MeshBasicNodeMaterial());
   const centered = uv().sub(0.5).mul(2);
-  const d = length(centered);
-  const rim = smoothstep(0.955, 0.985, d).mul(oneMinus(smoothstep(0.985, 1, d)));
-  const innerRim = smoothstep(0.9, 0.915, d)
-    .mul(oneMinus(smoothstep(0.915, 0.93, d)))
-    .mul(0.35);
-  const rings = oneMinus(
-    smoothstep(
-      0,
-      0.012,
-      abs(fract(d.mul(4)).sub(0.5))
-        .sub(0.488)
-        .abs(),
-    ),
-  )
-    .mul(0.045)
-    .mul(step(d, 0.9));
-  const angle = atan(centered.y, centered.x).div(TAU);
-  const sweep = pow(fract(angle.sub(time.mul(0.045))), 10)
-    .mul(0.09)
-    .mul(step(d, 0.955));
-  const fill = oneMinus(d).mul(0.02).add(0.008).mul(step(d, 0.955));
-  const beat = mix(float(1), sin(time.mul(5)).mul(0.3).add(0.7), alarm);
-
-  material.colorNode = tint;
-  const body = halo ? rim.add(innerRim) : rim.add(innerRim).add(rings).add(sweep).add(fill);
-  material.opacityNode = body.mul(beat).mul(visibility);
-  return { material, uniforms: { tint, alarm, visibility } };
-}
-
-// ---------------------------------------------------------------------------
-// Environment
-// ---------------------------------------------------------------------------
-
-/** An infinite-looking floor grid that dissolves into the dark. */
-export function createGridMaterial(radius: number): THREE.MeshBasicNodeMaterial {
-  const material = additive(new THREE.MeshBasicNodeMaterial());
-  const plane = positionWorld.xz;
-  const line = (cell: number) => {
-    const coordinate = plane.div(cell);
-    const distance = abs(fract(coordinate.sub(0.5)).sub(0.5)).div(fwidth(coordinate));
-    return oneMinus(min(min(distance.x, distance.y), float(1)));
-  };
-  const r = length(plane);
-  const fade = oneMinus(smoothstep(radius * 0.25, radius, r));
-  const glow = oneMinus(smoothstep(0, radius * 0.55, r)).mul(0.05);
-  material.colorNode = mix(rgb('#2B4B7E'), rgb(COLOR.cyan), 0.25);
-  material.opacityNode = line(4).mul(0.05).add(line(20).mul(0.1)).mul(fade).add(glow);
+  const d = round ? length(centered) : max(abs(centered.x), abs(centered.y));
+  const falloff = oneMinus(smoothstep(round ? 0.8 : 0.88, 1, d));
+  material.colorNode = theme.shadow;
+  material.opacityNode = falloff.mul(theme.shadowOpacity).mul(strength);
   return material;
 }
 
-/** Distant points of light with a slow twinkle. Instance: `aPos`, `aStar`. */
-export function createStarMaterial(): THREE.SpriteNodeMaterial {
-  const material = additive(new THREE.SpriteNodeMaterial());
-  material.sizeAttenuation = false;
-  const star = attribute('aStar', 'vec4');
-  material.positionNode = attribute('aPos', 'vec3');
-  material.scaleNode = vec2(star.x, star.x);
-  const twinkle = sin(time.mul(star.z).add(star.y.mul(TAU)))
-    .mul(0.35)
-    .add(0.65);
-  const radial = length(uv().sub(0.5)).mul(2);
-  material.colorNode = mix(rgb('#9FC4FF'), rgb('#FFFFFF'), star.w);
-  material.opacityNode = oneMinus(smoothstep(0, 1, radial))
-    .mul(twinkle)
-    .mul(0.75);
-  return material;
-}
+// ---------------------------------------------------------------------------
+// The traced request
+// ---------------------------------------------------------------------------
 
-/** Soft additive sprites positioned on the CPU (tracers and bursts). */
+/**
+ * Sprites positioned on the CPU: the head and tail of a traced request, and
+ * the ring that marks where it arrived or was stopped.
+ */
 export function createTracerMaterial(): THREE.SpriteNodeMaterial {
-  const material = additive(new THREE.SpriteNodeMaterial());
+  const material = blended(new THREE.SpriteNodeMaterial());
   material.depthTest = false;
   const fx = attribute('aTracerFx', 'vec4');
   material.positionNode = attribute('aPos', 'vec3');
   material.scaleNode = vec2(fx.x, fx.x);
-  const radial = length(uv().sub(0.5)).mul(2);
-  const halo = oneMinus(smoothstep(0, 1, radial));
-  // `fx.z` > 0 turns the sprite into an expanding ring (a burst).
-  const ring = smoothstep(0.55, 0.8, radial).mul(oneMinus(smoothstep(0.8, 1, radial)));
-  material.colorNode = attribute('aColor', 'vec3').mul(float(1).add(pow(halo, 3).mul(2)));
-  material.opacityNode = mix(halo, ring, fx.z).mul(fx.y);
+  const r = length(uv().sub(0.5).mul(2));
+  const disc = coverage(r.sub(0.72));
+  // `fx.z` > 0 turns the sprite into a ring.
+  const ring = coverage(abs(r.sub(0.82)).sub(0.07));
+  material.colorNode = attribute('aColor', 'vec3');
+  material.opacityNode = mix(disc, ring, fx.z).mul(fx.y);
   return material;
-}
-
-/** The vertical beam marking the selected node. */
-export function createBeamMaterial(): {
-  material: THREE.MeshBasicNodeMaterial;
-  tint: Uniform<THREE.Color>;
-} {
-  const material = additive(new THREE.MeshBasicNodeMaterial());
-  material.side = THREE.DoubleSide;
-  const tint = uniform(new THREE.Color(COLOR.cyan));
-  const rise = uv().y;
-  const shimmer = sin(rise.mul(40).sub(time.mul(4)))
-    .mul(0.15)
-    .add(0.85);
-  material.colorNode = tint;
-  material.opacityNode = pow(oneMinus(rise), 2.2).mul(0.5).mul(shimmer);
-  return { material, tint };
 }

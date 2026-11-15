@@ -129,7 +129,8 @@ async function frameRuns(mode, extraFlags) {
   for (const backend of ['webgpu', 'webgl2']) {
     const settings = {
       quality: 'ultra',
-      bloom: true,
+      theme: 'light',
+      // Keep the picture changing, so every frame is a full redraw.
       autoRotate: true,
       ...(backend === 'webgl2' ? { renderer: 'webgl2' } : {}),
     };
@@ -163,7 +164,11 @@ async function frameRuns(mode, extraFlags) {
 async function stability() {
   const browser = await chromium.launch({ channel: 'chrome', headless: !headed, args: GPU_FLAGS });
   await reset('helios-commerce');
-  const { context, page } = await open(browser, { quality: 'high', autoRotate: true });
+  const { context, page } = await open(browser, {
+    quality: 'high',
+    theme: 'light',
+    autoRotate: true,
+  });
   await page.waitForTimeout(3000);
   const sample = () =>
     page.evaluate(() => {

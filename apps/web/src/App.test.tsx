@@ -4,7 +4,7 @@
  * WebGPU or WebGL 2, so these also exercise the non-3D fallback.
  */
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,6 +62,16 @@ function renderApp() {
   );
 }
 
+/**
+ * The application starts with the model alone on the stage. Tests about what
+ * a panel contains begin with both already open; how one gets there is
+ * covered by "panels on demand".
+ */
+function renderOpen() {
+  useUi.setState({ explorerOpen: true, inspectorOpen: true });
+  return renderApp();
+}
+
 beforeEach(() => {
   window.innerWidth = 1600;
   localStorage.clear();
@@ -109,8 +119,9 @@ describe('loading and fallback rendering', () => {
   it('labels where the data comes from and how the stream is doing', async () => {
     renderApp();
     expect(screen.getByTestId('connection-health')).toHaveTextContent('Stream live');
-    expect(screen.getAllByText('Synthetic').length).toBeGreaterThan(0);
-    expect(await screen.findByText('Demo mode')).toBeInTheDocument();
+    // Provenance is a plain sentence, not a cluster of badges.
+    expect(screen.getByText('Synthetic data, simulated')).toBeInTheDocument();
+    expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'demo');
   });
 
   it('says so, and shows nothing invented, when the server cannot be reached', () => {
@@ -124,14 +135,126 @@ describe('loading and fallback rendering', () => {
   });
 
   it('renders platform metrics straight from the snapshot', () => {
-    renderApp();
+    renderOpen();
     const g = fixtures.snapshot().global;
-    expect(screen.getByTestId('hud-incidents')).toHaveTextContent(String(g.activeIncidents));
     expect(screen.getByTestId('hud-errors')).toHaveTextContent(
       `${(g.errorRate * 100).toFixed(2)}%`,
     );
-    expect(screen.getByTestId('hud-health')).toHaveTextContent(
-      new RegExp(`Healthy: ${g.health.healthy}.*Critical: ${g.health.critical}`),
+    // The four signals, each on a scale with its normal range.
+    for (const id of ['hud-rps', 'hud-p95', 'hud-errors', 'hud-saturation']) {
+      expect(screen.getByTestId(id)).not.toBeEmptyDOMElement();
+    }
+    // Secondary figures live with the platform overview.
+    expect(screen.getByTestId('platform-figures')).toHaveTextContent('Latency p99');
+  });
+
+  it('states the condition of the platform in one sentence', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const g = fixtures.snapshot().global;
+    const status = screen.getByTestId('platform-status');
+    expect(status).toHaveAttribute('data-incidents', String(g.activeIncidents));
+    // The fixture has an incident running: the sentence names it and says how
+    // far it reaches, and leads to the incident when pressed.
+    expect(status).not.toHaveAttribute('data-level', 'healthy');
+    expect(status).toHaveTextContent(/\d+ services? affected/);
+    await user.click(status);
+    expect(await screen.findByTestId('active-incident')).toBeInTheDocument();
+    expect(useUi.getState().acknowledgedIncidentId).toBe(fixtures.snapshot().incident?.id);
+  });
+
+  it('says nothing is wrong when nothing is', () => {
+    const quiet = fixtures.snapshot();
+    quiet.incident = null;
+    quiet.global.activeIncidents = 0;
+    quiet.global.health = { healthy: 51, degraded: 0, critical: 0, down: 0 };
+    useTelemetry.getState().applySnapshot(quiet);
+    renderApp();
+    const status = screen.getByTestId('platform-status');
+    expect(status).toHaveAttribute('data-level', 'healthy');
+    expect(status).toHaveTextContent('51 services, all normal');
+  });
+
+  it('shows in the top bar only the signals that have left their normal range', () => {
+    // A platform where every reading is where it was at the start.
+    const baseline = fixtures.metrics().history[0]!;
+    const calm = fixtures.snapshot();
+    calm.global.rps = baseline.rps;
+    calm.global.p95LatencyMs = baseline.p95LatencyMs;
+    calm.global.errorRate = 0;
+    calm.nodes.saturation = calm.nodes.saturation.map(() => 0.4);
+    useTelemetry.getState().applySnapshot(calm);
+    renderApp();
+    // The dark cockpit: with nothing out of range, no instrument is on show.
+    expect(screen.queryAllByTestId(/^deviation-/)).toHaveLength(0);
+
+    const failing = structuredClone(calm);
+    failing.global.errorRate = 0.2;
+    act(() => useTelemetry.getState().applySnapshot(failing));
+    expect(screen.getAllByTestId(/^deviation-/)).toHaveLength(1);
+    expect(screen.getByTestId('deviation-errors')).toHaveTextContent('20.0%');
+  });
+});
+
+describe('panels on demand', () => {
+  it('starts with the model alone on the stage', () => {
+    renderApp();
+    expect(screen.getByTestId('topology-table')).toBeInTheDocument();
+    expect(screen.queryByTestId('explorer')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scenario-console')).not.toBeInTheDocument();
+    // The four signals are not on show either; they are in the overview.
+    expect(screen.queryByTestId('hud')).not.toBeInTheDocument();
+  });
+
+  it('brings the explorer and the overview when they are asked for', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Show explorer' }));
+    expect(screen.getByTestId('explorer-count')).toHaveTextContent('51 of 51 services');
+    await user.click(screen.getByRole('button', { name: 'Show inspector' }));
+    expect(screen.getByTestId('overview')).toHaveTextContent('Helios Commerce');
+
+    await user.click(screen.getByRole('button', { name: 'Close the overview' }));
+    await user.click(screen.getByRole('button', { name: 'Hide explorer' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('explorer')).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens the overview from the status sentence while all is well', async () => {
+    const quiet = fixtures.snapshot();
+    quiet.incident = null;
+    quiet.global.activeIncidents = 0;
+    quiet.global.health = { healthy: 51, degraded: 0, critical: 0, down: 0 };
+    useTelemetry.getState().applySnapshot(quiet);
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId('platform-status'));
+    expect(screen.getByTestId('overview')).toBeInTheDocument();
+    expect(screen.getByTestId('hud-rps')).not.toBeEmptyDOMElement();
+  });
+
+  it('brings the inspector with a selection and puts it away without one', async () => {
+    renderApp();
+    act(() => useUi.getState().selectNode('use-gateway'));
+    expect(screen.getByTestId('inspector-title')).toHaveTextContent('API Gateway');
+    act(() => useUi.getState().select(null));
+    // On its way out it goes on showing the service, never the overview.
+    expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
+  });
+
+  it('keeps the authorization panel when the selection is cleared', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Authorization explorer' }));
+    act(() => useUi.getState().select(null));
+    expect(screen.getByRole('tab', { name: 'Authorization' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
   });
 });
@@ -139,7 +262,7 @@ describe('loading and fallback rendering', () => {
 describe('explorer', () => {
   it('lists every service by region and filters them', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     expect(screen.getByTestId('explorer-count')).toHaveTextContent('51 of 51 services');
     expect(screen.getByRole('region', { name: 'EU West' })).toBeInTheDocument();
 
@@ -154,6 +277,9 @@ describe('explorer', () => {
     ).toHaveLength(3);
 
     await user.click(screen.getByRole('button', { name: /Clear filters/ }));
+    // Filters stay out of the way until asked for.
+    expect(screen.queryByRole('button', { name: 'Critical', pressed: false })).toBeNull();
+    await user.click(screen.getByTestId('explorer-filters-toggle'));
     await user.click(screen.getByRole('button', { name: 'Critical', pressed: false }));
     const critical = screen.getAllByTestId(/^service-/);
     expect(critical.length).toBeGreaterThan(0);
@@ -162,24 +288,61 @@ describe('explorer', () => {
 
   it('explains an empty result', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.type(screen.getByRole('searchbox'), 'zzz');
     expect(screen.getByTestId('explorer-count')).toHaveTextContent('0 of 51 services');
     expect(screen.getAllByText('No services match').length).toBeGreaterThan(0);
   });
 });
 
-describe('inspector', () => {
-  it('starts with the platform overview', () => {
+describe('command palette', () => {
+  it('reaches a service by name from the keyboard', async () => {
+    const user = userEvent.setup();
     renderApp();
+    expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument();
+    await user.keyboard('{Control>}k{/Control}');
+    const input = await screen.findByTestId('command-input');
+    expect(input).toHaveFocus();
+    // Before anything is typed it offers actions, not a wall of services.
+    expect(screen.getByRole('option', { name: /Reset the camera/ })).toBeInTheDocument();
+
+    await user.type(input, 'orders db');
+    const first = screen.getAllByRole('option')[0]!;
+    expect(first).toHaveTextContent('Orders DB');
+    expect(first).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument());
+    expect(useUi.getState().selection).toEqual({ kind: 'node', id: 'use-orders-db' });
+    expect(screen.getByTestId('inspector-title')).toHaveTextContent('Orders DB');
+  });
+
+  it('moves through results with the arrow keys and says when nothing matches', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId('open-command'));
+    const input = await screen.findByTestId('command-input');
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
+    await user.type(input, 'no such thing anywhere');
+    expect(screen.getByText(/Nothing matches/)).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument());
+  });
+});
+
+describe('inspector', () => {
+  it('shows the platform overview when nothing is selected', () => {
+    renderOpen();
     const overview = screen.getByTestId('overview');
     expect(overview).toHaveTextContent('Helios Commerce');
-    expect(within(overview).getByText('Recent alerts')).toBeInTheDocument();
+    expect(within(overview).getByText('Needs attention')).toBeInTheDocument();
+    // The four signals live here, each against its normal range.
+    expect(within(overview).getByTestId('hud')).toBeInTheDocument();
   });
 
   it('shows metrics, connections and history for the selected service', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.click(screen.getByTestId('service-use-auth'));
 
     const inspector = screen.getByTestId('node-inspector');
@@ -204,13 +367,15 @@ describe('inspector', () => {
     );
     expect(screen.getByTestId('inspector-title')).toHaveTextContent('Session Cache');
 
+    // Letting go of the selection puts the inspector away.
     await user.click(screen.getByRole('button', { name: 'Clear selection' }));
-    expect(screen.getByTestId('overview')).toBeInTheDocument();
+    expect(useUi.getState().selection).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('tab-inspector')).not.toBeInTheDocument());
   });
 
   it('inspects a connection', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.click(screen.getByTestId('service-use-gateway'));
     await user.click(
       screen.getByRole('button', { name: 'Inspect connection to Identity Service' }),
@@ -223,13 +388,16 @@ describe('inspector', () => {
 
   it('can be driven from the keyboard', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     const service = screen.getByTestId('service-use-orders-db');
     service.focus();
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('inspector-title')).toHaveTextContent('Orders DB');
+    // Escape lets go of the selection, then puts the explorer away too.
     await user.keyboard('{Escape}');
-    expect(screen.getByTestId('overview')).toBeInTheDocument();
+    expect(useUi.getState()).toMatchObject({ selection: null, inspectorOpen: false });
+    await user.keyboard('{Escape}');
+    expect(useUi.getState().explorerOpen).toBe(false);
   });
 });
 
@@ -241,7 +409,7 @@ describe('incident console', () => {
 
   it('lists the five scenarios and starts one', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     const console_ = await openConsole(user);
     const cards = await within(console_).findAllByTestId(/^scenario-(?!start|console)/);
     expect(cards).toHaveLength(5);
@@ -251,7 +419,7 @@ describe('incident console', () => {
 
   it('shows the active incident, its phase and what it impacted', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await openConsole(user);
     const active = await screen.findByTestId('active-incident');
     expect(active).toHaveAttribute('data-scenario', 'credential-stuffing');
@@ -270,7 +438,7 @@ describe('incident console', () => {
 
   it('pauses, resumes and stops the scenario', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await openConsole(user);
     await user.click(await screen.findByTestId('incident-pause'));
     expect(api.control).toHaveBeenCalledWith({ action: 'pause' });
@@ -286,7 +454,7 @@ describe('incident console', () => {
 
   it('asks before erasing history', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await openConsole(user);
     await user.click(screen.getByTestId('reset-simulation'));
     expect(api.reset).not.toHaveBeenCalled();
@@ -297,14 +465,14 @@ describe('incident console', () => {
 
   it('inspects an event and jumps to its moment', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await openConsole(user);
     const alert = (await screen.findAllByTestId('event-row')).find(
       (row) => row.dataset.kind === 'alert',
     )!;
     await user.click(alert);
     const detail = screen.getByTestId('event-detail');
-    expect(detail).toHaveTextContent('alert');
+    expect(detail).toHaveTextContent('Alert');
     expect(detail).toHaveTextContent('Sequence');
     await user.click(within(detail).getByTestId('event-jump'));
     expect(api.control).toHaveBeenCalledWith(expect.objectContaining({ action: 'seek' }));
@@ -318,7 +486,7 @@ describe('incident console', () => {
       new ApiError(409, 'conflict', 'scenario `x` is not available'),
     );
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await openConsole(user);
     await user.click(await screen.findByTestId('scenario-start-regional-outage'));
     expect(
@@ -379,7 +547,7 @@ describe('playback', () => {
 
   it('toggles play with the space bar unless a control has focus', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.keyboard(' ');
     expect(api.control).toHaveBeenCalledWith({ action: 'pause' });
     api.control.mockClear();
@@ -389,7 +557,10 @@ describe('playback', () => {
 
   it('loads a recorded incident', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
+    // Recordings are loaded from the incidents panel, next to the scenarios.
+    expect(screen.queryByTestId('recording-picker')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
     await user.selectOptions(await screen.findByTestId('recording-picker'), 'black-friday-flood');
     expect(api.loadRecording).toHaveBeenCalledWith('black-friday-flood');
   });
@@ -399,7 +570,9 @@ describe('authorization explorer', () => {
   it('evaluates a request with Cedar and shows the engine’s answer', async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Authorization' }));
+    // Nothing is open at the start: the key in the top bar brings the panel.
+    expect(screen.queryByRole('tab', { name: 'Authorization' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Authorization explorer' }));
     const form = await screen.findByTestId('authz-form');
     await user.selectOptions(within(form).getByTestId('authz-principal'), 'User::"mallory"');
     await user.selectOptions(within(form).getByTestId('authz-action'), 'Action::"exportLedger"');
@@ -437,7 +610,7 @@ describe('authorization explorer', () => {
 
   it('lets policies be switched off for an evaluation', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.click(screen.getByRole('tab', { name: 'Authorization' }));
     const policies = await screen.findByTestId('policy-list');
     expect(within(policies).getAllByRole('listitem')).toHaveLength(9);
@@ -453,7 +626,7 @@ describe('authorization explorer', () => {
     const { ApiError } = await import('@/providers/api');
     api.evaluate.mockRejectedValue(new ApiError(400, 'invalid_request', 'invalid principal'));
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.click(screen.getByRole('tab', { name: 'Authorization' }));
     await user.click(await screen.findByTestId('authz-evaluate'));
     expect(await screen.findByRole('alert')).toHaveTextContent('invalid principal');
@@ -462,7 +635,7 @@ describe('authorization explorer', () => {
 
   it('only offers cedar-agent once one is connected', async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderOpen();
     await user.click(screen.getByRole('tab', { name: 'Authorization' }));
     const engines = await screen.findByRole('radiogroup', { name: 'Policy engine' });
     expect(within(engines).getAllByRole('radio')).toHaveLength(1);
@@ -503,8 +676,13 @@ describe('integrations and settings', () => {
       }),
     );
     expect(screen.getByTestId('app')).toHaveAttribute('data-reduced-motion', 'true');
-    await user.click(within(dialog).getByRole('switch', { name: /Bloom/ }));
-    expect(useSettings.getState().bloom).toBe(false);
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Theme' })).getByRole('radio', {
+        name: 'Night',
+      }),
+    );
+    expect(useSettings.getState().theme).toBe('night');
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('night'));
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -521,7 +699,7 @@ describe('integrations and settings', () => {
     renderApp();
     await user.keyboard('?');
     const dialog = await screen.findByRole('dialog', { name: 'Help and legend' });
-    expect(dialog).toHaveTextContent('A stylised cedar tree');
+    expect(dialog).toHaveTextContent('A lighthouse, on a mast above the edge');
     expect(dialog).toHaveTextContent('no real system is observed, scanned or attacked');
   });
 });

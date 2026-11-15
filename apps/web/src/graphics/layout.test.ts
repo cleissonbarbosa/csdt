@@ -84,7 +84,21 @@ describe('layout', () => {
     });
   });
 
-  it('cascades tiers downward away from the hub', () => {
+  it('stands every service on a surface, as pieces of a scale model', () => {
+    for (const mode of ['regions', 'dependencies'] as const) {
+      const layout = computeLayout(helios, mode);
+      expect(layout.ground).toHaveLength(helios.nodes.length);
+      helios.nodes.forEach((node, i) => {
+        // Geometry rests on y = -1, so centre = ground + scale means "standing".
+        const lift = nodePosition(layout, i)[1] - layout.scales[i]! - layout.ground[i]!;
+        expect(lift).toBeGreaterThan(-1e-4);
+        // Only the security monitor is raised, on its mast above the router.
+        if (node.serviceType !== 'security-monitor') expect(lift).toBeCloseTo(0, 4);
+      });
+    }
+  });
+
+  it('runs tiers outward from a raised hub', () => {
     const layout = computeLayout(helios, 'regions');
     const at = (id: string) =>
       nodePosition(
@@ -93,18 +107,31 @@ describe('layout', () => {
       );
     const gateway = at('use-gateway');
     const database = at('use-orders-db');
-    expect(gateway[1]).toBeGreaterThan(database[1]);
     expect(Math.hypot(gateway[0], gateway[2])).toBeLessThan(Math.hypot(database[0], database[2]));
-    // The edge router sits on the central pillar, above everything in a region.
+    // The edge router is the centre of the hub, which stands above the regions.
     const router = at('edge-router');
     expect(router[0]).toBe(0);
     expect(router[2]).toBe(0);
-    expect(router[1]).toBeGreaterThan(gateway[1]);
+    const hub = layout.regions.find((r) => r.kind === 'edge')!;
+    for (const region of layout.regions) {
+      if (region.kind === 'cloud') expect(hub.center[1]).toBeGreaterThan(region.center[1]);
+    }
+    // The monitor watches from above the router.
+    const monitor = at('threat-monitor');
+    expect(monitor[1]).toBeGreaterThan(router[1]);
+    expect(layout.board).toBeNull();
   });
 
   it('lays dependencies out left to right by tier', () => {
     const layout = computeLayout(helios, 'dependencies');
     expect(layout.regions).toEqual([]);
+    // One board under the whole graph, large enough for every service.
+    expect(layout.board).not.toBeNull();
+    for (let i = 0; i < helios.nodes.length; i++) {
+      const p = nodePosition(layout, i);
+      expect(Math.abs(p[0])).toBeLessThan(layout.board!.halfWidth);
+      expect(Math.abs(p[2])).toBeLessThan(layout.board!.halfDepth);
+    }
     const x = (id: string) =>
       nodePosition(
         layout,

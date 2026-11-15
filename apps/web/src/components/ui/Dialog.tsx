@@ -28,16 +28,16 @@ export function Dialog({
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-void/75" />
+        <RadixDialog.Overlay className="fixed inset-0 z-40 animate-fade bg-black/40" />
         <RadixDialog.Content
           className={cn(
-            'panel panel-ticks fixed left-1/2 top-1/2 z-50 flex max-h-[86vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-md animate-rise',
+            'panel fixed left-1/2 top-1/2 z-50 flex max-h-[86vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[3px] animate-rise',
             width,
           )}
         >
           <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
             <div className="min-w-0">
-              <RadixDialog.Title className="font-display text-base font-semibold uppercase tracking-[0.12em] text-ink">
+              <RadixDialog.Title className="text-base font-bold text-ink">
                 {title}
               </RadixDialog.Title>
               <RadixDialog.Description className="mt-1 text-xs text-ink-dim">

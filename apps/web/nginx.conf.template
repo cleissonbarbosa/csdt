@@ -19,7 +19,9 @@ server {
 
   server_tokens off;
   gzip on;
-  gzip_types text/css application/javascript application/json image/svg+xml;
+  # application/octet-stream is what the modelled pieces (.glb) are served
+  # as: raw floats, 508 kB that gzip takes to about 123 kB.
+  gzip_types text/css application/javascript application/json image/svg+xml application/octet-stream;
   gzip_min_length 1024;
 
   # Everything the app loads comes from its own origin: scripts, styles,

@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { decisionDeny } from '@/test/fixtures';
 
-import { EMPTY_FILTERS, filtersActive, prefersReducedMotion, useSettings, useUi } from './ui';
+import {
+  EMPTY_FILTERS,
+  filtersActive,
+  prefersReducedMotion,
+  resolveTheme,
+  useSettings,
+  useUi,
+} from './ui';
 
 beforeEach(() => {
   useUi.setState(useUi.getInitialState(), true);
@@ -97,16 +104,18 @@ describe('panels', () => {
 describe('settings', () => {
   it('persist to local storage and can be restored', () => {
     useSettings.getState().set('quality', 'low');
-    useSettings.getState().set('bloom', false);
+    useSettings.getState().set('theme', 'night');
     expect(JSON.parse(localStorage.getItem('aegis.settings.v1')!).state).toMatchObject({
       quality: 'low',
-      bloom: false,
+      theme: 'night',
     });
     useSettings.getState().reset();
     expect(useSettings.getState()).toMatchObject({
       quality: 'auto',
-      bloom: true,
+      theme: 'system',
       renderer: 'auto',
+      // The model only moves when the data or the viewer does.
+      autoRotate: false,
     });
   });
 
@@ -114,5 +123,18 @@ describe('settings', () => {
     expect(prefersReducedMotion('reduced')).toBe(true);
     expect(prefersReducedMotion('full')).toBe(false);
     expect(prefersReducedMotion('system')).toBe(false);
+  });
+
+  it('resolves the theme from the setting, or from the system when asked to', () => {
+    expect(resolveTheme('light')).toBe('light');
+    expect(resolveTheme('night')).toBe('night');
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('dark'),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    expect(resolveTheme('system')).toBe('night');
+    window.matchMedia = matchMedia;
   });
 });

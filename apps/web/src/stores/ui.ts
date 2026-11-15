@@ -56,6 +56,9 @@ export interface UiState {
   tracedDecision: AuthorizationDecision | null;
   /** Event whose details are shown in the event inspector. */
   inspectedEventSeq: number | null;
+  /** The incident the viewer has already looked at; newer ones ask for attention. */
+  acknowledgedIncidentId: string | null;
+  commandOpen: boolean;
 
   select: (selection: Selection) => void;
   selectNode: (id: string | null) => void;
@@ -75,6 +78,8 @@ export interface UiState {
   setInspectorOpen: (open: boolean) => void;
   traceDecision: (decision: AuthorizationDecision | null) => void;
   inspectEvent: (seq: number | null) => void;
+  acknowledgeIncident: (id: string | null) => void;
+  setCommandOpen: (open: boolean) => void;
   /** Clears state tied to a topology that is being replaced. */
   resetForTopology: () => void;
 }
@@ -87,23 +92,29 @@ export const useUi = create<UiState>((set) => ({
   viewMode: 'scene',
   openPanel: null,
   leftTab: 'explorer',
-  explorerOpen: true,
-  inspectorOpen: true,
+  // Overview first: the model has the screen to itself until a panel is
+  // asked for. Selecting something brings the inspector; letting go of the
+  // selection puts it away again.
+  explorerOpen: false,
+  inspectorOpen: false,
   tracedDecision: null,
   inspectedEventSeq: null,
+  acknowledgedIncidentId: null,
+  commandOpen: false,
 
   // Selecting something brings the inspector forward, also from the
-  // authorization tab that shares its sidebar.
+  // authorization tab that shares its sidebar. Clearing the selection puts
+  // the inspector away, unless the authorization tab is what is being used.
   select: (selection) =>
     set((s) => ({
       selection,
-      inspectorOpen: selection ? true : s.inspectorOpen,
+      inspectorOpen: selection ? true : s.openPanel === 'authorization',
       openPanel: selection && s.openPanel === 'authorization' ? null : s.openPanel,
     })),
   selectNode: (id) =>
     set((s) => ({
       selection: id ? { kind: 'node', id } : null,
-      inspectorOpen: id ? true : s.inspectorOpen,
+      inspectorOpen: id ? true : s.openPanel === 'authorization',
       openPanel: id && s.openPanel === 'authorization' ? null : s.openPanel,
     })),
   setHovered: (hoveredNodeId) => set({ hoveredNodeId }),
@@ -126,7 +137,12 @@ export const useUi = create<UiState>((set) => ({
     })),
   setLeftTab: (leftTab) => set({ leftTab, explorerOpen: true }),
   setExplorerOpen: (explorerOpen) => set({ explorerOpen }),
-  setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
+  // Closing the sidebar also leaves the authorization tab that lives in it.
+  setInspectorOpen: (inspectorOpen) =>
+    set((s) => ({
+      inspectorOpen,
+      openPanel: !inspectorOpen && s.openPanel === 'authorization' ? null : s.openPanel,
+    })),
   traceDecision: (tracedDecision) => set({ tracedDecision }),
   // Event details live in the incidents tab; opening one reveals it.
   inspectEvent: (inspectedEventSeq) =>
@@ -135,6 +151,8 @@ export const useUi = create<UiState>((set) => ({
         ? { inspectedEventSeq }
         : { inspectedEventSeq, leftTab: 'incidents', explorerOpen: true },
     ),
+  acknowledgeIncident: (acknowledgedIncidentId) => set({ acknowledgedIncidentId }),
+  setCommandOpen: (commandOpen) => set({ commandOpen }),
   resetForTopology: () =>
     set({
       selection: null,
@@ -150,10 +168,11 @@ export const useUi = create<UiState>((set) => ({
 export type QualitySetting = 'auto' | 'ultra' | 'high' | 'medium' | 'low';
 export type MotionSetting = 'system' | 'reduced' | 'full';
 export type RendererSetting = 'auto' | 'webgl2';
+export type ThemeSetting = 'system' | 'light' | 'night';
 
 export interface SettingsState {
+  theme: ThemeSetting;
   quality: QualitySetting;
-  bloom: boolean;
   labels: boolean;
   autoRotate: boolean;
   devOverlay: boolean;
@@ -166,10 +185,11 @@ export interface SettingsState {
 type SettingsValues = Omit<SettingsState, 'set' | 'reset'>;
 
 export const DEFAULT_SETTINGS: SettingsValues = {
+  theme: 'system',
   quality: 'auto',
-  bloom: true,
   labels: true,
-  autoRotate: true,
+  // Off by default: the scene only moves when the data or the viewer does.
+  autoRotate: false,
   devOverlay: false,
   motion: 'system',
   renderer: 'auto',
@@ -195,4 +215,14 @@ export function prefersReducedMotion(setting: MotionSetting): boolean {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
+}
+
+/** The theme actually shown, combining the setting and the OS preference. */
+export function resolveTheme(setting: ThemeSetting): 'light' | 'night' {
+  if (setting !== 'system') return setting;
+  return typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'night'
+    : 'light';
 }

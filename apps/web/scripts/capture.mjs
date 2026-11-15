@@ -6,7 +6,7 @@
 //        [--scenario ddos-surge --after 24] [--speed 2]
 //        [--click tab-incidents,scenario-start-ddos-surge]
 //        [--select authz-principal=User::"mallory"] [--then authz-evaluate]
-//        [--node use-gateway]
+//        [--node use-gateway] [--focus use-gateway]
 //        [--eval "<js to run in the page before the capture>"] [--settle 2]
 //        [--video demo.webm --duration 20]
 //
@@ -107,6 +107,14 @@ if (typeof args.node === 'string') {
   // Park the pointer so no hover card covers the subject.
   await page.mouse.move(4, 4);
   await page.waitForTimeout(450);
+}
+if (typeof args.focus === 'string') {
+  // Double-click a service: the camera moves in on it.
+  const at = await page.evaluate((id) => window.__aegis?.projectNode(id) ?? null, args.focus);
+  const box = await page.locator('canvas').boundingBox();
+  if (at && box) await page.mouse.dblclick(box.x + at.x, box.y + at.y);
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(1500);
 }
 if (args.eval) await page.evaluate(args.eval);
 if (args.settle) await page.waitForTimeout(Number(args.settle) * 1000);

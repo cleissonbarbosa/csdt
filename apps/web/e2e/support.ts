@@ -26,7 +26,22 @@ export async function openApp(page: Page): Promise<void> {
   await resetSimulation(page);
   await page.goto('/');
   await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
-  await expect(page.getByTestId('explorer-count')).toHaveText('51 of 51 services');
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '0');
+}
+
+/**
+ * The application opens with the model alone on the stage; panels come when
+ * they are asked for. These bring the two that most tests read from.
+ */
+export async function openExplorer(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Show explorer' }).click();
+  await expect(page.getByTestId('explorer-count')).toBeVisible();
+}
+
+/** The platform overview: the inspector with nothing selected. */
+export async function openOverview(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Show inspector' }).click();
+  await expect(page.getByTestId('overview')).toBeVisible();
 }
 
 /** Waits until the 3D scene has been built for the loaded topology. */
@@ -71,4 +86,33 @@ export function collectErrors(page: Page): string[] {
     if (!IGNORED.some((pattern) => pattern.test(text))) errors.push(text);
   });
   return errors;
+}
+
+/**
+ * Reads the rendered frame back and summarises it: the background colour,
+ * how many sampled pixels differ from it (is anything drawn?) and how many
+ * carry a real hue (is anything signalling?).
+ */
+export async function frameSummary(
+  page: Page,
+): Promise<{ background: [number, number, number]; drawn: number; chromatic: number }> {
+  return page.evaluate(async () => {
+    const frame = await window.__aegis!.captureFrame();
+    const p = frame.pixels;
+    const background: [number, number, number] = [p[0]!, p[1]!, p[2]!];
+    let drawn = 0;
+    let chromatic = 0;
+    for (let i = 0; i < p.length; i += 4 * 53) {
+      const r = p[i]!;
+      const g = p[i + 1]!;
+      const b = p[i + 2]!;
+      if (
+        Math.abs(r - background[0]) + Math.abs(g - background[1]) + Math.abs(b - background[2]) >
+        36
+      )
+        drawn++;
+      if (Math.max(r, g, b) - Math.min(r, g, b) > 70) chromatic++;
+    }
+    return { background, drawn, chromatic };
+  });
 }

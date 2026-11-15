@@ -54,7 +54,7 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
   return (
     <div className="h-full overflow-y-auto px-4 pb-6 pt-4" data-testid="topology-table">
       {notice && (
-        <p role="status" className="panel mb-4 rounded-md px-3 py-2 text-xs text-warning">
+        <p role="status" className="panel mb-4 rounded-[3px] px-3 py-2 text-xs text-ink">
           {notice}
         </p>
       )}
@@ -63,20 +63,15 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
       )}
       <div className="mx-auto max-w-5xl space-y-5">
         {groups.map(({ region, rows }) => (
-          <table
-            key={region.id}
-            className="panel w-full border-collapse rounded-md text-left text-xs"
-          >
+          <table key={region.id} className="panel w-full border-collapse text-left text-xs">
             <caption className="px-3 pb-2 pt-3 text-left">
-              <span className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-ink">
-                {region.name}
-              </span>
+              <span className="text-sm font-bold text-ink">{region.name}</span>
               <span className="ml-2 text-[11px] text-ink-faint">
-                {region.location} · {rows.length} service{rows.length === 1 ? '' : 's'}
+                {region.location}, {rows.length} service{rows.length === 1 ? '' : 's'}
               </span>
             </caption>
             <thead>
-              <tr className="border-y border-line/70">
+              <tr className="border-y border-line">
                 {[
                   'Service',
                   'Type',
@@ -90,7 +85,7 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
                   <th
                     key={heading}
                     scope="col"
-                    className={cn('eyebrow px-3 py-1.5', i >= 3 && i <= 6 && 'text-right')}
+                    className={cn('caption px-3 py-1.5', i >= 3 && i <= 6 && 'text-right')}
                   >
                     {heading}
                   </th>
@@ -111,15 +106,15 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
                     key={node.id}
                     aria-selected={selected}
                     className={cn(
-                      'border-b border-line/40 last:border-b-0',
-                      selected ? 'bg-cyan/10' : 'hover:bg-raised/60',
+                      'border-b border-line last:border-b-0',
+                      selected ? 'bg-raised' : 'hover:bg-raised',
                     )}
                   >
                     <th scope="row" className="px-3 py-1.5 font-normal">
                       <button
                         type="button"
                         onClick={() => useUi.getState().selectNode(node.id)}
-                        className="text-left text-ink hover:text-cyan"
+                        className="text-left text-ink hover:underline hover:underline-offset-2"
                         data-testid={`table-service-${node.id}`}
                       >
                         {node.name}

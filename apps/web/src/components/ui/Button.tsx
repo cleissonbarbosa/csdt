@@ -6,13 +6,10 @@ type Variant = 'primary' | 'ghost' | 'outline' | 'danger';
 type Size = 'sm' | 'md';
 
 const VARIANT: Record<Variant, string> = {
-  primary:
-    'border-cyan/60 bg-cyan/15 text-cyan hover:bg-cyan/25 hover:border-cyan active:bg-cyan/30',
-  outline:
-    'border-line-bright bg-surface/60 text-ink-dim hover:text-ink hover:border-ink-faint active:bg-raised',
-  ghost: 'border-transparent text-ink-dim hover:text-ink hover:bg-raised/80 active:bg-raised',
-  danger:
-    'border-critical/50 bg-critical/10 text-critical hover:bg-critical/20 hover:border-critical',
+  primary: 'border-accent bg-accent text-on-accent hover:opacity-85 active:opacity-75',
+  outline: 'border-line-strong bg-paper text-ink hover:bg-raised active:bg-sunken',
+  ghost: 'border-transparent text-ink-dim hover:bg-raised hover:text-ink active:bg-sunken',
+  danger: 'border-critical bg-paper text-critical hover:bg-critical/10 active:bg-critical/15',
 };
 
 const SIZE: Record<Size, string> = {
@@ -43,11 +40,11 @@ export function Button({
       type={type}
       aria-pressed={pressed}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-[3px] border font-display font-semibold uppercase tracking-[0.08em] transition-colors duration-150',
-        'disabled:pointer-events-none disabled:opacity-40',
+        'inline-flex shrink-0 items-center justify-center rounded-[3px] border transition-[color,background-color,border-color,opacity,scale] duration-150',
+        'active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40',
         VARIANT[variant],
         SIZE[size],
-        pressed && 'border-cyan/70 bg-cyan/15 text-cyan',
+        pressed && 'border-line-strong bg-sunken text-ink',
         className,
       )}
       {...rest}
@@ -81,10 +78,10 @@ export function IconButton({
       title={label}
       aria-pressed={pressed}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-[3px] border border-transparent text-ink-dim transition-colors duration-150',
-        'hover:border-line-bright hover:bg-raised/80 hover:text-ink disabled:pointer-events-none disabled:opacity-40',
+        'inline-flex shrink-0 items-center justify-center rounded-[3px] border border-transparent text-ink-dim transition-[color,background-color,border-color,scale] duration-150',
+        'hover:bg-raised hover:text-ink active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40',
         size === 'sm' ? 'size-7' : 'size-8',
-        pressed && 'border-cyan/60 bg-cyan/15 text-cyan hover:border-cyan hover:text-cyan',
+        pressed && 'border-line-strong bg-sunken text-ink',
         className,
       )}
       {...rest}

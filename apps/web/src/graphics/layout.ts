@@ -6,14 +6,18 @@
  * always produces the same picture, which keeps the scene stable across
  * reloads and makes the layout testable.
  *
- * `regions` mode — a hub-and-spoke archipelago. The global edge sits on a
- * central pillar (clients on a ring above the edge router, the security
- * monitor on top). Cloud regions are platforms on a ring around it. Inside a
- * region, tiers run outward from the hub and step downward, so traffic visibly
- * cascades from the edge down into data stores.
+ * The scene is a scale model, so every service stands on something. Node
+ * geometry is built with its base at `y = -1`; a node of scale `s` placed at
+ * `ground + s` therefore rests exactly on the surface below it. `ground` is
+ * kept per node so the scene can draw contact shadows and support stems.
  *
- * `dependencies` mode — a layered left-to-right dependency graph: one column
- * per tier, ignoring region placement.
+ * `regions` mode — a hub-and-spoke archipelago. The global edge is a raised
+ * plate at the centre (clients on its rim, the edge router in the middle, the
+ * security monitor on a mast above it). Cloud regions are plates on a ring
+ * around it, one step lower. Inside a region, tiers run outward from the hub.
+ *
+ * `dependencies` mode — a layered left-to-right dependency graph on a single
+ * board: one column per tier, ignoring region placement.
  */
 import type { InfrastructureNode, ServiceType, Topology } from '@aegis/contracts';
 
@@ -29,13 +33,24 @@ export interface RegionLayout {
   radius: number;
 }
 
+/** The rectangular base the dependency layout stands on. */
+export interface BoardLayout {
+  center: Vec3;
+  halfWidth: number;
+  halfDepth: number;
+}
+
 export interface SceneLayout {
   mode: LayoutMode;
   /** `x, y, z` per node, in topology order. */
   positions: Float32Array;
   /** Uniform scale per node. */
   scales: Float32Array;
+  /** Height of the surface under each node. */
+  ground: Float32Array;
+  /** Region plates; `center` is the middle of the plate's top face. */
   regions: RegionLayout[];
+  board: BoardLayout | null;
   /** Centre and radius of a sphere enclosing everything. */
   center: Vec3;
   radius: number;
@@ -49,8 +64,10 @@ const REGION_GAP = 2.4;
 const HUB_RING = 7.6;
 /** How far a region platform keeps from the central pillar. */
 const HUB_CLEARANCE = 5.2;
-const BASE_Y = 1.7;
-const TIER_STEP = 0.85;
+/** Height of the raised plate that carries the global edge. */
+const HUB_HEIGHT = 5.4;
+/** Gap between the edge router and the monitor on its mast. */
+const MAST_GAP = 1.4;
 
 const TYPE_ORDER: Record<ServiceType, number> = {
   'external-client': 0,
@@ -139,12 +156,15 @@ function layoutRegions(topology: Topology): SceneLayout {
   const n = topology.nodes.length;
   const positions = new Float32Array(n * 3);
   const scales = new Float32Array(n);
-  const put = (index: number, x: number, y: number, z: number) => {
-    positions[index * 3] = x;
-    positions[index * 3 + 1] = y;
-    positions[index * 3 + 2] = z;
-  };
+  const ground = new Float32Array(n);
   topology.nodes.forEach((node, i) => (scales[i] = TYPE_SCALE[node.serviceType]));
+  /** Stands a node on the surface at `floor`, optionally raised by `lift`. */
+  const put = (index: number, x: number, floor: number, z: number, lift = 0) => {
+    positions[index * 3] = x;
+    positions[index * 3 + 1] = floor + lift + scales[index]!;
+    positions[index * 3 + 2] = z;
+    ground[index] = floor;
+  };
 
   const byRegion = new Map<string, Indexed[]>();
   topology.nodes.forEach((node, index) => {
@@ -173,7 +193,6 @@ function layoutRegions(topology: Topology): SceneLayout {
     count <= 1
       ? count * (platform + hub)
       : Math.max((platform + REGION_GAP / 2) / Math.sin(Math.PI / count), platform + hub);
-  const tallest = Math.max(1, ...measured.map((m) => m.rows.length));
 
   const regions: RegionLayout[] = [];
   measured.forEach(({ region, rows, halfDepth }, i) => {
@@ -185,11 +204,10 @@ function layoutRegions(topology: Topology): SceneLayout {
     const cz = ring * uz;
     rows.forEach((row, r) => {
       const radial = -halfDepth + r * ROW_GAP;
-      const y = BASE_Y + (rows.length - 1 - r) * TIER_STEP;
       row.forEach((entry, c) => {
         const tangent = (c - (row.length - 1) / 2) * COL_GAP;
         // Tangent axis is the radial axis rotated a quarter turn.
-        put(entry.index, cx + ux * radial - uz * tangent, y, cz + uz * radial + ux * tangent);
+        put(entry.index, cx + ux * radial - uz * tangent, 0, cz + uz * radial + ux * tangent);
       });
     });
     regions.push({
@@ -201,8 +219,7 @@ function layoutRegions(topology: Topology): SceneLayout {
     });
   });
 
-  // The global edge: a pillar at the centre of the ring.
-  const hubY = BASE_Y + (tallest - 1) * TIER_STEP + 3.4;
+  // The global edge: a raised plate at the centre of the ring.
   for (const region of edge) {
     const members = byRegion.get(region.id)!.sort(byTypeThenId);
     const clients = members.filter((m) => m.node.serviceType === 'external-client');
@@ -212,23 +229,28 @@ function layoutRegions(topology: Topology): SceneLayout {
       (m) => !clients.includes(m) && !routers.includes(m) && !monitors.includes(m),
     );
     const core = routers.shift();
-    if (core) put(core.index, 0, hubY, 0);
-    monitors.forEach((m, i) => put(m.index, 0, hubY + 6.2 + i * 3.4, 0));
+    if (core) put(core.index, 0, HUB_HEIGHT, 0);
+    // Monitors watch from a mast above the router, one over the other.
+    let mast = core ? scales[core.index]! * 2 + MAST_GAP : 0;
+    for (const m of monitors) {
+      put(m.index, 0, HUB_HEIGHT, 0, mast);
+      mast += scales[m.index]! * 2 + MAST_GAP;
+    }
     clients.forEach((m, i) => {
       const angle =
         Math.PI / 2 + Math.PI / Math.max(1, clients.length) + (i * 2 * Math.PI) / clients.length;
-      put(m.index, HUB_RING * Math.cos(angle), hubY + 3.3, HUB_RING * Math.sin(angle));
+      put(m.index, HUB_RING * Math.cos(angle), HUB_HEIGHT, HUB_RING * Math.sin(angle));
     });
     const inner = [...routers, ...others];
     inner.forEach((m, i) => {
       const angle = (i * 2 * Math.PI) / inner.length;
-      put(m.index, 4.6 * Math.cos(angle), hubY, 4.6 * Math.sin(angle));
+      put(m.index, 4.6 * Math.cos(angle), HUB_HEIGHT, 4.6 * Math.sin(angle));
     });
     regions.push({
       id: region.id,
       name: region.name,
       kind: 'edge',
-      center: [0, hubY - 1.6, 0],
+      center: [0, HUB_HEIGHT, 0],
       radius: HUB_RING + 2.2,
     });
   }
@@ -243,7 +265,9 @@ function layoutRegions(topology: Topology): SceneLayout {
     mode: 'regions',
     positions,
     scales,
+    ground,
     regions,
+    board: null,
     center: [0, bounds.center[1], 0],
     radius: reach,
   };
@@ -280,13 +304,10 @@ function layoutDependencies(topology: Topology): SceneLayout {
     for (let c = 0; c < columns; c++) {
       const column = members.slice(c * perColumn, (c + 1) * perColumn);
       column.forEach((entry, r) => {
-        const z = (r - (column.length - 1) / 2) * LANE_GAP;
-        // Alternate lanes sit at slightly different heights so long columns
-        // read as depth rather than a flat wall.
-        const y = 2.2 + (r % 2) * 0.9;
         positions[entry.index * 3] = x + c * 3.6;
-        positions[entry.index * 3 + 1] = y;
-        positions[entry.index * 3 + 2] = z;
+        // Standing on the board, which is at height zero.
+        positions[entry.index * 3 + 1] = scales[entry.index]!;
+        positions[entry.index * 3 + 2] = (r - (column.length - 1) / 2) * LANE_GAP;
       });
     }
     x += COLUMN_GAP + (columns - 1) * 3.6;
@@ -295,7 +316,22 @@ function layoutDependencies(topology: Topology): SceneLayout {
   const shift = (x - COLUMN_GAP) / 2;
   for (let i = 0; i < n; i++) positions[i * 3] = positions[i * 3]! - shift;
 
-  return { mode: 'dependencies', positions, scales, regions: [], ...enclose(positions, 6) };
+  let halfWidth = 0;
+  let halfDepth = 0;
+  for (let i = 0; i < n; i++) {
+    halfWidth = Math.max(halfWidth, Math.abs(positions[i * 3]!));
+    halfDepth = Math.max(halfDepth, Math.abs(positions[i * 3 + 2]!));
+  }
+  return {
+    mode: 'dependencies',
+    positions,
+    scales,
+    ground: new Float32Array(n),
+    regions: [],
+    board:
+      n === 0 ? null : { center: [0, 0, 0], halfWidth: halfWidth + 4, halfDepth: halfDepth + 4 },
+    ...enclose(positions, 6),
+  };
 }
 
 export function computeLayout(topology: Topology, mode: LayoutMode): SceneLayout {

@@ -1,165 +1,158 @@
-import type { Health } from '@aegis/contracts';
-
-import { sceneHandle } from '@/graphics/handle';
+import { RangeBar } from '@/components/ui/Sparkline';
 import { cn } from '@/lib/cn';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
-import { COLOR, HEALTH_COLOR, HEALTH_LABEL } from '@/lib/palette';
+import { COLOR } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
 
-function Metric({
-  label,
-  value,
-  tone,
-  testId,
-  wide,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  testId: string;
-  wide?: boolean;
-}) {
-  return (
-    <div className={cn('flex shrink-0 flex-col px-3 py-1.5', wide ? 'w-[104px]' : 'w-[92px]')}>
-      <dt className="eyebrow whitespace-nowrap">{label}</dt>
-      <dd
-        className="numeric mt-0.5 whitespace-nowrap text-[15px] font-medium leading-tight text-ink"
-        style={tone ? { color: tone } : undefined}
-        data-testid={testId}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-/** Colour for a rate that is fine below `warn` and alarming above `alarm`. */
+/** Colour for a value that is fine below `warn` and alarming above `alarm`. */
 function grade(value: number, warn: number, alarm: number): string | undefined {
   if (value >= alarm) return COLOR.critical;
   if (value >= warn) return COLOR.warning;
   return undefined;
 }
 
-/** Platform-wide figures. Every number comes from the latest snapshot. */
-export function Hud() {
+interface PlatformSignal {
+  key: 'rps' | 'p95' | 'errors' | 'saturation';
+  label: string;
+  /** The name it goes by where there is little room. */
+  short: string;
+  value: string;
+  /** The number the marker shows, on the scale `0…max`. */
+  reading: number;
+  max: number;
+  normal: readonly [number, number];
+  /** Set only while the reading is outside its normal range. */
+  tone?: string;
+}
+
+/**
+ * The four signals that say whether a service platform is well: how much
+ * traffic, how slow, how many failures, how full. Each comes with its normal
+ * range, so "is this where it should be?" needs no arithmetic, and takes a
+ * colour only when it has left that range.
+ */
+function usePlatformSignals(): PlatformSignal[] | null {
   const global = useTelemetry((state) => state.snapshot?.global);
-  const baselineP95 = useTelemetry((state) => state.history[0]?.p95LatencyMs);
+  const saturation = useTelemetry((state) => {
+    const values = state.snapshot?.nodes.saturation;
+    if (!values) return 0;
+    let peak = 0;
+    for (const value of values) if (value > peak) peak = value;
+    return peak;
+  });
+  const baseline = useTelemetry((state) => state.history[0]);
   if (!global) return null;
-  const total =
-    global.health.healthy + global.health.degraded + global.health.critical + global.health.down;
-  const latencyTone =
-    baselineP95 !== undefined
-      ? grade(global.p95LatencyMs / Math.max(1, baselineP95), 1.6, 2.5)
-      : undefined;
+  const normalRps = Math.max(1, baseline?.rps ?? global.rps);
+  const normalP95 = Math.max(1, baseline?.p95LatencyMs ?? global.p95LatencyMs);
+  return [
+    {
+      key: 'rps',
+      label: 'Traffic',
+      short: 'Traffic',
+      value: `${formatRate(global.rps)}/s`,
+      reading: global.rps,
+      max: normalRps * 3,
+      normal: [normalRps * 0.6, normalRps * 1.4],
+      tone: grade(global.rps / normalRps, 1.6, 2.5),
+    },
+    {
+      key: 'p95',
+      label: 'Latency p95',
+      short: 'Latency',
+      value: formatMs(global.p95LatencyMs),
+      reading: global.p95LatencyMs,
+      max: normalP95 * 4,
+      normal: [0, normalP95 * 1.6],
+      tone: grade(global.p95LatencyMs / normalP95, 1.6, 2.5),
+    },
+    {
+      key: 'errors',
+      label: 'Errors',
+      short: 'Errors',
+      value: formatPercent(global.errorRate),
+      reading: global.errorRate,
+      max: 0.2,
+      normal: [0, 0.01],
+      tone: grade(global.errorRate, 0.01, 0.05),
+    },
+    {
+      key: 'saturation',
+      label: 'Peak saturation',
+      short: 'Saturation',
+      value: formatPercent(Math.min(1, saturation)),
+      reading: saturation,
+      max: 1,
+      normal: [0, 0.7],
+      tone: grade(saturation, 0.85, 0.97),
+    },
+  ];
+}
+
+/** All four signals, as shown in the platform overview. */
+export function Hud() {
+  const signals = usePlatformSignals();
+  if (!signals) return null;
   return (
     <dl
-      className="panel panel-ticks flex items-stretch divide-x divide-line/70 rounded-md"
-      aria-label="Platform metrics"
+      className="grid grid-cols-2 gap-x-4 gap-y-3"
+      aria-label="Platform signals"
       data-testid="hud"
     >
-      <Metric label="Requests/s" value={formatRate(global.rps)} testId="hud-rps" />
-      <Metric label="Avg latency" value={formatMs(global.avgLatencyMs)} testId="hud-avg" wide />
-      <Metric
-        label="p95"
-        value={formatMs(global.p95LatencyMs)}
-        tone={latencyTone}
-        testId="hud-p95"
-      />
-      <Metric
-        label="p99"
-        value={formatMs(global.p99LatencyMs)}
-        tone={latencyTone}
-        testId="hud-p99"
-      />
-      <Metric
-        label="Errors"
-        value={formatPercent(global.errorRate)}
-        tone={grade(global.errorRate, 0.01, 0.05)}
-        testId="hud-errors"
-      />
-      <Metric
-        label="Denials"
-        value={formatPercent(global.authzDenialRate)}
-        tone={grade(global.authzDenialRate, 0.12, 0.2)}
-        testId="hud-denials"
-      />
-      <Metric
-        label="Incidents"
-        value={String(global.activeIncidents)}
-        tone={global.activeIncidents > 0 ? COLOR.critical : undefined}
-        testId="hud-incidents"
-      />
-      <div className="flex w-[150px] shrink-0 flex-col justify-center px-3 py-1.5">
-        <dt className="eyebrow">Service health</dt>
-        <dd className="mt-1.5">
-          <div className="flex h-1.5 overflow-hidden rounded-full bg-abyss" aria-hidden>
-            {(['healthy', 'degraded', 'critical', 'down'] as const).map((health) =>
-              global.health[health] > 0 ? (
-                <div
-                  key={health}
-                  style={{
-                    width: `${(global.health[health] / Math.max(1, total)) * 100}%`,
-                    backgroundColor: HEALTH_COLOR[health],
-                  }}
-                />
-              ) : null,
-            )}
-          </div>
-          <p className="numeric mt-1 flex gap-2 text-[10px]" data-testid="hud-health">
-            {(['healthy', 'degraded', 'critical', 'down'] as const).map((health) => (
-              <span
-                key={health}
-                style={{ color: HEALTH_COLOR[health] }}
-                title={HEALTH_LABEL[health]}
-              >
-                <span className="sr-only">{HEALTH_LABEL[health]}: </span>
-                {global.health[health]}
-              </span>
-            ))}
-          </p>
-        </dd>
-      </div>
+      {signals.map((signal) => (
+        <div key={signal.key} className="min-w-0">
+          <dt className="caption truncate">{signal.label}</dt>
+          <dd
+            className={cn('numeric text-[15px] leading-snug text-ink', signal.tone && 'font-bold')}
+            style={{ color: signal.tone }}
+            data-testid={`hud-${signal.key}`}
+          >
+            {signal.value}
+          </dd>
+          <RangeBar
+            value={signal.reading}
+            max={signal.max}
+            normal={signal.normal}
+            tone={signal.tone}
+            className="mt-1.5"
+          />
+        </div>
+      ))}
     </dl>
   );
 }
 
-/** One chip per region: status at a glance, click to frame it. */
-export function RegionStrip() {
-  const regions = useTelemetry((state) => state.snapshot?.regions);
-  const topology = useTelemetry((state) => state.topology);
-  if (!regions || !topology) return null;
+/**
+ * The dark cockpit applied to the top bar: an instrument is on show only
+ * while its reading is outside the normal range. With the platform well this
+ * renders nothing; the readings themselves are always in the overview.
+ */
+export function Deviations() {
+  const signals = usePlatformSignals();
+  const abnormal = signals?.filter((signal) => signal.tone) ?? [];
   return (
-    <ul className="flex flex-wrap justify-center gap-1.5" aria-label="Regional status">
-      {regions.map((status) => {
-        const region = topology.regions.find((r) => r.id === status.id);
-        const health: Health = status.health;
-        return (
-          <li key={status.id}>
-            <button
-              type="button"
-              onClick={() => sceneHandle.current?.frameRegion(status.id)}
-              className="panel flex items-center gap-2 rounded-[3px] px-2 py-1 text-[11px] text-ink-dim transition-colors hover:text-ink"
-              title={`${region?.name ?? status.id}: ${HEALTH_LABEL[health]}, ${status.nodesUnhealthy} of ${status.nodesTotal} services unhealthy`}
-              data-testid={`region-${status.id}`}
-              data-health={health}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  'size-1.5 rounded-full',
-                  health !== 'healthy' && 'animate-pulse-soft',
-                )}
-                style={{ backgroundColor: HEALTH_COLOR[health] }}
-              />
-              <span className="font-display font-semibold uppercase tracking-[0.1em]">
-                {region?.name ?? status.id}
-              </span>
-              <span className="sr-only">{HEALTH_LABEL[health]}</span>
-              <span className="numeric text-ink-faint">{formatRate(status.rps)}/s</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <dl className="flex items-center gap-4" aria-label="Signals outside their normal range">
+      {abnormal.map((signal) => (
+        <div
+          key={signal.key}
+          className="min-w-[104px] shrink-0 animate-swap"
+          title={signal.label}
+          data-testid={`deviation-${signal.key}`}
+        >
+          <div className="flex items-baseline justify-between gap-3 whitespace-nowrap">
+            <dt className="caption">{signal.short}</dt>
+            <dd className="numeric text-xs font-bold" style={{ color: signal.tone }}>
+              {signal.value}
+            </dd>
+          </div>
+          <RangeBar
+            value={signal.reading}
+            max={signal.max}
+            normal={signal.normal}
+            tone={signal.tone}
+            className="mt-1"
+          />
+        </div>
+      ))}
+    </dl>
   );
 }

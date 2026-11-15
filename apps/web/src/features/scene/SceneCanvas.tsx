@@ -9,10 +9,17 @@ import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import type * as THREE from 'three/webgpu';
 
 import { sceneHandle } from '@/graphics/handle';
+import { loadPieces, type PieceSet } from '@/graphics/pieces';
 import { QUALITY, type QualityLevel } from '@/graphics/quality';
 import { createRenderer, type Backend } from '@/graphics/renderer';
-import { SceneController, type SceneOptions, type SceneStats } from '@/graphics/SceneController';
+import {
+  FOV,
+  SceneController,
+  type SceneOptions,
+  type SceneStats,
+} from '@/graphics/SceneController';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
+import type { ThemeName } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
@@ -34,11 +41,11 @@ export interface SceneRuntime {
   quality: QualityLevel;
 }
 
-function sceneOptions(): SceneOptions {
+function sceneOptions(theme: ThemeName): SceneOptions {
   const settings = useSettings.getState();
   return {
+    theme,
     quality: settings.quality,
-    bloom: settings.bloom,
     labels: settings.labels,
     autoRotate: settings.autoRotate,
     reducedMotion: prefersReducedMotion(settings.motion),
@@ -47,17 +54,21 @@ function sceneOptions(): SceneOptions {
 
 interface BridgeProps {
   backend: Backend;
+  pieces: PieceSet;
+  theme: ThemeName;
   tooltip: HTMLElement | null;
   onQuality: (level: QualityLevel) => void;
 }
 
-function SceneBridge({ backend, tooltip, onQuality }: BridgeProps) {
+function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps) {
   const gl = useThree((state) => state.gl) as unknown as THREE.WebGPURenderer;
   const scene = useThree((state) => state.scene) as unknown as THREE.Scene;
   const camera = useThree((state) => state.camera) as unknown as THREE.PerspectiveCamera;
   const controller = useRef<SceneController | null>(null);
   const onQualityRef = useRef(onQuality);
   onQualityRef.current = onQuality;
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   useEffect(() => {
     const instance = new SceneController(
@@ -72,7 +83,8 @@ function SceneBridge({ backend, tooltip, onQuality }: BridgeProps) {
         onQuality: (level) => onQualityRef.current(level),
         onTraceEnd: () => useUi.getState().traceDecision(null),
       },
-      sceneOptions(),
+      sceneOptions(themeRef.current),
+      pieces,
     );
     controller.current = instance;
     sceneHandle.current = instance;
@@ -133,7 +145,7 @@ function SceneBridge({ backend, tooltip, onQuality }: BridgeProps) {
           else instance.clearTrace();
         }
       }),
-      useSettings.subscribe(() => instance.setOptions(sceneOptions())),
+      useSettings.subscribe(() => instance.setOptions(sceneOptions(themeRef.current))),
     ];
 
     return () => {
@@ -143,13 +155,17 @@ function SceneBridge({ backend, tooltip, onQuality }: BridgeProps) {
       controller.current = null;
       instance.dispose();
     };
-  }, [gl, scene, camera, backend]);
+  }, [gl, scene, camera, backend, pieces]);
 
   useEffect(() => {
     controller.current?.setTooltipElement(tooltip);
   }, [tooltip]);
 
-  // Priority 1 hands rendering to the controller (it owns post-processing).
+  useEffect(() => {
+    controller.current?.setOptions(sceneOptions(theme));
+  }, [theme]);
+
+  // Priority 1 hands rendering to the controller.
   useFrame((_, delta) => {
     controller.current?.update(delta);
     controller.current?.render();
@@ -181,17 +197,40 @@ class SceneBoundary extends Component<BoundaryProps, { failed: boolean }> {
 }
 
 interface SceneCanvasProps {
+  theme: ThemeName;
   tooltip: HTMLElement | null;
   onRuntime: (runtime: SceneRuntime) => void;
   onUnavailable: (reason: string) => void;
 }
 
-export function SceneCanvas({ tooltip, onRuntime, onUnavailable }: SceneCanvasProps) {
+export function SceneCanvas({ theme, tooltip, onRuntime, onUnavailable }: SceneCanvasProps) {
   const preference = useSettings((state) => state.renderer);
   const [backend, setBackend] = useState<Backend | null>(null);
   const [quality, setQuality] = useState<QualityLevel>('high');
+  const [pieces, setPieces] = useState<PieceSet | null>(null);
   const onRuntimeRef = useRef(onRuntime);
   onRuntimeRef.current = onRuntime;
+  const onUnavailableRef = useRef(onUnavailable);
+  onUnavailableRef.current = onUnavailable;
+
+  // The modelled pieces are part of the scene: without them there is nothing
+  // to stand on the plates, and the application shows its table instead.
+  useEffect(() => {
+    let cancelled = false;
+    loadPieces().then(
+      (loaded) => {
+        if (!cancelled) setPieces(loaded);
+      },
+      (error: unknown) => {
+        if (!cancelled) {
+          onUnavailableRef.current(error instanceof Error ? error.message : String(error));
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (backend) onRuntimeRef.current({ backend, quality });
@@ -213,8 +252,11 @@ export function SceneCanvas({ tooltip, onRuntime, onUnavailable }: SceneCanvasPr
         // switch backends in place.
         key={preference}
         dpr={dpr}
+        // Colours are design tokens and must reach the screen as chosen:
+        // `flat` stops React Three Fiber from switching tone mapping on.
+        flat
         frameloop="always"
-        camera={{ fov: 40, near: 0.5, far: 4000, position: [0, 70, 130] }}
+        camera={{ fov: FOV, near: 2, far: 8000, position: [-120, 190, 270] }}
         gl={async (defaults) => {
           const created = await createRenderer(defaults.canvas as HTMLCanvasElement, preference);
           setBackend(created.backend);
@@ -223,7 +265,15 @@ export function SceneCanvas({ tooltip, onRuntime, onUnavailable }: SceneCanvasPr
         aria-label="Interactive 3D view of the infrastructure topology"
         role="img"
       >
-        {backend && <SceneBridge backend={backend} tooltip={tooltip} onQuality={setQuality} />}
+        {backend && pieces && (
+          <SceneBridge
+            backend={backend}
+            pieces={pieces}
+            theme={theme}
+            tooltip={tooltip}
+            onQuality={setQuality}
+          />
+        )}
       </Canvas>
     </SceneBoundary>
   );

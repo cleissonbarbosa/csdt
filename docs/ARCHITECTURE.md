@@ -223,23 +223,28 @@ loop. Everything inside the canvas is owned by one imperative
 `SceneController`; state reaches it through store subscriptions, so telemetry
 never re-renders a component.
 
-Draw calls follow the number of object classes, not the number of objects (41
-for 51 services, 47 for 178, bloom passes included):
+The scene is a scale model on a table: matte pieces standing on plates,
+connections as hairlines, traffic as beads. Why it looks like that is in
+[DESIGN.md](DESIGN.md); how it is drawn is here.
 
-| What         | How                                                             |
-| ------------ | --------------------------------------------------------------- |
-| Services     | one instanced mesh per service type, procedural geometry        |
-| Health rings | one instanced mesh                                              |
-| Connections  | one instanced mesh of camera-facing ribbons along Bézier curves |
-| Traffic      | one instanced mesh of stateless sprites                         |
-| Labels       | one instanced mesh sampling a canvas text atlas                 |
+Draw calls follow the number of object classes, not the number of objects
+(29 for 51 services, 35 for 178):
 
-**Traffic particles** own only static data: which edge they live on and four
-random seeds. Everything that changes (how many an edge shows, how fast they
-move, what share is errors, rejections or suspicious) lives in a small float
+| What         | How                                                                 |
+| ------------ | ------------------------------------------------------------------- |
+| Pieces       | one instanced mesh per service type, procedural geometry            |
+| Ground marks | one instanced mesh: contact shadow, status lamp, selection ring     |
+| Connections  | one instanced mesh of camera-facing hairlines along Bézier curves   |
+| Traffic      | one instanced mesh of stateless sprites ("beads")                   |
+| Labels       | one instanced mesh sampling a canvas text atlas, constant on screen |
+| Plates       | one mesh per region, plus the shadow it casts                       |
+
+**Beads** own only static data: which edge they live on and four random
+seeds. Everything that changes (how many an edge shows, how fast they move,
+what share is errors, rejections or suspicious) lives in a small float
 texture with one column per edge. The CPU updates that texture, never the
-particles; position, category, colour and size are derived in the vertex
-shader from `time`.
+beads; position, category, shape and colour are derived in the vertex shader
+from `time`. Shapes are signed-distance functions evaluated per fragment.
 
 All materials are written in **TSL**, which compiles to WGSL on the WebGPU
 backend and to GLSL ES 3.0 on the WebGL 2 backend. Nothing depends on compute
@@ -247,17 +252,30 @@ shaders or storage buffers, so the fallback is a different backend running the
 same code rather than a second implementation. If neither API yields a
 renderer, the application shows an accessible table view instead.
 
+**Shading is done by the materials themselves.** They are unlit in the
+engine's sense and compute one fixed studio light, with tone mapping off, so
+a surface facing the light shows exactly the palette colour. The palette is
+a set of uniforms shared by every material (`createSceneTheme`): switching
+between the light and night themes writes new values and rebuilds nothing.
+There is no post-processing; a frame is one pass to the canvas.
+
+**The camera** is a perspective camera with a long lens (14°). Parallel lines
+stay very nearly parallel, as in an axonometric drawing, while orbit, zoom to
+pointer and picking keep a single code path.
+
 **Adaptive quality** watches frame time and steps between four tiers
-(resolution, particle density, bloom, label range). A tier that proved too
-expensive becomes the ceiling so the scene does not oscillate.
+(resolution, bead density, label range). A tier that proved too expensive
+becomes the ceiling so the scene does not oscillate.
 
 ### Layout
 
 `graphics/layout.ts` is a pure function of the topology: no randomness, no
-iteration to convergence. _Regions_ mode arranges cloud regions as platforms
-on a ring around a central pillar holding the global edge; inside a region,
-tiers run outward and step downward, so traffic visibly cascades from the edge
-into data stores. _Dependencies_ mode is a layered left-to-right graph.
+iteration to convergence. Every service stands on a surface: geometry rests
+on a common base plane, and the layout records the height of the ground under
+each node so the scene can draw contact shadows and supports. _Regions_ mode
+arranges cloud regions as plates on a ring around a raised plate holding the
+global edge; inside a region, tiers run outward from the hub. _Dependencies_
+mode is a layered left-to-right graph on a single board.
 
 ### State
 
@@ -265,7 +283,7 @@ into data stores. _Dependencies_ mode is a layered left-to-right graph.
 | ---------------------- | ------------------------------------------------- |
 | `telemetry`            | topology, latest snapshot, events, metric history |
 | `ui`                   | selection, filters, panels, layout and view mode  |
-| `settings` (persisted) | quality, bloom, motion, renderer preference       |
+| `settings` (persisted) | theme, quality, motion, renderer preference       |
 
 TanStack Query holds request/response data (scenarios, providers, policy
 catalogue). The client talks to the server only through the

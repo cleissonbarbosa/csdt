@@ -1,72 +1,137 @@
 @import 'tailwindcss';
 
-@import '@fontsource/chakra-petch/latin-500.css';
-@import '@fontsource/chakra-petch/latin-600.css';
-@import '@fontsource/ibm-plex-sans/latin-400.css';
-@import '@fontsource/ibm-plex-sans/latin-500.css';
-@import '@fontsource/ibm-plex-sans/latin-600.css';
-@import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource/b612/latin-400.css';
+@import '@fontsource/b612/latin-700.css';
+@import '@fontsource/b612-mono/latin-400.css';
 
-/* Obsidian Command Center — design tokens. */
+/*
+ * Sinótico — design tokens.
+ *
+ * Neutral plate, neutral ink. The only hues are the three signals (warning,
+ * critical, hostile) and they are reserved for things that deviate. Values
+ * below are the light theme; the night theme overrides them further down.
+ * Keep `lib/palette.ts` in step: the 3D scene takes its colours from there.
+ */
 @theme {
-  --color-void: #070b14;
-  --color-abyss: #0a101c;
-  --color-surface: #101827;
-  --color-raised: #162033;
-  --color-line: #1e2b42;
-  --color-line-bright: #2c3f5f;
+  --color-plate: #e3e5e4;
+  --color-sunken: #d8dbda;
+  --color-paper: #f3f4f2;
+  --color-raised: #e8eae8;
+  --color-line: #cdd0d0;
+  --color-line-strong: #a4a9ab;
 
-  --color-ink: #eaf2ff;
-  --color-ink-dim: #9fb0cc;
-  --color-ink-faint: #64748f;
+  --color-ink: #191b1d;
+  --color-ink-dim: #4f545a;
+  --color-ink-faint: #676d73;
+  /* Selection, focus and primary actions are ink, never a hue. */
+  --color-accent: #191b1d;
+  --color-on-accent: #f3f4f2;
 
-  --color-cyan: #55e6f2;
-  --color-blue: #4a8dff;
-  --color-violet: #9b7bff;
-  --color-magenta: #ff5fd2;
-  --color-healthy: #45d6a0;
-  --color-warning: #ffbf69;
-  --color-critical: #ff6178;
-  --color-down: #6b7890;
+  --color-warning: #9a5c00;
+  --color-critical: #c8231a;
+  --color-hostile: #a81577;
 
-  --font-display: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+  /* B612 was drawn for aircraft cockpit displays: legible, unglamorous. */
+  --font-sans: 'B612', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'B612 Mono', ui-monospace, 'SFMono-Regular', monospace;
 
-  --animate-rise: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-pulse-soft: pulse-soft 2.2s ease-in-out infinite;
-  --animate-sweep: sweep 1.6s linear infinite;
+  /*
+   * Motion. One curve for things that arrive (fast out of the gate, a long
+   * settle) and one for things that travel between two places. Everything
+   * here runs once, in answer to an action or a change in the data.
+   */
+  --ease-arrive: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-travel: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --animate-rise: rise 160ms var(--ease-arrive) both;
+  /* Content that replaces other content in place. */
+  --animate-swap: swap 240ms var(--ease-arrive) both;
+  --animate-fade: fade 140ms linear both;
+  --animate-attention: attention 1s steps(2, jump-none) infinite;
 
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(4px);
     }
     to {
       opacity: 1;
       transform: none;
     }
   }
-  @keyframes pulse-soft {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.45;
-    }
-  }
-  @keyframes sweep {
+  @keyframes swap {
     from {
-      transform: translateX(-100%);
+      opacity: 0;
+      transform: translateY(7px);
     }
     to {
-      transform: translateX(100%);
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  /* The one looping animation: an alarm nobody has acknowledged yet. */
+  @keyframes attention {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.35;
     }
   }
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  :root[data-theme='night'] {
+    color-scheme: dark;
+    --color-plate: #1d1f20;
+    --color-sunken: #151718;
+    --color-paper: #26282a;
+    --color-raised: #303335;
+    --color-line: #3a3d40;
+    --color-line-strong: #5a5f63;
+    --color-ink: #ecedec;
+    --color-ink-dim: #b4b9bc;
+    --color-ink-faint: #8f9599;
+    --color-accent: #ecedec;
+    --color-on-accent: #1d1f20;
+    --color-warning: #ffb224;
+    --color-critical: #ff5d4f;
+    --color-hostile: #f26bc4;
+  }
+
+  /* Before the script has applied the stored preference, follow the system. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      color-scheme: dark;
+      --color-plate: #1d1f20;
+      --color-sunken: #151718;
+      --color-paper: #26282a;
+      --color-raised: #303335;
+      --color-line: #3a3d40;
+      --color-line-strong: #5a5f63;
+      --color-ink: #ecedec;
+      --color-ink-dim: #b4b9bc;
+      --color-ink-faint: #8f9599;
+      --color-accent: #ecedec;
+      --color-on-accent: #1d1f20;
+      --color-warning: #ffb224;
+      --color-critical: #ff5d4f;
+      --color-hostile: #f26bc4;
+    }
+  }
+
   html,
   body,
   #root {
@@ -76,7 +141,7 @@
   body {
     margin: 0;
     overflow: hidden;
-    background: var(--color-void);
+    background: var(--color-plate);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 13px;
@@ -86,12 +151,12 @@
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--color-cyan) 35%, transparent);
+    background: color-mix(in oklab, var(--color-ink) 22%, transparent);
   }
 
   /* One consistent, clearly visible focus treatment for keyboard users. */
   :focus-visible {
-    outline: 2px solid var(--color-cyan);
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
     border-radius: 3px;
   }
@@ -108,67 +173,115 @@
     cursor: not-allowed;
   }
 
+  select,
+  input {
+    color-scheme: inherit;
+  }
+
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-line-bright) transparent;
+    scrollbar-color: var(--color-line-strong) transparent;
   }
 }
 
 @layer components {
-  /* Instrument panel floating over the scene.
-     Deliberately no `backdrop-filter`: blurring what is behind a panel makes
-     the compositor re-sample the 3D canvas under it every frame, which was
-     measured to cost more than rendering the scene itself (docs/PERFORMANCE.md).
-     A nearly opaque gradient gives the same read for free. */
+  /*
+   * A sheet of paper lying on the plate.
+   *
+   * No blur, gradient or shadow. `backdrop-filter` in particular is out:
+   * blurring what is behind a panel makes the compositor re-sample the 3D
+   * canvas under it every frame, which was measured to cost more than
+   * rendering the scene itself (docs/PERFORMANCE.md).
+   */
   .panel {
     position: relative;
-    background: linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--color-surface) 94%, transparent),
-      color-mix(in oklab, var(--color-abyss) 96%, transparent)
-    );
-    border: 1px solid color-mix(in oklab, var(--color-line-bright) 70%, transparent);
-    box-shadow:
-      0 1px 0 0 rgb(255 255 255 / 0.04) inset,
-      0 18px 50px -18px rgb(0 0 0 / 0.8);
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
   }
 
-  /* Bracket ticks at the corners: the "holographic" frame. */
-  .panel-ticks::before,
-  .panel-ticks::after {
-    content: '';
-    position: absolute;
-    width: 10px;
-    height: 10px;
+  /*
+   * A panel that is summoned: it slides in from the edge it belongs to and
+   * leaves the same way. `data-state` is driven by `usePresence`.
+   */
+  .sheet {
+    transition:
+      transform 240ms var(--ease-arrive),
+      opacity 180ms linear;
+  }
+  .sheet[data-state='closed'] {
+    opacity: 0;
     pointer-events: none;
-    border-color: color-mix(in oklab, var(--color-cyan) 70%, transparent);
   }
-  .panel-ticks::before {
-    top: -1px;
-    left: -1px;
-    border-top: 1px solid;
-    border-left: 1px solid;
+  .sheet[data-side='left'][data-state='closed'] {
+    transform: translateX(-20px);
   }
-  .panel-ticks::after {
-    right: -1px;
-    bottom: -1px;
-    border-right: 1px solid;
-    border-bottom: 1px solid;
+  .sheet[data-side='right'][data-state='closed'] {
+    transform: translateX(20px);
   }
 
-  .eyebrow {
-    font-family: var(--font-display);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+  /* The sections of a freshly shown panel arrive one after another. */
+  .cascade > * {
+    animation: swap 260ms var(--ease-arrive) both;
+  }
+  .cascade > :nth-child(2) {
+    animation-delay: 35ms;
+  }
+  .cascade > :nth-child(3) {
+    animation-delay: 70ms;
+  }
+  .cascade > :nth-child(4) {
+    animation-delay: 105ms;
+  }
+  .cascade > :nth-child(5) {
+    animation-delay: 140ms;
+  }
+  .cascade > :nth-child(n + 6) {
+    animation-delay: 175ms;
+  }
+
+  /*
+   * The timeline is a thin strip until it is reached for; then it opens
+   * upward, over the scene, into the full chart.
+   */
+  .timeline-track {
+    height: 18px;
+    transition: height 200ms var(--ease-arrive);
+  }
+  .timeline-slot:hover .timeline-track,
+  .timeline-track:focus-visible,
+  .timeline-track[data-dragging='true'] {
+    height: 60px;
+  }
+  .timeline-track .timeline-ends {
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .timeline-slot:hover .timeline-ends,
+  .timeline-track:focus-visible .timeline-ends,
+  .timeline-track[data-dragging='true'] .timeline-ends {
+    opacity: 1;
+  }
+
+  /* A quiet label next to the thing it names. */
+  .caption {
+    font-size: 11px;
+    line-height: 1.35;
     color: var(--color-ink-faint);
   }
 
+  /*
+   * Figures that are compared or change in place keep their columns. B612's
+   * digits all share one width, so this needs no monospace face: punctuation
+   * stays tight and a number reads as a number.
+   */
   .numeric {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+  }
+
+  /* Things that are literally code: identifiers, policy source, JSON. */
+  .code {
+    font-family: var(--font-mono);
+    letter-spacing: -0.03em;
   }
 }
 

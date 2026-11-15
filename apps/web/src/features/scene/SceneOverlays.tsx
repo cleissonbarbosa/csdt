@@ -22,7 +22,7 @@ export function SceneToolbar() {
   const filters = useUi((state) => state.filters);
   return (
     <div
-      className="panel flex items-center gap-1.5 rounded-md p-1"
+      className="panel flex items-center gap-1.5 rounded-[3px] p-1"
       role="toolbar"
       aria-label="Scene controls"
     >
@@ -70,17 +70,23 @@ export function HoverCard() {
   if (!node || i === undefined) return null;
   const health = HEALTH_BY_CODE[snapshot?.nodes.health[i] ?? 0] ?? node.metrics.health;
   return (
-    <div className="panel -translate-x-1/2 -translate-y-[calc(100%+22px)] whitespace-nowrap rounded-[4px] px-2.5 py-1.5">
-      <p className="eyebrow" style={{ color: SERVICE_TYPE[node.serviceType].color }}>
-        {SERVICE_TYPE[node.serviceType].label}
-      </p>
-      <p className="font-display text-sm font-semibold text-ink">{node.name}</p>
-      <div className="mt-1 flex items-center gap-2">
-        <HealthBadge health={health} />
-        <span className="numeric text-[10px] text-ink-dim">
-          {formatRate(snapshot?.nodes.throughputRps[i] ?? 0)}/s ·{' '}
-          {formatMs(snapshot?.nodes.latencyMs[i] ?? 0)}
-        </span>
+    <div
+      // Keyed by the service so the card arrives again for each new piece.
+      key={hoveredId}
+      className="-translate-x-1/2 -translate-y-[calc(100%+22px)]"
+    >
+      <div className="panel animate-rise whitespace-nowrap rounded-[3px] px-2.5 py-1.5">
+        <p className="text-xs font-bold text-ink">{node.name}</p>
+        <p className="caption">{SERVICE_TYPE[node.serviceType].label}</p>
+        <p className="mt-1 flex items-center gap-2.5 text-[11px]">
+          {health !== 'healthy' && <HealthBadge health={health} />}
+          <span className="numeric text-ink-dim">
+            {formatRate(snapshot?.nodes.throughputRps[i] ?? 0)}/s
+          </span>
+          <span className="numeric text-ink-dim">
+            {formatMs(snapshot?.nodes.latencyMs[i] ?? 0)}
+          </span>
+        </p>
       </div>
     </div>
   );
@@ -100,8 +106,8 @@ export function Notices() {
           key={notice.id}
           type="button"
           onClick={() => useNotices.getState().dismiss(notice.id)}
-          className={`panel pointer-events-auto max-w-md animate-rise rounded-md px-3 py-1.5 text-left text-xs ${
-            notice.tone === 'error' ? 'text-critical' : 'text-ink'
+          className={`panel pointer-events-auto max-w-md animate-rise rounded-[3px] px-3 py-1.5 text-left text-xs ${
+            notice.tone === 'error' ? 'font-bold text-critical' : 'text-ink'
           }`}
         >
           {notice.message}

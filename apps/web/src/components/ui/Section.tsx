@@ -15,9 +15,9 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn('border-b border-line/70 px-3 py-3 last:border-b-0', className)}>
-      <header className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="eyebrow">{title}</h3>
+    <section className={cn('border-b border-line px-3 py-3 last:border-b-0', className)}>
+      <header className="mb-2 flex items-baseline justify-between gap-2">
+        <h3 className="text-xs font-bold text-ink">{title}</h3>
         {aside}
       </header>
       {children}
@@ -42,13 +42,13 @@ export function Stat({
 }) {
   return (
     <div className={cn('min-w-0', className)}>
-      <dt className="eyebrow truncate">{label}</dt>
+      <dt className="caption truncate">{label}</dt>
       <dd
-        className="numeric mt-0.5 truncate text-sm font-medium text-ink"
+        className="numeric mt-0.5 truncate text-sm text-ink"
         style={tone ? { color: tone } : undefined}
       >
         {value}
-        {unit && <span className="ml-1 text-[10px] font-normal text-ink-faint">{unit}</span>}
+        {unit && <span className="ml-1 text-[11px] text-ink-faint">{unit}</span>}
       </dd>
     </div>
   );
@@ -57,10 +57,8 @@ export function Stat({
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="px-4 py-8 text-center">
-      <p className="font-display text-xs font-semibold uppercase tracking-[0.12em] text-ink-dim">
-        {title}
-      </p>
-      {children && <p className="mx-auto mt-2 max-w-[28ch] text-xs text-ink-faint">{children}</p>}
+      <p className="text-xs font-bold text-ink-dim">{title}</p>
+      {children && <p className="mx-auto mt-2 max-w-[30ch] text-xs text-ink-faint">{children}</p>}
     </div>
   );
 }

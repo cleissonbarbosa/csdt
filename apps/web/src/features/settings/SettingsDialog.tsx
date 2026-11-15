@@ -8,6 +8,7 @@ import {
   type MotionSetting,
   type QualitySetting,
   type RendererSetting,
+  type ThemeSetting,
 } from '@/stores/ui';
 
 function Row({
@@ -30,6 +31,11 @@ function Row({
   );
 }
 
+const THEME: { value: ThemeSetting; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'night', label: 'Night' },
+];
 const QUALITY: { value: QualitySetting; label: string }[] = [
   { value: 'auto', label: 'Auto' },
   { value: 'low', label: 'Low' },
@@ -63,7 +69,20 @@ export function SettingsDialog() {
       description="Preferences are stored in this browser only."
       width="max-w-xl"
     >
-      <h3 className="eyebrow mb-1">Scene</h3>
+      <h3 className="mb-1 text-xs font-bold text-ink">Appearance</h3>
+      <Row
+        label="Theme"
+        hint="Light for a lit room, night for a dark one. Both follow the same rule: colour means something is wrong."
+      >
+        <Segmented
+          label="Theme"
+          value={settings.theme}
+          options={THEME}
+          onChange={(value) => settings.set('theme', value)}
+        />
+      </Row>
+
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Model</h3>
       <Row
         label="Topology layout"
         hint="Cluster by cloud region, or lay services out by dependency tier."
@@ -77,7 +96,7 @@ export function SettingsDialog() {
       </Row>
       <Row
         label="Rendering quality"
-        hint="Auto lowers resolution and particle density when frames get slow, and raises them back."
+        hint="Auto lowers resolution and bead density when frames get slow, and raises them back."
       >
         <Segmented
           label="Rendering quality"
@@ -98,28 +117,22 @@ export function SettingsDialog() {
         />
       </Row>
       <Switch
-        label="Bloom"
-        hint="Glow around bright accents."
-        checked={settings.bloom}
-        onCheckedChange={(v) => settings.set('bloom', v)}
-      />
-      <Switch
         label="Labels"
-        hint="Service and region names in the scene."
+        hint="Service and region names in the model."
         checked={settings.labels}
         onCheckedChange={(v) => settings.set('labels', v)}
       />
       <Switch
         label="Idle camera drift"
-        hint="Slow orbit until you move the camera."
+        hint="Turns the model slowly until you move the camera. Off by default."
         checked={settings.autoRotate}
         onCheckedChange={(v) => settings.set('autoRotate', v)}
       />
 
-      <h3 className="eyebrow mb-1 mt-5">Accessibility</h3>
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Accessibility</h3>
       <Row
         label="Motion"
-        hint="Reduced motion stops camera animation, spinning, pulsing and interface transitions."
+        hint="Reduced motion stops camera animation, the blink of a new alarm and interface transitions."
       >
         <Segmented
           label="Motion"
@@ -129,10 +142,10 @@ export function SettingsDialog() {
         />
       </Row>
 
-      <h3 className="eyebrow mb-1 mt-5">Developer</h3>
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Developer</h3>
       <Switch
         label="Performance overlay"
-        hint="Frame rate, frame time, draw calls, particle count and backend."
+        hint="Frame rate, frame time, draw calls, bead count and backend."
         checked={settings.devOverlay}
         onCheckedChange={(v) => settings.set('devOverlay', v)}
       />

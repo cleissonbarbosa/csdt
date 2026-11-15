@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { actions } from '@/app/actions';
 import { queryKeys } from '@/app/queryClient';
-import { Badge, SourceBadge } from '@/components/ui/Badge';
+import { SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/Section';
@@ -13,13 +13,14 @@ import { COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
-const STATE: Record<IntegrationState, { label: string; color: string }> = {
-  active: { label: 'Active', color: COLOR.healthy },
-  'not-configured': { label: 'Not configured', color: COLOR.inkFaint },
-  available: { label: 'Available', color: COLOR.cyan },
+/** A provider's state is plain text unless it is trying or failing. */
+const STATE: Record<IntegrationState, { label: string; color?: string; quiet?: boolean }> = {
+  active: { label: 'Active' },
+  'not-configured': { label: 'Not configured', quiet: true },
+  available: { label: 'Available' },
   connecting: { label: 'Connecting', color: COLOR.warning },
-  connected: { label: 'Connected', color: COLOR.healthy },
-  imported: { label: 'Imported', color: COLOR.healthy },
+  connected: { label: 'Connected' },
+  imported: { label: 'Imported' },
   error: { label: 'Error', color: COLOR.critical },
 };
 
@@ -51,22 +52,25 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
     provider.state === 'connecting';
   return (
     <li
-      className="rounded-[4px] border border-line p-3"
+      className="rounded-[3px] border border-line p-3"
       data-testid={`provider-${provider.id}`}
       data-state={provider.state}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-display text-sm font-semibold text-ink">{provider.name}</h3>
-          <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-            {KIND[provider.kind]}
-          </p>
+          <h3 className="text-sm font-bold text-ink">{provider.name}</h3>
+          <p className="mt-0.5 text-[11px] text-ink-faint">{KIND[provider.kind]}</p>
         </div>
         <div className="flex items-center gap-1.5">
           <SourceBadge source={provider.dataSource} />
-          <Badge color={state.color} dot pulse={provider.state === 'connecting'}>
+          <span
+            className={
+              state.quiet ? 'text-[11px] text-ink-faint' : 'text-[11px] font-bold text-ink'
+            }
+            style={{ color: state.color }}
+          >
             {state.label}
-          </Badge>
+          </span>
         </div>
       </div>
       <p className="mt-2 text-xs leading-relaxed text-ink-dim">{provider.description}</p>
@@ -80,7 +84,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
                 href={provider.repository}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="inline-flex max-w-full items-center gap-1 truncate text-cyan hover:underline"
+                className="inline-flex max-w-full items-center gap-1 truncate text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
               >
                 {provider.repository.replace('https://github.com/', '')}
                 <ExternalLink size={11} aria-hidden />

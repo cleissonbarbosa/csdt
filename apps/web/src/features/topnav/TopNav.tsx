@@ -1,3 +1,4 @@
+import type { Health } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -12,47 +13,135 @@ import {
 
 import { actions } from '@/app/actions';
 import { queryKeys } from '@/app/queryClient';
-import { Badge, SourceBadge, StatusDot } from '@/components/ui/Badge';
+import { HealthGlyph } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
+import { Deviations } from '@/features/hud/Hud';
 import { cn } from '@/lib/cn';
-import { COLOR } from '@/lib/palette';
+import { COLOR, DATA_SOURCE_HINT, DATA_SOURCE_LABEL, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
 import { Logo } from './Logo';
 
+/**
+ * The state of the platform in one sentence.
+ *
+ * While everything is normal it says so, quietly. When something is wrong it
+ * names it, in the colour of its severity, and leads to the details: the
+ * cockpit's master caution, then the system, then the fault. A new incident
+ * blinks until the viewer has looked at it.
+ */
+function PlatformStatus() {
+  const global = useTelemetry((state) => state.snapshot?.global);
+  const incident = useTelemetry((state) => state.snapshot?.incident ?? null);
+  const topology = useTelemetry((state) => state.topology);
+  const acknowledged = useUi((state) => state.acknowledgedIncidentId);
+  const { data: scenarios } = useQuery({ queryKey: queryKeys.scenarios, queryFn: api.scenarios });
+  if (!global || !topology) return null;
+
+  const unhealthy = global.health.degraded + global.health.critical + global.health.down;
+  const total = unhealthy + global.health.healthy;
+  const worst: Health =
+    global.health.down > 0
+      ? 'down'
+      : global.health.critical > 0
+        ? 'critical'
+        : global.health.degraded > 0
+          ? 'degraded'
+          : 'healthy';
+
+  let sentence = `${total} services, all normal`;
+  let level: Health = 'healthy';
+  if (incident && incident.status !== 'resolved') {
+    const scenario = scenarios?.scenarios.find((s) => s.id === incident.scenarioId);
+    const affected = incident.impactedNodeIds.length;
+    // Name the incident and where it stands; the count says how far it reaches.
+    sentence = `${scenario?.name ?? 'Incident'}: ${incident.phaseName.toLowerCase()}, ${affected} service${affected === 1 ? '' : 's'} affected`;
+    level = worst === 'healthy' ? 'degraded' : worst;
+  } else if (unhealthy > 0) {
+    sentence = `${unhealthy} of ${total} services not normal`;
+    level = worst;
+  }
+  const abnormal = level !== 'healthy';
+  const fresh = incident !== null && incident.status !== 'resolved' && incident.id !== acknowledged;
+
+  const phase = incident && incident.status !== 'resolved' ? incident.phaseName : '';
+  return (
+    // The live region wraps the button, so the sentence is announced when it
+    // changes and the control keeps its own role.
+    <div role="status" aria-live="polite" className="min-w-0">
+      <button
+        type="button"
+        className={cn(
+          'flex min-w-0 max-w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left text-xs transition-colors hover:bg-raised',
+          abnormal ? 'font-bold' : 'text-ink-dim hover:text-ink',
+        )}
+        style={abnormal ? { color: HEALTH_COLOR[level] } : undefined}
+        title={abnormal ? 'Show the incident' : 'Show the platform overview'}
+        onClick={() => {
+          const ui = useUi.getState();
+          if (abnormal) {
+            ui.acknowledgeIncident(incident?.id ?? null);
+            ui.setLeftTab('incidents');
+          } else {
+            // The overview is the inspector with nothing selected.
+            ui.select(null);
+            ui.setPanel(null);
+            ui.setInspectorOpen(true);
+          }
+        }}
+        data-testid="platform-status"
+        data-level={level}
+        data-incidents={global.activeIncidents}
+      >
+        {/* Keyed by what happened, not by the counts, so the sentence is
+          replaced with a movement when the situation changes and simply
+          updates while it develops. */}
+        <span key={`${level}:${phase}`} className="flex min-w-0 animate-swap items-center gap-2">
+          {abnormal && (
+            <span className={cn('inline-flex', fresh && 'animate-attention')}>
+              <HealthGlyph health={level} size={10} />
+            </span>
+          )}
+          <span className="truncate">{sentence}</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** Says nothing while the stream is healthy; speaks up when it is not. */
 function ConnectionHealth() {
   const connection = useTelemetry((state) => state.connection);
-  const latency = useTelemetry((state) => state.latencyMs);
   const view = {
-    open: { color: COLOR.healthy, label: 'Stream live', pulse: false },
-    connecting: { color: COLOR.warning, label: 'Connecting', pulse: true },
-    reconnecting: { color: COLOR.warning, label: 'Reconnecting', pulse: true },
-    idle: { color: COLOR.down, label: 'Offline', pulse: false },
-    closed: { color: COLOR.critical, label: 'Disconnected', pulse: false },
+    open: { label: 'Stream live', tone: undefined },
+    connecting: { label: 'Connecting', tone: COLOR.warning },
+    reconnecting: { label: 'Reconnecting', tone: COLOR.warning },
+    idle: { label: 'Offline', tone: COLOR.warning },
+    closed: { label: 'Disconnected', tone: COLOR.critical },
   }[connection];
   return (
-    <div
-      className="flex items-center gap-2 rounded-[3px] border border-line px-2 py-1"
+    <span
+      className={cn('text-[11px]', view.tone ? 'font-bold' : 'sr-only')}
+      style={{ color: view.tone }}
       role="status"
       aria-live="polite"
       data-testid="connection-health"
       data-state={connection}
     >
-      <StatusDot color={view.color} pulse={view.pulse} label={view.label} />
-      <span className="hidden text-[11px] text-ink-dim sm:inline">{view.label}</span>
-      {connection === 'open' && latency !== null && (
-        <span className="numeric text-[10px] text-ink-faint" title="Stream round-trip time">
-          {latency < 1 ? '<1' : latency.toFixed(0)} ms
-        </span>
-      )}
-    </div>
+      {view.label}
+    </span>
   );
 }
 
-function ModeSwitch() {
+/**
+ * Where the data comes from, in words: simulation, and any live adapters.
+ * The statement is also the way to the integrations that could change it.
+ */
+function Provenance() {
+  const topology = useTelemetry((state) => state.topology);
   const { data: providers } = useQuery({
     queryKey: queryKeys.providers,
     queryFn: api.providers,
@@ -63,23 +152,12 @@ function ModeSwitch() {
   const live =
     providers?.filter((p) => p.kind === 'live-adapter' && p.state === 'connected').length ?? 0;
   const connected = live > 0;
+  const hint = connected
+    ? `${live} local integration${live === 1 ? '' : 's'} connected alongside the simulation.`
+    : (topology && DATA_SOURCE_HINT[topology.dataSource]) ||
+      'Everything shown is produced by the built-in simulation.';
   return (
-    <div
-      className="flex items-center gap-1.5"
-      data-testid="mode-switch"
-      data-mode={connected ? 'connected' : 'demo'}
-    >
-      <Badge
-        color={connected ? COLOR.healthy : COLOR.cyan}
-        dot
-        title={
-          connected
-            ? `${live} local integration${live === 1 ? '' : 's'} connected alongside the simulation.`
-            : 'Everything shown is produced by the built-in simulation.'
-        }
-      >
-        {connected ? `Connected · ${live} live` : 'Demo mode'}
-      </Badge>
+    <div data-testid="mode-switch" data-mode={connected ? 'connected' : 'demo'}>
       <Button
         size="sm"
         variant="ghost"
@@ -87,9 +165,14 @@ function ModeSwitch() {
         pressed={openPanel === 'integrations'}
         onClick={() => setPanel('integrations')}
         aria-label="Integrations"
+        title={`${hint} Open integrations.`}
         data-testid="open-integrations"
       >
-        <span className="hidden lg:inline">Integrations</span>
+        <span className="hidden lg:inline">
+          {connected
+            ? `Simulation with ${live} live integration${live === 1 ? '' : 's'}`
+            : `${topology ? DATA_SOURCE_LABEL[topology.dataSource] : 'Synthetic'} data, simulated`}
+        </span>
       </Button>
     </div>
   );
@@ -105,12 +188,12 @@ function TopologyPicker() {
       hideLabel
       value={topology.id}
       onChange={(event) => void actions.selectTopology(event.target.value)}
-      className="w-60"
+      className="w-44"
       data-testid="topology-picker"
     >
       {data.topologies.map((t) => (
         <option key={t.id} value={t.id}>
-          {t.name} · {t.nodeCount} services
+          {t.name}
         </option>
       ))}
     </Select>
@@ -118,7 +201,6 @@ function TopologyPicker() {
 }
 
 export function TopNav() {
-  const topology = useTelemetry((state) => state.topology);
   const viewMode = useUi((state) => state.viewMode);
   const setViewMode = useUi((state) => state.setViewMode);
   const openPanel = useUi((state) => state.openPanel);
@@ -129,40 +211,49 @@ export function TopNav() {
   const setInspectorOpen = useUi((state) => state.setInspectorOpen);
 
   return (
-    <header className="panel relative z-30 flex h-12 shrink-0 items-center gap-3 border-x-0 border-t-0 px-3">
+    // On a narrow screen the controls drop to a second row, so the sentence
+    // that says how the platform is keeps its place.
+    <header className="relative z-30 flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 border-b border-line bg-paper px-2">
       <IconButton
         label={explorerOpen ? 'Hide explorer' : 'Show explorer'}
         pressed={explorerOpen}
         onClick={() => setExplorerOpen(!explorerOpen)}
+        data-testid="toggle-explorer"
       >
         <PanelLeft size={16} />
       </IconButton>
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 text-ink">
         <Logo />
-        <div className="leading-none">
-          <h1 className="font-display text-[15px] font-semibold tracking-[0.34em] text-ink">
-            AEGIS
-          </h1>
-          <p className="mt-1 hidden text-[9px] uppercase tracking-[0.2em] text-ink-faint xl:block">
-            Cloud security digital twin
-          </p>
+        <h1 className="text-sm font-bold">AEGIS</h1>
+      </div>
+
+      <div className="hidden md:block">
+        <TopologyPicker />
+      </div>
+      <div className="flex min-w-0 flex-[1_1_11rem] items-center gap-5">
+        <PlatformStatus />
+        <div className="hidden shrink-0 md:block">
+          <Deviations />
         </div>
       </div>
 
-      <div className="mx-1 hidden h-6 w-px bg-line md:block" aria-hidden />
-      <div className="hidden items-center gap-2 md:flex">
-        <TopologyPicker />
-        {topology && <SourceBadge source={topology.dataSource} />}
-      </div>
-
-      <div className="ml-auto flex items-center gap-2">
-        <ModeSwitch />
+      <div className="ml-auto flex h-11 shrink-0 items-center gap-1.5">
         <ConnectionHealth />
-        <div className="mx-0.5 h-6 w-px bg-line" aria-hidden />
+        <button
+          type="button"
+          onClick={() => useUi.getState().setCommandOpen(true)}
+          className="hidden h-7 items-center gap-2 rounded-[3px] border border-line px-2 text-[11px] text-ink-faint transition-colors hover:border-line-strong hover:text-ink xl:flex"
+          aria-label="Go to anything"
+          data-testid="open-command"
+        >
+          Go to
+          <kbd className="code text-[10px]">Ctrl K</kbd>
+        </button>
+        <Provenance />
         <div
           role="radiogroup"
           aria-label="Topology view"
-          className="flex overflow-hidden rounded-[3px] border border-line-bright"
+          className="flex overflow-hidden rounded-[3px] border border-line-strong"
         >
           {(
             [
@@ -179,13 +270,13 @@ export function TopNav() {
               title={label}
               onClick={() => setViewMode(mode)}
               className={cn(
-                'flex size-8 items-center justify-center border-r border-line-bright transition-colors last:border-r-0',
+                'flex size-7 items-center justify-center border-r border-line-strong transition-colors last:border-r-0',
                 viewMode === mode
-                  ? 'bg-cyan/20 text-cyan'
-                  : 'text-ink-dim hover:bg-raised hover:text-ink',
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-paper text-ink-dim hover:bg-raised hover:text-ink',
               )}
             >
-              <Icon size={15} aria-hidden />
+              <Icon size={14} aria-hidden />
             </button>
           ))}
         </div>
@@ -193,6 +284,7 @@ export function TopNav() {
           label="Authorization explorer"
           pressed={openPanel === 'authorization'}
           onClick={() => togglePanel('authorization')}
+          data-testid="open-authorization"
         >
           <KeyRound size={16} />
         </IconButton>
@@ -214,6 +306,7 @@ export function TopNav() {
           label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
           pressed={inspectorOpen}
           onClick={() => setInspectorOpen(!inspectorOpen)}
+          data-testid="toggle-inspector"
         >
           <PanelRight size={16} />
         </IconButton>

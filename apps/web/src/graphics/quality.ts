@@ -13,19 +13,17 @@ export const QUALITY_ORDER: readonly QualityLevel[] = ['low', 'medium', 'high', 
 export interface QualityProfile {
   /** Upper bound on the device pixel ratio. */
   maxDpr: number;
-  /** Multiplier on traffic particle density. */
+  /** Multiplier on traffic bead density. */
   particles: number;
-  bloom: boolean;
-  stars: boolean;
   /** Multiplier on the distance at which labels fade out. */
   labelRange: number;
 }
 
 export const QUALITY: Record<QualityLevel, QualityProfile> = {
-  ultra: { maxDpr: 2, particles: 1, bloom: true, stars: true, labelRange: 1.15 },
-  high: { maxDpr: 1.5, particles: 0.72, bloom: true, stars: true, labelRange: 1 },
-  medium: { maxDpr: 1, particles: 0.45, bloom: true, stars: true, labelRange: 0.85 },
-  low: { maxDpr: 0.75, particles: 0.24, bloom: false, stars: false, labelRange: 0.7 },
+  ultra: { maxDpr: 2, particles: 1, labelRange: 1.15 },
+  high: { maxDpr: 1.5, particles: 0.72, labelRange: 1 },
+  medium: { maxDpr: 1, particles: 0.45, labelRange: 0.85 },
+  low: { maxDpr: 0.75, particles: 0.24, labelRange: 0.7 },
 };
 
 /** Frame time above which the scene is considered to be struggling (~45 fps). */

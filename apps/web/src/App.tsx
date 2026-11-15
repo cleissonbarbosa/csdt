@@ -1,13 +1,15 @@
 import * as Tabs from '@radix-ui/react-tabs';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
 import { useAegisConnection } from '@/app/useAegisConnection';
+import { usePresence } from '@/app/usePresence';
+import { useTheme } from '@/app/useTheme';
 import { Button } from '@/components/ui/Button';
 import { AuthorizationExplorer } from '@/features/authorization/AuthorizationExplorer';
+import { CommandPalette } from '@/features/command/CommandPalette';
 import { Explorer } from '@/features/explorer/Explorer';
 import { HelpDialog } from '@/features/help/HelpDialog';
-import { Hud, RegionStrip } from '@/features/hud/Hud';
 import { Inspector } from '@/features/inspector/Inspector';
 import { IntegrationsDialog } from '@/features/integrations/IntegrationsDialog';
 import { ScenarioConsole } from '@/features/scenarios/ScenarioConsole';
@@ -29,12 +31,67 @@ import { cn } from '@/lib/cn';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
-const LEFT_WIDTH = 304;
-const RIGHT_WIDTH = 344;
-const GUTTER = 8;
+const LEFT_WIDTH = 300;
+const RIGHT_WIDTH = 340;
+/** Space between a sheet and the edges of the stage it floats over. */
+const GUTTER = 12;
+/** Room the scene keeps clear at the top (its toolbar) and the bottom. */
+const TOP_INSET = 28;
+const BOTTOM_INSET = 8;
 
 const tabClass =
-  'flex-1 border-b-2 border-transparent px-3 py-2 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint transition-colors hover:text-ink data-[state=active]:border-cyan data-[state=active]:text-ink';
+  'relative z-10 flex-1 px-3 py-2 text-xs text-ink-faint transition-colors hover:text-ink data-[state=active]:font-bold data-[state=active]:text-ink';
+
+/**
+ * A panel that is called for rather than always there: a sheet of paper laid
+ * on the stage, clear of its edges, sliding in from the side it belongs to.
+ */
+function Sheet({
+  side,
+  open,
+  width,
+  label,
+  children,
+}: {
+  side: 'left' | 'right';
+  open: boolean;
+  width: number;
+  label: string;
+  children: ReactNode;
+}) {
+  const presence = usePresence(open);
+  if (!presence.mounted) return null;
+  return (
+    <aside
+      className="sheet panel absolute z-20 flex flex-col overflow-hidden rounded-[3px]"
+      data-side={side}
+      data-state={presence.state}
+      // Out of reach while it leaves; reachable from the first frame it is
+      // asked for, so focus can be sent into it straight away.
+      inert={!open}
+      style={{
+        width: `min(${width}px, calc(100% - ${GUTTER * 2}px))`,
+        top: GUTTER,
+        bottom: GUTTER,
+        [side]: GUTTER,
+      }}
+      aria-label={label}
+    >
+      {children}
+    </aside>
+  );
+}
+
+/** The line under the active tab; it travels when the tab changes. */
+function TabMarker({ index, count }: { index: number; count: number }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute bottom-0 left-0 h-0.5 bg-ink transition-transform duration-200 ease-travel"
+      style={{ width: `${100 / count}%`, transform: `translateX(${index * 100}%)` }}
+    />
+  );
+}
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -44,6 +101,13 @@ function isTyping(target: EventTarget | null): boolean {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // The command palette opens from anywhere, including while typing.
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const state = useUi.getState();
+        state.setCommandOpen(!state.commandOpen);
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
       const ui = useUi.getState();
       const settings = useSettings.getState();
@@ -90,7 +154,12 @@ function useShortcuts() {
           ui.setPanel('help');
           break;
         case 'Escape':
-          if (ui.openPanel === null && ui.selection) ui.select(null);
+          // Let go of the selection first, then put the panels away.
+          if (ui.openPanel === 'authorization') ui.setInspectorOpen(false);
+          else if (ui.openPanel !== null) return;
+          else if (ui.selection) ui.select(null);
+          else if (ui.inspectorOpen) ui.setInspectorOpen(false);
+          else if (ui.explorerOpen) ui.setExplorerOpen(false);
           else return;
           break;
         default:
@@ -106,16 +175,14 @@ function useShortcuts() {
 function Unreachable({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
-      <div className="panel panel-ticks max-w-md rounded-md p-6 text-center">
-        <p className="eyebrow text-critical">No telemetry</p>
-        <h2 className="mt-2 font-display text-lg font-semibold text-ink">
-          The AEGIS server is not answering
-        </h2>
+      <div className="panel max-w-md rounded-[3px] p-6">
+        <h2 className="text-base font-bold text-ink">The AEGIS server is not answering</h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">{message}</p>
-        <p className="numeric mt-3 rounded-[3px] border border-line bg-abyss px-2 py-1.5 text-[11px] text-ink-dim">
+        <p className="mt-3 text-xs text-ink-dim">Start it with:</p>
+        <p className="numeric mt-1 rounded-[3px] border border-line bg-sunken px-2 py-1.5 text-xs text-ink">
           cargo run -p aegis-server
         </p>
-        <p className="mt-3 text-[11px] text-ink-faint">
+        <p className="caption mt-3">
           The interface reconnects by itself as soon as the server is up. Nothing is shown in the
           meantime: AEGIS does not invent data.
         </p>
@@ -130,12 +197,18 @@ function Unreachable({ message }: { message: string }) {
 export function App() {
   useAegisConnection();
   useShortcuts();
+  const theme = useTheme();
 
   const viewMode = useUi((state) => state.viewMode);
   const explorerOpen = useUi((state) => state.explorerOpen);
   const inspectorOpen = useUi((state) => state.inspectorOpen);
   const leftTab = useUi((state) => state.leftTab);
   const authorizationOpen = useUi((state) => state.openPanel === 'authorization');
+  const selection = useUi((state) => state.selection);
+  // Clearing the selection closes the inspector. While it slides away it
+  // goes on showing what it showed, instead of flashing the overview.
+  const [inspected, setInspected] = useState(selection);
+  if (inspectorOpen && inspected !== selection) setInspected(selection);
   const incidentActive = useTelemetry((state) => state.snapshot?.incident != null);
   const hasTopology = useTelemetry((state) => state.topology !== null);
   const loadError = useTelemetry((state) => state.loadError);
@@ -164,20 +237,13 @@ export function App() {
   const can3D = support !== null && canRender3D(support) && sceneError === null;
   const showScene = viewMode === 'scene' && can3D;
 
-  // Small screens start with the side panels tucked away.
+  const left = explorerOpen ? LEFT_WIDTH + GUTTER : 0;
+  const right = inspectorOpen ? RIGHT_WIDTH + GUTTER : 0;
   useEffect(() => {
-    const ui = useUi.getState();
-    if (window.innerWidth < 1180) ui.setInspectorOpen(false);
-    if (window.innerWidth < 860) ui.setExplorerOpen(false);
-  }, []);
-
-  const left = explorerOpen ? LEFT_WIDTH + GUTTER * 2 : 0;
-  const right = inspectorOpen ? RIGHT_WIDTH + GUTTER * 2 : 0;
-  useEffect(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: 100, bottom: 56 });
+    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom: BOTTOM_INSET });
   }, [left, right, showScene, hasTopology]);
   const onRuntime = useCallback(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: 100, bottom: 56 });
+    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom: BOTTOM_INSET });
   }, [left, right]);
 
   const unavailable =
@@ -195,7 +261,7 @@ export function App() {
     >
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2 focus:text-xs"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[3px] focus:border focus:border-ink focus:bg-paper focus:px-3 focus:py-2 focus:text-xs"
       >
         Skip to the topology
       </a>
@@ -210,6 +276,7 @@ export function App() {
         >
           {probing ? null : showScene ? (
             <SceneCanvas
+              theme={theme}
               tooltip={tooltip}
               onRuntime={onRuntime}
               onUnavailable={(reason) => {
@@ -219,8 +286,8 @@ export function App() {
             />
           ) : (
             <div
-              className="h-full"
-              style={{ paddingLeft: left, paddingRight: right, paddingTop: 92 }}
+              className="h-full transition-[padding] duration-200 ease-arrive"
+              style={{ paddingLeft: left, paddingRight: right }}
             >
               <TopologyTable notice={viewMode === 'scene' ? unavailable : null} />
             </div>
@@ -234,115 +301,118 @@ export function App() {
         </div>
 
         <div
-          className="pointer-events-none absolute top-2 z-10 flex flex-col items-center gap-1.5 px-2"
+          className="pointer-events-none absolute top-3 z-10 flex items-start justify-end gap-2 px-3 transition-[left,right] duration-200 ease-arrive"
           style={{ left, right }}
         >
-          <div className="pointer-events-auto max-w-full overflow-x-auto">
-            <Hud />
-          </div>
-          <div className="pointer-events-auto">
-            <RegionStrip />
-          </div>
+          <div className="pointer-events-auto">{showScene && <SceneToolbar />}</div>
+        </div>
+        <div
+          className="pointer-events-none absolute top-3 z-30 flex justify-center px-3 transition-[left,right] duration-200 ease-arrive"
+          style={{ left, right }}
+        >
           <Notices />
         </div>
 
-        <div
-          className="pointer-events-none absolute bottom-2 z-10 flex items-end justify-between gap-2 px-2"
-          style={{ left, right }}
+        {showScene && devOverlay && (
+          <div
+            className="absolute bottom-3 z-10 transition-[left] duration-200 ease-arrive"
+            style={{ left: left + GUTTER }}
+          >
+            <DevOverlay />
+          </div>
+        )}
+
+        <Sheet side="left" open={explorerOpen} width={LEFT_WIDTH} label="Explorer and incidents">
+          <Tabs.Root
+            value={leftTab}
+            onValueChange={(value) => useUi.getState().setLeftTab(value as typeof leftTab)}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <Tabs.List
+              className="relative flex shrink-0 border-b border-line"
+              aria-label="Left panel"
+            >
+              <Tabs.Trigger value="explorer" className={tabClass} data-testid="tab-explorer">
+                Explorer
+              </Tabs.Trigger>
+              <Tabs.Trigger value="incidents" className={tabClass} data-testid="tab-incidents">
+                Incidents
+                {incidentActive && (
+                  <span className="ml-1.5 inline-block size-[7px] bg-critical align-baseline">
+                    <span className="sr-only">(incident active)</span>
+                  </span>
+                )}
+              </Tabs.Trigger>
+              <TabMarker index={leftTab === 'explorer' ? 0 : 1} count={2} />
+            </Tabs.List>
+            <Tabs.Content
+              value="explorer"
+              className="flex min-h-0 flex-1 animate-fade flex-col data-[state=inactive]:hidden"
+            >
+              <Explorer />
+            </Tabs.Content>
+            <Tabs.Content
+              value="incidents"
+              className="flex min-h-0 flex-1 animate-fade flex-col data-[state=inactive]:hidden"
+            >
+              <ScenarioConsole />
+            </Tabs.Content>
+          </Tabs.Root>
+        </Sheet>
+
+        <Sheet
+          side="right"
+          open={inspectorOpen}
+          width={RIGHT_WIDTH}
+          label="Inspector and authorization"
         >
-          <div className="pointer-events-auto">{showScene && devOverlay && <DevOverlay />}</div>
-          <div className="pointer-events-auto">{showScene && <SceneToolbar />}</div>
-        </div>
-
-        {explorerOpen && (
-          <aside
-            className="panel absolute bottom-2 left-2 top-2 z-20 flex flex-col rounded-md"
-            style={{ width: LEFT_WIDTH }}
-            aria-label="Explorer and incidents"
+          <Tabs.Root
+            value={authorizationOpen ? 'authorization' : 'inspector'}
+            onValueChange={(value) =>
+              useUi.getState().setPanel(value === 'authorization' ? 'authorization' : null)
+            }
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <Tabs.Root
-              value={leftTab}
-              onValueChange={(value) => useUi.getState().setLeftTab(value as typeof leftTab)}
-              className="flex min-h-0 flex-1 flex-col"
+            <Tabs.List
+              className="relative flex shrink-0 border-b border-line"
+              aria-label="Right panel"
             >
-              <Tabs.List className="flex shrink-0 border-b border-line" aria-label="Left panel">
-                <Tabs.Trigger value="explorer" className={tabClass} data-testid="tab-explorer">
-                  Explorer
-                </Tabs.Trigger>
-                <Tabs.Trigger value="incidents" className={tabClass} data-testid="tab-incidents">
-                  Incidents
-                  {incidentActive && (
-                    <span className="ml-1.5 inline-block size-1.5 animate-pulse-soft rounded-full bg-critical align-middle">
-                      <span className="sr-only">(incident active)</span>
-                    </span>
-                  )}
-                </Tabs.Trigger>
-              </Tabs.List>
-              <Tabs.Content
-                value="explorer"
-                className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-              >
-                <Explorer />
-              </Tabs.Content>
-              <Tabs.Content
-                value="incidents"
-                className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-              >
-                <ScenarioConsole />
-              </Tabs.Content>
-            </Tabs.Root>
-          </aside>
-        )}
-
-        {inspectorOpen && (
-          <aside
-            className="panel absolute bottom-2 right-2 top-2 z-20 flex flex-col rounded-md"
-            style={{ width: RIGHT_WIDTH }}
-            aria-label="Inspector and authorization"
-          >
-            <Tabs.Root
-              value={authorizationOpen ? 'authorization' : 'inspector'}
-              onValueChange={(value) =>
-                useUi.getState().setPanel(value === 'authorization' ? 'authorization' : null)
-              }
-              className="flex min-h-0 flex-1 flex-col"
-            >
-              <Tabs.List className="flex shrink-0 border-b border-line" aria-label="Right panel">
-                <Tabs.Trigger value="inspector" className={tabClass} data-testid="tab-inspector">
-                  Inspector
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="authorization"
-                  className={tabClass}
-                  data-testid="tab-authorization"
-                >
-                  Authorization
-                </Tabs.Trigger>
-              </Tabs.List>
-              {/* Both stay mounted so a decision survives a trip to the inspector. */}
-              <Tabs.Content
-                value="inspector"
-                forceMount
-                className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}
-              >
-                <Inspector />
-              </Tabs.Content>
-              <Tabs.Content
+              <Tabs.Trigger value="inspector" className={tabClass} data-testid="tab-inspector">
+                Inspector
+              </Tabs.Trigger>
+              <Tabs.Trigger
                 value="authorization"
-                forceMount
-                className={cn('flex min-h-0 flex-1 flex-col', !authorizationOpen && 'hidden')}
+                className={tabClass}
+                data-testid="tab-authorization"
               >
-                <AuthorizationExplorer />
-              </Tabs.Content>
-            </Tabs.Root>
-          </aside>
-        )}
+                Authorization
+              </Tabs.Trigger>
+              <TabMarker index={authorizationOpen ? 1 : 0} count={2} />
+            </Tabs.List>
+            {/* Both stay mounted so a decision survives a trip to the inspector. */}
+            <Tabs.Content
+              value="inspector"
+              forceMount
+              className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}
+            >
+              <Inspector selection={inspectorOpen ? selection : inspected} />
+            </Tabs.Content>
+            <Tabs.Content
+              value="authorization"
+              forceMount
+              className={cn('flex min-h-0 flex-1 flex-col', !authorizationOpen && 'hidden')}
+            >
+              <AuthorizationExplorer />
+            </Tabs.Content>
+          </Tabs.Root>
+        </Sheet>
       </div>
 
       <Timeline />
       <IntegrationsDialog />
       <SettingsDialog />
       <HelpDialog />
+      <CommandPalette />
     </div>
   );
 }
