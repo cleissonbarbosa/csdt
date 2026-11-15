@@ -1,0 +1,51 @@
+# AEGIS — Demo Mode in two containers.
+#
+#   docker compose up --build        then open http://localhost:8080
+#
+# Nothing here needs credentials or reaches outside the compose network.
+# Connected Mode is opt-in: see `.env.example` and docs/INTEGRATIONS.md.
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: aegis-server:local
+    environment:
+      AEGIS_BIND: 0.0.0.0:8787
+      # Origins browsers will load the UI from (checked for CORS and the stream).
+      AEGIS_ALLOWED_ORIGINS: ${AEGIS_ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      AEGIS_SEED: ${AEGIS_SEED:-42}
+      AEGIS_LOG: ${AEGIS_LOG:-info}
+      # Optional integrations. Empty means "not configured".
+      AEGIS_CEDAR_AGENT_URL: ${AEGIS_CEDAR_AGENT_URL:-}
+      AEGIS_CEDAR_AGENT_TOKEN: ${AEGIS_CEDAR_AGENT_TOKEN:-}
+      AEGIS_CEDAR_AGENT_SYNC: ${AEGIS_CEDAR_AGENT_SYNC:-false}
+      AEGIS_RINHA_URL: ${AEGIS_RINHA_URL:-}
+      AEGIS_INTEGRATION_ALLOWED_HOSTS: ${AEGIS_INTEGRATION_ALLOWED_HOSTS:-}
+    # The API is reachable only through the web container's proxy.
+    expose:
+      - '8787'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: aegis-web:local
+    environment:
+      AEGIS_UPSTREAM: server:8787
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      # Bound to loopback by default; change deliberately if you need more.
+      - '127.0.0.1:${AEGIS_WEB_PORT:-8080}:8080'
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

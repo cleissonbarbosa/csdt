@@ -56,7 +56,10 @@ const BUNDLED: [&str; 2] = [
 
 /// Recordings shipped with AEGIS.
 pub fn bundled() -> Result<Vec<Recording>, serde_json::Error> {
-    BUNDLED.iter().map(|raw| serde_json::from_str(raw)).collect()
+    BUNDLED
+        .iter()
+        .map(|raw| serde_json::from_str(raw))
+        .collect()
 }
 
 #[cfg(test)]

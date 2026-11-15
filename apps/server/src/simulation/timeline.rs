@@ -364,7 +364,10 @@ impl Timeline {
                 let error_rate = if ingress.is_empty() {
                     0.0
                 } else {
-                    ingress.iter().map(|n| self.state.node_error[*n]).sum::<f64>()
+                    ingress
+                        .iter()
+                        .map(|n| self.state.node_error[*n])
+                        .sum::<f64>()
                         / ingress.len() as f64
                 };
                 RegionStatus {

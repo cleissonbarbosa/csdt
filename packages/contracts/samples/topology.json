@@ -1,0 +1,2600 @@
+{
+  "schemaVersion": "1.0",
+  "id": "helios-commerce",
+  "name": "Helios Commerce",
+  "description": "Fictional multi-region commerce platform. Every service, metric and incident is synthetic.",
+  "dataSource": "synthetic",
+  "regions": [
+    {
+      "id": "global",
+      "name": "Global Edge",
+      "kind": "edge",
+      "location": "Anycast"
+    },
+    {
+      "id": "us-east",
+      "name": "US East · Primary",
+      "kind": "cloud",
+      "location": "Virginia"
+    },
+    {
+      "id": "eu-west",
+      "name": "EU West",
+      "kind": "cloud",
+      "location": "Dublin"
+    },
+    {
+      "id": "ap-southeast",
+      "name": "AP Southeast",
+      "kind": "cloud",
+      "location": "Singapore"
+    }
+  ],
+  "roles": {
+    "attackSource": "unknown-sources",
+    "edgeRouter": "edge-router",
+    "failoverRegion": "us-east",
+    "outageRegion": "eu-west",
+    "partnerClient": "partner-api",
+    "primaryAuth": "use-auth",
+    "primaryAuthorizer": "use-cedar",
+    "primaryDatabase": "use-orders-db",
+    "primaryGateway": "use-gateway",
+    "protectedResource": "use-ledger-db",
+    "resource:Customer": "use-customers",
+    "resource:Ledger": "use-ledger-db",
+    "resource:Order": "use-orders",
+    "securityMonitor": "threat-monitor"
+  },
+  "nodes": [
+    {
+      "id": "clients-na",
+      "name": "Clients · Americas",
+      "serviceType": "external-client",
+      "region": "global",
+      "environment": "demo",
+      "tier": 0,
+      "description": "Web and mobile sessions originating in the Americas.",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 91.9,
+      "connectedServices": [
+        "edge-router"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 142.0,
+        "throughputRps": 991.5,
+        "errorRate": 0.0732,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "clients-eu",
+      "name": "Clients · Europe",
+      "serviceType": "external-client",
+      "region": "global",
+      "environment": "demo",
+      "tier": 0,
+      "description": "Web and mobile sessions originating in Europe.",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 89.9,
+      "connectedServices": [
+        "edge-router"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 140.0,
+        "throughputRps": 642.7,
+        "errorRate": 0.0732,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "clients-apac",
+      "name": "Clients · APAC",
+      "serviceType": "external-client",
+      "region": "global",
+      "environment": "demo",
+      "tier": 0,
+      "description": "Web and mobile sessions originating in Asia-Pacific.",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 97.9,
+      "connectedServices": [
+        "edge-router"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 148.0,
+        "throughputRps": 395.3,
+        "errorRate": 0.0732,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "partner-api",
+      "name": "Partner Integrations",
+      "serviceType": "external-client",
+      "region": "global",
+      "environment": "demo",
+      "tier": 0,
+      "description": "Server-to-server traffic from third-party partner applications.",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 85.9,
+      "connectedServices": [
+        "edge-router"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 136.0,
+        "throughputRps": 150.1,
+        "errorRate": 0.0732,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "unknown-sources",
+      "name": "Unattributed Sources",
+      "serviceType": "external-client",
+      "region": "global",
+      "environment": "demo",
+      "tier": 0,
+      "description": "Origins with no established reputation. Idle until a scenario routes synthetic hostile traffic through it.",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 103.9,
+      "connectedServices": [
+        "edge-router"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 154.0,
+        "throughputRps": 0.0,
+        "errorRate": 0.0732,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "edge-router",
+      "name": "Global Edge Router",
+      "serviceType": "network-gateway",
+      "region": "global",
+      "environment": "demo",
+      "tier": 1,
+      "description": "Anycast entry point: geo-routing, TLS termination and web application firewall.",
+      "dataSource": "synthetic",
+      "capacityRps": 7776.0,
+      "baselineLatencyMs": 73.9,
+      "connectedServices": [
+        "aps-gateway",
+        "clients-apac",
+        "clients-eu",
+        "clients-na",
+        "euw-gateway",
+        "partner-api",
+        "unknown-sources",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 124.0,
+        "throughputRps": 3499.3,
+        "errorRate": 0.0732,
+        "saturation": 0.45,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "threat-monitor",
+      "name": "Threat Detection",
+      "serviceType": "security-monitor",
+      "region": "global",
+      "environment": "demo",
+      "tier": 2,
+      "description": "Correlates gateway, authentication and authorization telemetry into security alerts.",
+      "dataSource": "synthetic",
+      "capacityRps": 985.0,
+      "baselineLatencyMs": 12.5,
+      "connectedServices": [
+        "aps-cedar",
+        "aps-gateway",
+        "euw-auth",
+        "euw-cedar",
+        "euw-gateway",
+        "use-auth",
+        "use-cedar",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 12.5,
+        "throughputRps": 157.7,
+        "errorRate": 0.0,
+        "saturation": 0.16,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-gateway",
+      "name": "API Gateway",
+      "serviceType": "api-gateway",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 2,
+      "description": "Regional entry point: request routing, quotas and policy enforcement.",
+      "dataSource": "synthetic",
+      "capacityRps": 2436.5,
+      "baselineLatencyMs": 59.7,
+      "connectedServices": [
+        "edge-router",
+        "threat-monitor",
+        "use-auth",
+        "use-cart",
+        "use-catalog",
+        "use-cedar",
+        "use-customers",
+        "use-ledger",
+        "use-orders",
+        "use-search"
+      ],
+      "metrics": {
+        "health": "degraded",
+        "latencyMs": 165.3,
+        "throughputRps": 2344.2,
+        "errorRate": 0.1558,
+        "saturation": 0.962,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-auth",
+      "name": "Identity Service",
+      "serviceType": "auth-service",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Authenticates principals and issues short-lived session tokens.",
+      "dataSource": "synthetic",
+      "capacityRps": 1055.8,
+      "baselineLatencyMs": 19.5,
+      "connectedServices": [
+        "threat-monitor",
+        "use-customer-db",
+        "use-gateway",
+        "use-sessions"
+      ],
+      "metrics": {
+        "health": "critical",
+        "latencyMs": 214.4,
+        "throughputRps": 1729.5,
+        "errorRate": 0.3895,
+        "saturation": 1.638,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-cedar",
+      "name": "Cedar Authorizer",
+      "serviceType": "cedar-authorizer",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Policy decision point evaluating Cedar policies for every protected action.",
+      "dataSource": "synthetic",
+      "capacityRps": 1827.4,
+      "baselineLatencyMs": 3.3,
+      "connectedServices": [
+        "threat-monitor",
+        "use-audit",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 3.3,
+        "throughputRps": 634.4,
+        "errorRate": 0.0,
+        "saturation": 0.347,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-catalog",
+      "name": "Catalog",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Product listings and pricing.",
+      "dataSource": "synthetic",
+      "capacityRps": 938.0,
+      "baselineLatencyMs": 31.1,
+      "connectedServices": [
+        "use-assets",
+        "use-catalog-db",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 31.2,
+        "throughputRps": 430.2,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-search",
+      "name": "Search",
+      "serviceType": "container",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Full-text and faceted product search.",
+      "dataSource": "synthetic",
+      "capacityRps": 312.7,
+      "baselineLatencyMs": 44.8,
+      "connectedServices": [
+        "use-catalog-db",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 45.0,
+        "throughputRps": 143.4,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-cart",
+      "name": "Cart",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Shopping cart state and promotions.",
+      "dataSource": "synthetic",
+      "capacityRps": 446.7,
+      "baselineLatencyMs": 22.4,
+      "connectedServices": [
+        "use-gateway",
+        "use-inventory",
+        "use-sessions"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 22.4,
+        "throughputRps": 204.9,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-orders",
+      "name": "Orders",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Order placement and lifecycle orchestration.",
+      "dataSource": "synthetic",
+      "capacityRps": 312.7,
+      "baselineLatencyMs": 104.9,
+      "connectedServices": [
+        "use-gateway",
+        "use-inventory",
+        "use-order-events",
+        "use-orders-db",
+        "use-payments"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 105.1,
+        "throughputRps": 143.4,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-payments",
+      "name": "Payments",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Payment authorisation and settlement.",
+      "dataSource": "synthetic",
+      "capacityRps": 238.5,
+      "baselineLatencyMs": 87.7,
+      "connectedServices": [
+        "aps-orders",
+        "use-fraud",
+        "use-ledger-db",
+        "use-orders"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 87.9,
+        "throughputRps": 109.4,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-customers",
+      "name": "Customer Profiles",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Customer records and preferences.",
+      "dataSource": "synthetic",
+      "capacityRps": 134.0,
+      "baselineLatencyMs": 25.5,
+      "connectedServices": [
+        "use-customer-db",
+        "use-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 25.4,
+        "throughputRps": 61.5,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-ledger",
+      "name": "Ledger API",
+      "serviceType": "microservice",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Finance-facing API in front of the ledger of record.",
+      "dataSource": "synthetic",
+      "capacityRps": 81.2,
+      "baselineLatencyMs": 30.5,
+      "connectedServices": [
+        "use-gateway",
+        "use-ledger-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 30.5,
+        "throughputRps": 20.5,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-inventory",
+      "name": "Inventory",
+      "serviceType": "container",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Stock reservations across warehouses.",
+      "dataSource": "synthetic",
+      "capacityRps": 384.2,
+      "baselineLatencyMs": 19.1,
+      "connectedServices": [
+        "use-cart",
+        "use-orders",
+        "use-orders-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 19.2,
+        "throughputRps": 176.2,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-fraud",
+      "name": "Fraud Scoring",
+      "serviceType": "serverless",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Scores each payment against known fraud patterns.",
+      "dataSource": "synthetic",
+      "capacityRps": 325.2,
+      "baselineLatencyMs": 24.9,
+      "connectedServices": [
+        "use-payments",
+        "use-sessions"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 24.9,
+        "throughputRps": 109.4,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-order-events",
+      "name": "Order Events",
+      "serviceType": "message-queue",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Durable stream of order lifecycle events.",
+      "dataSource": "synthetic",
+      "capacityRps": 568.5,
+      "baselineLatencyMs": 2.1,
+      "connectedServices": [
+        "use-order-worker",
+        "use-orders"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 2.1,
+        "throughputRps": 143.4,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-order-worker",
+      "name": "Fulfilment Worker",
+      "serviceType": "container",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Consumes order events and drives fulfilment.",
+      "dataSource": "synthetic",
+      "capacityRps": 213.2,
+      "baselineLatencyMs": 47.6,
+      "connectedServices": [
+        "use-notify-queue",
+        "use-order-events",
+        "use-orders-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 48.0,
+        "throughputRps": 143.4,
+        "errorRate": 0.0,
+        "saturation": 0.673,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-notify-queue",
+      "name": "Notification Queue",
+      "serviceType": "message-queue",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Buffered customer notifications.",
+      "dataSource": "synthetic",
+      "capacityRps": 511.7,
+      "baselineLatencyMs": 2.1,
+      "connectedServices": [
+        "use-notify",
+        "use-order-worker"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 2.1,
+        "throughputRps": 129.1,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-notify",
+      "name": "Notifier",
+      "serviceType": "serverless",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Sends e-mail and push notifications.",
+      "dataSource": "synthetic",
+      "capacityRps": 383.7,
+      "baselineLatencyMs": 66.0,
+      "connectedServices": [
+        "use-notify-queue"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 66.1,
+        "throughputRps": 129.1,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-orders-db",
+      "name": "Orders DB",
+      "serviceType": "database",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Primary relational store for orders. Replicated to every region.",
+      "dataSource": "synthetic",
+      "capacityRps": 716.5,
+      "baselineLatencyMs": 5.8,
+      "connectedServices": [
+        "aps-orders-db",
+        "euw-orders-db",
+        "use-inventory",
+        "use-order-worker",
+        "use-orders"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 5.8,
+        "throughputRps": 328.6,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-catalog-db",
+      "name": "Catalog DB",
+      "serviceType": "database",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Product catalogue of record.",
+      "dataSource": "synthetic",
+      "capacityRps": 1105.0,
+      "baselineLatencyMs": 4.5,
+      "connectedServices": [
+        "aps-catalog",
+        "euw-catalog-db",
+        "use-catalog",
+        "use-search"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 4.5,
+        "throughputRps": 446.0,
+        "errorRate": 0.0,
+        "saturation": 0.404,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-customer-db",
+      "name": "Customer DB",
+      "serviceType": "database",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Customer identities and profiles.",
+      "dataSource": "synthetic",
+      "capacityRps": 406.1,
+      "baselineLatencyMs": 5.7,
+      "connectedServices": [
+        "use-auth",
+        "use-customers"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 5.4,
+        "throughputRps": 124.0,
+        "errorRate": 0.0,
+        "saturation": 0.305,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-ledger-db",
+      "name": "Finance Ledger",
+      "serviceType": "database",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Ledger of record. Protected resource guarded by Cedar policies.",
+      "dataSource": "synthetic",
+      "capacityRps": 468.8,
+      "baselineLatencyMs": 7.9,
+      "connectedServices": [
+        "euw-payments",
+        "use-ledger",
+        "use-payments"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 7.9,
+        "throughputRps": 189.2,
+        "errorRate": 0.0,
+        "saturation": 0.404,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-sessions",
+      "name": "Session Cache",
+      "serviceType": "database",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "In-memory session and token cache.",
+      "dataSource": "synthetic",
+      "capacityRps": 1803.1,
+      "baselineLatencyMs": 1.1,
+      "connectedServices": [
+        "use-auth",
+        "use-cart",
+        "use-fraud"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 1.1,
+        "throughputRps": 462.8,
+        "errorRate": 0.0,
+        "saturation": 0.257,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-assets",
+      "name": "Media Assets",
+      "serviceType": "storage",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Object storage for product media.",
+      "dataSource": "synthetic",
+      "capacityRps": 426.4,
+      "baselineLatencyMs": 26.7,
+      "connectedServices": [
+        "euw-assets",
+        "use-catalog"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 26.7,
+        "throughputRps": 107.6,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "use-audit",
+      "name": "Audit Archive",
+      "serviceType": "storage",
+      "region": "us-east",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Immutable archive of authorization decisions.",
+      "dataSource": "synthetic",
+      "capacityRps": 1218.2,
+      "baselineLatencyMs": 32.0,
+      "connectedServices": [
+        "use-cedar"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 32.0,
+        "throughputRps": 307.3,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-gateway",
+      "name": "API Gateway",
+      "serviceType": "api-gateway",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 2,
+      "description": "Regional entry point for European traffic.",
+      "dataSource": "synthetic",
+      "capacityRps": 1710.7,
+      "baselineLatencyMs": 53.8,
+      "connectedServices": [
+        "edge-router",
+        "euw-auth",
+        "euw-cart",
+        "euw-catalog",
+        "euw-cedar",
+        "euw-orders",
+        "threat-monitor"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 53.9,
+        "throughputRps": 719.3,
+        "errorRate": 0.0,
+        "saturation": 0.42,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-auth",
+      "name": "Identity Service",
+      "serviceType": "auth-service",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Regional authentication endpoint.",
+      "dataSource": "synthetic",
+      "capacityRps": 741.3,
+      "baselineLatencyMs": 17.8,
+      "connectedServices": [
+        "euw-gateway",
+        "euw-sessions",
+        "threat-monitor"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 17.8,
+        "throughputRps": 287.7,
+        "errorRate": 0.0,
+        "saturation": 0.388,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-cedar",
+      "name": "Cedar Authorizer",
+      "serviceType": "cedar-authorizer",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Regional policy decision point.",
+      "dataSource": "synthetic",
+      "capacityRps": 1283.0,
+      "baselineLatencyMs": 3.3,
+      "connectedServices": [
+        "euw-gateway",
+        "threat-monitor"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 3.3,
+        "throughputRps": 431.6,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-catalog",
+      "name": "Catalog",
+      "serviceType": "microservice",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Product listings and pricing.",
+      "dataSource": "synthetic",
+      "capacityRps": 752.7,
+      "baselineLatencyMs": 31.1,
+      "connectedServices": [
+        "euw-assets",
+        "euw-catalog-db",
+        "euw-gateway"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 31.2,
+        "throughputRps": 345.2,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-cart",
+      "name": "Cart",
+      "serviceType": "microservice",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Shopping cart state.",
+      "dataSource": "synthetic",
+      "capacityRps": 345.0,
+      "baselineLatencyMs": 16.3,
+      "connectedServices": [
+        "euw-gateway",
+        "euw-sessions"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 16.3,
+        "throughputRps": 158.2,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-orders",
+      "name": "Orders",
+      "serviceType": "microservice",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Order placement for European customers.",
+      "dataSource": "synthetic",
+      "capacityRps": 235.2,
+      "baselineLatencyMs": 114.1,
+      "connectedServices": [
+        "euw-gateway",
+        "euw-order-events",
+        "euw-orders-db",
+        "euw-payments"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 114.3,
+        "throughputRps": 107.9,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-payments",
+      "name": "Payments",
+      "serviceType": "microservice",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Payment authorisation. Settles against the central ledger in US East.",
+      "dataSource": "synthetic",
+      "capacityRps": 129.4,
+      "baselineLatencyMs": 134.4,
+      "connectedServices": [
+        "euw-orders",
+        "use-ledger-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 134.6,
+        "throughputRps": 59.3,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-order-events",
+      "name": "Order Events",
+      "serviceType": "message-queue",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Regional order event stream.",
+      "dataSource": "synthetic",
+      "capacityRps": 427.7,
+      "baselineLatencyMs": 2.1,
+      "connectedServices": [
+        "euw-order-worker",
+        "euw-orders"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 2.1,
+        "throughputRps": 107.9,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-order-worker",
+      "name": "Fulfilment Worker",
+      "serviceType": "container",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 5,
+      "description": "Consumes order events and drives fulfilment.",
+      "dataSource": "synthetic",
+      "capacityRps": 192.5,
+      "baselineLatencyMs": 43.0,
+      "connectedServices": [
+        "euw-order-events",
+        "euw-orders-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 43.2,
+        "throughputRps": 107.9,
+        "errorRate": 0.0,
+        "saturation": 0.561,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-orders-db",
+      "name": "Orders DB",
+      "serviceType": "database",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Regional orders store, replica of US East.",
+      "dataSource": "synthetic",
+      "capacityRps": 684.7,
+      "baselineLatencyMs": 5.7,
+      "connectedServices": [
+        "euw-order-worker",
+        "euw-orders",
+        "use-orders-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 5.7,
+        "throughputRps": 276.4,
+        "errorRate": 0.0,
+        "saturation": 0.404,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-catalog-db",
+      "name": "Catalog DB",
+      "serviceType": "database",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Read replica of the product catalogue.",
+      "dataSource": "synthetic",
+      "capacityRps": 691.4,
+      "baselineLatencyMs": 4.5,
+      "connectedServices": [
+        "euw-catalog",
+        "use-catalog-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 4.5,
+        "throughputRps": 279.1,
+        "errorRate": 0.0,
+        "saturation": 0.404,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-sessions",
+      "name": "Session Cache",
+      "serviceType": "database",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 6,
+      "description": "In-memory session and token cache.",
+      "dataSource": "synthetic",
+      "capacityRps": 1240.3,
+      "baselineLatencyMs": 1.1,
+      "connectedServices": [
+        "euw-auth",
+        "euw-cart"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 1.1,
+        "throughputRps": 417.2,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "euw-assets",
+      "name": "Media Assets",
+      "serviceType": "storage",
+      "region": "eu-west",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Replicated object storage for product media.",
+      "dataSource": "synthetic",
+      "capacityRps": 384.8,
+      "baselineLatencyMs": 26.7,
+      "connectedServices": [
+        "euw-catalog",
+        "use-assets"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 26.7,
+        "throughputRps": 97.1,
+        "errorRate": 0.0,
+        "saturation": 0.252,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-gateway",
+      "name": "API Gateway",
+      "serviceType": "api-gateway",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 2,
+      "description": "Regional entry point for Asia-Pacific traffic.",
+      "dataSource": "synthetic",
+      "capacityRps": 1036.8,
+      "baselineLatencyMs": 74.4,
+      "connectedServices": [
+        "aps-auth",
+        "aps-catalog",
+        "aps-cedar",
+        "aps-edge-fn",
+        "aps-orders",
+        "edge-router",
+        "threat-monitor"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 74.5,
+        "throughputRps": 435.9,
+        "errorRate": 0.0,
+        "saturation": 0.42,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-auth",
+      "name": "Identity Service",
+      "serviceType": "auth-service",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Regional authentication endpoint.",
+      "dataSource": "synthetic",
+      "capacityRps": 449.3,
+      "baselineLatencyMs": 17.8,
+      "connectedServices": [
+        "aps-gateway",
+        "aps-sessions"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 17.8,
+        "throughputRps": 174.4,
+        "errorRate": 0.0,
+        "saturation": 0.388,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-cedar",
+      "name": "Cedar Authorizer",
+      "serviceType": "cedar-authorizer",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 3,
+      "description": "Regional policy decision point.",
+      "dataSource": "synthetic",
+      "capacityRps": 777.6,
+      "baselineLatencyMs": 3.3,
+      "connectedServices": [
+        "aps-gateway",
+        "threat-monitor"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 3.3,
+        "throughputRps": 261.5,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-catalog",
+      "name": "Catalog",
+      "serviceType": "microservice",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Product listings. Reads through to the primary catalogue.",
+      "dataSource": "synthetic",
+      "capacityRps": 475.2,
+      "baselineLatencyMs": 69.3,
+      "connectedServices": [
+        "aps-gateway",
+        "use-catalog-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 69.3,
+        "throughputRps": 218.0,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-orders",
+      "name": "Orders",
+      "serviceType": "microservice",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Order placement for APAC customers.",
+      "dataSource": "synthetic",
+      "capacityRps": 133.1,
+      "baselineLatencyMs": 129.4,
+      "connectedServices": [
+        "aps-gateway",
+        "aps-orders-db",
+        "use-payments"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 129.6,
+        "throughputRps": 61.0,
+        "errorRate": 0.0,
+        "saturation": 0.459,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-edge-fn",
+      "name": "Edge Personalisation",
+      "serviceType": "serverless",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 4,
+      "description": "Per-request personalisation at the regional edge.",
+      "dataSource": "synthetic",
+      "capacityRps": 388.8,
+      "baselineLatencyMs": 11.3,
+      "connectedServices": [
+        "aps-gateway",
+        "aps-sessions"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 11.3,
+        "throughputRps": 130.8,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-orders-db",
+      "name": "Orders DB",
+      "serviceType": "database",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 6,
+      "description": "Regional orders store, replica of US East.",
+      "dataSource": "synthetic",
+      "capacityRps": 273.3,
+      "baselineLatencyMs": 5.7,
+      "connectedServices": [
+        "aps-orders",
+        "use-orders-db"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 5.7,
+        "throughputRps": 110.3,
+        "errorRate": 0.0,
+        "saturation": 0.404,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "aps-sessions",
+      "name": "Session Cache",
+      "serviceType": "database",
+      "region": "ap-southeast",
+      "environment": "demo",
+      "tier": 6,
+      "description": "In-memory session and token cache.",
+      "dataSource": "synthetic",
+      "capacityRps": 699.8,
+      "baselineLatencyMs": 1.1,
+      "connectedServices": [
+        "aps-auth",
+        "aps-edge-fn"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 1.1,
+        "throughputRps": 235.4,
+        "errorRate": 0.0,
+        "saturation": 0.336,
+        "queueDepth": 0.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "clients-na->edge-router",
+      "source": "clients-na",
+      "target": "edge-router",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 991.5,
+        "latencyMs": 18.0,
+        "errorRate": 0.0732,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "clients-eu->edge-router",
+      "source": "clients-eu",
+      "target": "edge-router",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 642.7,
+        "latencyMs": 16.0,
+        "errorRate": 0.0732,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "clients-apac->edge-router",
+      "source": "clients-apac",
+      "target": "edge-router",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 395.3,
+        "latencyMs": 24.0,
+        "errorRate": 0.0732,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "partner-api->edge-router",
+      "source": "partner-api",
+      "target": "edge-router",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 150.1,
+        "latencyMs": 12.0,
+        "errorRate": 0.0732,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "unknown-sources->edge-router",
+      "source": "unknown-sources",
+      "target": "edge-router",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 1319.8,
+        "latencyMs": 30.0,
+        "errorRate": 0.0732,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 1319.8,
+        "securityStatus": "suspicious"
+      }
+    },
+    {
+      "id": "edge-router->use-gateway",
+      "source": "edge-router",
+      "target": "use-gateway",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 0.47,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 2344.2,
+        "latencyMs": 8.0,
+        "errorRate": 0.1558,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 1319.8,
+        "securityStatus": "suspicious"
+      }
+    },
+    {
+      "id": "edge-router->euw-gateway",
+      "source": "edge-router",
+      "target": "euw-gateway",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 0.33,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 719.3,
+        "latencyMs": 9.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "edge-router->aps-gateway",
+      "source": "edge-router",
+      "target": "aps-gateway",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 0.2,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 435.9,
+        "latencyMs": 11.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-auth",
+      "source": "use-gateway",
+      "target": "use-auth",
+      "protocol": "grpc",
+      "relationship": "auth",
+      "weight": 0.4,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 1729.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.3895,
+        "rejectedRps": 1300.0,
+        "suspiciousRps": 1319.8,
+        "securityStatus": "denied"
+      }
+    },
+    {
+      "id": "use-gateway->use-cedar",
+      "source": "use-gateway",
+      "target": "use-cedar",
+      "protocol": "grpc",
+      "relationship": "authz",
+      "weight": 0.6,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 634.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 62.8,
+        "suspiciousRps": 19.8,
+        "securityStatus": "authorized"
+      }
+    },
+    {
+      "id": "use-gateway->use-catalog",
+      "source": "use-gateway",
+      "target": "use-catalog",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.42,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 430.2,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-search",
+      "source": "use-gateway",
+      "target": "use-search",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.14,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 143.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-cart",
+      "source": "use-gateway",
+      "target": "use-cart",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.2,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 204.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-orders",
+      "source": "use-gateway",
+      "target": "use-orders",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.14,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 143.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-customers",
+      "source": "use-gateway",
+      "target": "use-customers",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.06,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 61.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->use-ledger",
+      "source": "use-gateway",
+      "target": "use-ledger",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.02,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 20.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-gateway->threat-monitor",
+      "source": "use-gateway",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.03,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 30.7,
+        "latencyMs": 9.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-auth->use-sessions",
+      "source": "use-auth",
+      "target": "use-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 0.9,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 225.1,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-auth->use-customer-db",
+      "source": "use-auth",
+      "target": "use-customer-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.25,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 62.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-auth->threat-monitor",
+      "source": "use-auth",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.05,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 12.5,
+        "latencyMs": 9.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-cedar->use-audit",
+      "source": "use-cedar",
+      "target": "use-audit",
+      "protocol": "s3",
+      "relationship": "telemetry",
+      "weight": 0.5,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 307.3,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-cedar->threat-monitor",
+      "source": "use-cedar",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.05,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 30.7,
+        "latencyMs": 9.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-catalog->use-catalog-db",
+      "source": "use-catalog",
+      "target": "use-catalog-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.55,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 236.6,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-catalog->use-assets",
+      "source": "use-catalog",
+      "target": "use-assets",
+      "protocol": "s3",
+      "relationship": "data",
+      "weight": 0.25,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 107.6,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-search->use-catalog-db",
+      "source": "use-search",
+      "target": "use-catalog-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.7,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 100.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-cart->use-sessions",
+      "source": "use-cart",
+      "target": "use-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 204.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-cart->use-inventory",
+      "source": "use-cart",
+      "target": "use-inventory",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.3,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 61.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders->use-payments",
+      "source": "use-orders",
+      "target": "use-payments",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.55,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 78.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders->use-inventory",
+      "source": "use-orders",
+      "target": "use-inventory",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.8,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 114.7,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders->use-orders-db",
+      "source": "use-orders",
+      "target": "use-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 143.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders->use-order-events",
+      "source": "use-orders",
+      "target": "use-order-events",
+      "protocol": "amqp",
+      "relationship": "publish",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 143.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-payments->use-fraud",
+      "source": "use-payments",
+      "target": "use-fraud",
+      "protocol": "https",
+      "relationship": "call",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 109.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-payments->use-ledger-db",
+      "source": "use-payments",
+      "target": "use-ledger-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 109.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-customers->use-customer-db",
+      "source": "use-customers",
+      "target": "use-customer-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 61.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-ledger->use-ledger-db",
+      "source": "use-ledger",
+      "target": "use-ledger-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 20.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-inventory->use-orders-db",
+      "source": "use-inventory",
+      "target": "use-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.4,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 70.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-fraud->use-sessions",
+      "source": "use-fraud",
+      "target": "use-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 0.3,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 32.8,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-order-events->use-order-worker",
+      "source": "use-order-events",
+      "target": "use-order-worker",
+      "protocol": "amqp",
+      "relationship": "consume",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 143.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-order-worker->use-orders-db",
+      "source": "use-order-worker",
+      "target": "use-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.8,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 114.7,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-order-worker->use-notify-queue",
+      "source": "use-order-worker",
+      "target": "use-notify-queue",
+      "protocol": "amqp",
+      "relationship": "publish",
+      "weight": 0.9,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 129.1,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-notify-queue->use-notify",
+      "source": "use-notify-queue",
+      "target": "use-notify",
+      "protocol": "amqp",
+      "relationship": "consume",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 129.1,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders-db->euw-orders-db",
+      "source": "use-orders-db",
+      "target": "euw-orders-db",
+      "protocol": "tcp",
+      "relationship": "replication",
+      "weight": 0.25,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 82.2,
+        "latencyMs": 72.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-orders-db->aps-orders-db",
+      "source": "use-orders-db",
+      "target": "aps-orders-db",
+      "protocol": "tcp",
+      "relationship": "replication",
+      "weight": 0.15,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 49.3,
+        "latencyMs": 185.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-catalog-db->euw-catalog-db",
+      "source": "use-catalog-db",
+      "target": "euw-catalog-db",
+      "protocol": "tcp",
+      "relationship": "replication",
+      "weight": 0.2,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 89.2,
+        "latencyMs": 72.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "use-assets->euw-assets",
+      "source": "use-assets",
+      "target": "euw-assets",
+      "protocol": "s3",
+      "relationship": "replication",
+      "weight": 0.1,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 10.8,
+        "latencyMs": 72.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-gateway->euw-auth",
+      "source": "euw-gateway",
+      "target": "euw-auth",
+      "protocol": "grpc",
+      "relationship": "auth",
+      "weight": 0.4,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 287.7,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "authorized"
+      }
+    },
+    {
+      "id": "euw-gateway->euw-cedar",
+      "source": "euw-gateway",
+      "target": "euw-cedar",
+      "protocol": "grpc",
+      "relationship": "authz",
+      "weight": 0.6,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 431.6,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 30.2,
+        "suspiciousRps": 0.0,
+        "securityStatus": "authorized"
+      }
+    },
+    {
+      "id": "euw-gateway->euw-catalog",
+      "source": "euw-gateway",
+      "target": "euw-catalog",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.48,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 345.2,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-gateway->euw-cart",
+      "source": "euw-gateway",
+      "target": "euw-cart",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.22,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 158.2,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-gateway->euw-orders",
+      "source": "euw-gateway",
+      "target": "euw-orders",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.15,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 107.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-gateway->threat-monitor",
+      "source": "euw-gateway",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.03,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 21.6,
+        "latencyMs": 14.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-auth->euw-sessions",
+      "source": "euw-auth",
+      "target": "euw-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 0.9,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 258.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-auth->threat-monitor",
+      "source": "euw-auth",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.05,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 14.4,
+        "latencyMs": 14.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-cedar->threat-monitor",
+      "source": "euw-cedar",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.05,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 21.6,
+        "latencyMs": 14.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-catalog->euw-catalog-db",
+      "source": "euw-catalog",
+      "target": "euw-catalog-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.55,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 189.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-catalog->euw-assets",
+      "source": "euw-catalog",
+      "target": "euw-assets",
+      "protocol": "s3",
+      "relationship": "data",
+      "weight": 0.25,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 86.3,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-cart->euw-sessions",
+      "source": "euw-cart",
+      "target": "euw-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 158.2,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-orders->euw-payments",
+      "source": "euw-orders",
+      "target": "euw-payments",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.55,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 59.3,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-orders->euw-orders-db",
+      "source": "euw-orders",
+      "target": "euw-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 107.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-orders->euw-order-events",
+      "source": "euw-orders",
+      "target": "euw-order-events",
+      "protocol": "amqp",
+      "relationship": "publish",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 107.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-payments->use-ledger-db",
+      "source": "euw-payments",
+      "target": "use-ledger-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 59.3,
+        "latencyMs": 74.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-order-events->euw-order-worker",
+      "source": "euw-order-events",
+      "target": "euw-order-worker",
+      "protocol": "amqp",
+      "relationship": "consume",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 107.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "euw-order-worker->euw-orders-db",
+      "source": "euw-order-worker",
+      "target": "euw-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.8,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 86.3,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-gateway->aps-auth",
+      "source": "aps-gateway",
+      "target": "aps-auth",
+      "protocol": "grpc",
+      "relationship": "auth",
+      "weight": 0.4,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 174.4,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "authorized"
+      }
+    },
+    {
+      "id": "aps-gateway->aps-cedar",
+      "source": "aps-gateway",
+      "target": "aps-cedar",
+      "protocol": "grpc",
+      "relationship": "authz",
+      "weight": 0.6,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 261.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 18.3,
+        "suspiciousRps": 0.0,
+        "securityStatus": "authorized"
+      }
+    },
+    {
+      "id": "aps-gateway->aps-catalog",
+      "source": "aps-gateway",
+      "target": "aps-catalog",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.5,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 218.0,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-gateway->aps-orders",
+      "source": "aps-gateway",
+      "target": "aps-orders",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.14,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 61.0,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-gateway->aps-edge-fn",
+      "source": "aps-gateway",
+      "target": "aps-edge-fn",
+      "protocol": "https",
+      "relationship": "call",
+      "weight": 0.3,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 130.8,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-gateway->threat-monitor",
+      "source": "aps-gateway",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.03,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 13.1,
+        "latencyMs": 21.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-auth->aps-sessions",
+      "source": "aps-auth",
+      "target": "aps-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 0.9,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 156.9,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-cedar->threat-monitor",
+      "source": "aps-cedar",
+      "target": "threat-monitor",
+      "protocol": "otlp",
+      "relationship": "telemetry",
+      "weight": 0.05,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 13.1,
+        "latencyMs": 21.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-catalog->use-catalog-db",
+      "source": "aps-catalog",
+      "target": "use-catalog-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 0.5,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 109.0,
+        "latencyMs": 92.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-orders->aps-orders-db",
+      "source": "aps-orders",
+      "target": "aps-orders-db",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 61.0,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-orders->use-payments",
+      "source": "aps-orders",
+      "target": "use-payments",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 0.5,
+      "crossRegion": true,
+      "metrics": {
+        "trafficRps": 30.5,
+        "latencyMs": 92.0,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    },
+    {
+      "id": "aps-edge-fn->aps-sessions",
+      "source": "aps-edge-fn",
+      "target": "aps-sessions",
+      "protocol": "redis",
+      "relationship": "data",
+      "weight": 0.6,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 78.5,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    }
+  ]
+}

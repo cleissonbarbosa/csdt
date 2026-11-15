@@ -1,0 +1,192 @@
+@import 'tailwindcss';
+
+@import '@fontsource/chakra-petch/latin-500.css';
+@import '@fontsource/chakra-petch/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* Obsidian Command Center — design tokens. */
+@theme {
+  --color-void: #070b14;
+  --color-abyss: #0a101c;
+  --color-surface: #101827;
+  --color-raised: #162033;
+  --color-line: #1e2b42;
+  --color-line-bright: #2c3f5f;
+
+  --color-ink: #eaf2ff;
+  --color-ink-dim: #9fb0cc;
+  --color-ink-faint: #64748f;
+
+  --color-cyan: #55e6f2;
+  --color-blue: #4a8dff;
+  --color-violet: #9b7bff;
+  --color-magenta: #ff5fd2;
+  --color-healthy: #45d6a0;
+  --color-warning: #ffbf69;
+  --color-critical: #ff6178;
+  --color-down: #6b7890;
+
+  --font-display: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pulse-soft: pulse-soft 2.2s ease-in-out infinite;
+  --animate-sweep: sweep 1.6s linear infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-cyan) 35%, transparent);
+  }
+
+  /* One consistent, clearly visible focus treatment for keyboard users. */
+  :focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  button,
+  [role='button'],
+  [role='tab'],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-bright) transparent;
+  }
+}
+
+@layer components {
+  /* Instrument panel floating over the scene.
+     Deliberately no `backdrop-filter`: blurring what is behind a panel makes
+     the compositor re-sample the 3D canvas under it every frame, which was
+     measured to cost more than rendering the scene itself (docs/PERFORMANCE.md).
+     A nearly opaque gradient gives the same read for free. */
+  .panel {
+    position: relative;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-surface) 94%, transparent),
+      color-mix(in oklab, var(--color-abyss) 96%, transparent)
+    );
+    border: 1px solid color-mix(in oklab, var(--color-line-bright) 70%, transparent);
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+      0 18px 50px -18px rgb(0 0 0 / 0.8);
+  }
+
+  /* Bracket ticks at the corners: the "holographic" frame. */
+  .panel-ticks::before,
+  .panel-ticks::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+    border-color: color-mix(in oklab, var(--color-cyan) 70%, transparent);
+  }
+  .panel-ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .panel-ticks::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+  }
+
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  .numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* The same switch, driven by the in-app setting. */
+[data-reduced-motion='true'] *,
+[data-reduced-motion='true'] *::before,
+[data-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}

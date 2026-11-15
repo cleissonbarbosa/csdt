@@ -306,7 +306,13 @@ mod tests {
             .collect();
         assert_eq!(open, [80, 8080]);
         assert_eq!(
-            report.findings.iter().find(|f| f.port == 8080).unwrap().service.as_deref(),
+            report
+                .findings
+                .iter()
+                .find(|f| f.port == 8080)
+                .unwrap()
+                .service
+                .as_deref(),
             Some("HTTP-Alt")
         );
         assert_eq!(
@@ -356,7 +362,9 @@ mod tests {
         let report = parse_report(BUNDLED_REPORT).unwrap();
         let events = report_events(&report);
         assert_eq!(events.len(), 3, "summary plus one per open port");
-        assert!(events.iter().all(|e| e.data_source == DataSource::Recording));
+        assert!(events
+            .iter()
+            .all(|e| e.data_source == DataSource::Recording));
         assert!(events.iter().all(|e| e.kind == EventKind::ScanFinding));
     }
 }

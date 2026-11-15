@@ -46,10 +46,14 @@ const ALERT_LATENCY: usize = 3;
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Command {
     #[serde(rename_all = "camelCase")]
-    StartScenario { scenario_id: String },
+    StartScenario {
+        scenario_id: String,
+    },
     AbortScenario,
     /// An authorization decision evaluated on demand by an operator.
-    RecordDecision { decision: Box<AuthorizationDecision> },
+    RecordDecision {
+        decision: Box<AuthorizationDecision>,
+    },
     /// Events imported from a fixture-backed provider.
     #[serde(rename_all = "camelCase")]
     ImportEvents {
@@ -420,11 +424,16 @@ fn classify(topo: &SimTopology, state: &SimState, node: usize, down: bool) -> He
     }
     let error = state.node_error[node];
     let rho = state.node_rho[node];
+    if topo.node_type[node].is_client() && topo.base_demand[node] <= 0.0 {
+        // An origin that is not one of our client populations (the source
+        // of hostile traffic) has no experience to be unhealthy about.
+        return Health::Healthy;
+    }
     if topo.node_type[node].is_queue() {
         let fill = state.queue_depth[node] / topo.queue_capacity[node].max(1.0);
-        return if fill >= 0.7 || error >= 0.2 {
+        return if fill >= 0.45 || error >= 0.2 {
             Health::Critical
-        } else if fill >= 0.2 || error >= 0.04 {
+        } else if fill >= 0.1 || error >= 0.04 {
             Health::Degraded
         } else {
             Health::Healthy
@@ -530,9 +539,7 @@ fn start_scenario(ctx: &StepContext, state: &mut SimState, scenario_id: &str, em
         resolved_at_ms: None,
         phase_index: 0,
         phase_name: String::new(),
-        root_cause_node_id: scenario
-            .root_cause
-            .map(|n| ctx.topo.node_id(n).to_string()),
+        root_cause_node_id: scenario.root_cause.map(|n| ctx.topo.node_id(n).to_string()),
         impacted_node_ids: Vec::new(),
         summary: scenario.info.summary.clone(),
     });
@@ -719,14 +726,15 @@ fn inject_flows(ctx: &StepContext, state: &SimState, m: &mut Modifiers) -> Injec
             let survivors = remaining - rejected;
             if let Some(reason) = reason.filter(|_| rejected > 0.0) {
                 injected.rejected[edge] += rejected;
-                let strongest = injected.reason[edge].is_none_or(|current| {
-                    rejection_cost(reason) >= rejection_cost(current)
-                });
+                let strongest = injected.reason[edge]
+                    .is_none_or(|current| rejection_cost(reason) >= rejection_cost(current));
                 if strongest {
                     injected.reason[edge] = Some(reason);
                 }
-                if blocked.is_none_or(|(_, _, share)| reject > share) {
-                    blocked = Some((dst, reason, reject));
+                // The flow is "blocked at" whichever node turns away the
+                // largest volume, not the largest fraction of what is left.
+                if blocked.is_none_or(|(_, _, volume)| rejected > volume) {
+                    blocked = Some((dst, reason, rejected));
                 }
                 m.path_load[dst] += rejected * rejection_cost(reason);
             }
@@ -760,10 +768,10 @@ fn inject_flows(ctx: &StepContext, state: &SimState, m: &mut Modifiers) -> Injec
             rps: rate,
             delivered_rps: remaining,
             blocked_at: blocked
-                .filter(|(_, _, share)| *share > 0.5)
+                .filter(|(_, _, volume)| *volume > 0.5 * rate)
                 .map(|(node, _, _)| topo.node_id(node).to_string()),
             blocked_reason: blocked
-                .filter(|(_, _, share)| *share > 0.5)
+                .filter(|(_, _, volume)| *volume > 0.5 * rate)
                 .map(|(_, reason, _)| reason),
         });
     }
@@ -819,8 +827,8 @@ fn emit_authz_samples(ctx: &StepContext, state: &mut SimState, em: &mut Emitter)
                 }
                 cursor -= entry.weight;
             }
-            let node = topo.authorizers
-                [((roll_node * topo.authorizers.len() as f64) as usize).min(topo.authorizers.len() - 1)];
+            let node = topo.authorizers[((roll_node * topo.authorizers.len() as f64) as usize)
+                .min(topo.authorizers.len() - 1)];
             let denied = picked.outcome.decision == Decision::Deny;
             em.push(
                 Emit::new(
@@ -832,7 +840,10 @@ fn emit_authz_samples(ctx: &StepContext, state: &mut SimState, em: &mut Emitter)
                     EventKind::AuthzDecision,
                     decision_title(picked),
                 )
-                .message(format!("Sampled from baseline traffic on {}.", picked.request.resource))
+                .message(format!(
+                    "Sampled from baseline traffic on {}.",
+                    picked.request.resource
+                ))
                 .nodes(vec![topo.node_id(node).to_string()])
                 .details(decision_details(picked, ctx.decisions)),
             );
@@ -858,10 +869,10 @@ fn emit_authz_samples(ctx: &StepContext, state: &mut SimState, em: &mut Emitter)
             .iter()
             .take_while(|e| topo.edge_dst[**e] != binding.node)
             .all(|e| {
-                state
-                    .channels
-                    .value(ChannelKey::FlowReject(index as u16, topo.edge_dst[*e] as u32))
-                    < 0.999
+                state.channels.value(ChannelKey::FlowReject(
+                    index as u16,
+                    topo.edge_dst[*e] as u32,
+                )) < 0.999
             });
         if rate <= 1.0 || !reaches_authorizer {
             continue;
@@ -928,13 +939,16 @@ fn evaluate_alerts(ctx: &StepContext, state: &mut SimState, em: &mut Emitter) {
             0.02,
             "Error budget burning",
             "Error rate back within objective",
-            format!("{:.1} % of client requests are failing.", g.error_rate * 100.0),
+            format!(
+                "{:.1} % of client requests are failing.",
+                g.error_rate * 100.0
+            ),
         ),
         (
             ALERT_DENIALS,
             g.authz_denial_rate,
-            deny_base + 0.10,
-            deny_base + 0.04,
+            deny_base + 0.08,
+            deny_base + 0.03,
             "Authorization denial spike",
             "Authorization denials back to baseline",
             format!(

@@ -1,0 +1,1434 @@
+{
+  "schemaVersion": "1.0",
+  "events": [
+    {
+      "seq": 1,
+      "id": "evt-1",
+      "tick": 20,
+      "virtualTimeMs": 4000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "aps-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "alice-view-order",
+        "request": {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "id": "evt-2",
+      "tick": 40,
+      "virtualTimeMs": 8000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "alice-view-order",
+        "request": {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "id": "evt-3",
+      "tick": 41,
+      "virtualTimeMs": 8200,
+      "severity": "warning",
+      "kind": "incident-started",
+      "title": "Credential Stuffing started",
+      "message": "Leaked credential pairs are replayed against the login endpoint. Almost all fail; the few that succeed are stopped by policy.",
+      "nodeIds": [
+        "unknown-sources",
+        "use-gateway",
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "scenarioId": "credential-stuffing"
+      }
+    },
+    {
+      "seq": 4,
+      "id": "evt-4",
+      "tick": 41,
+      "virtualTimeMs": 8200,
+      "severity": "warning",
+      "kind": "incident-phase",
+      "title": "Credential Stuffing · Low and slow",
+      "message": "A trickle of login attempts tests which leaked credentials are still valid.",
+      "nodeIds": [
+        "unknown-sources",
+        "use-gateway",
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "scenarioId": "credential-stuffing",
+        "phaseIndex": 0,
+        "phaseName": "Low and slow",
+        "status": "active"
+      }
+    },
+    {
+      "seq": 5,
+      "id": "evt-5",
+      "tick": 48,
+      "virtualTimeMs": 9600,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "id": "evt-6",
+      "tick": 56,
+      "virtualTimeMs": 11200,
+      "severity": "notice",
+      "kind": "auth-failure",
+      "title": "Authentication failures rising",
+      "message": "Failed logins are spread thinly across many accounts.",
+      "nodeIds": [
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic"
+    },
+    {
+      "seq": 7,
+      "id": "evt-7",
+      "tick": 60,
+      "virtualTimeMs": 12000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"bob\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "euw-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "bob-view-order",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "id": "evt-8",
+      "tick": 60,
+      "virtualTimeMs": 12000,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "id": "evt-9",
+      "tick": 72,
+      "virtualTimeMs": 14400,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "id": "evt-10",
+      "tick": 80,
+      "virtualTimeMs": 16000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"bob\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "euw-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "bob-view-order",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "id": "evt-11",
+      "tick": 84,
+      "virtualTimeMs": 16800,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "id": "evt-12",
+      "tick": 91,
+      "virtualTimeMs": 18200,
+      "severity": "warning",
+      "kind": "incident-phase",
+      "title": "Credential Stuffing · Stuffing burst",
+      "message": "Login attempts surge past the identity service's capacity. Legitimate sign-ins start to fail.",
+      "nodeIds": [
+        "unknown-sources",
+        "use-gateway",
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "scenarioId": "credential-stuffing",
+        "phaseIndex": 1,
+        "phaseName": "Stuffing burst",
+        "status": "active"
+      }
+    },
+    {
+      "seq": 13,
+      "id": "evt-13",
+      "tick": 96,
+      "virtualTimeMs": 19200,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "id": "evt-14",
+      "tick": 100,
+      "virtualTimeMs": 20000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"bob\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "aps-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "bob-view-order",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "id": "evt-15",
+      "tick": 104,
+      "virtualTimeMs": 20800,
+      "severity": "warning",
+      "kind": "alert",
+      "title": "Suspicious traffic surge",
+      "message": "16 % of inbound requests come from flagged sources.",
+      "nodeIds": [
+        "threat-monitor"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "rule": 2,
+        "value": 0.15703475923343552,
+        "threshold": 0.15
+      }
+    },
+    {
+      "seq": 16,
+      "id": "evt-16",
+      "tick": 106,
+      "virtualTimeMs": 21200,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Identity Service is degraded",
+      "message": "Identity Service in us-east went from healthy to degraded.",
+      "nodeIds": [
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0156,
+        "latencyMs": 69.1,
+        "saturation": 0.942
+      }
+    },
+    {
+      "seq": 17,
+      "id": "evt-17",
+      "tick": 108,
+      "virtualTimeMs": 21600,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 18,
+      "id": "evt-18",
+      "tick": 110,
+      "virtualTimeMs": 22000,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "API Gateway is degraded",
+      "message": "API Gateway in us-east went from healthy to degraded.",
+      "nodeIds": [
+        "use-gateway"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0607,
+        "latencyMs": 103.2,
+        "saturation": 0.765
+      }
+    },
+    {
+      "seq": 19,
+      "id": "evt-19",
+      "tick": 111,
+      "virtualTimeMs": 22200,
+      "severity": "critical",
+      "kind": "health-transition",
+      "title": "Identity Service is critical",
+      "message": "Identity Service in us-east went from degraded to critical.",
+      "nodeIds": [
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "degraded",
+        "to": "critical",
+        "errorRate": 0.1848,
+        "latencyMs": 130.7,
+        "saturation": 1.228
+      }
+    },
+    {
+      "seq": 20,
+      "id": "evt-20",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Clients · Americas is degraded",
+      "message": "Clients · Americas in global went from healthy to degraded.",
+      "nodeIds": [
+        "clients-na"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0465,
+        "latencyMs": 120.2,
+        "saturation": 0.0
+      }
+    },
+    {
+      "seq": 21,
+      "id": "evt-21",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Clients · Europe is degraded",
+      "message": "Clients · Europe in global went from healthy to degraded.",
+      "nodeIds": [
+        "clients-eu"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0465,
+        "latencyMs": 118.2,
+        "saturation": 0.0
+      }
+    },
+    {
+      "seq": 22,
+      "id": "evt-22",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Clients · APAC is degraded",
+      "message": "Clients · APAC in global went from healthy to degraded.",
+      "nodeIds": [
+        "clients-apac"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0465,
+        "latencyMs": 126.2,
+        "saturation": 0.0
+      }
+    },
+    {
+      "seq": 23,
+      "id": "evt-23",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Partner Integrations is degraded",
+      "message": "Partner Integrations in global went from healthy to degraded.",
+      "nodeIds": [
+        "partner-api"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0465,
+        "latencyMs": 114.2,
+        "saturation": 0.0
+      }
+    },
+    {
+      "seq": 24,
+      "id": "evt-24",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Global Edge Router is degraded",
+      "message": "Global Edge Router in global went from healthy to degraded.",
+      "nodeIds": [
+        "edge-router"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0465,
+        "latencyMs": 102.2,
+        "saturation": 0.411
+      }
+    },
+    {
+      "seq": 25,
+      "id": "evt-25",
+      "tick": 113,
+      "virtualTimeMs": 22600,
+      "severity": "warning",
+      "kind": "alert",
+      "title": "Error budget burning",
+      "message": "5.2 % of client requests are failing.",
+      "nodeIds": [
+        "threat-monitor"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "rule": 0,
+        "value": 0.051614306713335875,
+        "threshold": 0.05
+      }
+    },
+    {
+      "seq": 26,
+      "id": "evt-26",
+      "tick": 120,
+      "virtualTimeMs": 24000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"bob\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "aps-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "bob-view-order",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 27,
+      "id": "evt-27",
+      "tick": 120,
+      "virtualTimeMs": 24000,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 28,
+      "id": "evt-28",
+      "tick": 121,
+      "virtualTimeMs": 24200,
+      "severity": "critical",
+      "kind": "alert",
+      "title": "Credential stuffing pattern detected",
+      "message": "More than 98 % of login attempts from unattributed sources fail, across thousands of distinct accounts.",
+      "nodeIds": [
+        "threat-monitor",
+        "use-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic"
+    },
+    {
+      "seq": 29,
+      "id": "evt-29",
+      "tick": 132,
+      "virtualTimeMs": 26400,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 30,
+      "id": "evt-30",
+      "tick": 140,
+      "virtualTimeMs": 28000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "alice-view-order",
+        "request": {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 31,
+      "id": "evt-31",
+      "tick": 141,
+      "virtualTimeMs": 28200,
+      "severity": "warning",
+      "kind": "auth-failure",
+      "title": "Valid credentials replayed without MFA",
+      "message": "A small share of attempts authenticate, but the sessions carry no MFA assertion.",
+      "nodeIds": [
+        "use-auth",
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic"
+    },
+    {
+      "seq": 32,
+      "id": "evt-32",
+      "tick": 144,
+      "virtualTimeMs": 28800,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 33,
+      "id": "evt-33",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "notice",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"exportLedger\"",
+      "message": "Evaluated on demand against Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "partner-api",
+        "edge-router",
+        "use-gateway",
+        "use-auth",
+        "use-cedar",
+        "use-ledger",
+        "use-ledger-db"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "explorer",
+        "decision": {
+          "id": "dec-1",
+          "virtualTimeMs": 30000,
+          "request": {
+            "principal": "User::\"alice\"",
+            "action": "Action::\"exportLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": {
+              "mfa": true
+            }
+          },
+          "decision": "allow",
+          "determiningPolicies": [
+            "finance-export-ledger-mfa"
+          ],
+          "errors": [],
+          "engine": {
+            "kind": "embedded-cedar",
+            "version": "4.14.1"
+          },
+          "evaluationMicros": 0,
+          "path": [
+            {
+              "nodeId": "partner-api",
+              "kind": "client",
+              "reached": true
+            },
+            {
+              "nodeId": "edge-router",
+              "kind": "edge",
+              "reached": true
+            },
+            {
+              "nodeId": "use-gateway",
+              "kind": "gateway",
+              "reached": true
+            },
+            {
+              "nodeId": "use-auth",
+              "kind": "authentication",
+              "reached": true
+            },
+            {
+              "nodeId": "use-cedar",
+              "kind": "authorization",
+              "reached": true
+            },
+            {
+              "nodeId": "use-ledger",
+              "kind": "resource",
+              "reached": true
+            },
+            {
+              "nodeId": "use-ledger-db",
+              "kind": "resource",
+              "reached": true
+            }
+          ],
+          "hops": [
+            "partner-api->edge-router",
+            "edge-router->use-gateway",
+            "use-gateway->use-auth",
+            "use-gateway->use-cedar",
+            "use-gateway->use-ledger",
+            "use-ledger->use-ledger-db"
+          ],
+          "blockedAt": null,
+          "disabledPolicies": [],
+          "dataSource": "synthetic"
+        }
+      }
+    },
+    {
+      "seq": 34,
+      "id": "evt-34",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"mallory\" → Action::\"exportLedger\"",
+      "message": "Evaluated on demand against Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "partner-api",
+        "edge-router",
+        "use-gateway",
+        "use-auth",
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "explorer",
+        "decision": {
+          "id": "dec-2",
+          "virtualTimeMs": 30000,
+          "request": {
+            "principal": "User::\"mallory\"",
+            "action": "Action::\"exportLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": {}
+          },
+          "decision": "deny",
+          "determiningPolicies": [
+            "forbid-cross-tenant"
+          ],
+          "errors": [],
+          "engine": {
+            "kind": "embedded-cedar",
+            "version": "4.14.1"
+          },
+          "evaluationMicros": 0,
+          "path": [
+            {
+              "nodeId": "partner-api",
+              "kind": "client",
+              "reached": true
+            },
+            {
+              "nodeId": "edge-router",
+              "kind": "edge",
+              "reached": true
+            },
+            {
+              "nodeId": "use-gateway",
+              "kind": "gateway",
+              "reached": true
+            },
+            {
+              "nodeId": "use-auth",
+              "kind": "authentication",
+              "reached": true
+            },
+            {
+              "nodeId": "use-cedar",
+              "kind": "authorization",
+              "reached": true
+            },
+            {
+              "nodeId": "use-ledger",
+              "kind": "resource",
+              "reached": false
+            },
+            {
+              "nodeId": "use-ledger-db",
+              "kind": "resource",
+              "reached": false
+            }
+          ],
+          "hops": [
+            "partner-api->edge-router",
+            "edge-router->use-gateway",
+            "use-gateway->use-auth",
+            "use-gateway->use-cedar"
+          ],
+          "blockedAt": "use-cedar",
+          "disabledPolicies": [],
+          "dataSource": "synthetic"
+        }
+      }
+    },
+    {
+      "seq": 35,
+      "id": "evt-35",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "notice",
+      "kind": "scan-finding",
+      "title": "Port scan report: 2 of 13 ports open",
+      "message": "Imported from a network-scanner report generated at 2026-01-15 09:30:00.482913 UTC. OS guess: Linux/Unix.",
+      "nodeIds": [],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "network-scanner",
+        "payload": {
+          "report": {
+            "generatedAt": "2026-01-15 09:30:00.482913 UTC",
+            "findings": [
+              {
+                "port": 75,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 76,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 77,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 78,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 79,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 80,
+                "open": true,
+                "service": "HTTP"
+              },
+              {
+                "port": 81,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 82,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 83,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 84,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 85,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 443,
+                "open": false,
+                "service": null
+              },
+              {
+                "port": 8080,
+                "open": true,
+                "service": "HTTP-Alt"
+              }
+            ],
+            "osFingerprint": {
+              "ttl": 64,
+              "guess": "Linux/Unix"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 36,
+      "id": "evt-36",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "info",
+      "kind": "scan-finding",
+      "title": "Open port 80",
+      "message": "TCP 80 accepted a connection (HTTP).",
+      "nodeIds": [],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "network-scanner",
+        "payload": {
+          "finding": {
+            "port": 80,
+            "open": true,
+            "service": "HTTP"
+          }
+        }
+      }
+    },
+    {
+      "seq": 37,
+      "id": "evt-37",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "info",
+      "kind": "scan-finding",
+      "title": "Open port 8080",
+      "message": "TCP 8080 accepted a connection (HTTP-Alt).",
+      "nodeIds": [],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "network-scanner",
+        "payload": {
+          "finding": {
+            "port": 8080,
+            "open": true,
+            "service": "HTTP-Alt"
+          }
+        }
+      }
+    },
+    {
+      "seq": 38,
+      "id": "evt-38",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "critical",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10001 · CVSS 9.8",
+      "message": "FICTIONAL ADVISORY. Request smuggling in the HTTP/2 downgrade path of the fictional Helios Gateway allows a remote attacker to bypass route-level quotas.",
+      "nodeIds": [
+        "use-gateway",
+        "euw-gateway",
+        "aps-gateway"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10001",
+            "published": "2026-01-14T18:15:00.000",
+            "description": "FICTIONAL ADVISORY. Request smuggling in the HTTP/2 downgrade path of the fictional Helios Gateway allows a remote attacker to bypass route-level quotas.",
+            "baseScore": 9.8
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 39,
+      "id": "evt-39",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "warning",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10002 · CVSS 8.1",
+      "message": "FICTIONAL ADVISORY. Session fixation in the fictional Helios Identity Service lets an attacker reuse a pre-authentication session identifier after login.",
+      "nodeIds": [
+        "use-auth",
+        "euw-auth",
+        "aps-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10002",
+            "published": "2026-01-13T11:02:00.000",
+            "description": "FICTIONAL ADVISORY. Session fixation in the fictional Helios Identity Service lets an attacker reuse a pre-authentication session identifier after login.",
+            "baseScore": 8.1
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 40,
+      "id": "evt-40",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "notice",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10003 · CVSS 6.5",
+      "message": "FICTIONAL ADVISORY. Unbounded result sets in the fictional Helios Orders database driver can exhaust connection pools under crafted queries.",
+      "nodeIds": [
+        "use-orders-db"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10003",
+            "published": "2026-01-12T07:44:00.000",
+            "description": "FICTIONAL ADVISORY. Unbounded result sets in the fictional Helios Orders database driver can exhaust connection pools under crafted queries.",
+            "baseScore": 6.5
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 41,
+      "id": "evt-41",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "info",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10004 · unscored",
+      "message": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
+      "nodeIds": [
+        "use-assets",
+        "euw-assets"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10004",
+            "published": "2026-01-10T15:20:00.000",
+            "description": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
+            "baseScore": null
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 42,
+      "id": "evt-42",
+      "tick": 156,
+      "virtualTimeMs": 31200,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 43,
+      "id": "evt-43",
+      "tick": 160,
+      "virtualTimeMs": 32000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "euw-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "alice-view-order",
+        "request": {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    }
+  ],
+  "playback": {
+    "status": "playing",
+    "mode": "live",
+    "speed": 1.0,
+    "tick": 160,
+    "virtualTimeMs": 32000,
+    "headTick": 160,
+    "headTimeMs": 32000,
+    "windowStartMs": 0,
+    "tickMs": 200,
+    "recordingId": null
+  }
+}

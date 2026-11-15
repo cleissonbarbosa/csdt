@@ -1,0 +1,162 @@
+{
+  "type": "events",
+  "data": [
+    {
+      "seq": 39,
+      "id": "evt-39",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "warning",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10002 · CVSS 8.1",
+      "message": "FICTIONAL ADVISORY. Session fixation in the fictional Helios Identity Service lets an attacker reuse a pre-authentication session identifier after login.",
+      "nodeIds": [
+        "use-auth",
+        "euw-auth",
+        "aps-auth"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10002",
+            "published": "2026-01-13T11:02:00.000",
+            "description": "FICTIONAL ADVISORY. Session fixation in the fictional Helios Identity Service lets an attacker reuse a pre-authentication session identifier after login.",
+            "baseScore": 8.1
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 40,
+      "id": "evt-40",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "notice",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10003 · CVSS 6.5",
+      "message": "FICTIONAL ADVISORY. Unbounded result sets in the fictional Helios Orders database driver can exhaust connection pools under crafted queries.",
+      "nodeIds": [
+        "use-orders-db"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10003",
+            "published": "2026-01-12T07:44:00.000",
+            "description": "FICTIONAL ADVISORY. Unbounded result sets in the fictional Helios Orders database driver can exhaust connection pools under crafted queries.",
+            "baseScore": 6.5
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 41,
+      "id": "evt-41",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "info",
+      "kind": "cve-advisory",
+      "title": "CVE-2099-10004 · unscored",
+      "message": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
+      "nodeIds": [
+        "use-assets",
+        "euw-assets"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "recording",
+      "details": {
+        "providerId": "security-alerts",
+        "payload": {
+          "advisory": {
+            "id": "CVE-2099-10004",
+            "published": "2026-01-10T15:20:00.000",
+            "description": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
+            "baseScore": null
+          },
+          "fictional": true
+        }
+      }
+    },
+    {
+      "seq": 42,
+      "id": "evt-42",
+      "tick": 156,
+      "virtualTimeMs": 31200,
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"bob\" → Action::\"exportLedger\"",
+      "message": "Request blocked at the authorizer on Ledger::\"acme-ledger-2026\".",
+      "nodeIds": [
+        "use-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "stolen-session-export",
+        "request": {
+          "principal": "User::\"bob\"",
+          "action": "Action::\"exportLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "context": {
+            "mfa": false
+          }
+        },
+        "decision": "deny",
+        "determiningPolicies": [],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    },
+    {
+      "seq": 43,
+      "id": "evt-43",
+      "tick": 160,
+      "virtualTimeMs": 32000,
+      "severity": "info",
+      "kind": "authz-decision",
+      "title": "Allow · User::\"alice\" → Action::\"viewOrder\"",
+      "message": "Sampled from baseline traffic on Order::\"acme-ord-1001\".",
+      "nodeIds": [
+        "euw-cedar"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "origin": "traffic",
+        "requestId": "alice-view-order",
+        "request": {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewOrder\"",
+          "resource": "Order::\"acme-ord-1001\"",
+          "context": {}
+        },
+        "decision": "allow",
+        "determiningPolicies": [
+          "tenant-view-orders"
+        ],
+        "errors": [],
+        "engine": {
+          "kind": "embedded-cedar",
+          "version": "4.14.1"
+        }
+      }
+    }
+  ]
+}

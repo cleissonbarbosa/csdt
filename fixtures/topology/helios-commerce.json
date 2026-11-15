@@ -47,7 +47,7 @@
     { "id": "use-inventory", "name": "Inventory", "type": "container", "region": "us-east", "tier": 4, "baseLatencyMs": 14, "description": "Stock reservations across warehouses." },
     { "id": "use-fraud", "name": "Fraud Scoring", "type": "serverless", "region": "us-east", "tier": 5, "baseLatencyMs": 22, "description": "Scores each payment against known fraud patterns." },
     { "id": "use-order-events", "name": "Order Events", "type": "message-queue", "region": "us-east", "tier": 5, "baseLatencyMs": 2, "description": "Durable stream of order lifecycle events." },
-    { "id": "use-order-worker", "name": "Fulfilment Worker", "type": "container", "region": "us-east", "tier": 5, "baseLatencyMs": 30, "headroom": 1.8, "description": "Consumes order events and drives fulfilment." },
+    { "id": "use-order-worker", "name": "Fulfilment Worker", "type": "container", "region": "us-east", "tier": 5, "baseLatencyMs": 30, "headroom": 1.5, "description": "Consumes order events and drives fulfilment." },
     { "id": "use-notify-queue", "name": "Notification Queue", "type": "message-queue", "region": "us-east", "tier": 5, "baseLatencyMs": 2, "description": "Buffered customer notifications." },
     { "id": "use-notify", "name": "Notifier", "type": "serverless", "region": "us-east", "tier": 5, "baseLatencyMs": 60, "description": "Sends e-mail and push notifications." },
     { "id": "use-orders-db", "name": "Orders DB", "type": "database", "region": "us-east", "tier": 6, "baseLatencyMs": 5, "headroom": 2.2, "description": "Primary relational store for orders. Replicated to every region." },

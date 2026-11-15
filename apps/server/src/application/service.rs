@@ -8,9 +8,8 @@ use crate::authorization::validate_request;
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, Decision, EngineInfo,
     ImportedEvent, Incident, MetricsReport, PathStage, PathStageKind, PlaybackState,
-    PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario,
-    SecurityEvent, Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS,
-    SCHEMA_VERSION,
+    PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario, SecurityEvent,
+    Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS, SCHEMA_VERSION,
 };
 use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
@@ -96,14 +95,12 @@ impl StreamMessage<'_> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ControlAction {
     Play,
     Pause,
     /// Advance exactly one tick (only meaningful while paused).
     Step,
-    #[serde(rename_all = "camelCase")]
     Seek {
         to_ms: u64,
     },
@@ -474,7 +471,13 @@ impl SimulationService {
             .cedar
             .evaluate(&input.request, &input.disabled_policies)?;
         let micros = started.elapsed().as_micros() as u64;
-        Ok(self.record_decision(input, outcome, self.assets.cedar.engine(), micros))
+        Ok(self.record_decision(
+            input,
+            outcome,
+            self.assets.cedar.engine(),
+            micros,
+            DataSource::Synthetic,
+        ))
     }
 
     /// Records a decision produced by any engine and places it on the topology.
@@ -484,6 +487,7 @@ impl SimulationService {
         outcome: PolicyDecision,
         engine: EngineInfo,
         evaluation_micros: u64,
+        data_source: DataSource,
     ) -> AuthorizationDecision {
         let mut rt = self.lock();
         rt.decision_counter += 1;
@@ -503,7 +507,7 @@ impl SimulationService {
             hops,
             blocked_at,
             disabled_policies: input.disabled_policies,
-            data_source: DataSource::Synthetic,
+            data_source,
         };
         let branched = rt.timeline.issue(Command::RecordDecision {
             decision: Box::new(decision.clone()),
@@ -616,8 +620,8 @@ fn decision_path(
     ) else {
         return (Vec::new(), Vec::new(), None);
     };
-    let resource_node = role(&format!("resource:{}", entity_type(resource)))
-        .or_else(|| role("protectedResource"));
+    let resource_node =
+        role(&format!("resource:{}", entity_type(resource))).or_else(|| role("protectedResource"));
 
     let mut stages = Vec::new();
     let mut hops = Vec::new();
@@ -650,7 +654,11 @@ fn decision_path(
                 if allowed {
                     hops.push(topo.edge_ids[*edge].clone());
                 }
-                stages.push(stage(topo.edge_dst[*edge], PathStageKind::Resource, allowed));
+                stages.push(stage(
+                    topo.edge_dst[*edge],
+                    PathStageKind::Resource,
+                    allowed,
+                ));
             }
         }
     }

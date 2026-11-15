@@ -29,7 +29,7 @@ pub const DOWN_LATENCY_MS: f64 = 1200.0;
 pub const MAX_LATENCY_MS: f64 = 6000.0;
 
 const QUEUE_DRAIN_TAU_S: f64 = 1.5;
-const QUEUE_RETENTION_S: f64 = 40.0;
+const QUEUE_RETENTION_S: f64 = 25.0;
 const MIN_CAPACITY_RPS: f64 = 40.0;
 const SAME_REGION_LATENCY_MS: f64 = 1.2;
 const CROSS_REGION_LATENCY_MS: f64 = 60.0;
@@ -570,15 +570,18 @@ pub fn propagate(
                 let failure = combine_failures(flow.err_eff[dst], m.edge_err_inject[e]);
                 let hop_latency = topo.edge_latency[e] * m.edge_lat_factor[e].max(0.0)
                     + flow.lat_eff[dst].min(TIMEOUT_MS);
-                let weight = m.edge_weight[e].max(0.0);
                 if rel == Relationship::Route {
                     if route_weight > f64::EPSILON {
-                        let share = weight / route_weight;
+                        let share = m.edge_weight[e].max(0.0) / route_weight;
                         success *= 1.0 - share * failure;
                         latency += share * hop_latency;
                     }
                 } else {
-                    let probability = weight.min(1.0);
+                    // Whether a request depends on this hop is a property of
+                    // the caller, so the nominal weight is used: a circuit
+                    // breaker that cuts traffic on the edge (a weight factor)
+                    // makes calls fail fast, it does not make them succeed.
+                    let probability = topo.edge_weight[e].min(1.0);
                     success *= 1.0 - probability * topo.edge_crit[e] * failure;
                     latency += probability * hop_latency;
                 }

@@ -121,7 +121,9 @@ mod tests {
         assert!((wait.as_secs_f64() - 0.5).abs() < 1e-6);
         // Half a second later one token is back.
         assert!(limiter.check_at(A, t0 + Duration::from_millis(500)).is_ok());
-        assert!(limiter.check_at(A, t0 + Duration::from_millis(500)).is_err());
+        assert!(limiter
+            .check_at(A, t0 + Duration::from_millis(500))
+            .is_err());
     }
 
     #[test]

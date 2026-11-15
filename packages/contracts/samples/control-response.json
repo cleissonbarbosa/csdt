@@ -1,0 +1,14 @@
+{
+  "playback": {
+    "status": "playing",
+    "mode": "live",
+    "speed": 1.0,
+    "tick": 40,
+    "virtualTimeMs": 8000,
+    "headTick": 40,
+    "headTimeMs": 8000,
+    "windowStartMs": 0,
+    "tickMs": 200,
+    "recordingId": null
+  }
+}

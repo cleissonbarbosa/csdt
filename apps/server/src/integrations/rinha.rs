@@ -307,11 +307,7 @@ mod tests {
             base_url: "http://127.0.0.1:9999".into(),
             probe_interval: Duration::from_millis(1),
         };
-        let provider = RinhaProbeProvider::new(
-            Some(config),
-            &[],
-            reqwest::Client::new(),
-        );
+        let provider = RinhaProbeProvider::new(Some(config), &[], reqwest::Client::new());
         let (_, interval) = provider.configured().expect("configured");
         assert_eq!(*interval, MIN_PROBE_INTERVAL);
     }

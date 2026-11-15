@@ -1,0 +1,253 @@
+{
+  "scenarios": [
+    {
+      "id": "ddos-surge",
+      "name": "DDoS Surge",
+      "summary": "A volumetric flood from unattributed sources overwhelms the primary API gateway until edge filtering absorbs it.",
+      "category": "availability",
+      "severity": "critical",
+      "durationMs": 96000,
+      "phases": [
+        {
+          "name": "Probing",
+          "atMs": 0,
+          "status": "active",
+          "description": "Low-rate probes map the public API surface."
+        },
+        {
+          "name": "Volumetric surge",
+          "atMs": 8000,
+          "status": "active",
+          "description": "Request volume climbs to several times the gateway's capacity. Latency rises and requests are shed."
+        },
+        {
+          "name": "Edge mitigation",
+          "atMs": 36000,
+          "status": "mitigating",
+          "description": "Rate-based rules at the edge router drop traffic from the offending sources before it reaches the gateway."
+        },
+        {
+          "name": "Attack subsides",
+          "atMs": 62000,
+          "status": "recovering",
+          "description": "The flood loses intensity while filtering stays in place."
+        },
+        {
+          "name": "Recovery",
+          "atMs": 80000,
+          "status": "recovering",
+          "description": "Traffic returns to its normal shape and services recover."
+        }
+      ],
+      "targetNodeIds": [
+        "unknown-sources",
+        "edge-router",
+        "use-gateway"
+      ],
+      "available": true
+    },
+    {
+      "id": "credential-stuffing",
+      "name": "Credential Stuffing",
+      "summary": "Leaked credential pairs are replayed against the login endpoint. Almost all fail; the few that succeed are stopped by policy.",
+      "category": "identity",
+      "severity": "warning",
+      "durationMs": 84000,
+      "phases": [
+        {
+          "name": "Low and slow",
+          "atMs": 0,
+          "status": "active",
+          "description": "A trickle of login attempts tests which leaked credentials are still valid."
+        },
+        {
+          "name": "Stuffing burst",
+          "atMs": 10000,
+          "status": "active",
+          "description": "Login attempts surge past the identity service's capacity. Legitimate sign-ins start to fail."
+        },
+        {
+          "name": "Adaptive rate limiting",
+          "atMs": 30000,
+          "status": "mitigating",
+          "description": "The gateway throttles login attempts per source, relieving the identity service."
+        },
+        {
+          "name": "Source blocked",
+          "atMs": 50000,
+          "status": "mitigating",
+          "description": "The offending sources are blocked at the edge."
+        },
+        {
+          "name": "Recovery",
+          "atMs": 68000,
+          "status": "recovering",
+          "description": "Attempts stop and authentication returns to normal."
+        }
+      ],
+      "targetNodeIds": [
+        "unknown-sources",
+        "use-gateway",
+        "use-auth"
+      ],
+      "available": true
+    },
+    {
+      "id": "cedar-denial",
+      "name": "Cedar Authorization Denial",
+      "summary": "An authenticated contractor from another tenant repeatedly attempts prohibited actions. Cedar denies every one of them.",
+      "category": "authorization",
+      "severity": "warning",
+      "durationMs": 70000,
+      "phases": [
+        {
+          "name": "Permitted access",
+          "atMs": 0,
+          "status": "active",
+          "description": "A finance analyst reads her own tenant's ledger. Cedar permits it and the request reaches the resource."
+        },
+        {
+          "name": "Prohibited export",
+          "atMs": 10000,
+          "status": "active",
+          "description": "A contractor of another tenant requests an export of the ledger. Authentication succeeds; Cedar denies the action."
+        },
+        {
+          "name": "Escalation attempts",
+          "atMs": 26000,
+          "status": "active",
+          "description": "The principal cycles through other actions and resources. Every request is denied."
+        },
+        {
+          "name": "Session revoked",
+          "atMs": 46000,
+          "status": "mitigating",
+          "description": "The identity service revokes the principal's sessions; requests now stop at authentication."
+        },
+        {
+          "name": "Recovery",
+          "atMs": 58000,
+          "status": "recovering",
+          "description": "The attempts stop."
+        }
+      ],
+      "targetNodeIds": [
+        "partner-api",
+        "use-gateway",
+        "use-auth",
+        "use-cedar",
+        "use-ledger-db"
+      ],
+      "available": true
+    },
+    {
+      "id": "cascading-failure",
+      "name": "Cascading Service Failure",
+      "summary": "The primary orders database degrades. Dependent services fail, queues back up, and circuit breakers finally stop the spread.",
+      "category": "resilience",
+      "severity": "critical",
+      "durationMs": 104000,
+      "phases": [
+        {
+          "name": "Latency creep",
+          "atMs": 0,
+          "status": "active",
+          "description": "Storage latency on the primary database climbs steadily."
+        },
+        {
+          "name": "Connection exhaustion",
+          "atMs": 14000,
+          "status": "active",
+          "description": "Slow queries exhaust connection pools. The database serves a fraction of its normal load and callers start timing out."
+        },
+        {
+          "name": "Retry storm",
+          "atMs": 34000,
+          "status": "active",
+          "description": "Callers retry failed queries, multiplying the load on an already degraded database."
+        },
+        {
+          "name": "Circuit breakers open",
+          "atMs": 52000,
+          "status": "mitigating",
+          "description": "Callers stop sending queries and fail fast, giving the database room to recover."
+        },
+        {
+          "name": "Replica promoted",
+          "atMs": 66000,
+          "status": "recovering",
+          "description": "A healthy replica takes over as primary; breakers close gradually."
+        },
+        {
+          "name": "Backlog drain",
+          "atMs": 84000,
+          "status": "recovering",
+          "description": "Queue consumers work through the accumulated backlog."
+        }
+      ],
+      "targetNodeIds": [
+        "use-orders-db"
+      ],
+      "available": true
+    },
+    {
+      "id": "regional-outage",
+      "name": "Regional Outage",
+      "summary": "An entire cloud region becomes unreachable. Health checks fail, traffic is re-routed to the failover region, and the region is later restored.",
+      "category": "resilience",
+      "severity": "critical",
+      "durationMs": 100000,
+      "phases": [
+        {
+          "name": "Network partition",
+          "atMs": 0,
+          "status": "active",
+          "description": "Connectivity into the region degrades: packets are lost and latency spikes."
+        },
+        {
+          "name": "Region dark",
+          "atMs": 9000,
+          "status": "active",
+          "description": "Every service in the region is unreachable. Requests routed there fail."
+        },
+        {
+          "name": "Failover",
+          "atMs": 24000,
+          "status": "mitigating",
+          "description": "The edge router withdraws the region and sends its traffic to the failover region, which absorbs the extra load."
+        },
+        {
+          "name": "Region restored",
+          "atMs": 56000,
+          "status": "recovering",
+          "description": "Services in the region come back with reduced capacity while caches warm up. Traffic stays on the failover region."
+        },
+        {
+          "name": "Rebalancing",
+          "atMs": 72000,
+          "status": "recovering",
+          "description": "Traffic shifts back to the restored region gradually."
+        }
+      ],
+      "targetNodeIds": [
+        "edge-router",
+        "use-gateway",
+        "euw-gateway",
+        "euw-auth",
+        "euw-cedar",
+        "euw-catalog",
+        "euw-cart",
+        "euw-orders",
+        "euw-payments",
+        "euw-order-events",
+        "euw-order-worker",
+        "euw-orders-db",
+        "euw-catalog-db",
+        "euw-sessions",
+        "euw-assets"
+      ],
+      "available": true
+    }
+  ],
+  "activeScenarioId": "credential-stuffing"
+}

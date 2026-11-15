@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+target
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+docs
+.env
+.env.*
+!.env.example
+*.md

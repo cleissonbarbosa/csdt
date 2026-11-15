@@ -1,0 +1,18 @@
+{
+  "type": "hello",
+  "protocolVersion": 1,
+  "schemaVersion": "1.0",
+  "topologyId": "helios-commerce",
+  "playback": {
+    "status": "playing",
+    "mode": "live",
+    "speed": 1.0,
+    "tick": 0,
+    "virtualTimeMs": 0,
+    "headTick": 0,
+    "headTimeMs": 0,
+    "windowStartMs": 0,
+    "tickMs": 200,
+    "recordingId": null
+  }
+}

@@ -151,7 +151,12 @@ impl CedarAgentProvider {
         }
     }
 
-    fn request(&self, method: reqwest::Method, url: String, token: Option<&str>) -> reqwest::RequestBuilder {
+    fn request(
+        &self,
+        method: reqwest::Method,
+        url: String,
+        token: Option<&str>,
+    ) -> reqwest::RequestBuilder {
         let mut builder = self.client.request(method, url);
         if let Some(token) = token {
             builder = builder.header(reqwest::header::AUTHORIZATION, token);
@@ -285,7 +290,10 @@ impl CedarAgentProvider {
             // requests it cannot parse.
             let description = serde_json::from_slice::<serde_json::Value>(&body)
                 .ok()
-                .and_then(|v| v.get("description").and_then(|d| d.as_str().map(str::to_owned)))
+                .and_then(|v| {
+                    v.get("description")
+                        .and_then(|d| d.as_str().map(str::to_owned))
+                })
                 .unwrap_or_else(|| "the agent rejected the request".into());
             return Err(AuthzError::InvalidRequest {
                 field: "request",

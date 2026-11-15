@@ -1,0 +1,16 @@
+{
+  "type": "timeline",
+  "reason": "seek",
+  "playback": {
+    "status": "playing",
+    "mode": "replay",
+    "speed": 1.0,
+    "tick": 30,
+    "virtualTimeMs": 6000,
+    "headTick": 160,
+    "headTimeMs": 32000,
+    "windowStartMs": 0,
+    "tickMs": 200,
+    "recordingId": null
+  }
+}

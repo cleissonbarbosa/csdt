@@ -1,0 +1,3 @@
+# `unwrap()` is a lint warning in production code; tests may use it freely.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

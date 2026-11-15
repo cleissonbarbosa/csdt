@@ -34,7 +34,12 @@ const SERVICES: [(&str, &str, ServiceType, f64); 12] = [
     ("cart", "Cart", ServiceType::Microservice, 12.0),
     ("orders", "Orders", ServiceType::Microservice, 28.0),
     ("payments", "Payments", ServiceType::Microservice, 44.0),
-    ("customers", "Customer Profiles", ServiceType::Microservice, 16.0),
+    (
+        "customers",
+        "Customer Profiles",
+        ServiceType::Microservice,
+        16.0,
+    ),
     ("inventory", "Inventory", ServiceType::Container, 14.0),
     ("pricing", "Pricing", ServiceType::Serverless, 11.0),
     ("shipping", "Shipping", ServiceType::Container, 26.0),
@@ -187,20 +192,76 @@ pub fn stress(seed: u64) -> TopologySpec {
     let mut primary_stores: Vec<String> = Vec::new();
     for (r, (region, _, _)) in STRESS_REGIONS.iter().enumerate() {
         let id = |slug: &str| format!("{region}-{slug}");
-        let gateway = b.node(id("gateway"), "API Gateway", ServiceType::ApiGateway, region, 2, 6.0, None);
-        let auth = b.node(id("auth"), "Identity Service", ServiceType::AuthService, region, 3, 14.0, None);
-        let cedar = b.node(id("cedar"), "Cedar Authorizer", ServiceType::CedarAuthorizer, region, 3, 3.0, None);
-        b.edge(&router, &gateway, Protocol::Https, Relationship::Route, demands[r] / total_demand);
+        let gateway = b.node(
+            id("gateway"),
+            "API Gateway",
+            ServiceType::ApiGateway,
+            region,
+            2,
+            6.0,
+            None,
+        );
+        let auth = b.node(
+            id("auth"),
+            "Identity Service",
+            ServiceType::AuthService,
+            region,
+            3,
+            14.0,
+            None,
+        );
+        let cedar = b.node(
+            id("cedar"),
+            "Cedar Authorizer",
+            ServiceType::CedarAuthorizer,
+            region,
+            3,
+            3.0,
+            None,
+        );
+        b.edge(
+            &router,
+            &gateway,
+            Protocol::Https,
+            Relationship::Route,
+            demands[r] / total_demand,
+        );
         b.edge(&gateway, &auth, Protocol::Grpc, Relationship::Auth, 0.4);
         b.edge(&gateway, &cedar, Protocol::Grpc, Relationship::Authz, 0.6);
-        b.edge(&gateway, &monitor, Protocol::Otlp, Relationship::Telemetry, 0.03);
-        b.edge(&auth, &monitor, Protocol::Otlp, Relationship::Telemetry, 0.05);
-        b.edge(&cedar, &monitor, Protocol::Otlp, Relationship::Telemetry, 0.05);
+        b.edge(
+            &gateway,
+            &monitor,
+            Protocol::Otlp,
+            Relationship::Telemetry,
+            0.03,
+        );
+        b.edge(
+            &auth,
+            &monitor,
+            Protocol::Otlp,
+            Relationship::Telemetry,
+            0.05,
+        );
+        b.edge(
+            &cedar,
+            &monitor,
+            Protocol::Otlp,
+            Relationship::Telemetry,
+            0.05,
+        );
 
         let stores: Vec<String> = STORES
             .iter()
             .map(|(slug, name, latency)| {
-                b.node(id(slug), name, ServiceType::Database, region, 6, *latency, None)
+                b.node(
+                    id(slug),
+                    name,
+                    ServiceType::Database,
+                    region,
+                    6,
+                    *latency,
+                    None,
+                )
             })
             .collect();
         let buckets: Vec<String> = BUCKETS
@@ -209,7 +270,17 @@ pub fn stress(seed: u64) -> TopologySpec {
             .collect();
         let queues: Vec<String> = QUEUES
             .iter()
-            .map(|(slug, name)| b.node(id(slug), name, ServiceType::MessageQueue, region, 5, 2.0, None))
+            .map(|(slug, name)| {
+                b.node(
+                    id(slug),
+                    name,
+                    ServiceType::MessageQueue,
+                    region,
+                    5,
+                    2.0,
+                    None,
+                )
+            })
             .collect();
         let workers: Vec<String> = QUEUES
             .iter()
@@ -232,10 +303,18 @@ pub fn stress(seed: u64) -> TopologySpec {
 
         b.edge(&auth, &stores[4], Protocol::Redis, Relationship::Data, 0.9);
         b.edge(&auth, &stores[3], Protocol::Sql, Relationship::Data, 0.25);
-        b.edge(&cedar, &buckets[1], Protocol::S3, Relationship::Telemetry, 0.5);
+        b.edge(
+            &cedar,
+            &buckets[1],
+            Protocol::S3,
+            Relationship::Telemetry,
+            0.5,
+        );
 
         // Gateway fan-out follows a Zipf-like popularity curve.
-        let popularity: Vec<f64> = (0..services.len()).map(|j| 1.0 / (1.0 + j as f64 * 0.35)).collect();
+        let popularity: Vec<f64> = (0..services.len())
+            .map(|j| 1.0 / (1.0 + j as f64 * 0.35))
+            .collect();
         let total_popularity: f64 = popularity.iter().sum();
         for (j, service) in services.iter().enumerate() {
             b.edge(
@@ -253,32 +332,90 @@ pub fn stress(seed: u64) -> TopologySpec {
                 } else {
                     Protocol::Sql
                 };
-                b.edge(service, store, protocol, Relationship::Data, 0.35 + rng.next_f64() * 0.6);
+                b.edge(
+                    service,
+                    store,
+                    protocol,
+                    Relationship::Data,
+                    0.35 + rng.next_f64() * 0.6,
+                );
             }
-            b.edge(service, &buckets[j % 2], Protocol::S3, Relationship::Data, 0.1 + rng.next_f64() * 0.2);
+            b.edge(
+                service,
+                &buckets[j % 2],
+                Protocol::S3,
+                Relationship::Data,
+                0.1 + rng.next_f64() * 0.2,
+            );
             // Calls only ever point at later services, which keeps the graph acyclic.
             if j + 1 < services.len() {
                 let first = j + 1 + rng.below(services.len() - j - 1);
-                b.edge(service, &services[first], Protocol::Grpc, Relationship::Call, 0.2 + rng.next_f64() * 0.4);
+                b.edge(
+                    service,
+                    &services[first],
+                    Protocol::Grpc,
+                    Relationship::Call,
+                    0.2 + rng.next_f64() * 0.4,
+                );
                 if j + 2 < services.len() && j % 3 != 2 {
                     let mut second = j + 1 + rng.below(services.len() - j - 1);
                     if second == first {
-                        second = if first + 1 < services.len() { first + 1 } else { j + 1 };
+                        second = if first + 1 < services.len() {
+                            first + 1
+                        } else {
+                            j + 1
+                        };
                     }
                     if second != first {
-                        b.edge(service, &services[second], Protocol::Grpc, Relationship::Call, 0.15 + rng.next_f64() * 0.3);
+                        b.edge(
+                            service,
+                            &services[second],
+                            Protocol::Grpc,
+                            Relationship::Call,
+                            0.15 + rng.next_f64() * 0.3,
+                        );
                     }
                 }
             }
             if j % 2 == 1 {
-                b.edge(service, &queues[(j / 2) % queues.len()], Protocol::Amqp, Relationship::Publish, 0.5 + rng.next_f64() * 0.5);
+                b.edge(
+                    service,
+                    &queues[(j / 2) % queues.len()],
+                    Protocol::Amqp,
+                    Relationship::Publish,
+                    0.5 + rng.next_f64() * 0.5,
+                );
             }
         }
         for (q, queue) in queues.iter().enumerate() {
-            b.edge(queue, &workers[q], Protocol::Amqp, Relationship::Consume, 1.0);
-            b.edge(&workers[q], &stores[q], Protocol::Sql, Relationship::Data, 0.8);
-            b.edge(&workers[q], &stores[(q + 2) % stores.len()], Protocol::Sql, Relationship::Data, 0.4);
-            b.edge(&workers[q], &buckets[q % 2], Protocol::S3, Relationship::Data, 0.3);
+            b.edge(
+                queue,
+                &workers[q],
+                Protocol::Amqp,
+                Relationship::Consume,
+                1.0,
+            );
+            b.edge(
+                &workers[q],
+                &stores[q],
+                Protocol::Sql,
+                Relationship::Data,
+                0.8,
+            );
+            b.edge(
+                &workers[q],
+                &stores[(q + 2) % stores.len()],
+                Protocol::Sql,
+                Relationship::Data,
+                0.4,
+            );
+            b.edge(
+                &workers[q],
+                &buckets[q % 2],
+                Protocol::S3,
+                Relationship::Data,
+                0.3,
+            );
         }
 
         if r == 0 {
@@ -294,8 +431,20 @@ pub fn stress(seed: u64) -> TopologySpec {
             roles.insert("failoverRegion".to_string(), (*region).to_string());
         } else {
             // Replication from the primary region.
-            b.edge(&primary_stores[0], &stores[0], Protocol::Tcp, Relationship::Replication, 0.15);
-            b.edge(&primary_stores[2], &stores[2], Protocol::Tcp, Relationship::Replication, 0.1);
+            b.edge(
+                &primary_stores[0],
+                &stores[0],
+                Protocol::Tcp,
+                Relationship::Replication,
+                0.15,
+            );
+            b.edge(
+                &primary_stores[2],
+                &stores[2],
+                Protocol::Tcp,
+                Relationship::Replication,
+                0.1,
+            );
         }
         if r == 2 {
             roles.insert("outageRegion".to_string(), (*region).to_string());

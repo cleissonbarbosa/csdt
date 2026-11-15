@@ -393,7 +393,7 @@ fn try_resolve(
                 }
             }
         }
-        targets.sort_by(|a, b| a.0.cmp(&b.0));
+        targets.sort_by_key(|target| target.0);
         targets.dedup_by(|a, b| a.0 == b.0);
 
         let mut events = Vec::with_capacity(phase.events.len());

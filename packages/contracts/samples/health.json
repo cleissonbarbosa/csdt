@@ -1,0 +1,15 @@
+{
+  "status": "ok",
+  "service": "aegis-server",
+  "version": "0.1.0",
+  "schemaVersion": "1.0",
+  "protocolVersion": 1,
+  "mode": "demo",
+  "uptimeSeconds": 0,
+  "topologyId": "helios-commerce",
+  "tick": 40,
+  "authorizationEngine": {
+    "kind": "embedded-cedar",
+    "version": "4.14.1"
+  }
+}

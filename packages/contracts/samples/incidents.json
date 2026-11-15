@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "incidents": [
+    {
+      "id": "inc-001",
+      "scenarioId": "credential-stuffing",
+      "title": "Credential Stuffing",
+      "severity": "warning",
+      "status": "active",
+      "startedAtMs": 8200,
+      "resolvedAtMs": null,
+      "phaseIndex": 1,
+      "phaseName": "Stuffing burst",
+      "rootCauseNodeId": "use-auth",
+      "impactedNodeIds": [
+        "clients-apac",
+        "clients-eu",
+        "clients-na",
+        "edge-router",
+        "partner-api",
+        "use-auth",
+        "use-gateway"
+      ],
+      "summary": "Leaked credential pairs are replayed against the login endpoint. Almost all fail; the few that succeed are stopped by policy."
+    }
+  ]
+}

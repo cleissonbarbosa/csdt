@@ -6,7 +6,8 @@ use std::time::Duration;
 use crate::integrations::{CedarAgentConfig, IntegrationConfig, RinhaConfig};
 
 const DEFAULT_BIND: &str = "127.0.0.1:8787";
-const DEFAULT_ORIGINS: &str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
+const DEFAULT_ORIGINS: &str =
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
 const DEFAULT_SEED: u64 = 42;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -33,7 +34,9 @@ pub struct Config {
 }
 
 fn non_empty(value: Option<String>) -> Option<String> {
-    value.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 fn list(value: Option<String>) -> Vec<String> {
@@ -162,7 +165,9 @@ mod tests {
         let config = config(&[]).expect("defaults are valid");
         assert_eq!(config.bind.to_string(), "127.0.0.1:8787");
         assert_eq!(config.seed, 42);
-        assert!(config.allowed_origins.contains(&"http://localhost:5173".to_string()));
+        assert!(config
+            .allowed_origins
+            .contains(&"http://localhost:5173".to_string()));
         assert!(config.integrations.cedar_agent.is_none());
         assert!(config.integrations.rinha.is_none());
     }
@@ -205,7 +210,12 @@ mod tests {
             config(&[("AEGIS_SEED", "-1")]).unwrap_err(),
             ConfigError::Seed("-1".into())
         );
-        for origin in ["*", "localhost:5173", "http://a.example/path", "http://u@a.example"] {
+        for origin in [
+            "*",
+            "localhost:5173",
+            "http://a.example/path",
+            "http://u@a.example",
+        ] {
             assert_eq!(
                 config(&[("AEGIS_ALLOWED_ORIGINS", origin)]).unwrap_err(),
                 ConfigError::Origin(origin.into()),

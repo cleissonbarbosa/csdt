@@ -84,12 +84,12 @@ impl Assets {
         let mut worlds = BTreeMap::new();
         for spec in [topologies::helios()?, topologies::stress(0xAE615)] {
             let id = spec.id.clone();
-            let topo = Arc::new(
-                SimTopology::compile(spec).map_err(|source| BootstrapError::Topology {
+            let topo = Arc::new(SimTopology::compile(spec).map_err(|source| {
+                BootstrapError::Topology {
                     id: id.clone(),
                     source,
-                })?,
-            );
+                }
+            })?);
             let scenarios = Arc::new(resolve_all(&topo, &decisions));
             worlds.insert(id, World { topo, scenarios });
         }

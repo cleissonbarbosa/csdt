@@ -262,12 +262,13 @@ impl PolicyDecisionPoint for CedarEngine {
                     field: "context",
                     message: e.to_string(),
                 })?;
-        let cedar_request = Request::new(principal, action, resource, context, None).map_err(
-            |e| AuthzError::InvalidRequest {
-                field: "request",
-                message: e.to_string(),
-            },
-        )?;
+        let cedar_request =
+            Request::new(principal, action, resource, context, None).map_err(|e| {
+                AuthzError::InvalidRequest {
+                    field: "request",
+                    message: e.to_string(),
+                }
+            })?;
         let policies = self.policy_set(disabled_policies)?;
         let response = self
             .authorizer
@@ -471,7 +472,12 @@ mod tests {
         let engine = engine();
         let outside = engine
             .evaluate(
-                &request("carol", "deleteCustomer", ACME_CUSTOMER, serde_json::json!({})),
+                &request(
+                    "carol",
+                    "deleteCustomer",
+                    ACME_CUSTOMER,
+                    serde_json::json!({}),
+                ),
                 &[],
             )
             .expect("evaluates");
@@ -553,11 +559,7 @@ mod tests {
         let total: f64 = catalog.traffic_mix.iter().map(|t| t.weight).sum();
         assert!((total - 1.0).abs() < 1e-9, "traffic mix sums to {total}");
         let engine = engine();
-        for template in catalog
-            .traffic_mix
-            .iter()
-            .chain(&catalog.scenario_requests)
-        {
+        for template in catalog.traffic_mix.iter().chain(&catalog.scenario_requests) {
             engine
                 .evaluate(&template.request(), &[])
                 .unwrap_or_else(|e| panic!("{} evaluates: {e}", template.id));

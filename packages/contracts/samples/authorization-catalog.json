@@ -1,0 +1,226 @@
+{
+  "engines": [
+    {
+      "kind": "embedded-cedar",
+      "version": "4.14.1",
+      "available": true
+    },
+    {
+      "kind": "cedar-agent",
+      "version": null,
+      "available": false
+    }
+  ],
+  "policies": [
+    {
+      "id": "tenant-view-orders",
+      "description": "Any member of a tenant may view that tenant's orders.",
+      "content": "permit(principal, action == Action::\"viewOrder\", resource) when { principal.tenant == resource.tenant };",
+      "effect": "permit"
+    },
+    {
+      "id": "support-refund-limit",
+      "description": "Support agents may refund orders of their own tenant up to 500.",
+      "content": "permit(principal in Role::\"support\", action == Action::\"refundOrder\", resource) when { principal.tenant == resource.tenant && resource.amount <= 500 };",
+      "effect": "permit"
+    },
+    {
+      "id": "support-view-customers",
+      "description": "Support agents may view customer profiles of their own tenant.",
+      "content": "permit(principal in Role::\"support\", action == Action::\"viewCustomer\", resource) when { principal.tenant == resource.tenant };",
+      "effect": "permit"
+    },
+    {
+      "id": "finance-view-ledger",
+      "description": "Finance staff may read their tenant's ledger.",
+      "content": "permit(principal in Role::\"finance\", action == Action::\"viewLedger\", resource) when { principal.tenant == resource.tenant };",
+      "effect": "permit"
+    },
+    {
+      "id": "finance-export-ledger-mfa",
+      "description": "Exporting the ledger additionally requires a fresh MFA assertion in the request context.",
+      "content": "permit(principal in Role::\"finance\", action == Action::\"exportLedger\", resource) when { principal.tenant == resource.tenant && context.mfa == true };",
+      "effect": "permit"
+    },
+    {
+      "id": "admin-own-tenant",
+      "description": "Tenant administrators may perform any action on their own tenant's resources.",
+      "content": "permit(principal in Role::\"admin\", action, resource) when { principal.tenant == resource.tenant };",
+      "effect": "permit"
+    },
+    {
+      "id": "forbid-cross-tenant",
+      "description": "Hard tenant isolation: no principal may touch another tenant's resources.",
+      "content": "forbid(principal, action, resource) unless { principal.tenant == resource.tenant };",
+      "effect": "forbid"
+    },
+    {
+      "id": "forbid-suspended",
+      "description": "Suspended principals are denied everything, regardless of role.",
+      "content": "forbid(principal, action, resource) when { principal.suspended };",
+      "effect": "forbid"
+    },
+    {
+      "id": "forbid-destructive-outside-change-window",
+      "description": "Customer deletion is only possible inside an approved change window.",
+      "content": "forbid(principal, action == Action::\"deleteCustomer\", resource) unless { context has changeWindow && context.changeWindow == true };",
+      "effect": "forbid"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme Retail"
+    },
+    {
+      "id": "globex",
+      "name": "Globex Logistics"
+    }
+  ],
+  "principals": [
+    {
+      "uid": "User::\"alice\"",
+      "label": "Alice",
+      "tenant": "acme",
+      "roles": [
+        "finance"
+      ],
+      "note": "Finance analyst"
+    },
+    {
+      "uid": "User::\"bob\"",
+      "label": "Bob",
+      "tenant": "acme",
+      "roles": [
+        "support"
+      ],
+      "note": "Support agent"
+    },
+    {
+      "uid": "User::\"carol\"",
+      "label": "Carol",
+      "tenant": "acme",
+      "roles": [
+        "admin"
+      ],
+      "note": "Tenant administrator"
+    },
+    {
+      "uid": "User::\"erin\"",
+      "label": "Erin",
+      "tenant": "acme",
+      "roles": [
+        "finance"
+      ],
+      "note": "Finance analyst · suspended"
+    },
+    {
+      "uid": "User::\"dave\"",
+      "label": "Dave",
+      "tenant": "globex",
+      "roles": [
+        "admin"
+      ],
+      "note": "Administrator of another tenant"
+    },
+    {
+      "uid": "User::\"mallory\"",
+      "label": "Mallory",
+      "tenant": "globex",
+      "roles": [
+        "contractor"
+      ],
+      "note": "External contractor of another tenant"
+    }
+  ],
+  "actions": [
+    {
+      "uid": "Action::\"viewOrder\"",
+      "label": "View order",
+      "resourceType": "Order"
+    },
+    {
+      "uid": "Action::\"refundOrder\"",
+      "label": "Refund order",
+      "resourceType": "Order"
+    },
+    {
+      "uid": "Action::\"viewLedger\"",
+      "label": "View ledger",
+      "resourceType": "Ledger"
+    },
+    {
+      "uid": "Action::\"exportLedger\"",
+      "label": "Export ledger",
+      "resourceType": "Ledger"
+    },
+    {
+      "uid": "Action::\"viewCustomer\"",
+      "label": "View customer",
+      "resourceType": "Customer"
+    },
+    {
+      "uid": "Action::\"deleteCustomer\"",
+      "label": "Delete customer",
+      "resourceType": "Customer"
+    }
+  ],
+  "resources": [
+    {
+      "uid": "Order::\"acme-ord-1001\"",
+      "label": "Order 1001 · 120",
+      "tenant": "acme",
+      "resourceType": "Order"
+    },
+    {
+      "uid": "Order::\"acme-ord-9000\"",
+      "label": "Order 9000 · 4,200",
+      "tenant": "acme",
+      "resourceType": "Order"
+    },
+    {
+      "uid": "Order::\"globex-ord-5001\"",
+      "label": "Order 5001 · 310",
+      "tenant": "globex",
+      "resourceType": "Order"
+    },
+    {
+      "uid": "Ledger::\"acme-ledger-2026\"",
+      "label": "Acme ledger 2026",
+      "tenant": "acme",
+      "resourceType": "Ledger"
+    },
+    {
+      "uid": "Ledger::\"globex-ledger-2026\"",
+      "label": "Globex ledger 2026",
+      "tenant": "globex",
+      "resourceType": "Ledger"
+    },
+    {
+      "uid": "Customer::\"acme-cust-77\"",
+      "label": "Customer 77",
+      "tenant": "acme",
+      "resourceType": "Customer"
+    },
+    {
+      "uid": "Customer::\"globex-cust-12\"",
+      "label": "Customer 12",
+      "tenant": "globex",
+      "resourceType": "Customer"
+    }
+  ],
+  "contextKeys": [
+    {
+      "key": "mfa",
+      "label": "Fresh MFA assertion",
+      "description": "Required by finance-export-ledger-mfa."
+    },
+    {
+      "key": "changeWindow",
+      "label": "Inside change window",
+      "description": "Required by forbid-destructive-outside-change-window."
+    }
+  ],
+  "baselineDenyFraction": 0.07,
+  "dataSource": "synthetic"
+}

@@ -1,0 +1,138 @@
+[
+  {
+    "id": "dec-1",
+    "virtualTimeMs": 30000,
+    "request": {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "context": {
+        "mfa": true
+      }
+    },
+    "decision": "allow",
+    "determiningPolicies": [
+      "finance-export-ledger-mfa"
+    ],
+    "errors": [],
+    "engine": {
+      "kind": "embedded-cedar",
+      "version": "4.14.1"
+    },
+    "evaluationMicros": 0,
+    "path": [
+      {
+        "nodeId": "partner-api",
+        "kind": "client",
+        "reached": true
+      },
+      {
+        "nodeId": "edge-router",
+        "kind": "edge",
+        "reached": true
+      },
+      {
+        "nodeId": "use-gateway",
+        "kind": "gateway",
+        "reached": true
+      },
+      {
+        "nodeId": "use-auth",
+        "kind": "authentication",
+        "reached": true
+      },
+      {
+        "nodeId": "use-cedar",
+        "kind": "authorization",
+        "reached": true
+      },
+      {
+        "nodeId": "use-ledger",
+        "kind": "resource",
+        "reached": true
+      },
+      {
+        "nodeId": "use-ledger-db",
+        "kind": "resource",
+        "reached": true
+      }
+    ],
+    "hops": [
+      "partner-api->edge-router",
+      "edge-router->use-gateway",
+      "use-gateway->use-auth",
+      "use-gateway->use-cedar",
+      "use-gateway->use-ledger",
+      "use-ledger->use-ledger-db"
+    ],
+    "blockedAt": null,
+    "disabledPolicies": [],
+    "dataSource": "synthetic"
+  },
+  {
+    "id": "dec-2",
+    "virtualTimeMs": 30000,
+    "request": {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "context": {}
+    },
+    "decision": "deny",
+    "determiningPolicies": [
+      "forbid-cross-tenant"
+    ],
+    "errors": [],
+    "engine": {
+      "kind": "embedded-cedar",
+      "version": "4.14.1"
+    },
+    "evaluationMicros": 0,
+    "path": [
+      {
+        "nodeId": "partner-api",
+        "kind": "client",
+        "reached": true
+      },
+      {
+        "nodeId": "edge-router",
+        "kind": "edge",
+        "reached": true
+      },
+      {
+        "nodeId": "use-gateway",
+        "kind": "gateway",
+        "reached": true
+      },
+      {
+        "nodeId": "use-auth",
+        "kind": "authentication",
+        "reached": true
+      },
+      {
+        "nodeId": "use-cedar",
+        "kind": "authorization",
+        "reached": true
+      },
+      {
+        "nodeId": "use-ledger",
+        "kind": "resource",
+        "reached": false
+      },
+      {
+        "nodeId": "use-ledger-db",
+        "kind": "resource",
+        "reached": false
+      }
+    ],
+    "hops": [
+      "partner-api->edge-router",
+      "edge-router->use-gateway",
+      "use-gateway->use-auth",
+      "use-gateway->use-cedar"
+    ],
+    "blockedAt": "use-cedar",
+    "disabledPolicies": [],
+    "dataSource": "synthetic"
+  }
+]

@@ -46,9 +46,11 @@ impl IntoResponse for ApiError {
 
 impl From<JsonRejection> for ApiError {
     fn from(rejection: JsonRejection) -> Self {
-        let status = match rejection {
-            JsonRejection::MissingJsonContentType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            _ => StatusCode::BAD_REQUEST,
+        // Keep axum's status (415 wrong content type, 413 body too large)
+        // but report every malformed or mistyped body uniformly as 400.
+        let status = match rejection.status() {
+            StatusCode::UNPROCESSABLE_ENTITY => StatusCode::BAD_REQUEST,
+            other => other,
         };
         Self::new(status, "invalid_request", rejection.body_text())
     }

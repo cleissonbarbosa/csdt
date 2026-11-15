@@ -1,0 +1,25 @@
+[
+  {
+    "id": "black-friday-flood",
+    "name": "Black Friday Flood",
+    "description": "Fictional post-incident recording: a volumetric flood during peak trading, followed minutes later by a database failure that cascades through order processing.",
+    "topologyId": "helios-commerce",
+    "durationMs": 260000,
+    "scenarioIds": [
+      "ddos-surge",
+      "cascading-failure"
+    ]
+  },
+  {
+    "id": "insider-and-outage",
+    "name": "Insider Probe, Then Darkness",
+    "description": "Fictional post-incident recording: a contractor probes another tenant's ledger and is denied by Cedar, credential stuffing follows, and a regional outage forces a failover.",
+    "topologyId": "helios-commerce",
+    "durationMs": 330000,
+    "scenarioIds": [
+      "cedar-denial",
+      "credential-stuffing",
+      "regional-outage"
+    ]
+  }
+]

@@ -324,9 +324,11 @@ fn cedar_denial() -> ScenarioDef {
             last,
         ]
     };
+    // Legitimate traffic to the ledger is a trickle; the probing is not.
+    let permitted = |rps: f64| Effect::FlowRate(ALLOWED, Rate::Absolute(rps));
     let probes = |rate: f64| {
         vec![
-            Effect::FlowRate(ALLOWED, Rate::OfCapacity(AUTHORIZER, 0.03)),
+            permitted(14.0),
             Effect::FlowRate(EXPORT, Rate::OfCapacity(AUTHORIZER, rate)),
             Effect::FlowRate(READ, Rate::OfCapacity(AUTHORIZER, rate)),
             Effect::FlowRate(DELETE, Rate::OfCapacity(AUTHORIZER, rate * 0.6)),
@@ -389,7 +391,7 @@ fn cedar_denial() -> ScenarioDef {
                 ramp_ms: 3_000,
                 status: IncidentStatus::Active,
                 description: "A finance analyst reads her own tenant's ledger. Cedar permits it and the request reaches the resource.",
-                effects: vec![Effect::FlowRate(ALLOWED, Rate::OfCapacity(AUTHORIZER, 0.05))],
+                effects: vec![permitted(22.0)],
                 events: vec![],
             },
             PhaseDef {
@@ -399,7 +401,7 @@ fn cedar_denial() -> ScenarioDef {
                 status: IncidentStatus::Active,
                 description: "A contractor of another tenant requests an export of the ledger. Authentication succeeds; Cedar denies the action.",
                 effects: vec![
-                    Effect::FlowRate(ALLOWED, Rate::OfCapacity(AUTHORIZER, 0.03)),
+                    permitted(14.0),
                     Effect::FlowRate(EXPORT, Rate::OfCapacity(AUTHORIZER, 0.1)),
                 ],
                 events: vec![event(
@@ -417,7 +419,7 @@ fn cedar_denial() -> ScenarioDef {
                 ramp_ms: 5_000,
                 status: IncidentStatus::Active,
                 description: "The principal cycles through other actions and resources. Every request is denied.",
-                effects: probes(0.11),
+                effects: probes(0.08),
                 events: vec![event(
                     8_000,
                     Severity::Critical,
@@ -434,7 +436,7 @@ fn cedar_denial() -> ScenarioDef {
                 status: IncidentStatus::Mitigating,
                 description: "The identity service revokes the principal's sessions; requests now stop at authentication.",
                 effects: {
-                    let mut effects = probes(0.11);
+                    let mut effects = probes(0.08);
                     for flow in [EXPORT, READ, DELETE] {
                         effects.push(Effect::FlowReject(
                             flow,

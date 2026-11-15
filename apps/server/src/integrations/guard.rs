@@ -61,7 +61,9 @@ pub fn validate_target(raw: &str, allowed_hosts: &[String]) -> Result<Target, Pr
     if !matches!(url.path(), "" | "/") {
         return Err(refuse("the URL must not contain a path"));
     }
-    let host = url.host_str().ok_or_else(|| refuse("the URL has no host"))?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| refuse("the URL has no host"))?;
     let allowed = is_loopback(host)
         || allowed_hosts
             .iter()
@@ -123,7 +125,10 @@ mod tests {
     #[test]
     fn joins_paths_without_doubling_slashes() {
         let target = validate_target("http://127.0.0.1:8180/", &[]).expect("valid");
-        assert_eq!(target.url("/v1/is_authorized"), "http://127.0.0.1:8180/v1/is_authorized");
+        assert_eq!(
+            target.url("/v1/is_authorized"),
+            "http://127.0.0.1:8180/v1/is_authorized"
+        );
         assert_eq!(target.url("v1/"), "http://127.0.0.1:8180/v1/");
         assert_eq!(target.display(), "http://127.0.0.1:8180");
     }

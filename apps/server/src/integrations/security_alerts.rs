@@ -322,6 +322,8 @@ mod tests {
         assert_eq!(events.len(), 4);
         assert_eq!(events[0].severity, Severity::Critical);
         assert!(events[0].node_ids.contains(&"use-gateway".to_string()));
-        assert!(events.iter().all(|e| e.data_source == DataSource::Recording));
+        assert!(events
+            .iter()
+            .all(|e| e.data_source == DataSource::Recording));
     }
 }
