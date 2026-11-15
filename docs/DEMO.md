@@ -118,18 +118,18 @@ shown in the panel. Nothing is scripted.
 
 ## 6 · The other four incidents
 
-| Scenario                       | What to look for                                                                                                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Credential Stuffing**        | The identity service saturates on failed logins; rate limiting at the gateway relieves it; the few valid credentials are still denied by Cedar for lacking MFA.                           |
+| Scenario                       | What to look for                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Credential Stuffing**        | The identity service saturates on failed logins; rate limiting at the gateway relieves it; the few valid credentials are still denied by Cedar for lacking MFA.                              |
 | **Cedar Authorization Denial** | The share of checks denied rises (platform figures in the overview); the prohibited principal's traffic stops at the authorizer; after _Session revoked_ it stops at authentication instead. |
-| **Cascading Service Failure**  | The orders database degrades, its callers fail, the order queue backs up; circuit breakers stop the spread; the backlog drains after a replica is promoted.                               |
-| **Regional Outage**            | The EU West plate goes dark and its pieces pale; the edge router withdraws the region; US East absorbs the traffic; the region is restored and traffic rebalances.                        |
+| **Cascading Service Failure**  | The orders database degrades, its callers fail, the order queue backs up; circuit breakers stop the spread; the backlog drains after a replica is promoted.                                  |
+| **Regional Outage**            | The EU West plate goes dark and its pieces pale; the edge router withdraws the region; US East absorbs the traffic; the region is restored and traffic rebalances.                           |
 
 ## 7 · Recorded incidents
 
-The selector at the foot of the **Incidents** tab loads a prerecorded
-fictional incident. Its whole history is available immediately: scrub
-anywhere.
+The selector under the list of scenarios, in the **Incidents** tab, loads a
+prerecorded fictional incident. Its whole history is available immediately:
+scrub anywhere.
 
 - **Black Friday Flood**: a flood followed by a database cascade.
 - **Insider Probe, Then Darkness**: a Cedar denial, credential stuffing and a

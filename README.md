@@ -47,7 +47,7 @@ revisited exactly, because the engine is deterministic and history is
 event-sourced.
 
 <p align="center">
-  <img src="docs/assets/overview.png" alt="AEGIS in its normal state: a neutral scale model of the Helios Commerce platform, the API Gateway selected and its signals shown against their normal range" />
+  <img src="docs/assets/overview.png" alt="AEGIS in its normal state: a neutral scale model of the Helios Commerce platform. The API Gateway is selected: its piece and connections stand out, the rest of the model recedes, and the inspector shows its signals against their normal range" />
 </p>
 
 ## One rule
@@ -77,15 +77,31 @@ in [docs/DESIGN.md](docs/DESIGN.md).
 
 **A model you can walk around**
 
-- Twelve service types, each with its own procedural silhouette: portal
-  gateways, shield-and-keyhole identity services, cedar-tree authorizers,
-  platter-stack databases, rail-mounted queues.
+- Twelve kinds of service, each a modelled piece with its own silhouette: an
+  arch for a gateway, a shield with a keyhole for authentication, a cedar for
+  the authorizer, a stack of platters for a database, a lighthouse for the
+  threat monitor. The pieces are built in Blender by a script in the
+  repository, with ambient occlusion baked per vertex.
 - Deterministic layout by cloud region or by dependency tier; readable at
   178 services and 648 connections.
 - Orbit, zoom, pan, click to inspect services and connections, double-click to
-  move in on one. Search, and filter by kind, state, region or incident.
+  move in on a service or frame a region. Search, and filter by kind, state,
+  region or incident.
 - Light and night themes with the same rules. Names keep one size on screen,
   like the names on a map, and appear as you get closer.
+
+**Quiet until asked**
+
+- At rest the screen holds the model, one sentence saying how the platform
+  is, and a strip of timeline. The explorer comes when asked for, the
+  inspector comes with a selection and leaves with it, the timeline opens
+  into its chart when reached for.
+- <kbd>Ctrl</kbd> <kbd>K</kbd> reaches any service, region, scenario or
+  action by name.
+- Motion happens once and answers something: the model assembles as it
+  loads, pieces walk when the layout changes, a selection lifts its piece and
+  pushes the rest back. Nothing idles and nothing loops, and reduced-motion
+  preferences switch all of it off.
 
 **Traffic as beads**
 
@@ -123,13 +139,14 @@ seed plus a command list.
 **Signals with their range**
 
 Traffic, latency, error rate and saturation, each drawn on a scale with its
-normal band, all computed from the simulation state of the same tick. One
-sentence states the condition of the platform. Every figure says whether it is
-_synthetic_, _recorded_ or _live_.
+normal band, all computed from the simulation state of the same tick. They
+live in the platform overview; in the top bar a signal appears only while it
+is outside its range. Every figure says whether it is _synthetic_,
+_recorded_ or _live_.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/closeup.png" alt="Close view of the US East plate: matte pieces with contact shadows, bead traffic on hairline connections, the selected gateway ringed in ink" /></td>
+    <td width="50%"><img src="docs/assets/closeup.png" alt="Close view of the US East plate: modelled matte pieces with contact shadows, bead traffic on hairline connections, the selected gateway ringed in ink" /></td>
     <td width="50%"><img src="docs/assets/cedar-denial.png" alt="Authorization explorer showing a Deny decision determined by the forbid-cross-tenant policy, with the request traced to the Cedar authorizer" /></td>
   </tr>
   <tr>

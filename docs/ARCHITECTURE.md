@@ -55,7 +55,7 @@ apps/
     application/     use cases; owns the single mutable timeline
     api/             Axum routes, WebSocket, rate limiting, errors
   web/src/
-    graphics/        layout, geometries, TSL materials, SceneController
+    graphics/        layout, modelled pieces, TSL materials, SceneController
     features/        scene, explorer, inspector, timeline, scenarios, …
     stores/          telemetry, interface state, persisted settings
     providers/       REST client, stream client, TelemetryProvider
@@ -232,12 +232,21 @@ Draw calls follow the number of object classes, not the number of objects
 
 | What         | How                                                                 |
 | ------------ | ------------------------------------------------------------------- |
-| Pieces       | one instanced mesh per service type, procedural geometry            |
+| Pieces       | one instanced mesh per service type, modelled solids                |
 | Ground marks | one instanced mesh: contact shadow, status lamp, selection ring     |
 | Connections  | one instanced mesh of camera-facing hairlines along Bézier curves   |
 | Traffic      | one instanced mesh of stateless sprites ("beads")                   |
 | Labels       | one instanced mesh sampling a canvas text atlas, constant on screen |
 | Plates       | one mesh per region, plus the shadow it casts                       |
+
+**Pieces** are modelled, not drawn by hand: `apps/web/scripts/build-pieces.py`
+builds every service type in Blender, in code, and exports one GLB
+(`graphics/pieces.glb`). The asset uses a narrow part of the format, so
+`graphics/pieces.ts` reads it with a small parser of its own instead of a
+general glTF loader. Each vertex carries which part of the piece it belongs
+to (body, detail, mark) and an ambient-occlusion value baked in Blender; the
+piece material turns those into tone. All instances of a type still share
+one geometry and one draw call.
 
 **Beads** own only static data: which edge they live on and four random
 seeds. Everything that changes (how many an edge shows, how fast they move,
@@ -253,8 +262,9 @@ same code rather than a second implementation. If neither API yields a
 renderer, the application shows an accessible table view instead.
 
 **Shading is done by the materials themselves.** They are unlit in the
-engine's sense and compute one fixed studio light, with tone mapping off, so
-a surface facing the light shows exactly the palette colour. The palette is
+engine's sense and compute one fixed studio light, darkened by the baked
+occlusion, with tone mapping off, so an open surface facing the light shows
+exactly the palette colour. The palette is
 a set of uniforms shared by every material (`createSceneTheme`): switching
 between the light and night themes writes new values and rebuilds nothing.
 There is no post-processing; a frame is one pass to the canvas.
@@ -262,6 +272,13 @@ There is no post-processing; a frame is one pass to the canvas.
 **The camera** is a perspective camera with a long lens (14°). Parallel lines
 stay very nearly parallel, as in an axonometric drawing, while orbit, zoom to
 pointer and picking keep a single code path.
+
+**Motion** is driven by the same controller. Everything that moves besides
+the beads is a one-shot answer to an action or to a change in the data (the
+model assembling, pieces walking to a new layout, a selection lifting its
+piece), eased on the CPU into the per-instance buffers that are uploaded
+anyway; there is no animation system and nothing loops. The list, and the
+reason for each entry, is rule 6 of [DESIGN.md](DESIGN.md).
 
 **Adaptive quality** watches frame time and steps between four tiers
 (resolution, bead density, label range). A tier that proved too expensive
