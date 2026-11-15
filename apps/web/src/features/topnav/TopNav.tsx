@@ -42,6 +42,7 @@ import { Logo } from './Logo';
 function PlatformStatus() {
   const global = useTelemetry((state) => state.snapshot?.global);
   const incident = useTelemetry((state) => state.snapshot?.incident ?? null);
+  const faults = useTelemetry((state) => state.snapshot?.faults.length ?? 0);
   const topology = useTelemetry((state) => state.topology);
   const acknowledged = useUi((state) => state.acknowledgedIncidentId);
   const { data: scenarios } = useQuery({ queryKey: queryKeys.scenarios, queryFn: api.scenarios });
@@ -58,7 +59,10 @@ function PlatformStatus() {
           ? 'degraded'
           : 'healthy';
 
-  let sentence = `${total} services, all normal`;
+  // A fault placed by hand may not have moved anything out of range yet;
+  // it is said anyway, so "all normal" is never the whole story.
+  const byHand = faults > 0 ? `; ${faults} fault${faults === 1 ? '' : 's'} placed by hand` : '';
+  let sentence = `${total} services, all normal${byHand}`;
   let level: Health = 'healthy';
   if (incident && incident.status !== 'resolved') {
     const scenario = scenarios?.scenarios.find((s) => s.id === incident.scenarioId);
@@ -85,11 +89,17 @@ function PlatformStatus() {
           abnormal ? 'font-bold' : 'text-ink-faint hover:text-ink',
         )}
         style={abnormal ? { color: HEALTH_COLOR[level] } : undefined}
-        title={abnormal ? 'Show the incident' : 'Show the platform overview'}
+        title={
+          abnormal
+            ? 'Show the incident'
+            : faults > 0
+              ? 'Show what was placed by hand'
+              : 'Show the platform overview'
+        }
         onClick={() => {
           const ui = useUi.getState();
-          if (abnormal) {
-            ui.acknowledgeIncident(incident?.id ?? null);
+          if (abnormal || faults > 0) {
+            if (abnormal) ui.acknowledgeIncident(incident?.id ?? null);
             ui.setLeftTab('incidents');
           } else {
             // The overview is the inspector with nothing selected.
@@ -101,6 +111,7 @@ function PlatformStatus() {
         data-testid="platform-status"
         data-level={level}
         data-incidents={global.activeIncidents}
+        data-faults={faults}
       >
         {/* Keyed by what happened, not by the counts, so the sentence is
           replaced with a movement when the situation changes and simply

@@ -232,6 +232,7 @@ are mirrored in `packages/contracts`.
 | `GET /providers` · `POST /providers/{id}/(dis)connect` | integrations                                 |
 | `POST /demo/scenarios/start` · `/reset`                | scenario control                             |
 | `POST /demo/playback/control`                          | play, pause, step, seek, speed, replay, live |
+| `POST /demo/faults/inject` · `/clear`                  | place or lift a fault by hand                |
 | `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                     |
 | `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                       |
 | `POST /demo/topology/select` · `/demo/recordings/load` | switch context                               |

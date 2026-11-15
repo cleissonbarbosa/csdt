@@ -29,6 +29,8 @@ const api = vi.hoisted(() => ({
   startScenario: vi.fn(),
   reset: vi.fn(),
   control: vi.fn(),
+  injectFault: vi.fn(),
+  clearFaults: vi.fn(),
   selectTopology: vi.fn(),
   loadRecording: vi.fn(),
   authorizationCatalog: vi.fn(),
@@ -105,6 +107,8 @@ beforeEach(() => {
   api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
   api.checkWorkspace.mockResolvedValue(fixtures.workspaceCheck());
   api.importWorkspace.mockResolvedValue(fixtures.workspaceResponse());
+  api.injectFault.mockResolvedValue(control);
+  api.clearFaults.mockResolvedValue(control);
   api.resetWorkspace.mockResolvedValue({
     workspace: fixtures.workspace(),
     playback: fixtures.snapshot().playback,
@@ -245,11 +249,13 @@ describe('panels on demand', () => {
   it('opens the overview from the status sentence while all is well', async () => {
     const quiet = fixtures.snapshot();
     quiet.incident = null;
+    quiet.faults = [];
     quiet.global.activeIncidents = 0;
     quiet.global.health = { healthy: 51, degraded: 0, critical: 0, down: 0 };
     useTelemetry.getState().applySnapshot(quiet);
     const user = userEvent.setup();
     renderApp();
+    expect(screen.getByTestId('platform-status')).toHaveTextContent('51 services, all normal');
     await user.click(screen.getByTestId('platform-status'));
     expect(screen.getByTestId('overview')).toBeInTheDocument();
     expect(screen.getByTestId('hud-rps')).not.toBeEmptyDOMElement();
@@ -979,5 +985,124 @@ describe('integrations and settings', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Help and legend' });
     expect(dialog).toHaveTextContent('A lighthouse above the edge; its lamp sweeps round');
     expect(dialog).toHaveTextContent('no real system is observed, scanned or attacked');
+  });
+});
+
+describe('faults placed by hand', () => {
+  /** The platform in range, with the one fault the sample was taken with. */
+  function withAFault() {
+    const quiet = fixtures.snapshot();
+    quiet.incident = null;
+    quiet.global.activeIncidents = 0;
+    quiet.global.health = { healthy: 51, degraded: 0, critical: 0, down: 0 };
+    useTelemetry.getState().applySnapshot(quiet);
+    return quiet;
+  }
+
+  it('are said in the top bar even while everything is in range, and listed', async () => {
+    withAFault();
+    const user = userEvent.setup();
+    renderApp();
+    const status = screen.getByTestId('platform-status');
+    expect(status).toHaveTextContent('51 services, all normal; 1 fault placed by hand');
+    // Nothing is out of range, so the sentence carries no alarm.
+    expect(status).toHaveAttribute('data-level', 'healthy');
+
+    await user.click(status);
+    const list = screen.getByTestId('faults-in-force');
+    expect(within(list).getByText('Search')).toBeInTheDocument();
+    expect(within(list).getByText('latency ×3')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Lift this fault from Search' }));
+    expect(api.clearFaults).toHaveBeenCalledWith({
+      type: 'latency',
+      nodes: 'node:use-search',
+      factor: 3,
+    });
+    await user.click(screen.getByTestId('faults-lift-all'));
+    expect(api.clearFaults).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('are not listed when there are none', () => {
+    const quiet = withAFault();
+    quiet.faults = [];
+    useTelemetry.getState().applySnapshot(quiet);
+    useUi.setState({ explorerOpen: true, leftTab: 'incidents' });
+    renderApp();
+    expect(screen.getByTestId('scenario-console')).toBeInTheDocument();
+    expect(screen.queryByTestId('faults-in-force')).not.toBeInTheDocument();
+  });
+
+  it('are placed and lifted from the card of a service', async () => {
+    withAFault();
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().selectNode('use-gateway'));
+    const card = within(screen.getByTestId('node-inspector'));
+    // Nothing is placed on the gateway: the section waits, folded.
+    const faults = card.getByTestId('faults');
+    expect(faults).not.toHaveAttribute('open');
+    await user.click(within(faults).getByText('Faults'));
+    const slow = within(faults).getByRole('button', { name: 'Latency ×4' });
+    expect(slow).toHaveAttribute('aria-pressed', 'false');
+    await user.click(slow);
+    expect(api.injectFault).toHaveBeenCalledWith(
+      { type: 'latency', nodes: 'node:use-gateway', factor: 4 },
+      2000,
+    );
+    await user.click(within(faults).getByRole('button', { name: 'Unreachable' }));
+    expect(api.injectFault).toHaveBeenLastCalledWith(
+      { type: 'down', nodes: 'node:use-gateway' },
+      2000,
+    );
+
+    // The service the sample slowed down shows it, at the figure it has.
+    act(() => useUi.getState().selectNode('use-search'));
+    const search = within(screen.getByTestId('node-inspector')).getByTestId('faults');
+    expect(search).toHaveAttribute('open');
+    const placed = within(search).getByRole('button', { name: 'Latency ×3' });
+    expect(placed).toHaveAttribute('aria-pressed', 'true');
+    await user.click(placed);
+    expect(api.clearFaults).toHaveBeenCalledWith({
+      type: 'latency',
+      nodes: 'node:use-search',
+      factor: 3,
+    });
+  });
+
+  it('are placed on a connection by its two ends', async () => {
+    withAFault();
+    const edge = fixtures
+      .topology()
+      .edges.find((e) => e.source === 'use-gateway' && e.target === 'use-catalog');
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().select({ kind: 'edge', id: edge!.id }));
+    const faults = within(screen.getByTestId('edge-inspector')).getByTestId('faults');
+    await user.click(within(faults).getByText('Faults'));
+    await user.click(within(faults).getByRole('button', { name: 'Network latency ×4' }));
+    expect(api.injectFault).toHaveBeenCalledWith(
+      {
+        type: 'edgeLatency',
+        edges: { between: { from: 'node:use-gateway', to: 'node:use-catalog' } },
+        factor: 4,
+      },
+      2000,
+    );
+  });
+
+  it('say why when one cannot be placed', async () => {
+    withAFault();
+    const { ApiError } = await import('@/providers/api');
+    api.injectFault.mockRejectedValue(
+      new ApiError(409, 'too_many_faults', 'too many faults are in force; lift some first'),
+    );
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().selectNode('use-gateway'));
+    const faults = within(screen.getByTestId('node-inspector')).getByTestId('faults');
+    await user.click(within(faults).getByText('Faults'));
+    await user.click(within(faults).getByRole('button', { name: 'Capacity ×0.5' }));
+    expect(await screen.findByText(/The fault could not be placed. too many faults/)).toBeVisible();
   });
 });

@@ -425,6 +425,20 @@ It may only start and stop scenarios, on a topology and with scenarios the
 workspace has, and a command takes no field beyond the ones shown. The timeline's other commands record an authorization decision
 or an imported event; a file is not allowed to put either there by saying so.
 
+A recording may also place and lift faults by hand: one effect, written as
+in a scenario phase, outside any scenario. Effects on a scenario's own flow
+(`flowRate`, `flowReject`) are refused, and what a fault names must exist on
+the recording's topology.
+
+```json
+{ "atMs": 4000, "command": { "type": "injectFault", "rampMs": 2000,
+  "effect": { "type": "latency", "nodes": "node:till", "factor": 4 } } },
+{ "atMs": 30000, "command": { "type": "clearFaults" } }
+```
+
+`clearFaults` lifts every fault, or with an `effect` only what that effect
+touches. `rampMs` is at most 60000.
+
 ## Cedar
 
 The embedded engine is the `cedar-policy` crate. The workspace decides what it

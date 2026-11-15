@@ -38,6 +38,7 @@ import {
 } from '@/stores/telemetry';
 import { useUi, type Selection } from '@/stores/ui';
 
+import { Faults } from './Faults';
 import { GroupCard } from './GroupCard';
 
 /** How long an alert stays under "Needs attention", in virtual time. */
@@ -334,6 +335,7 @@ function NodeInspector({
           <p className="text-xs text-ink-faint">Nothing calls this service.</p>
         )}
       </Fold>
+      <Faults topology={topology} snapshot={snapshot} position={{ node: nodeIndex }} />
 
       {decisions.length > 0 && (
         <Section title="Authorization decisions">
@@ -467,6 +469,7 @@ function EdgeInspector({
           <Stat label="Calls per request" value={edge.weight.toFixed(2)} />
         </dl>
       </Section>
+      <Faults topology={topology} snapshot={snapshot} position={{ edge: edgeIndex }} />
     </div>
   );
 }

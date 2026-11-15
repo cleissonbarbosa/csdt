@@ -269,6 +269,62 @@ test('a Cedar decision is evaluated by the real engine and its path drawn', asyn
   await expect.poll(async () => (await frameSummary(page)).chromatic).toBe(0);
 });
 
+test('a fault is placed by hand on a service, shows on the model and is lifted', async ({
+  page,
+}) => {
+  await openApp(page);
+  await waitForScene(page);
+  expect((await frameSummary(page)).chromatic).toBe(0);
+  await setSpeed(page, 4);
+  await openExplorer(page);
+  const status = page.getByTestId('platform-status');
+  await expect(status).toHaveAttribute('data-faults', '0');
+
+  // From the card of a service: the section waits folded until asked for.
+  await page.getByTestId('service-use-search').click();
+  const faults = page.getByTestId('node-inspector').getByTestId('faults');
+  await faults.getByText('Faults').click();
+  await faults.getByTestId('fault-down').click();
+  await expect(faults.getByTestId('fault-down')).toHaveAttribute('aria-pressed', 'true');
+  await expect(status).toHaveAttribute('data-faults', '1');
+  await expect(page.getByTestId('service-use-search')).toHaveAttribute('data-health', 'down', {
+    timeout: 30_000,
+  });
+  // It is not an incident: nothing was started, and no scenario is running.
+  await expect(status).toHaveAttribute('data-incidents', '0');
+  await expect(page.getByTestId('active-incident')).toHaveCount(0);
+
+  // With the selection let go, the hue left on the model is the data's.
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(0);
+
+  // It is on the timeline and in the list of what was placed by hand.
+  await page.getByTestId('tab-incidents').click();
+  await expect(page.getByTestId('event-log')).toContainText('Fault placed by hand: unreachable');
+  const placed = page.getByTestId('faults-in-force');
+  await expect(placed).toContainText('Search');
+  await expect(placed).toContainText('unreachable');
+
+  // Before it was placed there was none: the past says so.
+  await page.getByTestId('playback-toggle').click();
+  await page.getByRole('slider', { name: 'Timeline position' }).focus();
+  await page.keyboard.press('Home');
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-mode', 'replay');
+  await expect(status).toHaveAttribute('data-faults', '0');
+  await expect(placed).toHaveCount(0);
+  await page.getByTestId('playback-live').click();
+  await expect(status).toHaveAttribute('data-faults', '1');
+
+  await page.getByTestId('faults-lift-all').click();
+  await expect(status).toHaveAttribute('data-faults', '0');
+  await expect(placed).toHaveCount(0);
+  await page.getByTestId('tab-explorer').click();
+  await expect(page.getByTestId('service-use-search')).toHaveAttribute('data-health', 'healthy', {
+    timeout: 30_000,
+  });
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBe(0);
+});
+
 test('filters, the table view and keyboard shortcuts work together', async ({ page }) => {
   await openApp(page);
   await waitForScene(page);

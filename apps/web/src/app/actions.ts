@@ -7,19 +7,22 @@ import type {
   ControlAction,
   ControlResponse,
   EvaluateRequest,
+  FaultEffect,
   WorkspaceFile,
   WorkspaceResponse,
   WorkspaceStatus,
 } from '@aegis/contracts';
 
 import { api, ApiError } from '@/providers/api';
-
-import { HOST } from './host';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
+import { HOST } from './host';
 import { invalidateWorkspaceQueries, queryClient, queryKeys } from './queryClient';
+
+/** How long a fault placed from the interface takes to ease in. */
+const FAULT_RAMP_MS = 2000;
 
 function describe(error: unknown): string {
   return error instanceof ApiError ? error.message : 'Something went wrong.';
@@ -64,6 +67,16 @@ export const actions = {
     if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.scenarios });
     return ok;
   },
+
+  /** Places a fault by hand on a service or a connection. It holds until lifted. */
+  placeFault: async (effect: FaultEffect) =>
+    adopt(
+      await run(() => api.injectFault(effect, FAULT_RAMP_MS), 'The fault could not be placed.'),
+    ),
+
+  /** Lifts one fault placed by hand, or with no effect named, all of them. */
+  liftFault: async (effect?: FaultEffect) =>
+    adopt(await run(() => api.clearFaults(effect), 'The fault could not be lifted.')),
 
   /** Stops the running scenario and lets the platform recover. History is kept. */
   stopScenario: async () =>

@@ -25,6 +25,7 @@ import {
   WorkspaceStatusSchema,
   type ControlAction,
   type EvaluateRequest,
+  type FaultEffect,
   type WorkspaceFile,
 } from '@aegis/contracts';
 import { transport } from '@transport';
@@ -130,6 +131,12 @@ export const api = {
     request(ControlResponseSchema, '/demo/scenarios/reset', { scope }),
   control: (action: ControlAction) =>
     request(ControlResponseSchema, '/demo/playback/control', action),
+  /** Places a fault by hand: one scenario effect, outside any scenario. */
+  injectFault: (effect: FaultEffect, rampMs: number) =>
+    request(ControlResponseSchema, '/demo/faults/inject', { effect, rampMs }),
+  /** Lifts what `effect` touches, or with none every fault placed by hand. */
+  clearFaults: (effect?: FaultEffect) =>
+    request(ControlResponseSchema, '/demo/faults/clear', effect ? { effect } : {}),
   selectTopology: (topologyId: string) =>
     request(ControlResponseSchema, '/demo/topology/select', { topologyId }),
   loadRecording: (recordingId: string) =>

@@ -200,6 +200,10 @@ describe('the engine built for the browser', () => {
     for (const provider of ['network-scanner', 'security-alerts']) {
       post(`/providers/${provider}/connect`, {});
     }
+    post('/demo/faults/inject', {
+      effect: { type: 'latency', nodes: 'node:use-search', factor: 3.0 },
+      rampMs: 1000,
+    });
     advance(2);
 
     produced.set('topology', get('/topology'));
@@ -353,6 +357,24 @@ describe('every route, in the module', () => {
       ['POST', '/demo/playback/control', { action: 'live' }],
       ['POST', '/demo/playback/control', { action: 'play' }],
       ['POST', '/demo/scenarios/reset', { scope: 'scenario' }],
+      [
+        'POST',
+        '/demo/faults/inject',
+        { effect: { type: 'down', nodes: 'node:use-search' }, rampMs: 400 },
+      ],
+      [
+        'POST',
+        '/demo/faults/inject',
+        {
+          effect: {
+            type: 'edgeError',
+            edges: { between: { from: 'node:use-gateway', to: 'node:use-catalog' } },
+            rate: 0.3,
+          },
+        },
+      ],
+      ['POST', '/demo/faults/clear', { effect: { type: 'down', nodes: 'node:use-search' } }],
+      ['POST', '/demo/faults/clear', {}],
       ['POST', '/providers/network-scanner/connect', {}],
       ['POST', '/providers/network-scanner/disconnect', {}],
       ['POST', '/demo/recordings/load', { recordingId: 'black-friday-flood' }],

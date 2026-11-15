@@ -1,6 +1,7 @@
 import {
   PLAYBACK_SPEEDS,
   SEVERITY_ORDER,
+  type ActiveFault,
   type Health,
   type Incident,
   type PlaybackSpeed,
@@ -9,17 +10,18 @@ import {
   type Severity,
 } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Pause, Play, RotateCcw, Square, Zap } from 'lucide-react';
+import { ChevronLeft, Pause, Play, RotateCcw, Square, X, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { actions } from '@/app/actions';
 import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { HealthGlyph, SeverityBadge, SourceBadge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
 import { cn } from '@/lib/cn';
+import { describeFault, faultEffect, faultTarget } from '@/lib/faults';
 import { formatClock, titleCase } from '@/lib/format';
 import { COLOR, SEVERITY_LABEL } from '@/lib/palette';
 import { api } from '@/providers/api';
@@ -466,6 +468,73 @@ function Recordings() {
   );
 }
 
+/**
+ * Everything placed by hand, wherever it is on the platform. It is here
+ * only while there is something to list.
+ */
+function PlacedByHand() {
+  const topology = useTelemetry((state) => state.topology);
+  // The list changes rarely; the snapshot that carries it arrives all the time.
+  const key = useTelemetry((state) =>
+    state.snapshot && state.snapshot.topologyId === state.topology?.id
+      ? JSON.stringify(state.snapshot.faults)
+      : '[]',
+  );
+  const faults = useMemo(() => JSON.parse(key) as ActiveFault[], [key]);
+  if (!topology || faults.length === 0) return null;
+  return (
+    <Section
+      title="Placed by hand"
+      aside={
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => void actions.liftFault()}
+          data-testid="faults-lift-all"
+        >
+          Lift all
+        </Button>
+      }
+    >
+      <ul className="space-y-1" data-testid="faults-in-force">
+        {faults.map((fault) => {
+          const effect = faultEffect(topology, fault);
+          const node = fault.node === null ? undefined : topology.nodes[fault.node];
+          const edge = fault.edge === null ? undefined : topology.edges[fault.edge];
+          const target = faultTarget(topology, fault);
+          return (
+            <li
+              key={`${fault.kind}:${fault.node ?? ''}:${fault.edge ?? ''}:${fault.onto ?? ''}`}
+              className="flex items-center justify-between gap-2"
+            >
+              <button
+                type="button"
+                className="min-w-0 flex-1 rounded-control px-1.5 py-1 text-left text-xs hover:bg-raised"
+                onClick={() => {
+                  if (node) useUi.getState().selectNode(node.id);
+                  else if (edge) useUi.getState().select({ kind: 'edge', id: edge.id });
+                }}
+              >
+                <span className="block truncate text-ink">{target}</span>
+                <span className="caption block">{describeFault(fault.kind, fault.value)}</span>
+              </button>
+              {effect && (
+                <IconButton
+                  label={`Lift this fault from ${target}`}
+                  size="sm"
+                  onClick={() => void actions.liftFault(effect)}
+                >
+                  <X size={13} />
+                </IconButton>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
+  );
+}
+
 export function ScenarioConsole() {
   const { data, isError } = useQuery({ queryKey: queryKeys.scenarios, queryFn: api.scenarios });
   const activeId = useTelemetry((state) => state.snapshot?.incident?.scenarioId ?? null);
@@ -483,6 +552,7 @@ export function ScenarioConsole() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="scenario-console">
       <ActiveIncident scenario={active} />
+      <PlacedByHand />
       <Section
         title="Scenarios"
         aside={
