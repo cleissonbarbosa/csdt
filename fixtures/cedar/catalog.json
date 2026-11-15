@@ -1,0 +1,54 @@
+{
+  "tenants": [
+    { "id": "acme", "name": "Acme Retail" },
+    { "id": "globex", "name": "Globex Logistics" }
+  ],
+  "principals": [
+    { "uid": "User::\"alice\"", "label": "Alice", "tenant": "acme", "roles": ["finance"], "note": "Finance analyst" },
+    { "uid": "User::\"bob\"", "label": "Bob", "tenant": "acme", "roles": ["support"], "note": "Support agent" },
+    { "uid": "User::\"carol\"", "label": "Carol", "tenant": "acme", "roles": ["admin"], "note": "Tenant administrator" },
+    { "uid": "User::\"erin\"", "label": "Erin", "tenant": "acme", "roles": ["finance"], "note": "Finance analyst · suspended" },
+    { "uid": "User::\"dave\"", "label": "Dave", "tenant": "globex", "roles": ["admin"], "note": "Administrator of another tenant" },
+    { "uid": "User::\"mallory\"", "label": "Mallory", "tenant": "globex", "roles": ["contractor"], "note": "External contractor of another tenant" }
+  ],
+  "actions": [
+    { "uid": "Action::\"viewOrder\"", "label": "View order", "resourceType": "Order" },
+    { "uid": "Action::\"refundOrder\"", "label": "Refund order", "resourceType": "Order" },
+    { "uid": "Action::\"viewLedger\"", "label": "View ledger", "resourceType": "Ledger" },
+    { "uid": "Action::\"exportLedger\"", "label": "Export ledger", "resourceType": "Ledger" },
+    { "uid": "Action::\"viewCustomer\"", "label": "View customer", "resourceType": "Customer" },
+    { "uid": "Action::\"deleteCustomer\"", "label": "Delete customer", "resourceType": "Customer" }
+  ],
+  "resources": [
+    { "uid": "Order::\"acme-ord-1001\"", "label": "Order 1001 · 120", "tenant": "acme", "resourceType": "Order" },
+    { "uid": "Order::\"acme-ord-9000\"", "label": "Order 9000 · 4,200", "tenant": "acme", "resourceType": "Order" },
+    { "uid": "Order::\"globex-ord-5001\"", "label": "Order 5001 · 310", "tenant": "globex", "resourceType": "Order" },
+    { "uid": "Ledger::\"acme-ledger-2026\"", "label": "Acme ledger 2026", "tenant": "acme", "resourceType": "Ledger" },
+    { "uid": "Ledger::\"globex-ledger-2026\"", "label": "Globex ledger 2026", "tenant": "globex", "resourceType": "Ledger" },
+    { "uid": "Customer::\"acme-cust-77\"", "label": "Customer 77", "tenant": "acme", "resourceType": "Customer" },
+    { "uid": "Customer::\"globex-cust-12\"", "label": "Customer 12", "tenant": "globex", "resourceType": "Customer" }
+  ],
+  "contextKeys": [
+    { "key": "mfa", "label": "Fresh MFA assertion", "description": "Required by finance-export-ledger-mfa." },
+    { "key": "changeWindow", "label": "Inside change window", "description": "Required by forbid-destructive-outside-change-window." }
+  ],
+  "trafficMix": [
+    { "id": "alice-view-order", "weight": 0.38, "principal": "User::\"alice\"", "action": "Action::\"viewOrder\"", "resource": "Order::\"acme-ord-1001\"", "context": {} },
+    { "id": "bob-view-order", "weight": 0.24, "principal": "User::\"bob\"", "action": "Action::\"viewOrder\"", "resource": "Order::\"acme-ord-1001\"", "context": {} },
+    { "id": "bob-refund-small", "weight": 0.1, "principal": "User::\"bob\"", "action": "Action::\"refundOrder\"", "resource": "Order::\"acme-ord-1001\"", "context": {} },
+    { "id": "bob-view-customer", "weight": 0.07, "principal": "User::\"bob\"", "action": "Action::\"viewCustomer\"", "resource": "Customer::\"acme-cust-77\"", "context": {} },
+    { "id": "alice-view-ledger", "weight": 0.08, "principal": "User::\"alice\"", "action": "Action::\"viewLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": {} },
+    { "id": "alice-export-ledger-mfa", "weight": 0.04, "principal": "User::\"alice\"", "action": "Action::\"exportLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": { "mfa": true } },
+    { "id": "carol-delete-customer-window", "weight": 0.02, "principal": "User::\"carol\"", "action": "Action::\"deleteCustomer\"", "resource": "Customer::\"acme-cust-77\"", "context": { "changeWindow": true } },
+    { "id": "bob-refund-large", "weight": 0.03, "principal": "User::\"bob\"", "action": "Action::\"refundOrder\"", "resource": "Order::\"acme-ord-9000\"", "context": {} },
+    { "id": "bob-view-ledger", "weight": 0.02, "principal": "User::\"bob\"", "action": "Action::\"viewLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": {} },
+    { "id": "alice-export-ledger-no-mfa", "weight": 0.02, "principal": "User::\"alice\"", "action": "Action::\"exportLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": { "mfa": false } }
+  ],
+  "scenarioRequests": [
+    { "id": "alice-view-ledger", "principal": "User::\"alice\"", "action": "Action::\"viewLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": {} },
+    { "id": "mallory-export-ledger", "principal": "User::\"mallory\"", "action": "Action::\"exportLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": { "mfa": true } },
+    { "id": "mallory-view-ledger", "principal": "User::\"mallory\"", "action": "Action::\"viewLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": {} },
+    { "id": "mallory-delete-customer", "principal": "User::\"mallory\"", "action": "Action::\"deleteCustomer\"", "resource": "Customer::\"acme-cust-77\"", "context": {} },
+    { "id": "stolen-session-export", "principal": "User::\"bob\"", "action": "Action::\"exportLedger\"", "resource": "Ledger::\"acme-ledger-2026\"", "context": { "mfa": false } }
+  ]
+}

@@ -1,0 +1,18 @@
+Scan report generated at: 2026-01-15 09:30:00.482913 UTC
+
+Port 80 is open (HTTP)
+No connection to port 443
+Port 8080 is open (HTTP-Alt)
+No connection to port 75
+No connection to port 76
+No connection to port 77
+No connection to port 78
+No connection to port 79
+Port 80 is open (HTTP)
+No connection to port 81
+No connection to port 82
+No connection to port 83
+No connection to port 84
+No connection to port 85
+
+OS Fingerprint based on TTL (64): Linux/Unix

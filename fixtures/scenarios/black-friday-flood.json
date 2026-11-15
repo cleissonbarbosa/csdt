@@ -1,0 +1,12 @@
+{
+  "id": "black-friday-flood",
+  "name": "Black Friday Flood",
+  "description": "Fictional post-incident recording: a volumetric flood during peak trading, followed minutes later by a database failure that cascades through order processing.",
+  "topologyId": "helios-commerce",
+  "seed": 20261127,
+  "durationMs": 260000,
+  "commands": [
+    { "atMs": 12000, "command": { "type": "startScenario", "scenarioId": "ddos-surge" } },
+    { "atMs": 132000, "command": { "type": "startScenario", "scenarioId": "cascading-failure" } }
+  ]
+}

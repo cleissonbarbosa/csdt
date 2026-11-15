@@ -1,0 +1,28 @@
+{
+  "name": "aegis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AEGIS — Interactive Cloud Security Digital Twin",
+  "license": "MIT",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @aegis/web --filter @aegis/contracts run dev",
+    "dev:web": "pnpm --filter @aegis/web run dev",
+    "dev:server": "cargo run -p aegis-server",
+    "build": "pnpm --filter @aegis/contracts run build && pnpm --filter @aegis/web run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css,yml,yaml}\"",
+    "test": "pnpm -r run test",
+    "test:rust": "cargo test --workspace",
+    "e2e": "pnpm --filter @aegis/web run e2e",
+    "contracts:samples": "cargo run -q -p aegis-server --bin export-contract-samples"
+  },
+  "devDependencies": {
+    "prettier": "^3.10.1"
+  }
+}

@@ -1,0 +1,48 @@
+[package]
+name = "aegis-server"
+description = "AEGIS backend: deterministic infrastructure simulation, Cedar authorization and telemetry streaming"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+default-run = "aegis-server"
+
+[lib]
+name = "aegis_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aegis-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "export-contract-samples"
+path = "src/bin/export_contract_samples.rs"
+
+[dependencies]
+async-trait = "0.1"
+axum = { version = "0.8", features = ["ws", "macros"] }
+cedar-policy = "4.14"
+futures-util = "0.3"
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "set-header", "limit", "timeout"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tokio-tungstenite = "0.30"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unwrap_used = "warn"

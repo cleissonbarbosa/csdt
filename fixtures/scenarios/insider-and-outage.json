@@ -1,0 +1,13 @@
+{
+  "id": "insider-and-outage",
+  "name": "Insider Probe, Then Darkness",
+  "description": "Fictional post-incident recording: a contractor probes another tenant's ledger and is denied by Cedar, credential stuffing follows, and a regional outage forces a failover.",
+  "topologyId": "helios-commerce",
+  "seed": 77031,
+  "durationMs": 330000,
+  "commands": [
+    { "atMs": 10000, "command": { "type": "startScenario", "scenarioId": "cedar-denial" } },
+    { "atMs": 96000, "command": { "type": "startScenario", "scenarioId": "credential-stuffing" } },
+    { "atMs": 200000, "command": { "type": "startScenario", "scenarioId": "regional-outage" } }
+  ]
+}

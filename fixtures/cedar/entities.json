@@ -1,0 +1,31 @@
+[
+  { "uid": { "type": "Tenant", "id": "acme" }, "attrs": { "name": "Acme Retail" }, "parents": [] },
+  { "uid": { "type": "Tenant", "id": "globex" }, "attrs": { "name": "Globex Logistics" }, "parents": [] },
+
+  { "uid": { "type": "Role", "id": "support" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Role", "id": "finance" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Role", "id": "admin" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Role", "id": "contractor" }, "attrs": {}, "parents": [] },
+
+  { "uid": { "type": "User", "id": "alice" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "suspended": false }, "parents": [{ "type": "Role", "id": "finance" }] },
+  { "uid": { "type": "User", "id": "bob" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "suspended": false }, "parents": [{ "type": "Role", "id": "support" }] },
+  { "uid": { "type": "User", "id": "carol" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "suspended": false }, "parents": [{ "type": "Role", "id": "admin" }] },
+  { "uid": { "type": "User", "id": "erin" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "suspended": true }, "parents": [{ "type": "Role", "id": "finance" }] },
+  { "uid": { "type": "User", "id": "dave" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "globex" } }, "suspended": false }, "parents": [{ "type": "Role", "id": "admin" }] },
+  { "uid": { "type": "User", "id": "mallory" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "globex" } }, "suspended": false }, "parents": [{ "type": "Role", "id": "contractor" }] },
+
+  { "uid": { "type": "Action", "id": "viewOrder" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Action", "id": "refundOrder" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Action", "id": "viewLedger" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Action", "id": "exportLedger" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Action", "id": "viewCustomer" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Action", "id": "deleteCustomer" }, "attrs": {}, "parents": [] },
+
+  { "uid": { "type": "Order", "id": "acme-ord-1001" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "amount": 120 }, "parents": [] },
+  { "uid": { "type": "Order", "id": "acme-ord-9000" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "amount": 4200 }, "parents": [] },
+  { "uid": { "type": "Order", "id": "globex-ord-5001" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "globex" } }, "amount": 310 }, "parents": [] },
+  { "uid": { "type": "Ledger", "id": "acme-ledger-2026" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } }, "classification": "restricted" }, "parents": [] },
+  { "uid": { "type": "Ledger", "id": "globex-ledger-2026" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "globex" } }, "classification": "restricted" }, "parents": [] },
+  { "uid": { "type": "Customer", "id": "acme-cust-77" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "acme" } } }, "parents": [] },
+  { "uid": { "type": "Customer", "id": "globex-cust-12" }, "attrs": { "tenant": { "__entity": { "type": "Tenant", "id": "globex" } } }, "parents": [] }
+]

@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = ["apps/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.85"
+repository = "https://github.com/cleissonbarbosa/csdt"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+
+[profile.dev.package."*"]
+# Cedar's parser is slow unoptimised; keep dependencies fast in dev and tests.
+opt-level = 2
