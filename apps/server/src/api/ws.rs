@@ -18,37 +18,21 @@ use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::OwnedSemaphorePermit;
 
 use crate::application::StreamMessage;
 
 use super::error::ApiError;
+use super::protocol::{self, MAX_CLIENT_MESSAGE_BYTES};
 use super::AppState;
 
-/// Largest client message accepted.
-const MAX_CLIENT_MESSAGE_BYTES: usize = 1024;
 /// A subscriber whose socket stays blocked this long is disconnected.
 const SEND_TIMEOUT: Duration = Duration::from_secs(5);
 /// Client messages allowed per second.
 const CLIENT_MESSAGES_PER_SECOND: u32 = 20;
 /// Malformed client messages tolerated before the socket is closed.
 const MAX_PROTOCOL_ERRORS: u32 = 8;
-/// Most events returned for one `resync`.
-const RESYNC_LIMIT: usize = 500;
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
-enum ClientMessage {
-    Ping {
-        t: f64,
-    },
-    #[serde(rename_all = "camelCase")]
-    Resync {
-        after_seq: u64,
-    },
-}
 
 fn origin_allowed(headers: &HeaderMap, allowed: &[String]) -> bool {
     // Browsers always send Origin on WebSocket handshakes and do not apply
@@ -135,17 +119,10 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                     if window_count > CLIENT_MESSAGES_PER_SECOND {
                         break;
                     }
-                    match serde_json::from_str::<ClientMessage>(text.as_str()) {
-                        Ok(ClientMessage::Ping { t }) if t.is_finite() => {
-                            send!(&StreamMessage::Pong { t }.encode());
-                        }
-                        Ok(ClientMessage::Resync { after_seq }) => {
-                            let events = state.service.events(after_seq, RESYNC_LIMIT, None, None);
-                            if !events.is_empty() {
-                                send!(&StreamMessage::Events { data: &events }.encode());
-                            }
-                        }
-                        _ => {
+                    match protocol::answer(&state.service, text.as_str()) {
+                        Ok(Some(reply)) => send!(&reply),
+                        Ok(None) => {}
+                        Err(protocol::Malformed) => {
                             protocol_errors += 1;
                             if protocol_errors > MAX_PROTOCOL_ERRORS {
                                 break;
@@ -193,19 +170,5 @@ mod tests {
         ));
         assert!(!origin_allowed(&with("https://localhost:5173"), &allowed));
         assert!(!origin_allowed(&with("null"), &allowed));
-    }
-
-    #[test]
-    fn client_messages_are_strictly_typed() {
-        assert!(matches!(
-            serde_json::from_str::<ClientMessage>(r#"{"type":"ping","t":1.5}"#),
-            Ok(ClientMessage::Ping { .. })
-        ));
-        assert!(matches!(
-            serde_json::from_str::<ClientMessage>(r#"{"type":"resync","afterSeq":12}"#),
-            Ok(ClientMessage::Resync { after_seq: 12 })
-        ));
-        assert!(serde_json::from_str::<ClientMessage>(r#"{"type":"start"}"#).is_err());
-        assert!(serde_json::from_str::<ClientMessage>(r#"{"type":"ping","t":1,"x":2}"#).is_err());
     }
 }

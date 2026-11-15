@@ -132,6 +132,39 @@ pub struct IncidentPulse {
     pub impacted_node_ids: Vec<String>,
 }
 
+/// What a fault placed by hand bends. The names are those of the scenario
+/// effects that do the same.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FaultKind {
+    Demand,
+    Capacity,
+    Latency,
+    ErrorInject,
+    Down,
+    EdgeWeight,
+    EdgeLatency,
+    EdgeError,
+    RouteShift,
+}
+
+/// A fault placed by hand that is in force: one figure of one service or
+/// connection, held away from nominal until it is lifted.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveFault {
+    pub kind: FaultKind,
+    /// The service it is on, as an index into the topology's nodes.
+    pub node: Option<u32>,
+    /// The connection it is on, as an index into the topology's edges.
+    pub edge: Option<u32>,
+    /// For a route shift, the connection the traffic is moved onto.
+    pub onto: Option<u32>,
+    /// What the figure is held at: a factor, or a rate or fraction from 0
+    /// to 1. A service that is down has 1.
+    pub value: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetrySnapshot {
@@ -148,6 +181,8 @@ pub struct TelemetrySnapshot {
     pub regions: Vec<RegionStatus>,
     pub flows: Vec<TrafficEvent>,
     pub incident: Option<IncidentPulse>,
+    /// Faults placed by hand and in force at this point in time.
+    pub faults: Vec<ActiveFault>,
     pub playback: PlaybackState,
 }
 

@@ -1,6 +1,9 @@
 /**
  * Typed REST client for the AEGIS server. Every response is validated against
  * the shared contracts before it reaches the rest of the application.
+ *
+ * Requests leave through the transport the application was built with: the
+ * server over HTTP, or the same engine running in this tab.
  */
 import {
   ApiErrorSchema,
@@ -24,6 +27,7 @@ import {
   type EvaluateRequest,
   type WorkspaceFile,
 } from '@aegis/contracts';
+import { transport } from '@transport';
 import { z } from 'zod';
 
 /** Base URL of the API. Empty means "same origin" (the default). */
@@ -59,7 +63,7 @@ async function request<T>(schema: z.ZodType<T>, path: string, body?: unknown): P
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await transport.fetch(apiUrl(path), {
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -70,7 +74,7 @@ async function request<T>(schema: z.ZodType<T>, path: string, body?: unknown): P
     throw new ApiError(
       0,
       timedOut ? 'timeout' : 'unreachable',
-      timedOut ? 'The AEGIS server did not answer in time.' : 'The AEGIS server is unreachable.',
+      transport.unanswered(timedOut, cause),
     );
   } finally {
     clearTimeout(timer);

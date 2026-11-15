@@ -13,23 +13,17 @@ import {
   type ConnectionState,
   type StreamMessage,
 } from '@aegis/contracts';
+import { transport } from '@transport';
+
+import type { SocketLike } from './transport';
+
+export type { SocketLike };
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 8000;
 const PING_INTERVAL_MS = 5000;
 /** A connection that stays silent this long is considered dead. */
 const STALE_AFTER_MS = 12_000;
-
-/** The subset of `WebSocket` the client needs; lets tests supply a fake. */
-export interface SocketLike {
-  readyState: number;
-  onopen: ((event: unknown) => void) | null;
-  onclose: ((event: unknown) => void) | null;
-  onerror: ((event: unknown) => void) | null;
-  onmessage: ((event: { data: unknown }) => void) | null;
-  send(data: string): void;
-  close(): void;
-}
 
 export interface StreamClientOptions {
   url: string;
@@ -38,6 +32,7 @@ export interface StreamClientOptions {
   onLatency?: (milliseconds: number) => void;
   /** Called with a description when a message fails contract validation. */
   onViolation?: (reason: string) => void;
+  /** Defaults to the transport's socket; tests supply a fake. */
   createSocket?: (url: string) => SocketLike;
   /** Injectable for tests. */
   now?: () => number;
@@ -116,7 +111,7 @@ export class StreamClient {
 
   private open(): void {
     this.setState(this.everConnected ? 'reconnecting' : 'connecting');
-    const create = this.options.createSocket ?? ((url: string) => new WebSocket(url) as SocketLike);
+    const create = this.options.createSocket ?? transport.socket;
     let socket: SocketLike;
     try {
       socket = create(this.options.url);

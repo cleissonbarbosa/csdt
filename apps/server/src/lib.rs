@@ -17,6 +17,7 @@
 pub mod api;
 pub mod application;
 pub mod authorization;
+pub mod clock;
 pub mod config;
 pub mod domain;
 pub mod incidents;
@@ -25,11 +26,14 @@ pub mod simulation;
 pub mod workspace;
 
 use std::sync::Arc;
-use std::time::Instant;
 
-use api::{AppState, Limits};
+use api::AppState;
+#[cfg(not(target_arch = "wasm32"))]
+use api::Limits;
 use application::{BootstrapError, Loaded, SimulationService};
+use clock::Instant;
 use config::Config;
+#[cfg(not(target_arch = "wasm32"))]
 use domain::WorkspaceOrigin;
 use integrations::ProviderRegistry;
 
@@ -37,14 +41,36 @@ use integrations::ProviderRegistry;
 pub enum StartupError {
     #[error(transparent)]
     Bootstrap(#[from] BootstrapError),
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("building the HTTP client: {0}")]
     HttpClient(#[from] reqwest::Error),
     #[error("workspace: {0}")]
     Workspace(#[from] workspace::WorkspaceError),
+    #[error("configuration: {0}")]
+    Config(config::ConfigError),
+}
+
+/// Builds the application state of an engine with no network and no file
+/// system: the bundled fixtures, the default configuration, and only the
+/// providers that need neither. This is what runs in the browser; time is
+/// advanced by whoever holds it, through [`SimulationService::advance`].
+pub fn build_offline_state(seed: u64) -> Result<AppState, StartupError> {
+    let mut config = Config::from_lookup(|_| None).map_err(StartupError::Config)?;
+    config.seed = seed;
+    let service = SimulationService::new(Loaded::bundled()?, seed);
+    Ok(AppState {
+        service,
+        providers: Arc::new(ProviderRegistry::offline()),
+        config: Arc::new(config),
+        #[cfg(not(target_arch = "wasm32"))]
+        limits: Arc::new(Limits::default()),
+        started: Instant::now(),
+    })
 }
 
 /// Builds the shared application state. Does not start the scheduler; call
 /// [`SimulationService::spawn`] for that.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_state(config: Config) -> Result<AppState, StartupError> {
     let loaded = match &config.workspace {
         Some(path) => {

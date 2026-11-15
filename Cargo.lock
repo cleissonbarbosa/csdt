@@ -25,6 +25,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aegis-wasm"
+version = "0.1.0"
+dependencies = [
+ "aegis-server",
+ "axum",
+ "serde_json",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

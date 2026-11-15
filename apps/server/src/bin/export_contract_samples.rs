@@ -147,6 +147,15 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
     for provider in ["network-scanner", "security-alerts"] {
         post_dynamic(&state, &format!("/providers/{provider}/connect")).await?;
     }
+    // A fault placed by hand, so the samples below show one in force.
+    post(
+        "/demo/faults/inject",
+        json!({
+            "effect": { "type": "latency", "nodes": "node:use-search", "factor": 3.0 },
+            "rampMs": 1000,
+        }),
+    )
+    .await?;
     advance(&state, 2);
 
     save("topology", get("/topology").await?)?;

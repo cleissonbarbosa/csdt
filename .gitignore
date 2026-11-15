@@ -5,6 +5,10 @@
 # Node
 node_modules/
 dist/
+dist-static/
+
+# The engine built for the browser (`pnpm engine:build`)
+apps/web/src/engine/aegis.wasm
 .vite/
 *.tsbuildinfo
 coverage/

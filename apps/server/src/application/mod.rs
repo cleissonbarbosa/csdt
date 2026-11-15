@@ -22,13 +22,13 @@ use crate::domain::{
     WorkspaceOrigin, WorkspaceStatus,
 };
 use crate::incidents::recordings::{self, Recording};
-use crate::incidents::{catalog, check, resolve_all, ResolvedScenario, ScenarioDef};
+use crate::incidents::{catalog, check, resolve_all, resolve_fault, ResolvedScenario, ScenarioDef};
 use crate::simulation::topologies;
 use crate::simulation::{DecisionTable, SimTopology, TopologyError};
 
 pub use service::{
     ControlAction, EvaluateEngine, EvaluateInput, ResetScope, ServiceError, SimulationService,
-    StreamMessage, TimelineReason, PROTOCOL_VERSION,
+    StreamMessage, TimelineReason, PROTOCOL_VERSION, SCHEDULER_PERIOD,
 };
 
 /// Most topologies, scenarios or recordings one server offers.
@@ -66,6 +66,8 @@ pub enum BootstrapError {
     RecordingTopology { recording: String, topology: String },
     #[error("recording `{recording}` starts unknown scenario `{scenario}`")]
     RecordingScenario { recording: String, scenario: String },
+    #[error("recording `{recording}` places a fault its topology cannot take: {message}")]
+    RecordingFault { recording: String, message: String },
 }
 
 /// Everything the application is built from, before anything is compiled.
@@ -274,6 +276,18 @@ impl Assets {
                     recording: recording.id.clone(),
                     scenario,
                 });
+            }
+            // A fault names services and connections; they have to be ones
+            // the recording's own topology has.
+            if let Some(world) = worlds.get(&recording.topology_id) {
+                for effect in recording.faults() {
+                    resolve_fault(&world.topo, effect).map_err(|message| {
+                        BootstrapError::RecordingFault {
+                            recording: recording.id.clone(),
+                            message,
+                        }
+                    })?;
+                }
             }
         }
 

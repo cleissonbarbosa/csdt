@@ -26,30 +26,15 @@ use crate::domain::{
 };
 
 use super::guard::{validate_target, Target};
+pub use super::settings::RinhaConfig;
 use super::{sanitize, ConnectOutcome, ProviderError, TelemetryProvider};
 
 pub const PROVIDER_ID: &str = "rinha-backend";
 const REPOSITORY: &str = "https://github.com/cleissonbarbosa/rinha-backend-2026";
 /// Probes are never issued more often than this.
 pub const MIN_PROBE_INTERVAL: Duration = Duration::from_secs(1);
-const DEFAULT_PROBE_INTERVAL: Duration = Duration::from_secs(2);
 const MAX_BACKOFF: Duration = Duration::from_secs(16);
 const WINDOW: usize = 60;
-
-#[derive(Debug, Clone)]
-pub struct RinhaConfig {
-    pub base_url: String,
-    pub probe_interval: Duration,
-}
-
-impl RinhaConfig {
-    pub fn new(base_url: String) -> Self {
-        Self {
-            base_url,
-            probe_interval: DEFAULT_PROBE_INTERVAL,
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 struct ProbeState {

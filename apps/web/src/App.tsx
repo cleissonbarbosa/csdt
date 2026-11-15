@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
+import { IN_BROWSER } from '@/app/host';
 import { useAegisConnection } from '@/app/useAegisConnection';
 import { usePresence } from '@/app/usePresence';
 import { useTheme } from '@/app/useTheme';
@@ -188,7 +189,27 @@ function useShortcuts() {
   }, []);
 }
 
+/** The engine in this tab could not start, or stopped. Only a reload brings it back. */
+function EngineStopped({ message }: { message: string }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
+      <div className="panel max-w-md p-6" data-testid="engine-stopped">
+        <h2 className="text-base font-bold text-ink">The simulation engine is not running</h2>
+        <p className="mt-2 text-xs leading-relaxed text-ink-dim">{message}</p>
+        <p className="caption mt-3">
+          On this page the simulation runs in the browser, from a WebAssembly module. Nothing is
+          shown in its place: AEGIS does not invent data.
+        </p>
+        <Button className="mt-4" onClick={() => window.location.reload()}>
+          Reload the page
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function Unreachable({ message }: { message: string }) {
+  if (IN_BROWSER) return <EngineStopped message={message} />;
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
       <div className="panel max-w-md p-6">

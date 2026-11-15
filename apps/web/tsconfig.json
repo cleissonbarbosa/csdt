@@ -16,7 +16,10 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"],
+      "@transport": ["./src/providers/serverTransport.ts"]
+    }
   },
   "include": ["src", "e2e", "*.ts"]
 }

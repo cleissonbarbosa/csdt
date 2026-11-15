@@ -1351,6 +1351,30 @@
     {
       "seq": 42,
       "id": "evt-42",
+      "tick": 151,
+      "virtualTimeMs": 30200,
+      "severity": "notice",
+      "kind": "system",
+      "title": "Fault placed by hand: latency ×3",
+      "message": "Placed by the operator, outside any scenario. It holds until it is lifted or the simulation is reset.",
+      "nodeIds": [
+        "use-search"
+      ],
+      "edgeIds": [],
+      "incidentId": null,
+      "dataSource": "synthetic",
+      "details": {
+        "fault": {
+          "type": "latency",
+          "nodes": "node:use-search",
+          "factor": 3.0
+        },
+        "rampMs": 1000
+      }
+    },
+    {
+      "seq": 43,
+      "id": "evt-43",
       "tick": 156,
       "virtualTimeMs": 31200,
       "severity": "warning",
@@ -1384,8 +1408,31 @@
       }
     },
     {
-      "seq": 43,
-      "id": "evt-43",
+      "seq": 44,
+      "id": "evt-44",
+      "tick": 157,
+      "virtualTimeMs": 31400,
+      "severity": "warning",
+      "kind": "health-transition",
+      "title": "Search is degraded",
+      "message": "Search in us-east went from healthy to degraded.",
+      "nodeIds": [
+        "use-search"
+      ],
+      "edgeIds": [],
+      "incidentId": "inc-001",
+      "dataSource": "synthetic",
+      "details": {
+        "from": "healthy",
+        "to": "degraded",
+        "errorRate": 0.0,
+        "latencyMs": 110.3,
+        "saturation": 0.459
+      }
+    },
+    {
+      "seq": 45,
+      "id": "evt-45",
       "tick": 160,
       "virtualTimeMs": 32000,
       "severity": "info",

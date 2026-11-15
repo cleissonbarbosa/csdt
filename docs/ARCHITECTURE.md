@@ -55,11 +55,13 @@ apps/
     application/     use cases; owns the single mutable timeline
     workspace.rs     reads an operator's own files from a directory at start-up
     api/             Axum routes, WebSocket, rate limiting, errors
+  wasm/src/          the same routes and service as a WebAssembly module
   web/src/
     graphics/        layout, modelled pieces, TSL materials, SceneController
     features/        scene, explorer, inspector, timeline, scenarios, …
     stores/          telemetry, interface state, persisted settings
     providers/       REST client, stream client, TelemetryProvider
+    engine/          the module's binding, its worker and the transport to it
     components/ui/   buttons, badges, dialog, fields, sparkline
 packages/contracts/  zod schemas + samples exported by the server
 fixtures/            the bundled topology, scenarios, recordings and Cedar
@@ -252,6 +254,51 @@ simulation: it receives `lagged` with the number of dropped messages and a
 fresh snapshot, and can ask for missed events with `resync`. Events carry
 gapless sequence numbers, so a client always knows what it has.
 
+### The engine in the browser
+
+`pnpm build:static` builds the application with no server behind it. The
+engine is not a second implementation: `apps/wasm` is a thin crate around the
+server library, compiled for `wasm32-unknown-unknown`, and what it serves is
+the route table above, the same `SimulationService` and the same Cedar
+engine. Only what needs an operating system is left out of that build: the
+socket, the scheduler task, rate limiting, the HTTP client and the two live
+adapters.
+
+|                 | Server                                  | In the browser                                        |
+| --------------- | --------------------------------------- | ----------------------------------------------------- |
+| A request       | HTTP to `/api/v1`                       | a function call into the module, same path and body   |
+| The stream      | WebSocket                               | what each call hands back, delivered as socket events |
+| Time            | a 50 ms task and the operating system   | the worker's timer; the clock is an argument          |
+| Simulation      | one, shared by every viewer             | one per tab, gone on reload                           |
+| Integrations    | fixtures, and live adapters on loopback | fixtures only; live adapters are not listed           |
+| Cedar           | embedded, or a connected `cedar-agent`  | embedded                                              |
+| Evaluation time | measured                                | not measured, and shown as such                       |
+| Workspace       | start-up directory, or import           | import, held in the tab                               |
+
+**The boundary.** The module imports nothing from its host, so it can do
+nothing but compute. The page writes text into a buffer the module owns,
+calls an exported function and reads lines out of another: a request is
+`METHOD path` and its JSON body, its answer is the status, the response body
+and the stream messages the request produced. Nothing is parsed or re-encoded
+in between, because JSON as the server writes it holds no line break. The
+router is invoked directly and polled once; no handler behind it has anything
+to wait for. There is no `unsafe` block and no binding generator.
+
+**Time.** The engine never reads a clock (that is what makes it
+deterministic), and the little that does (uptime, how often snapshots are
+sent) uses `clock::Instant`, which is the standard one on the server and, in
+the module, the last time the page said it was. A worker calls `advance`
+every 50 ms with the time that passed, capped at one second, so a tab that
+slept does not sprint when it wakes.
+
+**The page.** `providers/transport.ts` is the seam. The REST client asks the
+transport for a `Response` and the stream client asks it for a socket; the
+server transport gives them `fetch` and a `WebSocket`, the engine transport
+gives them the worker's answers in the same shapes. Which one is linked is
+decided at build time (`--mode static`), so the server build carries no
+module and the static build makes no request. Everything above the seam,
+including the schema check on every response and message, is one code path.
+
 ### Contract testing
 
 `cargo run -p aegis-server --bin export-contract-samples` drives the real
@@ -259,6 +306,13 @@ router through a fixed scenario and writes its responses to
 `packages/contracts/samples/`. The TypeScript tests parse every sample with
 the zod schemas and require the parsed value to equal the input, which catches
 drift in both directions. CI regenerates the samples and fails on any diff.
+
+The module is held to the same files. `pnpm test:engine` loads the built
+module in Node, drives it through the exporter's sequence and requires what
+comes out to equal the samples value for value, floating-point figures
+included (the two wall-clock fields the exporter zeroes are zeroed here too).
+The provider list is the one deliberate difference. A second test calls every
+route, since one that reached for a clock or a thread would stop the module.
 
 ---
 

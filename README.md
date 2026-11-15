@@ -173,6 +173,18 @@ Versioned [JSON Schemas](schemas/README.md) provide editor completion and
 file validation; the incident console explains why an incompatible scenario
 cannot run on the selected topology.
 
+**No server needed**
+
+The whole application also builds as a static site. The engine (the server's
+own routes, simulation, Cedar decision point and workspace checks) is
+compiled to WebAssembly and runs in the tab, in a worker; the page requests
+nothing but its own files, so it can be served from any path of any static
+host. It answers as the server does: a test drives the module through the
+sequence that produced the contract samples and requires the same output,
+value for value. Importing your own files works there too, and stays in the
+tab. What needs a network stays with the server: the live adapters, a
+simulation shared between viewers and a workspace read at start-up.
+
 **Signals with their range**
 
 Traffic, latency, error rate and saturation, each drawn on a scale with its
@@ -238,6 +250,18 @@ pnpm install
 pnpm dev:web                            # UI on http://localhost:5173
 ```
 
+Without a server at all (adds the `wasm32-unknown-unknown` Rust target):
+
+```bash
+rustup target add wasm32-unknown-unknown
+pnpm install
+pnpm build:static                          # the engine as WebAssembly and the site around it
+pnpm --filter @aegis/web preview:static    # http://localhost:4173
+```
+
+`apps/web/dist-static` is then plain files that run the simulation in the
+browser.
+
 Then follow the five-minute tour in [docs/DEMO.md](docs/DEMO.md).
 
 To run it on a platform of your own:
@@ -287,6 +311,7 @@ flowchart LR
 | `application`        | Use cases; owns the single mutable timeline.                                     |
 | `workspace`          | Reads an operator's topologies, scenarios and policies from a directory, once.   |
 | `api`                | HTTP and WebSocket shell: validation, limits, error mapping.                     |
+| `apps/wasm`          | The same routes and service as a WebAssembly module, for the static site.        |
 | `packages/contracts` | The same contract as zod schemas, verified against real server output.           |
 | `apps/web`           | Rendering engine, interface, stores, provider.                                   |
 
@@ -392,30 +417,38 @@ access control. Full detail in [docs/SECURITY.md](docs/SECURITY.md).
 cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters, workspaces, diff
 pnpm test                   # contracts, stores, layout, stream client, interface
 pnpm e2e                    # Playwright against the real stack
+pnpm engine:build           # the engine as WebAssembly, for the two below
+pnpm test:engine            # the module against the server's own output
+pnpm e2e:static             # Playwright against the static site, no server
 ```
 
-| Suite      | Tests | Covers                                                                                                                                                                                                                                               |
-| ---------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rust       |   175 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them                                                      |
-| Contracts  |    59 | Every zod schema against samples exported by the server binary; the published JSON Schemas against the bundled files and the example                                                                                                                 |
-| Web        |   245 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                                               |
-| End to end |    12 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, no-GPU fallback |
+| Suite       | Tests | Covers                                                                                                                                                                                                                                               |
+| ----------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust        |   187 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, the boundary of the engine built for the browser    |
+| Contracts   |    71 | Every zod schema against samples exported by the server binary; the published JSON Schemas against the bundled files and the examples                                                                                                                |
+| Web         |   258 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface, the engine's client and transport                                                            |
+| End to end  |    12 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, no-GPU fallback |
+| Engine      |    28 | The built WebAssembly module, loaded in Node: 23 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                   |
+| Static site |     6 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, and what it shows when the engine cannot load                |
 
-All 491 pass locally. The end-to-end suite runs the real server and a production
+All 562 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
 incident is under way. The same suite passes on a real GPU through WebGPU (11
-tests; the fallback test does not apply there). One more Rust test compares the
-embedded engine with a real `cedar-agent` binary and is skipped unless
-`AEGIS_TEST_CEDAR_AGENT_BIN` is set.
+tests; the fallback test does not apply there). The last two suites need the
+engine module (`pnpm engine:build`) and run in their own CI job. One more Rust
+test compares the embedded engine with a real `cedar-agent` binary and is
+skipped unless `AEGIS_TEST_CEDAR_AGENT_BIN` is set.
 
 ## Project layout
 
 ```
 apps/server         Rust backend (domain · simulation · incidents · authorization
                     · integrations · application · api)
-apps/web            React client (graphics · features · stores · providers)
+apps/wasm           The engine for the browser: the server's routes behind a
+                    function-call boundary, compiled to WebAssembly
+apps/web            React client (graphics · features · stores · providers · engine)
 packages/contracts  Shared contract: zod schemas + samples exported by the server
 fixtures            The bundled topology, scenarios, recordings and Cedar files, laid
                     out as a workspace; fixtures for the integrations
@@ -426,8 +459,6 @@ scripts             Screenshot and benchmark runners
 
 ## Roadmap
 
-- Compile the engine to WebAssembly so the demo runs as a static site with no
-  backend.
 - Generic OpenTelemetry provider (OTLP traces → topology and edge metrics).
 - Merge live probe data into the scene as its own clearly-labelled region.
 - Topology and scenario editors in the interface (files are already read

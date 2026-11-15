@@ -11,26 +11,36 @@
 //!
 //! See `docs/INTEGRATIONS.md` for what was verified in each repository.
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cedar_agent;
+#[cfg(target_arch = "wasm32")]
+#[path = "cedar_agent_offline.rs"]
+pub mod cedar_agent;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod guard;
 pub mod network_scanner;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod rinha;
 pub mod security_alerts;
+pub mod settings;
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::authorization::PolicyDocument;
 use crate::domain::{
     DataSource, ImportedEvent, IntegrationKind, IntegrationState, IntegrationStatus,
 };
 
-pub use cedar_agent::{CedarAgentConfig, CedarAgentProvider};
+pub use cedar_agent::CedarAgentProvider;
 pub use network_scanner::NetworkScannerFixtureProvider;
-pub use rinha::{RinhaConfig, RinhaProbeProvider};
+#[cfg(not(target_arch = "wasm32"))]
+pub use rinha::RinhaProbeProvider;
 pub use security_alerts::SecurityAlertFixtureProvider;
+pub use settings::{CedarAgentConfig, IntegrationConfig, RinhaConfig};
 
 /// Timeout applied to every outbound integration request.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
@@ -74,6 +84,7 @@ pub trait TelemetryProvider: Send + Sync {
 
 /// Builds the HTTP client shared by live adapters: short timeout, no
 /// redirects and no ambient proxy configuration.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn http_client() -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
@@ -85,6 +96,7 @@ pub fn http_client() -> Result<reqwest::Client, reqwest::Error> {
 }
 
 /// Reads a response body, refusing anything larger than the adapter limit.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn read_limited(response: reqwest::Response) -> Result<Vec<u8>, ProviderError> {
     if response
         .content_length()
@@ -104,6 +116,7 @@ pub async fn read_limited(response: reqwest::Response) -> Result<Vec<u8>, Provid
 
 /// Describes a transport error without echoing URLs (which could carry
 /// operator configuration) into logs or API responses.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn sanitize(error: &reqwest::Error) -> String {
     if error.is_timeout() {
         "request timed out".into()
@@ -159,14 +172,6 @@ impl TelemetryProvider for DemoSimulationProvider {
     }
 }
 
-/// Integration settings read from the environment.
-#[derive(Debug, Clone, Default)]
-pub struct IntegrationConfig {
-    pub cedar_agent: Option<CedarAgentConfig>,
-    pub rinha: Option<RinhaConfig>,
-    pub allowed_hosts: Vec<String>,
-}
-
 pub struct ProviderRegistry {
     providers: Vec<Arc<dyn TelemetryProvider>>,
     cedar_agent: Arc<CedarAgentProvider>,
@@ -175,6 +180,7 @@ pub struct ProviderRegistry {
 impl ProviderRegistry {
     /// `policies` and `entities` are what the embedded engine was built
     /// from; a cedar-agent sync uploads the same ones.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(
         config: &IntegrationConfig,
         policies: Vec<PolicyDocument>,
@@ -204,6 +210,28 @@ impl ProviderRegistry {
             providers,
             cedar_agent,
         })
+    }
+
+    /// The providers that need no network: the simulation itself and the two
+    /// fixture parsers. This is all the in-browser engine has; the live
+    /// adapters are not listed there, because nothing could connect them.
+    pub fn offline() -> Self {
+        Self {
+            providers: vec![
+                Arc::new(DemoSimulationProvider),
+                Arc::new(NetworkScannerFixtureProvider::default()),
+                Arc::new(SecurityAlertFixtureProvider::default()),
+            ],
+            #[cfg(target_arch = "wasm32")]
+            cedar_agent: Arc::new(CedarAgentProvider),
+            #[cfg(not(target_arch = "wasm32"))]
+            cedar_agent: Arc::new(CedarAgentProvider::new(
+                None,
+                &[],
+                // Never used: no target is configured.
+                reqwest::Client::new(),
+            )),
+        }
     }
 
     pub fn cedar_agent(&self) -> &Arc<CedarAgentProvider> {

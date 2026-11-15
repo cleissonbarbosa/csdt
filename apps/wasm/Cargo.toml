@@ -1,0 +1,31 @@
+[package]
+name = "aegis-wasm"
+description = "The AEGIS engine for the browser: the server's own router, service and Cedar engine as a WebAssembly module"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+# The module the page loads. `rlib` as well, so the crate's tests can link
+# the same engine natively.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aegis-server = { path = "../server" }
+axum = { version = "0.8", default-features = false }
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["sync"] }
+tower = { version = "0.5", features = ["util"] }
+
+[lints.rust]
+# No `unsafe` block anywhere. The lint also covers `#[no_mangle]`, which the
+# exported functions need and allow one by one.
+unsafe_code = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unwrap_used = "warn"

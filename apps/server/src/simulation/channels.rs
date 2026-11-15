@@ -107,6 +107,35 @@ impl ChannelSet {
             channel.start_tick = tick;
             channel.ramp_ticks = ramp_ticks;
         }
+        self.open(targets, tick, ramp_ticks);
+    }
+
+    /// Points the listed channels at their targets and leaves every other
+    /// channel as it is. This is how effects that do not belong to a phase
+    /// are placed and lifted one at a time.
+    pub fn set(&mut self, targets: &[(ChannelKey, f64)], tick: u64, ramp_ticks: u32) {
+        let ramp_ticks = ramp_ticks.max(1);
+        for channel in &mut self.0 {
+            if let Some((_, value)) = targets.iter().find(|(key, _)| *key == channel.key) {
+                channel.from = channel.current;
+                channel.target = *value;
+                channel.start_tick = tick;
+                channel.ramp_ticks = ramp_ticks;
+            }
+        }
+        self.open(targets, tick, ramp_ticks);
+    }
+
+    /// The channels heading somewhere other than neutral: what is in force
+    /// or easing in, as opposed to what is on its way out.
+    pub fn in_force(&self) -> impl Iterator<Item = &Channel> {
+        self.0
+            .iter()
+            .filter(|channel| (channel.target - channel.key.neutral()).abs() >= 1e-12)
+    }
+
+    /// Adds the targets that have no channel yet, starting from neutral.
+    fn open(&mut self, targets: &[(ChannelKey, f64)], tick: u64, ramp_ticks: u32) {
         for (key, value) in targets {
             if let Err(position) = self.0.binary_search_by(|c| c.key.cmp(key)) {
                 let neutral = key.neutral();

@@ -119,6 +119,14 @@ describe('columnar snapshots', () => {
       true,
     );
   });
+
+  it('carry the faults placed by hand, by position in the topology', () => {
+    // The exporter slows one service down by hand before taking the sample.
+    expect(snapshot.faults).toEqual([
+      { kind: 'latency', node: expect.any(Number), edge: null, onto: null, value: 3 },
+    ]);
+    expect(topology.nodes[snapshot.faults[0]?.node ?? -1]?.id).toBe('use-search');
+  });
 });
 
 describe('schemas reject malformed data', () => {

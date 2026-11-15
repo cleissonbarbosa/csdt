@@ -4,6 +4,8 @@
 target
 **/node_modules
 **/dist
+**/dist-static
+apps/web/src/engine/aegis.wasm
 **/test-results
 **/playwright-report
 docs

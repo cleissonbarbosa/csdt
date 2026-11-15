@@ -32,29 +32,11 @@ use crate::domain::{
 };
 
 use super::guard::{validate_target, Target};
+pub use super::settings::CedarAgentConfig;
 use super::{read_limited, sanitize, ConnectOutcome, ProviderError, TelemetryProvider};
 
 pub const PROVIDER_ID: &str = "cedar-agent";
 const REPOSITORY: &str = "https://github.com/cleissonbarbosa/cedar-agent";
-
-#[derive(Clone)]
-pub struct CedarAgentConfig {
-    pub base_url: String,
-    pub token: Option<String>,
-    /// Upload AEGIS' synthetic policies and entities on connect.
-    pub sync: bool,
-}
-
-impl std::fmt::Debug for CedarAgentConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Never print the token.
-        f.debug_struct("CedarAgentConfig")
-            .field("base_url", &self.base_url)
-            .field("token", &self.token.as_ref().map(|_| "<redacted>"))
-            .field("sync", &self.sync)
-            .finish()
-    }
-}
 
 /// Body of `POST /v1/is_authorized` (cedar-agent's `AuthorizationCall`).
 #[derive(Debug, Serialize)]

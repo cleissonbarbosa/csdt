@@ -31,7 +31,7 @@ export default defineConfig({
     {
       // Software WebGL 2 (SwiftShader): what CI has.
       name: 'chromium',
-      testIgnore: /fallback\.spec\.ts/,
+      testIgnore: /(fallback|static)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1600, height: 900 } },
     },
     {
@@ -49,7 +49,7 @@ export default defineConfig({
           {
             // Opt-in: a locally installed Chrome on a real GPU, using WebGPU.
             name: 'chrome-webgpu',
-            testIgnore: /fallback\.spec\.ts/,
+            testIgnore: /(fallback|static)\.spec\.ts/,
             use: {
               ...devices['Desktop Chrome'],
               viewport: { width: 1600, height: 900 },

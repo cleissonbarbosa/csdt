@@ -13,6 +13,7 @@ import { ChevronLeft, Pause, Play, RotateCcw, Square, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { HealthGlyph, SeverityBadge, SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -520,9 +521,7 @@ export function ScenarioConsole() {
           Fictional, deterministic incidents that run only inside the simulation engine. Nothing
           here touches a real system.
         </p>
-        {isError && (
-          <EmptyState title="Scenarios unavailable">The server could not be reached.</EmptyState>
-        )}
+        {isError && <EmptyState title="Scenarios unavailable">{HOST.unreachable}</EmptyState>}
         <ul className="divide-y divide-line">
           {data?.scenarios.map((scenario) => (
             <ScenarioCard

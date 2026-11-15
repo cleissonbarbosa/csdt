@@ -1,0 +1,385 @@
+/**
+ * The engine in the browser answers as the server does.
+ *
+ * `packages/contracts/samples` is what the native server emitted when
+ * `export-contract-samples` drove it through a fixed sequence. This test
+ * drives the WebAssembly module through the same sequence and compares what
+ * comes out with those files. The module is the real one, loaded in Node the
+ * way the worker loads it in a browser.
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import { Engine } from './binding';
+
+const MODULE = fileURLToPath(new URL('./aegis.wasm', import.meta.url));
+const SAMPLES = fileURLToPath(new URL('../../../../packages/contracts/samples/', import.meta.url));
+
+type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+
+function sample(name: string): Json {
+  return JSON.parse(readFileSync(`${SAMPLES}${name}.json`, 'utf8')) as Json;
+}
+
+/** The fields the exporter zeroes because they depend on the wall clock. */
+function normalise(value: Json): Json {
+  if (Array.isArray(value)) return value.map(normalise);
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      key === 'evaluationMicros' || key === 'uptimeSeconds' ? 0 : normalise(entry),
+    ]),
+  );
+}
+
+/** Where two values differ, as paths; numbers are compared exactly. */
+function differences(actual: Json, expected: Json, path = '$', found: string[] = []): string[] {
+  if (found.length >= 20) return found;
+  if (Array.isArray(actual) && Array.isArray(expected)) {
+    if (actual.length !== expected.length) {
+      found.push(`${path}: ${actual.length} items, expected ${expected.length}`);
+      return found;
+    }
+    actual.forEach((item, index) =>
+      differences(item, expected[index]!, `${path}[${index}]`, found),
+    );
+    return found;
+  }
+  const objects =
+    actual !== null &&
+    expected !== null &&
+    typeof actual === 'object' &&
+    typeof expected === 'object';
+  if (objects && !Array.isArray(actual) && !Array.isArray(expected)) {
+    const keys = new Set([...Object.keys(actual), ...Object.keys(expected)]);
+    for (const key of keys) {
+      if (!(key in actual)) found.push(`${path}.${key}: missing`);
+      else if (!(key in expected)) found.push(`${path}.${key}: not expected`);
+      else differences(actual[key]!, expected[key]!, `${path}.${key}`, found);
+    }
+    return found;
+  }
+  if (actual !== expected) {
+    found.push(`${path}: ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
+  }
+  return found;
+}
+
+/** The smallest workspace that replaces something; the exporter's own. */
+function tinyWorkspace(): { path: string; text: string }[] {
+  const topology = {
+    id: 'front-desk',
+    name: 'Front Desk',
+    description: 'Fictional two-service platform used for the contract samples.',
+    dataSource: 'synthetic',
+    regions: [{ id: 'lobby', name: 'Lobby', kind: 'cloud', location: 'Ground floor' }],
+    roles: { primaryGateway: 'door' },
+    nodes: [
+      {
+        id: 'visitors',
+        name: 'Visitors',
+        type: 'external-client',
+        region: 'lobby',
+        tier: 0,
+        baseLatencyMs: 0,
+        baseRps: 40,
+      },
+      {
+        id: 'door',
+        name: 'Door',
+        type: 'api-gateway',
+        region: 'lobby',
+        tier: 1,
+        baseLatencyMs: 3,
+      },
+    ],
+    edges: [
+      {
+        source: 'visitors',
+        target: 'door',
+        protocol: 'https',
+        relationship: 'route',
+        weight: 1.0,
+      },
+    ],
+  };
+  const scenario = {
+    id: 'slow-door',
+    name: 'Slow door',
+    summary: 'The door takes several times longer to open.',
+    category: 'resilience',
+    severity: 'warning',
+    durationMs: 20000,
+    rootCause: 'role:primaryGateway',
+    targets: ['role:primaryGateway'],
+    phases: [
+      {
+        name: 'Stiff hinge',
+        atMs: 0,
+        rampMs: 2000,
+        status: 'active',
+        effects: [{ type: 'latency', nodes: 'role:primaryGateway', factor: 6.0 }],
+      },
+      { name: 'Recovery', atMs: 12000, rampMs: 3000, status: 'recovering' },
+    ],
+  };
+  return [
+    { path: 'topologies/front-desk.json', text: JSON.stringify(topology) },
+    { path: 'scenarios/01-slow-door.json', text: JSON.stringify(scenario) },
+  ];
+}
+
+describe('the engine built for the browser', () => {
+  let engine: Engine;
+  let clock = 0;
+  /** What each step of the sequence produced, by the name of its sample. */
+  const produced = new Map<string, Json>();
+
+  const advance = (seconds: number) => {
+    for (let tick = 0; tick < seconds * 5; tick += 1) {
+      clock += 200;
+      engine.advance(200, clock);
+    }
+  };
+  const call = (method: 'GET' | 'POST', path: string, body?: unknown) => {
+    const answer = engine.request(
+      method,
+      `/api/v1${path}`,
+      body === undefined ? undefined : JSON.stringify(body),
+      clock,
+    );
+    expect(answer.status, `${method} ${path}: ${answer.body}`).toBe(200);
+    return { body: JSON.parse(answer.body) as Json, stream: answer.stream };
+  };
+  const get = (path: string) => call('GET', path).body;
+  const post = (path: string, body: unknown) => call('POST', path, body);
+  const message = (text: string) => JSON.parse(text) as Json;
+
+  beforeAll(async () => {
+    if (!existsSync(MODULE)) {
+      throw new Error('src/engine/aegis.wasm is missing. Build it with `pnpm engine:build`.');
+    }
+    const { instance } = await WebAssembly.instantiate(readFileSync(MODULE), {});
+    engine = Engine.from(instance.exports);
+    engine.boot(42, clock);
+
+    // The sequence of `export-contract-samples`, step for step.
+    const [hello] = engine.open(clock);
+    produced.set('stream-hello', message(hello!));
+    advance(8);
+    produced.set('health', get('/health'));
+    produced.set('topologies', get('/topologies'));
+    produced.set('recordings', get('/recordings'));
+    produced.set('authorization-catalog', get('/demo/authorization/catalog'));
+
+    produced.set(
+      'control-response',
+      post('/demo/scenarios/start', { scenarioId: 'credential-stuffing' }).body,
+    );
+    advance(22);
+    produced.set(
+      'decision-allow',
+      post('/demo/authorization/evaluate', {
+        principal: 'User::"alice"',
+        action: 'Action::"exportLedger"',
+        resource: 'Ledger::"acme-ledger-2026"',
+        context: { mfa: true },
+      }).body,
+    );
+    produced.set(
+      'decision-deny',
+      post('/demo/authorization/evaluate', {
+        principal: 'User::"mallory"',
+        action: 'Action::"exportLedger"',
+        resource: 'Ledger::"acme-ledger-2026"',
+      }).body,
+    );
+    for (const provider of ['network-scanner', 'security-alerts']) {
+      post(`/providers/${provider}/connect`, {});
+    }
+    advance(2);
+
+    produced.set('topology', get('/topology'));
+    produced.set('scenarios', get('/scenarios'));
+    produced.set('incidents', get('/incidents'));
+    produced.set('metrics', get('/metrics'));
+    produced.set('events', get('/events?limit=1000'));
+    produced.set('providers', get('/providers'));
+    produced.set('authorization-decisions', get('/demo/authorization/decisions'));
+    produced.set('stream-snapshot', message(engine.open(clock)[1]!));
+    const [replay] = engine.message('{"type":"resync","afterSeq":0}', clock);
+    produced.set('stream-events', message(replay!));
+    const seek = post('/demo/playback/control', { action: 'seek', toMs: 6000 });
+    produced.set('stream-timeline', message(seek.stream[0]!));
+
+    post('/demo/topology/select', { topologyId: 'hyperscale-stress' });
+    advance(2);
+    const stress = get('/topology') as {
+      id: string;
+      nodes: Json[];
+      edges: Json[];
+      regions: Json[];
+    };
+    produced.set('topology-stress-summary', {
+      id: stress.id,
+      nodes: stress.nodes.length,
+      edges: stress.edges.length,
+      regions: stress.regions.length,
+    });
+
+    produced.set('workspace', get('/workspace'));
+    produced.set('workspace-check', post('/demo/workspace/check', { files: tinyWorkspace() }).body);
+    const broken = tinyWorkspace();
+    broken[1]!.text = '{ "id": "slow-door" }';
+    produced.set('workspace-check-invalid', post('/demo/workspace/check', { files: broken }).body);
+    const imported = post('/demo/workspace/import', { files: tinyWorkspace() });
+    produced.set('workspace-response', imported.body);
+    produced.set('workspace-export', get('/workspace/export'));
+    produced.set('stream-timeline-workspace', message(imported.stream[0]!));
+  });
+
+  it.each([
+    'stream-hello',
+    'health',
+    'topologies',
+    'recordings',
+    'authorization-catalog',
+    'control-response',
+    'decision-allow',
+    'decision-deny',
+    'topology',
+    'scenarios',
+    'incidents',
+    'metrics',
+    'events',
+    'authorization-decisions',
+    'stream-snapshot',
+    'stream-timeline',
+    'topology-stress-summary',
+    'workspace',
+    'workspace-check',
+    'workspace-check-invalid',
+    'workspace-response',
+    'workspace-export',
+    'stream-timeline-workspace',
+  ])('answers %s exactly as the server does', (name) => {
+    const actual = produced.get(name);
+    expect(actual, `the sequence did not produce ${name}`).toBeDefined();
+    expect(differences(normalise(actual!), sample(name))).toEqual([]);
+  });
+
+  it('replays the same events a subscriber of the server is sent', () => {
+    // The sample holds the newest five; a resync from the start returns them all.
+    const actual = produced.get('stream-events') as { type: string; data: Json[] };
+    const expected = sample('stream-events') as { type: string; data: Json[] };
+    expect(actual.type).toBe(expected.type);
+    expect(actual.data.length).toBeGreaterThan(expected.data.length);
+    expect(differences(normalise(actual.data.slice(-expected.data.length)), expected.data)).toEqual(
+      [],
+    );
+  });
+
+  it('lists the providers that need no network, and only those', () => {
+    // The server also lists its two live adapters; the engine has no network
+    // to reach them through, and does not offer what it cannot do.
+    const expected = (sample('providers') as { kind: string }[]).filter(
+      (provider) => provider.kind !== 'live-adapter',
+    );
+    expect(expected).toHaveLength(3);
+    expect(differences(produced.get('providers')!, expected as Json)).toEqual([]);
+  });
+
+  it('refuses an engine it cannot reach, as the server does without one', () => {
+    const answer = engine.request(
+      'POST',
+      '/api/v1/demo/authorization/evaluate',
+      JSON.stringify({
+        principal: 'User::"alice"',
+        action: 'Action::"viewLedger"',
+        resource: 'Ledger::"acme-ledger-2026"',
+        engine: 'cedar-agent',
+      }),
+      clock,
+    );
+    expect(answer.status).toBe(503);
+  });
+
+  it('imports nothing from its host', async () => {
+    const module = await WebAssembly.compile(readFileSync(MODULE));
+    expect(WebAssembly.Module.imports(module)).toEqual([]);
+  });
+});
+
+describe('every route, in the module', () => {
+  // A route that reads a clock, a file or a thread the browser does not
+  // have would stop the module with a panic. Each one is called here.
+  it('answers without stopping the engine', async () => {
+    if (!existsSync(MODULE)) {
+      throw new Error('src/engine/aegis.wasm is missing. Build it with `pnpm engine:build`.');
+    }
+    const { instance } = await WebAssembly.instantiate(readFileSync(MODULE), {});
+    const engine = Engine.from(instance.exports);
+    let clock = 0;
+    engine.boot(7, clock);
+    const run = (ticks: number) => {
+      for (let tick = 0; tick < ticks; tick += 1) {
+        clock += 200;
+        engine.advance(200, clock);
+      }
+    };
+    const calls: [method: 'GET' | 'POST', path: string, body?: unknown][] = [
+      ['GET', '/health'],
+      ['GET', '/topology'],
+      ['GET', '/topologies'],
+      ['GET', '/metrics'],
+      ['GET', '/events?afterSeq=0&limit=10'],
+      ['GET', '/incidents'],
+      ['GET', '/scenarios'],
+      ['GET', '/recordings'],
+      ['GET', '/providers'],
+      ['GET', '/workspace'],
+      ['GET', '/workspace/export'],
+      ['GET', '/demo/authorization/catalog'],
+      ['GET', '/demo/authorization/decisions'],
+      ['POST', '/demo/scenarios/start', { scenarioId: 'regional-outage' }],
+      ['POST', '/demo/playback/control', { action: 'setSpeed', speed: 4 }],
+      ['POST', '/demo/playback/control', { action: 'pause' }],
+      ['POST', '/demo/playback/control', { action: 'step' }],
+      ['POST', '/demo/playback/control', { action: 'seek', toMs: 1000 }],
+      ['POST', '/demo/playback/control', { action: 'replay' }],
+      ['POST', '/demo/playback/control', { action: 'live' }],
+      ['POST', '/demo/playback/control', { action: 'play' }],
+      ['POST', '/demo/scenarios/reset', { scope: 'scenario' }],
+      ['POST', '/providers/network-scanner/connect', {}],
+      ['POST', '/providers/network-scanner/disconnect', {}],
+      ['POST', '/demo/recordings/load', { recordingId: 'black-friday-flood' }],
+      ['POST', '/demo/topology/select', { topologyId: 'hyperscale-stress' }],
+      ['POST', '/demo/scenarios/reset', { scope: 'simulation' }],
+      ['POST', '/demo/workspace/reset', {}],
+    ];
+    for (const [method, path, body] of calls) {
+      const answer = engine.request(
+        method,
+        `/api/v1${path}`,
+        body === undefined ? undefined : JSON.stringify(body),
+        clock,
+      );
+      expect(answer.status, `${method} ${path}: ${answer.body}`).toBe(200);
+      expect(() => JSON.parse(answer.body) as unknown).not.toThrow();
+      run(10);
+    }
+    expect(engine.failure).toBeNull();
+    // The 178-service topology, for a virtual minute.
+    engine.request(
+      'POST',
+      '/api/v1/demo/topology/select',
+      '{"topologyId":"hyperscale-stress"}',
+      clock,
+    );
+    run(300);
+    expect(engine.failure).toBeNull();
+  });
+});

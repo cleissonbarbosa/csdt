@@ -6,13 +6,13 @@
     "dataSource": "synthetic",
     "tick": 160,
     "virtualTimeMs": 32000,
-    "seq": 43,
+    "seq": 45,
     "global": {
       "rps": 3498.4,
-      "avgLatencyMs": 154.2,
-      "p50LatencyMs": 142.1,
-      "p95LatencyMs": 276.2,
-      "p99LatencyMs": 363.7,
+      "avgLatencyMs": 160.2,
+      "p50LatencyMs": 147.4,
+      "p95LatencyMs": 288.7,
+      "p99LatencyMs": 381.4,
       "errorRate": 0.0732,
       "authzChecksRps": 1327.0,
       "authzDenialRate": 0.0839,
@@ -20,8 +20,8 @@
       "suspiciousRps": 1319.8,
       "activeIncidents": 1,
       "health": {
-        "healthy": 44,
-        "degraded": 6,
+        "healthy": 43,
+        "degraded": 7,
         "critical": 1,
         "down": 0
       }
@@ -39,7 +39,7 @@
         2,
         0,
         0,
-        0,
+        1,
         0,
         0,
         0,
@@ -81,18 +81,18 @@
         0
       ],
       "latencyMs": [
-        142.0,
-        140.0,
-        148.0,
-        136.0,
-        154.0,
-        124.0,
+        147.1,
+        145.1,
+        153.1,
+        141.1,
+        159.1,
+        129.1,
         12.5,
-        165.3,
+        176.1,
         214.4,
         3.3,
         31.2,
-        45.0,
+        122.3,
         22.4,
         105.1,
         87.9,
@@ -825,7 +825,7 @@
         "rps": 2344.2,
         "errorRate": 0.1558,
         "nodesTotal": 23,
-        "nodesUnhealthy": 2
+        "nodesUnhealthy": 3
       },
       {
         "id": "eu-west",
@@ -876,9 +876,19 @@
         "edge-router",
         "partner-api",
         "use-auth",
-        "use-gateway"
+        "use-gateway",
+        "use-search"
       ]
     },
+    "faults": [
+      {
+        "kind": "latency",
+        "node": 11,
+        "edge": null,
+        "onto": null,
+        "value": 3.0
+      }
+    ],
     "playback": {
       "status": "playing",
       "mode": "live",

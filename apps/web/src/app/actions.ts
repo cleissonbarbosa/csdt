@@ -13,6 +13,8 @@ import type {
 } from '@aegis/contracts';
 
 import { api, ApiError } from '@/providers/api';
+
+import { HOST } from './host';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -122,7 +124,7 @@ export const actions = {
   resetWorkspace: async (): Promise<WorkspaceStatus | ApiError> => {
     try {
       const workspace = adoptWorkspace(await api.resetWorkspace());
-      useNotices.getState().push('info', 'Back to the files the server started with.');
+      useNotices.getState().push('info', HOST.backToStart);
       return workspace;
     } catch (error) {
       return asApiError(error);

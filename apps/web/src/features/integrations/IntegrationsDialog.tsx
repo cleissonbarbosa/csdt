@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -165,16 +166,17 @@ export function IntegrationsDialog() {
       description="Demo Mode needs none of these. Each one is opt-in, and every piece of data is labelled with where it came from."
       width="max-w-3xl"
     >
-      {isError && <EmptyState title="Unavailable">The server could not be reached.</EmptyState>}
+      {isError && <EmptyState title="Unavailable">{HOST.unreachable}</EmptyState>}
       <ul className="grid gap-3 md:grid-cols-2">
         {data?.map((provider) => (
           <ProviderCard key={provider.id} provider={provider} />
         ))}
       </ul>
-      <p className="mt-4 text-[11px] leading-relaxed text-ink-faint">
-        Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server),
-        use short timeouts and never follow redirects. Fixtures are local files parsed in the format
-        of a public project; importing them contacts nothing.
+      <p
+        className="mt-4 text-[11px] leading-relaxed text-ink-faint"
+        data-testid="integrations-note"
+      >
+        {HOST.adapters}
       </p>
     </Dialog>
   );

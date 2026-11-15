@@ -63,7 +63,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 142.0,
+        "latencyMs": 147.1,
         "throughputRps": 991.5,
         "errorRate": 0.0732,
         "saturation": 0.0,
@@ -86,7 +86,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 140.0,
+        "latencyMs": 145.1,
         "throughputRps": 642.7,
         "errorRate": 0.0732,
         "saturation": 0.0,
@@ -109,7 +109,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 148.0,
+        "latencyMs": 153.1,
         "throughputRps": 395.3,
         "errorRate": 0.0732,
         "saturation": 0.0,
@@ -132,7 +132,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 136.0,
+        "latencyMs": 141.1,
         "throughputRps": 150.1,
         "errorRate": 0.0732,
         "saturation": 0.0,
@@ -155,7 +155,7 @@
       ],
       "metrics": {
         "health": "healthy",
-        "latencyMs": 154.0,
+        "latencyMs": 159.1,
         "throughputRps": 0.0,
         "errorRate": 0.0732,
         "saturation": 0.0,
@@ -185,7 +185,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 124.0,
+        "latencyMs": 129.1,
         "throughputRps": 3499.3,
         "errorRate": 0.0732,
         "saturation": 0.45,
@@ -247,7 +247,7 @@
       ],
       "metrics": {
         "health": "degraded",
-        "latencyMs": 165.3,
+        "latencyMs": 176.1,
         "throughputRps": 2344.2,
         "errorRate": 0.1558,
         "saturation": 0.962,
@@ -346,8 +346,8 @@
         "use-gateway"
       ],
       "metrics": {
-        "health": "healthy",
-        "latencyMs": 45.0,
+        "health": "degraded",
+        "latencyMs": 122.3,
         "throughputRps": 143.4,
         "errorRate": 0.0,
         "saturation": 0.459,

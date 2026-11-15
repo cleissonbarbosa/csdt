@@ -98,6 +98,14 @@ impl From<ServiceError> for ApiError {
                 Self::new(StatusCode::CONFLICT, "conflict", error.to_string())
             }
             ServiceError::InvalidSpeed(_) => Self::bad_request(error.to_string()),
+            ServiceError::InvalidFault(_) => Self::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_fault",
+                error.to_string(),
+            ),
+            ServiceError::TooManyFaults => {
+                Self::new(StatusCode::CONFLICT, "too_many_faults", error.to_string())
+            }
             ServiceError::Authz(inner) => inner.into(),
         }
     }

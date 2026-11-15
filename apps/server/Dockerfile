@@ -4,11 +4,13 @@
 FROM rust:1-slim-bookworm AS build
 WORKDIR /src
 
-# The workspace manifest, the server crate and the fixtures it embeds at
-# compile time. `rust-toolchain.toml` is deliberately left out: the image
-# already is the toolchain.
+# The workspace manifest, its crates and the fixtures the server embeds at
+# compile time. Only the server is built; `apps/wasm` is here because Cargo
+# reads the manifest of every workspace member. `rust-toolchain.toml` is
+# deliberately left out: the image already is the toolchain.
 COPY Cargo.toml Cargo.lock ./
 COPY apps/server apps/server
+COPY apps/wasm apps/wasm
 COPY fixtures fixtures
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

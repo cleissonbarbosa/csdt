@@ -19,7 +19,8 @@
         "edge-router",
         "partner-api",
         "use-auth",
-        "use-gateway"
+        "use-gateway",
+        "use-search"
       ],
       "summary": "Leaked credential pairs are replayed against the login endpoint. Almost all fail; the few that succeed are stopped by policy."
     }

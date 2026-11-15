@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { actions } from '@/app/actions';
+import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { HealthGlyph } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -122,8 +123,8 @@ function ConnectionHealth() {
   const connection = useTelemetry((state) => state.connection);
   const view = {
     open: { label: 'Stream live', tone: undefined },
-    connecting: { label: 'Connecting', tone: COLOR.warning },
-    reconnecting: { label: 'Reconnecting', tone: COLOR.warning },
+    connecting: { label: HOST.connecting, tone: COLOR.warning },
+    reconnecting: { label: HOST.reconnecting, tone: COLOR.warning },
     idle: { label: 'Offline', tone: COLOR.warning },
     closed: { label: 'Disconnected', tone: COLOR.critical },
   }[connection];
@@ -158,8 +159,9 @@ function Provenance() {
   const connected = live > 0;
   const hint = connected
     ? `${live} local integration${live === 1 ? '' : 's'} connected alongside the simulation.`
-    : (topology && DATA_SOURCE_HINT[topology.dataSource]) ||
-      'Everything shown is produced by the built-in simulation.';
+    : !topology || topology.dataSource === 'synthetic'
+      ? HOST.synthetic
+      : DATA_SOURCE_HINT[topology.dataSource];
   return (
     <div data-testid="mode-switch" data-mode={connected ? 'connected' : 'demo'}>
       <button

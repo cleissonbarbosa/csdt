@@ -1,16 +1,19 @@
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::authorization::validate_request;
+use crate::clock::Instant;
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, Decision, EngineInfo,
     ImportedEvent, Incident, MetricsReport, PathStage, PathStageKind, PlaybackState,
     PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario, SecurityEvent,
     Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS, SCHEMA_VERSION,
 };
+use crate::incidents::{resolve_fault, Effect};
+use crate::simulation::engine::{fault_fits, MAX_FAULT_RAMP_MS};
 use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
@@ -19,8 +22,9 @@ use super::{Assets, Loaded};
 /// Version of the WebSocket message protocol.
 pub const PROTOCOL_VERSION: u32 = 1;
 
-/// Wall-clock period of the scheduler.
-const SCHEDULER_PERIOD: Duration = Duration::from_millis(50);
+/// Wall-clock period of the scheduler: how often time is advanced, by the
+/// server's own task or by the page that holds the in-browser engine.
+pub const SCHEDULER_PERIOD: Duration = Duration::from_millis(50);
 /// Most ticks simulated per scheduler wake-up; the rest is dropped so a
 /// stalled process cannot spiral trying to catch up.
 const MAX_STEPS_PER_WAKE: u32 = 8;
@@ -44,6 +48,10 @@ pub enum ServiceError {
     InvalidSpeed(f64),
     #[error("no scenario is running")]
     NoActiveScenario,
+    #[error("the fault cannot be placed: {0}")]
+    InvalidFault(String),
+    #[error("too many faults are in force; lift some first")]
+    TooManyFaults,
     #[error("the platform's files were replaced while this was being prepared; try again")]
     WorkspaceChanged,
     #[error(transparent)]
@@ -265,7 +273,9 @@ impl SimulationService {
         self.tx.subscribe()
     }
 
-    /// Spawns the scheduler that advances virtual time.
+    /// Spawns the scheduler that advances virtual time. In the browser the
+    /// page calls [`SimulationService::advance`] from a timer of its own.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn spawn(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
         let service = Arc::clone(self);
         tokio::spawn(async move {
@@ -327,6 +337,47 @@ impl SimulationService {
             scenario_id: scenario_id.to_string(),
         });
         rt.status = PlaybackStatus::Playing;
+        if branched {
+            self.broadcast_timeline(&mut rt, TimelineReason::Branch);
+        }
+        Ok(rt.timeline.playback(rt.status, rt.speed))
+    }
+
+    /// Places a fault by hand on the active topology: one scenario effect,
+    /// outside any scenario. It is a command on the timeline like any
+    /// other, so it is replayed, rewound and branched with the rest.
+    pub fn inject_fault(
+        &self,
+        effect: Effect,
+        ramp_ms: u64,
+    ) -> Result<PlaybackState, ServiceError> {
+        effect.validate().map_err(ServiceError::InvalidFault)?;
+        if ramp_ms > MAX_FAULT_RAMP_MS {
+            return Err(ServiceError::InvalidFault(format!(
+                "rampMs must be at most {MAX_FAULT_RAMP_MS}, got {ramp_ms}"
+            )));
+        }
+        let mut rt = self.lock();
+        let targets =
+            resolve_fault(rt.timeline.topology(), &effect).map_err(ServiceError::InvalidFault)?;
+        if !fault_fits(&rt.timeline.state().faults, &targets) {
+            return Err(ServiceError::TooManyFaults);
+        }
+        let branched = rt.timeline.issue(Command::InjectFault { effect, ramp_ms });
+        if branched {
+            self.broadcast_timeline(&mut rt, TimelineReason::Branch);
+        }
+        Ok(rt.timeline.playback(rt.status, rt.speed))
+    }
+
+    /// Lifts the faults placed by hand: all of them, or only what `effect`
+    /// touches.
+    pub fn clear_faults(&self, effect: Option<Effect>) -> Result<PlaybackState, ServiceError> {
+        let mut rt = self.lock();
+        if let Some(effect) = &effect {
+            resolve_fault(rt.timeline.topology(), effect).map_err(ServiceError::InvalidFault)?;
+        }
+        let branched = rt.timeline.issue(Command::ClearFaults { effect });
         if branched {
             self.broadcast_timeline(&mut rt, TimelineReason::Branch);
         }

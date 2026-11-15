@@ -8,6 +8,7 @@ import { Check, Play, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { evaluationTime, HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { Badge, DecisionTag, SourceBadge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -191,7 +192,7 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
           </div>
           <div>
             <dt className="sr-only">Evaluation time</dt>
-            <dd>{decision.evaluationMicros} µs measured</dd>
+            <dd data-testid="decision-time">{evaluationTime(decision.evaluationMicros)}</dd>
           </div>
           <div>
             <dt className="sr-only">Virtual time</dt>
@@ -362,11 +363,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
               onChange={setEngine}
             />
           </div>
-          {!agentAvailable && (
-            <p className="text-[11px] text-ink-faint">
-              Connect a local cedar-agent under Integrations to evaluate with it instead.
-            </p>
-          )}
+          {!agentAvailable && <p className="text-[11px] text-ink-faint">{HOST.agent}</p>}
           <Button
             type="submit"
             variant="primary"
@@ -498,10 +495,7 @@ export function AuthorizationExplorer() {
     queryKey: queryKeys.catalog,
     queryFn: api.authorizationCatalog,
   });
-  if (isError)
-    return (
-      <EmptyState title="Authorization unavailable">The server could not be reached.</EmptyState>
-    );
+  if (isError) return <EmptyState title="Authorization unavailable">{HOST.unreachable}</EmptyState>;
   if (!catalog) return <EmptyState title="Loading policies" />;
   const embedded = catalog.engines.find((e) => e.kind === 'embedded-cedar');
   return (

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/server"]
+members = ["apps/server", "apps/wasm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,3 +18,14 @@ strip = true
 [profile.dev.package."*"]
 # Cedar's parser is slow unoptimised; keep dependencies fast in dev and tests.
 opt-level = 2
+
+# The in-browser engine (`apps/wasm`), built with `--profile wasm`. What is
+# downloaded matters more there than what a tick costs (a fraction of a
+# millisecond either way, against 200 ms of virtual time), and a panic has
+# nowhere to unwind to.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

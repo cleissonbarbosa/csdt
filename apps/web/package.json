@@ -8,12 +8,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:static": "tsc --noEmit && vite build --mode static",
+    "dev:static": "vite --mode static",
     "preview": "vite preview",
+    "preview:static": "vite preview --mode static",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:engine": "vitest run --config vitest.engine.config.ts",
     "e2e": "playwright test",
+    "e2e:static": "playwright test --config playwright.static.config.ts",
     "e2e:install": "playwright install chromium",
     "bench": "node scripts/benchmark.mjs",
     "capture": "node scripts/capture.mjs"

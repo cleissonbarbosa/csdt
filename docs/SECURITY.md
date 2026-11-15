@@ -162,9 +162,54 @@ set by the interface. The build inlines no assets, so `font-src` and
 `script-src` stay at `'self'`. The policy was verified by loading the
 containerised application in a browser and checking for violations.
 
+Nothing in the page evaluates a string as code. The schema library would
+compile its parsers that way if the policy let it; it is configured not to
+try, so the policy has nothing to refuse.
+
 **Response validation.** Every REST response and stream message is parsed
 against the shared schemas before use; a message that violates the contract is
 dropped and logged. Event text is rendered as text, never as HTML.
+
+## Static site
+
+`pnpm build:static` builds the application around the engine compiled to
+WebAssembly (`apps/wasm`) instead of the server. It is the same code behind
+the same routes, so everything above about what a file can and cannot do
+holds there unchanged. What is different is where it runs.
+
+- **It talks to nothing.** There is no API and no socket. The page requests
+  its own files (scripts, styles, fonts, the model file and the engine
+  module) and nothing else, and a test fails if it requests anything more.
+- **The module cannot reach out.** It is built with no imports at all: no
+  network, no clock, no storage, no DOM. Text goes in, text comes out. This
+  is checked on the built file, not assumed.
+- **The live adapters do not exist in it.** The code that makes outbound
+  requests is not compiled into the module, and the two adapters are not
+  listed. Asking for a decision from `cedar-agent` is refused, as it is on a
+  server with none connected.
+- **An import stays in the tab.** Files are checked by the same code as on
+  the server, held in the page's memory and gone on reload. Nobody else
+  shares the simulation, so there is nothing to switch off.
+- **The policy travels in the page.** A static host sets no headers for it,
+  so the build writes the policy into the document:
+
+  ```
+  default-src 'self'; script-src 'self' 'wasm-unsafe-eval';
+  style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;
+  font-src 'self'; connect-src 'self'; worker-src 'self' blob:;
+  object-src 'none'; base-uri 'self'; form-action 'none'
+  ```
+
+  It is the policy above with one addition, `'wasm-unsafe-eval'`, which
+  permits compiling a WebAssembly module and nothing else (`eval` stays
+  refused). `frame-ancestors` cannot be given in a document; a host that can
+  set headers should send it, and `X-Content-Type-Options: nosniff`.
+  The end-to-end suite of the static site runs under this policy and fails
+  on any violation.
+
+The site is static files. Publishing it shows the bundled, fictional
+platform to whoever opens it and nothing else: there is no state on a server
+to reach, because there is no server.
 
 ## Containers
 

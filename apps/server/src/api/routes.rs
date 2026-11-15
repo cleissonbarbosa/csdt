@@ -16,6 +16,7 @@ use crate::domain::{
     RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary, WorkspaceCheck,
     WorkspaceOrigin, WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
 };
+use crate::incidents::Effect;
 use crate::workspace::{bundle_of, from_files, Bundle, SourceFile};
 
 use super::error::ApiError;
@@ -28,6 +29,25 @@ type ApiResult<T> = Result<Json<T>, ApiError>;
 const MAX_ID_LEN: usize = 128;
 const DEFAULT_EVENT_LIMIT: usize = 200;
 const MAX_EVENT_LIMIT: usize = 1000;
+
+/// Runs CPU-bound work where it does not hold up other requests: on the
+/// blocking pool of the server. The in-browser engine has one thread and one
+/// caller, so there it simply runs, as it does when the same engine is driven
+/// natively without a runtime (its tests).
+#[cfg(not(target_arch = "wasm32"))]
+async fn off_the_workers<T: Send + 'static>(
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, ()> {
+    match tokio::runtime::Handle::try_current() {
+        Ok(runtime) => runtime.spawn_blocking(work).await.map_err(|_| ()),
+        Err(_) => Ok(work()),
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn off_the_workers<T>(work: impl FnOnce() -> T) -> Result<T, ()> {
+    Ok(work())
+}
 
 fn check_id(kind: &str, id: &str) -> Result<(), ApiError> {
     let valid = !id.is_empty()
@@ -209,6 +229,42 @@ pub async fn scenario_start(
     Ok(Json(ControlResponse { playback }))
 }
 
+/// A fault to place by hand: one effect, in the format a scenario phase
+/// writes it in.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InjectFaultBody {
+    effect: Effect,
+    #[serde(default)]
+    ramp_ms: u64,
+}
+
+pub async fn fault_inject(
+    State(state): State<AppState>,
+    body: Result<Json<InjectFaultBody>, JsonRejection>,
+) -> ApiResult<ControlResponse> {
+    let Json(body) = body?;
+    let playback = state.service.inject_fault(body.effect, body.ramp_ms)?;
+    Ok(Json(ControlResponse { playback }))
+}
+
+/// Which faults to lift: what `effect` touches, or with none, all of them.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClearFaultsBody {
+    #[serde(default)]
+    effect: Option<Effect>,
+}
+
+pub async fn fault_clear(
+    State(state): State<AppState>,
+    body: Result<Json<ClearFaultsBody>, JsonRejection>,
+) -> ApiResult<ControlResponse> {
+    let Json(body) = body?;
+    let playback = state.service.clear_faults(body.effect)?;
+    Ok(Json(ControlResponse { playback }))
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResetBody {
@@ -323,15 +379,9 @@ pub async fn recording_load(
     check_id("recordingId", &body.recording_id)?;
     let service = state.service.clone();
     // Re-simulating a recording is CPU work; keep it off the async workers.
-    let playback = tokio::task::spawn_blocking(move || service.load_recording(&body.recording_id))
+    let playback = off_the_workers(move || service.load_recording(&body.recording_id))
         .await
-        .map_err(|_| {
-            ApiError::new(
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                "internal",
-                "recording could not be loaded",
-            )
-        })??;
+        .map_err(|()| internal("recording could not be loaded"))??;
     Ok(Json(ControlResponse { playback }))
 }
 
@@ -415,7 +465,7 @@ async fn build_import(state: &AppState, files: Vec<SourceFile>) -> Result<Loaded
     let base = Arc::clone(&state.service.initial().sources);
     // Parsing policies and compiling topologies is CPU work; keep it off the
     // async workers.
-    tokio::task::spawn_blocking(move || {
+    off_the_workers(move || {
         let read = from_files(files, base.as_ref().clone()).map_err(|error| WorkspaceProblem {
             // A problem with the import as a whole is in no one file.
             path: (error.path != std::path::Path::new("import"))
@@ -429,7 +479,7 @@ async fn build_import(state: &AppState, files: Vec<SourceFile>) -> Result<Loaded
             })
     })
     .await
-    .map_err(|_| ImportFailure::Api(internal("the files could not be checked")))?
+    .map_err(|()| ImportFailure::Api(internal("the files could not be checked")))?
     .map_err(ImportFailure::Invalid)
 }
 

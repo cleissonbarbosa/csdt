@@ -12,6 +12,7 @@ import { Download, FileUp, FolderUp, RotateCcw, X } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
+import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
@@ -33,8 +34,7 @@ import {
 const ORIGIN: Record<WorkspaceStatus['origin'], string> = {
   bundled: 'The platform that ships with AEGIS.',
   startup: 'The workspace this server was started with.',
-  imported:
-    'Files imported since this server started. They are held in its memory and are gone when it restarts.',
+  imported: HOST.imported,
 };
 
 function plural(count: number, noun: string, many = `${noun}s`): string {
@@ -201,8 +201,8 @@ function Import() {
       </h3>
       <p className="mt-1 text-xs leading-relaxed text-ink-dim">
         A topology, scenarios, recordings, Cedar policies, entities, a catalogue, a whole workspace
-        folder, or a file saved from here. Each kind of file you add replaces that part of what the
-        server started with; the rest stays.
+        folder, or a file saved from here. Each kind of file you add replaces that part of{' '}
+        {HOST.started}; the rest stays.
       </p>
 
       <div
@@ -435,15 +435,13 @@ export function WorkspaceDialog() {
                   onClick={() => void reset()}
                   data-testid="workspace-reset"
                 >
-                  Return to what the server started with
+                  Return to {HOST.started}
                 </Button>
               )}
             </div>
           </div>
         ) : (
-          <p className="mt-1 text-xs text-ink-faint">
-            {error ? message(error) : 'Asking the server…'}
-          </p>
+          <p className="mt-1 text-xs text-ink-faint">{error ? message(error) : HOST.asking}</p>
         )}
         {failure && (
           <div className="mt-2">

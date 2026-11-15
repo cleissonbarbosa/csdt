@@ -26,10 +26,7 @@ path = "src/bin/export_workspace_schemas.rs"
 
 [dependencies]
 async-trait = "0.1"
-axum = { version = "0.8", features = ["ws", "macros"] }
 cedar-policy = "4.14"
-futures-util = "0.3"
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
 # Pin the generator so published schema changes are deliberate.
 schemars = "=1.2.0"
 serde = { version = "1", features = ["derive"] }
@@ -37,11 +34,23 @@ serde = { version = "1", features = ["derive"] }
 # which the determinism of a recording depends on.
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.7", features = ["cors", "trace", "set-header", "limit", "timeout"] }
 tracing = "0.1"
+
+# The library also builds for the browser (`apps/wasm`): there it keeps the
+# router, the service and Cedar, and leaves out everything that needs a
+# socket, a thread or the operating system's clock.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axum = { version = "0.8", features = ["ws", "macros"] }
+futures-util = "0.3"
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "set-header", "limit", "timeout"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+axum = { version = "0.8", default-features = false, features = ["json", "query"] }
+tokio = { version = "1", default-features = false, features = ["sync"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

@@ -8,9 +8,19 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{is_valid_id, RecordingSummary};
-use crate::simulation::engine::Command;
+use crate::simulation::engine::{Command, MAX_FAULT_RAMP_MS};
 
-use super::spec::{MAX_DURATION_MS, MAX_LIST};
+use super::spec::{Effect, MAX_DURATION_MS, MAX_LIST};
+
+/// A fault in a recording is held to what one placed through the interface
+/// is: figures in range, and an effect that means something outside a
+/// scenario.
+fn check_fault(effect: &Effect) -> Result<(), String> {
+    if !effect.is_fault() {
+        return Err("a fault cannot be an effect on a scenario's own flow".into());
+    }
+    effect.validate().map_err(|e| format!("fault: {e}"))
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -35,10 +45,10 @@ pub struct Recording {
 }
 
 impl Recording {
-    /// Checks a recording on its own. A recording may only start and stop
-    /// scenarios: the other commands put a decision or an imported event on
-    /// the timeline, and those have to come from an engine or an importer,
-    /// never from a file that merely says so.
+    /// Checks a recording on its own. A recording may start and stop
+    /// scenarios and place and lift faults: the other commands put a
+    /// decision or an imported event on the timeline, and those have to come
+    /// from an engine or an importer, never from a file that merely says so.
     pub fn validate(&self) -> Result<(), String> {
         if !is_valid_id(&self.id) {
             return Err(format!("id `{}` is not a valid identifier", self.id));
@@ -65,17 +75,40 @@ impl Recording {
                     recorded.at_ms
                 ));
             }
-            if !matches!(
-                recorded.command,
-                Command::StartScenario { .. } | Command::AbortScenario {}
-            ) {
-                return Err(
-                    "a recording may only contain `startScenario` and `abortScenario` commands"
-                        .into(),
-                );
+            match &recorded.command {
+                Command::StartScenario { .. } | Command::AbortScenario {} => {}
+                Command::InjectFault { effect, ramp_ms } => {
+                    check_fault(effect)?;
+                    if *ramp_ms > MAX_FAULT_RAMP_MS {
+                        return Err(format!(
+                            "a fault's rampMs must be at most {MAX_FAULT_RAMP_MS}, got {ramp_ms}"
+                        ));
+                    }
+                }
+                Command::ClearFaults { effect } => {
+                    if let Some(effect) = effect {
+                        check_fault(effect)?;
+                    }
+                }
+                Command::RecordDecision { .. } | Command::ImportEvents { .. } => {
+                    return Err(
+                        "a recording may only contain `startScenario`, `abortScenario`, `injectFault` and `clearFaults` commands"
+                            .into(),
+                    );
+                }
             }
         }
         Ok(())
+    }
+
+    /// The faults the recording places or lifts by hand, in order. Whether
+    /// each names something a topology has is checked against that topology.
+    pub fn faults(&self) -> impl Iterator<Item = &Effect> {
+        self.commands.iter().filter_map(|c| match &c.command {
+            Command::InjectFault { effect, .. } => Some(effect),
+            Command::ClearFaults { effect } => effect.as_ref(),
+            _ => None,
+        })
     }
 
     /// Scenarios the recording starts, in the order it starts them.

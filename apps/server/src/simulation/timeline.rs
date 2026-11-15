@@ -17,18 +17,43 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::domain::{
-    AuthorizationDecision, DataSource, EdgeColumns, EdgeMetrics, Health, Incident, IncidentPulse,
-    InfrastructureEdge, InfrastructureNode, MetricSample, MetricsReport, NodeColumns, NodeMetrics,
-    PlaybackMode, PlaybackState, PlaybackStatus, RegionStatus, Scenario, SecurityEvent,
-    TelemetrySnapshot, Topology, SCHEMA_VERSION,
+    ActiveFault, AuthorizationDecision, DataSource, EdgeColumns, EdgeMetrics, FaultKind, Health,
+    Incident, IncidentPulse, InfrastructureEdge, InfrastructureNode, MetricSample, MetricsReport,
+    NodeColumns, NodeMetrics, PlaybackMode, PlaybackState, PlaybackStatus, RegionStatus, Scenario,
+    SecurityEvent, TelemetrySnapshot, Topology, SCHEMA_VERSION,
 };
 use crate::incidents::recordings::Recording;
 use crate::incidents::ResolvedScenario;
 
+use super::channels::{Channel, ChannelKey};
 use super::decisions::DecisionTable;
 use super::engine::{self, is_ingress, Command, SimState, StepContext};
 use super::math::round_to;
 use super::model::{SimTopology, TICK_MS};
+
+/// A channel of the fault set as the contract shows it.
+fn active_fault(channel: &Channel) -> Option<ActiveFault> {
+    let (kind, node, edge, onto) = match channel.key {
+        ChannelKey::Demand(n) => (FaultKind::Demand, Some(n), None, None),
+        ChannelKey::Capacity(n) => (FaultKind::Capacity, Some(n), None, None),
+        ChannelKey::Latency(n) => (FaultKind::Latency, Some(n), None, None),
+        ChannelKey::ErrorInject(n) => (FaultKind::ErrorInject, Some(n), None, None),
+        ChannelKey::Down(n) => (FaultKind::Down, Some(n), None, None),
+        ChannelKey::EdgeWeight(e) => (FaultKind::EdgeWeight, None, Some(e), None),
+        ChannelKey::EdgeLatency(e) => (FaultKind::EdgeLatency, None, Some(e), None),
+        ChannelKey::EdgeError(e) => (FaultKind::EdgeError, None, Some(e), None),
+        ChannelKey::RouteShift(from, to) => (FaultKind::RouteShift, None, Some(from), Some(to)),
+        // Only a scenario has flows; they are never placed by hand.
+        ChannelKey::FlowRate(_) | ChannelKey::FlowReject(..) => return None,
+    };
+    Some(ActiveFault {
+        kind,
+        node,
+        edge,
+        onto,
+        value: channel.target,
+    })
+}
 
 /// Ticks between checkpoints (5 virtual seconds).
 pub const CHECKPOINT_INTERVAL: u64 = 25;
@@ -454,6 +479,7 @@ impl Timeline {
                 })
                 .collect(),
             incident,
+            faults: s.faults.in_force().filter_map(active_fault).collect(),
             playback: self.playback(status, speed),
         }
     }

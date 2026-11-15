@@ -13,7 +13,14 @@ cargo run --release -p aegis-server      # terminal 1: API on 127.0.0.1:8787
 pnpm install && pnpm dev:web             # terminal 2: UI on http://localhost:5173
 ```
 
-Demo Mode needs no credentials, accounts or network access.
+or with no server at all, the engine running in the browser tab:
+
+```bash
+pnpm build:static && pnpm --filter @aegis/web preview:static   # http://localhost:4173
+```
+
+Demo Mode needs no credentials, accounts or network access. Everything below
+works the same on the static site except step 9, which needs the server.
 
 ## 1 · Read the overview (30 s)
 

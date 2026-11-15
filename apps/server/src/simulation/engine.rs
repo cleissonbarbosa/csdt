@@ -14,7 +14,7 @@ use crate::domain::{
     ImportedEvent, Incident, IncidentStatus, RejectReason, Relationship, SecurityEvent,
     SecurityStatus, ServiceType, Severity, TrafficCategory, TrafficEvent,
 };
-use crate::incidents::ResolvedScenario;
+use crate::incidents::{resolve_fault, Effect, ResolvedScenario};
 
 use super::channels::{ChannelKey, ChannelSet};
 use super::decisions::{DecisionTable, EvaluatedRequest};
@@ -32,8 +32,13 @@ const DWELL_IMPROVE: u8 = 6;
 const AUTHZ_SAMPLE_TICKS: u64 = 20;
 /// Ticks between decision events of an active scenario flow.
 const AUTHZ_FLOW_TICKS: u64 = 12;
-/// Ramp used when a scenario ends or is aborted.
+/// Ramp used when a scenario ends or is aborted, and when a fault is lifted.
 const RELEASE_RAMP_TICKS: u32 = 10;
+/// Longest a fault placed by hand may take to ease in.
+pub const MAX_FAULT_RAMP_MS: u64 = 60_000;
+/// Most figures faults placed by hand may hold away from nominal at once.
+/// One fault on a region holds one per service in it.
+pub const MAX_FAULT_CHANNELS: usize = 256;
 
 const ALERT_ERROR_RATE: usize = 0;
 const ALERT_DENIALS: usize = 1;
@@ -63,6 +68,23 @@ pub enum Command {
     ImportEvents {
         provider_id: String,
         events: Vec<ImportedEvent>,
+    },
+    /// Places a fault by hand: one effect, written as in a scenario phase,
+    /// on services or connections of the topology. It holds, alongside
+    /// whatever a scenario is doing, until it is lifted.
+    #[serde(rename_all = "camelCase")]
+    InjectFault {
+        effect: Effect,
+        /// How long it takes to ease in.
+        #[serde(default)]
+        #[schemars(range(max = MAX_FAULT_RAMP_MS))]
+        ramp_ms: u64,
+    },
+    /// Lifts the faults placed by hand: every one, or with `effect` only
+    /// what that effect touches (its figures are not read).
+    ClearFaults {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effect: Option<Effect>,
     },
 }
 
@@ -99,7 +121,11 @@ pub struct SimState {
     pub edge_security: Vec<SecurityStatus>,
     pub global: GlobalMetrics,
     pub flows: Vec<TrafficEvent>,
+    /// What the running scenario holds the model to.
     pub channels: ChannelSet,
+    /// What faults placed by hand hold it to. A second set, so a scenario
+    /// changing phase or ending does not lift them.
+    pub faults: ChannelSet,
     pub scenario: Option<ScenarioRuntime>,
     pub incidents: Vec<Incident>,
     pub alerts: [bool; 4],
@@ -135,6 +161,7 @@ impl SimState {
             global: GlobalMetrics::default(),
             flows: Vec::new(),
             channels: ChannelSet::default(),
+            faults: ChannelSet::default(),
             scenario: None,
             incidents: Vec::new(),
             alerts: [false; 4],
@@ -617,7 +644,110 @@ fn apply_command(ctx: &StepContext, state: &mut SimState, command: &Command, em:
                 );
             }
         }
+        Command::InjectFault { effect, ramp_ms } => {
+            // A command is checked against the topology before it is
+            // accepted. One that does not resolve changes nothing.
+            let Ok(targets) = resolve_fault(ctx.topo, effect) else {
+                return;
+            };
+            if !fault_fits(&state.faults, &targets) {
+                return;
+            }
+            let ramp_ticks = (ramp_ms / TICK_MS).min(u64::from(u32::MAX)) as u32;
+            state.faults.set(&targets, em.tick, ramp_ticks);
+            let keys: Vec<ChannelKey> = targets.iter().map(|target| target.0).collect();
+            em.push(
+                Emit::new(
+                    Severity::Notice,
+                    EventKind::System,
+                    format!("Fault placed by hand: {}", effect.describe()),
+                )
+                .message(
+                    "Placed by the operator, outside any scenario. It holds until it is lifted or the simulation is reset.",
+                )
+                .nodes(ids(ctx.topo, &touched(ctx.topo, &keys)))
+                .details(json!({ "fault": effect, "rampMs": ramp_ms })),
+            );
+        }
+        Command::ClearFaults { effect } => {
+            let keys: Vec<ChannelKey> = match effect {
+                Some(effect) => {
+                    let Ok(targets) = resolve_fault(ctx.topo, effect) else {
+                        return;
+                    };
+                    state
+                        .faults
+                        .in_force()
+                        .map(|channel| channel.key)
+                        .filter(|key| targets.iter().any(|target| target.0 == *key))
+                        .collect()
+                }
+                None => state.faults.in_force().map(|channel| channel.key).collect(),
+            };
+            if keys.is_empty() {
+                return;
+            }
+            let neutral: Vec<(ChannelKey, f64)> =
+                keys.iter().map(|key| (*key, key.neutral())).collect();
+            state.faults.set(&neutral, em.tick, RELEASE_RAMP_TICKS);
+            em.push(
+                Emit::new(
+                    Severity::Info,
+                    EventKind::System,
+                    if effect.is_some() {
+                        "Fault lifted"
+                    } else {
+                        "Faults lifted"
+                    },
+                )
+                .message("What was placed by hand eases back to nominal.")
+                .nodes(ids(ctx.topo, &touched(ctx.topo, &keys)))
+                .details(json!({ "lifted": keys.len() })),
+            );
+        }
     }
+}
+
+/// Whether placing these targets keeps the faults within their bound.
+pub fn fault_fits(faults: &ChannelSet, targets: &[(ChannelKey, f64)]) -> bool {
+    let new = targets
+        .iter()
+        .filter(|target| faults.get(target.0).is_none())
+        .count();
+    faults.len() + new <= MAX_FAULT_CHANNELS
+}
+
+/// The services a set of channels acts on: the service itself, or the two
+/// ends of a connection. Sorted, each once.
+fn touched(topo: &SimTopology, keys: &[ChannelKey]) -> Vec<usize> {
+    let mut nodes = Vec::new();
+    let mut ends = |edge: u32| {
+        nodes.push(topo.edge_src[edge as usize]);
+        nodes.push(topo.edge_dst[edge as usize]);
+    };
+    let mut direct = Vec::new();
+    for key in keys {
+        match *key {
+            ChannelKey::Demand(n)
+            | ChannelKey::Capacity(n)
+            | ChannelKey::Latency(n)
+            | ChannelKey::ErrorInject(n)
+            | ChannelKey::Down(n)
+            | ChannelKey::FlowReject(_, n) => direct.push(n as usize),
+            ChannelKey::EdgeWeight(e) | ChannelKey::EdgeLatency(e) | ChannelKey::EdgeError(e) => {
+                ends(e);
+            }
+            ChannelKey::RouteShift(from, to) => {
+                ends(from);
+                ends(to);
+            }
+            ChannelKey::FlowRate(_) => {}
+        }
+    }
+    nodes.extend(direct);
+    nodes.sort_unstable();
+    nodes.dedup();
+    nodes
 }
 
 fn advance_scenario(ctx: &StepContext, state: &mut SimState, em: &mut Emitter) {
@@ -665,7 +795,9 @@ fn build_modifiers(topo: &SimTopology, state: &mut SimState) -> Modifiers {
         m.demand[client] = topo.base_demand[client] * wave * noise;
     }
     let mut shifts = Vec::new();
-    for channel in state.channels.iter() {
+    // What the scenario holds and what was placed by hand compose: factors
+    // multiply, failure rates combine, and either can take a service down.
+    for channel in state.channels.iter().chain(state.faults.iter()) {
         let v = channel.current;
         match channel.key {
             ChannelKey::Demand(n) => m.demand[n as usize] *= v.max(0.0),
@@ -674,7 +806,7 @@ fn build_modifiers(topo: &SimTopology, state: &mut SimState) -> Modifiers {
             ChannelKey::ErrorInject(n) => {
                 m.err_inject[n as usize] = combine_failures(m.err_inject[n as usize], v);
             }
-            ChannelKey::Down(n) => m.down[n as usize] = v > 0.5,
+            ChannelKey::Down(n) => m.down[n as usize] |= v > 0.5,
             ChannelKey::EdgeWeight(e) => m.edge_weight[e as usize] *= v.max(0.0),
             ChannelKey::EdgeLatency(e) => m.edge_lat_factor[e as usize] *= v.max(0.0),
             ChannelKey::EdgeError(e) => {
@@ -1029,6 +1161,7 @@ pub fn step(ctx: &StepContext, state: &mut SimState, commands: &[Command]) -> Ve
     state.tick += 1;
     advance_scenario(ctx, state, &mut em);
     state.channels.advance(state.tick);
+    state.faults.advance(state.tick);
 
     let mut modifiers = build_modifiers(topo, state);
     let injected = inject_flows(ctx, state, &mut modifiers);

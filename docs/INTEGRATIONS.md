@@ -209,6 +209,14 @@ Enforced in `apps/server/src/integrations/guard.rs` and `mod.rs`, with tests:
   `available`, `connected`, `error`…), its target without credentials, and its
   last error.
 
+## The static site
+
+The application built around the engine in WebAssembly (`pnpm build:static`)
+has no network to reach an adapter through. It lists the built-in simulation
+and the two fixture adapters, whose files are embedded in the module, and
+does not list `cedar-agent` or `rinha-backend`: the code that would contact
+them is not in that build.
+
 ## Adding a provider
 
 Implement `TelemetryProvider` (`apps/server/src/integrations/mod.rs`),

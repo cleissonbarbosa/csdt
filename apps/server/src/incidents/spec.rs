@@ -357,6 +357,58 @@ fn at_most(what: &str, len: usize, max: usize) -> Result<(), String> {
     }
 }
 
+impl Effect {
+    /// Checks the figures of one effect against their ranges. Whether what it
+    /// names exists is a question for a topology, answered when it is
+    /// resolved.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Effect::Demand { factor, .. }
+            | Effect::Capacity { factor, .. }
+            | Effect::Latency { factor, .. }
+            | Effect::EdgeWeight { factor, .. }
+            | Effect::EdgeLatency { factor, .. } => in_range("factor", *factor, MAX_FACTOR),
+            Effect::ErrorInject { rate, .. } | Effect::EdgeError { rate, .. } => {
+                in_range("rate", *rate, 1.0)
+            }
+            Effect::Down { .. } => Ok(()),
+            Effect::RouteShift { fraction, .. } | Effect::FlowReject { fraction, .. } => {
+                in_range("fraction", *fraction, 1.0)
+            }
+            Effect::FlowRate { rate, .. } => match rate {
+                Rate::Rps(rps) => in_range("rps", *rps, MAX_RPS),
+                Rate::OfCapacity { factor, .. } => in_range("factor", *factor, MAX_FACTOR),
+            },
+        }
+    }
+
+    /// Whether the effect can be placed by hand, outside a scenario: it
+    /// bends services or connections. The two that act on a scenario's own
+    /// injected flow mean nothing without the scenario.
+    pub fn is_fault(&self) -> bool {
+        !matches!(self, Effect::FlowRate { .. } | Effect::FlowReject { .. })
+    }
+
+    /// The effect in a few words, for the timeline: `latency ×4`.
+    pub fn describe(&self) -> String {
+        match self {
+            Effect::Demand { factor, .. } => format!("demand ×{factor}"),
+            Effect::Capacity { factor, .. } => format!("capacity ×{factor}"),
+            Effect::Latency { factor, .. } => format!("latency ×{factor}"),
+            Effect::ErrorInject { rate, .. } => format!("{}% of requests fail", rate * 100.0),
+            Effect::Down { .. } => "unreachable".into(),
+            Effect::EdgeWeight { factor, .. } => format!("calls ×{factor}"),
+            Effect::EdgeLatency { factor, .. } => format!("network latency ×{factor}"),
+            Effect::EdgeError { rate, .. } => format!("{}% of calls fail", rate * 100.0),
+            Effect::RouteShift { fraction, .. } => {
+                format!("{}% of traffic moved", fraction * 100.0)
+            }
+            Effect::FlowRate { .. } => "flow rate".into(),
+            Effect::FlowReject { .. } => "flow rejection".into(),
+        }
+    }
+}
+
 impl ScenarioDef {
     /// Checks everything that does not depend on a topology. A definition
     /// that passes can still be unavailable on a topology that lacks a role
@@ -446,31 +498,10 @@ impl ScenarioDef {
             }
         };
         for effect in &phase.effects {
-            match effect {
-                Effect::Demand { factor, .. }
-                | Effect::Capacity { factor, .. }
-                | Effect::Latency { factor, .. }
-                | Effect::EdgeWeight { factor, .. }
-                | Effect::EdgeLatency { factor, .. } => in_range("factor", *factor, MAX_FACTOR)?,
-                Effect::ErrorInject { rate, .. } | Effect::EdgeError { rate, .. } => {
-                    in_range("rate", *rate, 1.0)?;
-                }
-                Effect::Down { .. } => {}
-                Effect::RouteShift { fraction, .. } => in_range("fraction", *fraction, 1.0)?,
-                Effect::FlowRate { flow, rate } => {
-                    known_flow(flow)?;
-                    match rate {
-                        Rate::Rps(rps) => in_range("rps", *rps, MAX_RPS)?,
-                        Rate::OfCapacity { factor, .. } => {
-                            in_range("factor", *factor, MAX_FACTOR)?;
-                        }
-                    }
-                }
-                Effect::FlowReject { flow, fraction, .. } => {
-                    known_flow(flow)?;
-                    in_range("fraction", *fraction, 1.0)?;
-                }
+            if let Effect::FlowRate { flow, .. } | Effect::FlowReject { flow, .. } = effect {
+                known_flow(flow)?;
             }
+            effect.validate()?;
         }
         for event in &phase.events {
             if event.title.trim().is_empty() {

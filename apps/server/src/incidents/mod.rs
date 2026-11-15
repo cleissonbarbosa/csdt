@@ -185,6 +185,64 @@ impl Resolver<'_> {
         Ok(out)
     }
 
+    /// The channels an effect on services or connections sets, with the
+    /// value each is held at. `None` for the two effects that act on a
+    /// scenario's own flow, which only the scenario can resolve.
+    fn targets(&self, effect: &Effect) -> Result<Option<Vec<(ChannelKey, f64)>>, String> {
+        let mut targets = Vec::new();
+        match effect {
+            Effect::Demand { node, factor } => {
+                targets.push((ChannelKey::Demand(self.node(node)? as u32), *factor));
+            }
+            Effect::Capacity { nodes, factor } => {
+                for n in self.nodes(nodes)? {
+                    targets.push((ChannelKey::Capacity(n as u32), *factor));
+                }
+            }
+            Effect::Latency { nodes, factor } => {
+                for n in self.nodes(nodes)? {
+                    targets.push((ChannelKey::Latency(n as u32), *factor));
+                }
+            }
+            Effect::ErrorInject { nodes, rate } => {
+                for n in self.nodes(nodes)? {
+                    targets.push((ChannelKey::ErrorInject(n as u32), *rate));
+                }
+            }
+            Effect::Down { nodes } => {
+                for n in self.nodes(nodes)? {
+                    targets.push((ChannelKey::Down(n as u32), 1.0));
+                }
+            }
+            Effect::EdgeWeight { edges, factor } => {
+                for e in self.edges(edges)? {
+                    targets.push((ChannelKey::EdgeWeight(e as u32), *factor));
+                }
+            }
+            Effect::EdgeLatency { edges, factor } => {
+                for e in self.edges(edges)? {
+                    targets.push((ChannelKey::EdgeLatency(e as u32), *factor));
+                }
+            }
+            Effect::EdgeError { edges, rate } => {
+                for e in self.edges(edges)? {
+                    targets.push((ChannelKey::EdgeError(e as u32), *rate));
+                }
+            }
+            Effect::RouteShift {
+                edge,
+                onto,
+                fraction,
+            } => {
+                let a = self.edge(&edge.from, &edge.to)?;
+                let b = self.edge(&onto.from, &onto.to)?;
+                targets.push((ChannelKey::RouteShift(a as u32, b as u32), *fraction));
+            }
+            Effect::FlowRate { .. } | Effect::FlowReject { .. } => return Ok(None),
+        }
+        Ok(Some(targets))
+    }
+
     fn rate(&self, rate: &Rate) -> Result<f64, String> {
         match rate {
             Rate::Rps(rps) => Ok(*rps),
@@ -250,54 +308,11 @@ fn try_resolve(
     for phase in &def.phases {
         let mut targets: Vec<(ChannelKey, f64)> = Vec::new();
         for effect in &phase.effects {
+            if let Some(found) = r.targets(effect)? {
+                targets.extend(found);
+                continue;
+            }
             match effect {
-                Effect::Demand { node, factor } => {
-                    targets.push((ChannelKey::Demand(r.node(node)? as u32), *factor));
-                }
-                Effect::Capacity { nodes, factor } => {
-                    for n in r.nodes(nodes)? {
-                        targets.push((ChannelKey::Capacity(n as u32), *factor));
-                    }
-                }
-                Effect::Latency { nodes, factor } => {
-                    for n in r.nodes(nodes)? {
-                        targets.push((ChannelKey::Latency(n as u32), *factor));
-                    }
-                }
-                Effect::ErrorInject { nodes, rate } => {
-                    for n in r.nodes(nodes)? {
-                        targets.push((ChannelKey::ErrorInject(n as u32), *rate));
-                    }
-                }
-                Effect::Down { nodes } => {
-                    for n in r.nodes(nodes)? {
-                        targets.push((ChannelKey::Down(n as u32), 1.0));
-                    }
-                }
-                Effect::EdgeWeight { edges, factor } => {
-                    for e in r.edges(edges)? {
-                        targets.push((ChannelKey::EdgeWeight(e as u32), *factor));
-                    }
-                }
-                Effect::EdgeLatency { edges, factor } => {
-                    for e in r.edges(edges)? {
-                        targets.push((ChannelKey::EdgeLatency(e as u32), *factor));
-                    }
-                }
-                Effect::EdgeError { edges, rate } => {
-                    for e in r.edges(edges)? {
-                        targets.push((ChannelKey::EdgeError(e as u32), *rate));
-                    }
-                }
-                Effect::RouteShift {
-                    edge,
-                    onto,
-                    fraction,
-                } => {
-                    let a = r.edge(&edge.from, &edge.to)?;
-                    let b = r.edge(&onto.from, &onto.to)?;
-                    targets.push((ChannelKey::RouteShift(a as u32, b as u32), *fraction));
-                }
                 Effect::FlowRate { flow, rate } => {
                     let index = flow_index(flow)?;
                     targets.push((ChannelKey::FlowRate(index as u16), r.rate(rate)?));
@@ -316,6 +331,8 @@ fn try_resolve(
                     }
                     targets.push((ChannelKey::FlowReject(index as u16, node as u32), *fraction));
                 }
+                // Everything else was resolved above.
+                _ => {}
             }
         }
         targets.sort_by_key(|target| target.0);
@@ -442,6 +459,25 @@ pub fn resolve_all(
     defs.iter()
         .map(|def| resolve(def, topo, decisions))
         .collect()
+}
+
+/// What a fault placed by hand sets on a topology: the channels, sorted, and
+/// the value each is held at. An effect that names something the topology
+/// does not have, or that only means something inside a scenario, is refused
+/// with the reason.
+pub fn resolve_fault(
+    topo: &SimTopology,
+    effect: &Effect,
+) -> Result<Vec<(ChannelKey, f64)>, String> {
+    let mut targets = Resolver { topo }
+        .targets(effect)?
+        .ok_or("an effect on a scenario's flow cannot be placed by hand")?;
+    targets.sort_by_key(|target| target.0);
+    targets.dedup_by(|a, b| a.0 == b.0);
+    if targets.is_empty() {
+        return Err("the effect touches nothing on this topology".into());
+    }
+    Ok(targets)
 }
 
 /// Edges on which an injected flow is treated as an authorization check.

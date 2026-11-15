@@ -1,0 +1,60 @@
+name: Publish the static site
+
+# Publishes the application built around the engine in WebAssembly to GitHub
+# Pages. It runs only when someone starts it by hand: nothing is published by
+# a push. The repository must have Pages enabled with "GitHub Actions" as the
+# source (Settings → Pages) before the first run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  PNPM_VERSION: 12.18.0
+  NODE_VERSION: 24
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the engine module and the site
+        run: pnpm build:static
+      - name: The module answers as the server does
+        run: pnpm test:engine
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/web/dist-static
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

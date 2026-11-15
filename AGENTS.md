@@ -5,7 +5,9 @@ Guidance for AI coding agents working in this repository.
 AEGIS is an interactive digital twin of a fictional cloud platform: a
 deterministic Rust simulation with real Cedar policy decisions
 (`apps/server`), a React + Three.js WebGPU client (`apps/web`) and the JSON
-contract between them (`packages/contracts`). Everything it shows is
+contract between them (`packages/contracts`). The same engine also builds as
+a WebAssembly module (`apps/wasm`) so the client can run as a static site
+with no server. Everything it shows is
 synthetic. Docs and code comments are written in English.
 
 ## Toolchain
@@ -15,6 +17,8 @@ synthetic. Docs and code comments are written in English.
   (`packageManager`). An older default `node` fails in Vitest, so check
   `node -v` first.
 - `pnpm install` once. Nothing needs credentials, tokens or a `.env`.
+- The static site also needs the `wasm32-unknown-unknown` target:
+  `rustup target add wasm32-unknown-unknown`.
 
 ## Commands
 
@@ -38,6 +42,15 @@ AEGIS_WORKSPACE=<dir> cargo run -p aegis-server
 `pnpm dev` starts Vite plus a typecheck watch on the contracts; it does not
 start the server.
 
+The static site, with the engine in the browser and no server:
+
+```bash
+pnpm engine:build     # apps/wasm → apps/web/src/engine/aegis.wasm (git-ignored)
+pnpm dev:static       # Vite on http://localhost:5173, no proxy, engine in a worker
+pnpm build:static     # engine:build, then apps/web/dist-static
+pnpm --filter @aegis/web preview:static
+```
+
 Checks, exactly as CI runs them (`.github/workflows/ci.yml`):
 
 ```bash
@@ -50,6 +63,11 @@ pnpm lint
 pnpm test             # Vitest: contracts + web
 pnpm build
 pnpm e2e              # Playwright against the real stack
+# The static site (its own CI job; needs the wasm32 target):
+cargo clippy -p aegis-wasm --target wasm32-unknown-unknown --locked -- -D warnings
+pnpm engine:build
+pnpm test:engine      # the built module against the contract samples, in Node
+pnpm e2e:static       # Playwright against the static build, no server
 ```
 
 A single test:
@@ -61,6 +79,8 @@ pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
 pnpm --filter @aegis/contracts test
 pnpm --filter @aegis/web exec playwright test -g "part of the title" --project chromium
+cargo test -p aegis-wasm <name_substring>                        # the engine's boundary, natively
+pnpm --filter @aegis/web exec playwright test --config playwright.static.config.ts -g "part of the title"
 ```
 
 End-to-end notes:
@@ -93,6 +113,7 @@ Ports are deliberately separate so runs never share a simulation:
 | Development                                       | 8787   | 5173 |
 | `vite preview`                                    | 8787   | 4173 |
 | Playwright                                        | 8797   | 4183 |
+| Playwright, static site (`pnpm e2e:static`)       | none   | 4187 |
 | `scripts/capture-docs.sh`, `scripts/benchmark.sh` | 8798   | 4184 |
 
 ## Architecture
@@ -164,6 +185,18 @@ Things that are easy to break:
   before it is put in place. The cedar-agent adapter's sync store is updated
   with every swap. The browser never decides what a file is: classification
   is `workspace::from_files`, on the server.
+- **The library also builds for the browser.** `aegis-server` compiles for
+  `wasm32-unknown-unknown` and `apps/wasm` serves `api::offline_router` from
+  it. There, `std::time::Instant::now()`, threads, sockets and a Tokio
+  runtime do not exist: reading the standard clock compiles and then panics
+  in the tab. Shared code takes time from `crate::clock::Instant`, hands
+  blocking work to `off_the_workers` in `routes.rs`, and keeps anything that
+  needs the operating system behind `#[cfg(not(target_arch = "wasm32"))]`
+  (the dependencies are split the same way in `Cargo.toml`). A new route
+  goes into `route_table()` so both builds serve it, and into the list in
+  `apps/web/src/engine/parity.spec.ts`, which calls every route in the
+  built module. Anything the exporter of contract samples does, that test
+  repeats: change one and change the other.
 - **Fixtures are compiled in.** Everything under `fixtures/` is embedded with
   `include_str!`, so editing one means rebuilding the server and usually
   regenerating the contract samples.
@@ -185,6 +218,28 @@ Things that are easy to break:
   the exported stress topology with the generated one.
 - **History is bounded** (30 virtual minutes, 8 000 events), as is every
   buffer an outside party can fill.
+
+### Engine for the browser (`apps/wasm`, crate `aegis-wasm`)
+
+A thin crate around the server library: `Engine` owns the state from
+`build_offline_state`, the offline router and a place in the broadcast
+stream, and the exported `aegis_*` functions carry text across the boundary.
+It decides nothing about the simulation or about a response.
+
+- The module imports nothing from its host (a test reads the built file's
+  import section). No `wasm-bindgen`, no `unsafe` block: the page writes into
+  a buffer the module owns and reads another.
+- Everything that crosses is lines of UTF-8: `METHOD path` and a JSON body
+  in; status, body and stream messages out. `ABI_VERSION` is checked by the
+  page; change the boundary and change it in `src/lib.rs` and in
+  `apps/web/src/engine/binding.ts` together.
+- The router is called with `oneshot` and polled without a runtime. A
+  handler that awaited something real would never finish; it is reported as
+  an error, not waited on.
+- Wall-clock time is an argument of every call. `aegis_advance` is the
+  scheduler, called by the page's worker, and caps a step at one second.
+- A client's `ping` and `resync` are answered by `api::protocol::answer`,
+  the same function the WebSocket handler calls.
 
 ### Contract (`packages/contracts`)
 
@@ -212,6 +267,17 @@ persisted `useSettings`) → features and the scene. TanStack Query holds
 request/response data (scenarios, providers, policy catalogue) and is
 invalidated from stream events. Every REST response and stream message is
 parsed with the shared schemas before use.
+
+Where requests go is decided when the client is built. `@transport`
+resolves to `providers/serverTransport.ts` (`fetch` and a WebSocket) or, with
+`--mode static`, to `engine/transport.ts`, which answers with a real
+`Response` and a socket-shaped object fed by the engine's worker
+(`engine/worker.ts` holds the module, `engine/binding.ts` knows its
+boundary, `engine/client.ts` matches answers to requests). Nothing above
+`providers/transport.ts` knows which one it has; copy that names the server
+goes through `app/host.ts`. The static build writes its Content-Security-
+Policy into the page (`vite.config.ts`), and no code may evaluate a string:
+zod is set to `jitless` in `app/policy.ts` for that reason.
 
 Rendering: React Three Fiber owns the canvas, its size and the frame loop.
 One imperative `SceneController` (`graphics/SceneController.ts`) owns
@@ -362,7 +428,10 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   (`docs/INTEGRATIONS.md`).
 - **The browser makes no third-party requests.** Fonts are bundled and the
   build inlines no assets, which is what lets the deployed CSP stay at
-  `'self'`.
+  `'self'`. The static site makes no request at all beyond its own files,
+  and an E2E test fails if it does.
+- **Publishing is a person's decision.** `.github/workflows/pages.yml`
+  deploys the static site and runs only when started by hand.
 - **Rust lints.** `unsafe` is forbidden and `dbg!` / `todo!` are denied.
   `unwrap()` outside tests is a Clippy warning, which CI's `-D warnings`
   turns into a failure. Request bodies deserialise into types that reject

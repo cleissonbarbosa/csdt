@@ -20,15 +20,32 @@ export async function resetSimulation(page: Page): Promise<void> {
   await post('/demo/playback/control', { action: 'play' });
 }
 
-export async function openApp(page: Page): Promise<void> {
+/** Puts the deterministic settings in place before the page loads. */
+async function applySettings(page: Page): Promise<void> {
   await page.addInitScript((settings) => {
     window.localStorage.setItem(
       'aegis.settings.v1',
       JSON.stringify({ state: settings, version: 1 }),
     );
   }, SETTINGS);
+}
+
+export async function openApp(page: Page): Promise<void> {
+  await applySettings(page);
   await resetSimulation(page);
   await page.goto('/');
+  await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '0');
+}
+
+/**
+ * Opens the static site. There is no simulation to reset: every page load
+ * starts an engine of its own, at its beginning.
+ */
+export async function openStatic(page: Page): Promise<void> {
+  await applySettings(page);
+  // Relative to the base URL, which is a path below the root.
+  await page.goto('./');
   await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
   await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '0');
 }

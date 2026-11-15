@@ -340,6 +340,63 @@ export const IncidentPulseSchema = z.object({
 });
 export type IncidentPulse = z.infer<typeof IncidentPulseSchema>;
 
+/**
+ * What a fault placed by hand bends. The names are those of the scenario
+ * effects that do the same.
+ */
+export const FaultKindSchema = z.enum([
+  'demand',
+  'capacity',
+  'latency',
+  'errorInject',
+  'down',
+  'edgeWeight',
+  'edgeLatency',
+  'edgeError',
+  'routeShift',
+]);
+export type FaultKind = z.infer<typeof FaultKindSchema>;
+
+/**
+ * A fault placed by hand that is in force: one figure of one service or
+ * connection, held away from nominal until it is lifted.
+ */
+export const ActiveFaultSchema = z.object({
+  kind: FaultKindSchema,
+  /** The service it is on, as an index into the topology's nodes. */
+  node: count.nullable(),
+  /** The connection it is on, as an index into the topology's edges. */
+  edge: count.nullable(),
+  /** For a route shift, the connection the traffic is moved onto. */
+  onto: count.nullable(),
+  /** A factor, or a rate or fraction from 0 to 1. A service that is down has 1. */
+  value: rate,
+});
+export type ActiveFault = z.infer<typeof ActiveFaultSchema>;
+
+/** One connection, by its two ends, each written as in a scenario file. */
+export interface FaultEdge {
+  from: string;
+  to: string;
+}
+
+/** The connections a fault is placed on: one, or every synchronous one into a service. */
+export type FaultEdges = { between: FaultEdge } | { inboundSync: string };
+
+/**
+ * A fault to place by hand: one scenario effect on services or connections,
+ * in the format a scenario phase writes it in. Services are named
+ * `node:<id>`, or `region:<id>` for every service of a region.
+ */
+export type FaultEffect =
+  | { type: 'demand'; node: string; factor: number }
+  | { type: 'capacity' | 'latency'; nodes: string; factor: number }
+  | { type: 'errorInject'; nodes: string; rate: number }
+  | { type: 'down'; nodes: string }
+  | { type: 'edgeWeight' | 'edgeLatency'; edges: FaultEdges; factor: number }
+  | { type: 'edgeError'; edges: FaultEdges; rate: number }
+  | { type: 'routeShift'; edge: FaultEdge; onto: FaultEdge; fraction: number };
+
 export const TelemetrySnapshotSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   topologyId: z.string(),
@@ -354,6 +411,8 @@ export const TelemetrySnapshotSchema = z.object({
   regions: z.array(RegionStatusSchema),
   flows: z.array(TrafficEventSchema),
   incident: IncidentPulseSchema.nullable(),
+  /** Faults placed by hand and in force at this point in time. */
+  faults: z.array(ActiveFaultSchema),
   playback: PlaybackStateSchema,
 });
 export type TelemetrySnapshot = z.infer<typeof TelemetrySnapshotSchema>;
