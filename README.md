@@ -156,16 +156,22 @@ seed plus a command list.
 
 **Your own platform**
 
-A workspace directory replaces the bundled platform, incidents and policies
-with yours, without recompiling: topologies and scenarios as JSON files, Cedar
+Your own files replace the bundled platform, incidents and policies, from
+the interface (**Import or export files**, with a check before anything is
+applied) or from a workspace directory the server starts with: topologies and scenarios as JSON files, Cedar
 policies as JSON or in Cedar's own syntax, an optional Cedar schema they must
 validate against. `aegis-server export-workspace` writes the bundled set out as
 a starting point and `check-workspace` validates a directory and says why a
 scenario cannot run on a topology. Replace only the policies and the same
-platform shows what the new set permits and denies. It is still a simulation:
+platform shows what the new set permits and denies; `diff-workspace` lists
+every request Cedar decides differently between two sets and which simulated
+flows stop because of it, and can fail a pipeline when a decision changes. It is still a simulation:
 the figures on your topology are computed, and labelled synthetic. See
 [docs/WORKSPACE.md](docs/WORKSPACE.md) and the six-service
 [example](examples/corner-shop).
+Versioned [JSON Schemas](schemas/README.md) provide editor completion and
+file validation; the incident console explains why an incompatible scenario
+cannot run on the selected topology.
 
 **Signals with their range**
 
@@ -366,9 +372,11 @@ Method, raw data and caveats: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
   targets only.
 - **Provenance everywhere.** Synthetic, recorded and live data are labelled
   from the server to the pixel.
-- **Your files, read once.** A workspace is read from one directory before
-  the server listens. No route uploads or reloads files, and a scenario file
-  can only change numbers inside the model.
+- **Your files are data.** A workspace is read from one directory before the
+  server listens, or imported through the interface: checked first, held in
+  memory, never written to disk and undone with a click. Either way a
+  scenario file can only change numbers inside the model. On a shared server
+  `AEGIS_IMPORT=off` switches importing off.
 - **Hardened edges.** Typed input validation, per-client rate limits,
   origin-checked WebSockets, bounded buffers and history, strict CSP,
   distroless non-root containers with read-only filesystems.
@@ -381,23 +389,23 @@ access control. Full detail in [docs/SECURITY.md](docs/SECURITY.md).
 ## Tests
 
 ```bash
-cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters, workspaces
+cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters, workspaces, diff
 pnpm test                   # contracts, stores, layout, stream client, interface
 pnpm e2e                    # Playwright against the real stack
 ```
 
-| Suite      | Tests | Covers                                                                                                                                                                                                                         |
-| ---------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Rust       |   141 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces                                                                   |
-| Contracts  |    28 | Every zod schema against samples exported by the server binary                                                                                                                                                                 |
-| Web        |   232 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                         |
-| End to end |    11 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, no-GPU fallback |
+| Suite      | Tests | Covers                                                                                                                                                                                                                                               |
+| ---------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust       |   175 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them                                                      |
+| Contracts  |    59 | Every zod schema against samples exported by the server binary; the published JSON Schemas against the bundled files and the example                                                                                                                 |
+| Web        |   245 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                                               |
+| End to end |    12 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, no-GPU fallback |
 
-All 412 pass locally. The end-to-end suite runs the real server and a production
+All 491 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
-incident is under way. The same suite passes on a real GPU through WebGPU (10
+incident is under way. The same suite passes on a real GPU through WebGPU (11
 tests; the fallback test does not apply there). One more Rust test compares the
 embedded engine with a real `cedar-agent` binary and is skipped unless
 `AEGIS_TEST_CEDAR_AGENT_BIN` is set.

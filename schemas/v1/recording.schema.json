@@ -1,0 +1,109 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/recording.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recording",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "topologyId": {
+      "type": "string"
+    },
+    "seed": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "durationMs": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 1,
+      "maximum": 1800000
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RecordedCommand"
+      },
+      "minItems": 1,
+      "maxItems": 64
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "description",
+    "topologyId",
+    "seed",
+    "durationMs",
+    "commands"
+  ],
+  "definitions": {
+    "RecordedCommand": {
+      "type": "object",
+      "properties": {
+        "atMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "command": {
+          "$ref": "#/definitions/Command"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "atMs",
+        "command"
+      ]
+    },
+    "Command": {
+      "description": "An input to the simulation, recorded on the timeline with the tick at\nwhich it was issued.",
+      "oneOf": [
+        {
+          "description": "Starts a scenario by its id.",
+          "type": "object",
+          "properties": {
+            "scenarioId": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "startScenario"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "scenarioId"
+          ]
+        },
+        {
+          "description": "Stops the scenario that is running.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "abortScenario"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    }
+  }
+}

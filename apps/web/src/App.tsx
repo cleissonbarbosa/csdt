@@ -19,6 +19,7 @@ import { SceneCanvas } from '@/features/scene/SceneCanvas';
 import { HoverCard, Notices, SceneToolbar } from '@/features/scene/SceneOverlays';
 import { TopologyTable } from '@/features/scene/TopologyTable';
 import { SettingsDialog } from '@/features/settings/SettingsDialog';
+import { WorkspaceDialog } from '@/features/workspace/WorkspaceDialog';
 import { Timeline, TIMELINE_HEIGHT, useTimelineVisible } from '@/features/timeline/Timeline';
 import { TopNav } from '@/features/topnav/TopNav';
 import { sceneHandle } from '@/graphics/handle';
@@ -414,6 +415,7 @@ export function App() {
 
       <IntegrationsDialog />
       <SettingsDialog />
+      <WorkspaceDialog />
       <HelpDialog />
       <CommandPalette />
     </div>

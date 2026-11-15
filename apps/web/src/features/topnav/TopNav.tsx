@@ -5,6 +5,7 @@ import {
   Box,
   CircleHelp,
   Ellipsis,
+  FolderOpen,
   History,
   KeyRound,
   List,
@@ -310,6 +311,12 @@ export function TopNav() {
               icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
               onSelect: () =>
                 useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+            },
+            {
+              id: 'workspace',
+              label: 'Import or export files',
+              icon: <FolderOpen size={14} />,
+              onSelect: () => useUi.getState().setPanel('workspace'),
             },
             {
               id: 'settings',

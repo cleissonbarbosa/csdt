@@ -28,8 +28,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use api::{AppState, Limits};
-use application::{Assets, BootstrapError, SimulationService, Sources};
+use application::{BootstrapError, Loaded, SimulationService};
 use config::Config;
+use domain::WorkspaceOrigin;
 use integrations::ProviderRegistry;
 
 #[derive(Debug, thiserror::Error)]
@@ -45,26 +46,25 @@ pub enum StartupError {
 /// Builds the shared application state. Does not start the scheduler; call
 /// [`SimulationService::spawn`] for that.
 pub fn build_state(config: Config) -> Result<AppState, StartupError> {
-    let sources = match &config.workspace {
-        Some(dir) => {
-            let loaded = workspace::load(dir)?;
+    let loaded = match &config.workspace {
+        Some(path) => {
+            let read = workspace::load(path)?;
             tracing::info!(
-                directory = %dir.display(),
-                replaced = ?loaded.replaced,
-                ignored = loaded.ignored.len(),
+                workspace = %path.display(),
+                replaced = ?read.replaced,
+                ignored = read.ignored.len(),
                 "workspace loaded"
             );
-            loaded.sources
+            read.build(WorkspaceOrigin::Startup)?
         }
-        None => Sources::bundled().map_err(BootstrapError::from)?,
+        None => Loaded::bundled()?,
     };
-    let assets = Arc::new(Assets::build(sources)?);
     let providers = Arc::new(ProviderRegistry::new(
         &config.integrations,
-        assets.cedar.documents(),
-        assets.cedar.entities_json().clone(),
+        loaded.assets.cedar.documents(),
+        loaded.assets.cedar.entities_json().clone(),
     )?);
-    let service = SimulationService::new(assets, config.seed);
+    let service = SimulationService::new(loaded, config.seed);
     Ok(AppState {
         service,
         providers,

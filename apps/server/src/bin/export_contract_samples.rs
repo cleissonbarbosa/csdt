@@ -14,8 +14,10 @@ use std::time::Duration;
 
 use aegis_server::api::{self, AppState};
 use aegis_server::application::{ControlAction, StreamMessage, TimelineReason};
+use aegis_server::application::{Loaded, SimulationService, Sources};
 use aegis_server::build_state;
 use aegis_server::config::Config;
+use aegis_server::domain::WorkspaceOrigin;
 use axum::body::Body;
 use axum::http::{header, Method, Request};
 use serde_json::{json, Value};
@@ -149,6 +151,22 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
 
     save("topology", get("/topology").await?)?;
     save("scenarios", get("/scenarios").await?)?;
+    // A custom topology can lack anchors the bundled scenarios need. Export
+    // the actual route's diagnostics as well as the all-available catalogue.
+    let mut sources = Sources::bundled()?;
+    sources.topologies.truncate(1);
+    sources.topologies[0].roles.clear();
+    let unavailable = AppState {
+        service: SimulationService::new(
+            Loaded::build(sources, WorkspaceOrigin::Bundled, Vec::new(), Vec::new())?,
+            42,
+        ),
+        ..state.clone()
+    };
+    save(
+        "scenarios-unavailable",
+        call(&unavailable, Method::GET, "/scenarios", None).await?,
+    )?;
     save("incidents", get("/incidents").await?)?;
     save("metrics", get("/metrics").await?)?;
     save("events", get("/events?limit=1000").await?)?;
@@ -203,7 +221,88 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
             "regions": stress["regions"].as_array().map_or(0, Vec::len),
         }),
     )?;
+
+    // The files the platform comes from, and replacing them while running.
+    // Last, because an import leaves the server on another topology.
+    save("workspace", get("/workspace").await?)?;
+    save(
+        "workspace-check",
+        post(
+            "/demo/workspace/check",
+            json!({ "files": tiny_workspace() }),
+        )
+        .await?,
+    )?;
+    let mut broken = tiny_workspace();
+    broken[1]["text"] = json!("{ \"id\": \"slow-door\" }");
+    save(
+        "workspace-check-invalid",
+        post("/demo/workspace/check", json!({ "files": broken })).await?,
+    )?;
+    save(
+        "workspace-response",
+        post(
+            "/demo/workspace/import",
+            json!({ "files": tiny_workspace() }),
+        )
+        .await?,
+    )?;
+    save("workspace-export", get("/workspace/export").await?)?;
+    save(
+        "stream-timeline-workspace",
+        serde_json::from_str(
+            &StreamMessage::Timeline {
+                reason: TimelineReason::Workspace,
+                playback: state.service.playback(),
+            }
+            .encode(),
+        )?,
+    )?;
     Ok(written)
+}
+
+/// The smallest workspace that replaces something: a two-service platform
+/// and one scenario written for it. The Cedar files stay the bundled ones.
+fn tiny_workspace() -> Vec<Value> {
+    let topology = json!({
+        "id": "front-desk",
+        "name": "Front Desk",
+        "description": "Fictional two-service platform used for the contract samples.",
+        "dataSource": "synthetic",
+        "regions": [{ "id": "lobby", "name": "Lobby", "kind": "cloud", "location": "Ground floor" }],
+        "roles": { "primaryGateway": "door" },
+        "nodes": [
+            { "id": "visitors", "name": "Visitors", "type": "external-client", "region": "lobby", "tier": 0, "baseLatencyMs": 0, "baseRps": 40 },
+            { "id": "door", "name": "Door", "type": "api-gateway", "region": "lobby", "tier": 1, "baseLatencyMs": 3 }
+        ],
+        "edges": [
+            { "source": "visitors", "target": "door", "protocol": "https", "relationship": "route", "weight": 1.0 }
+        ]
+    });
+    let scenario = json!({
+        "id": "slow-door",
+        "name": "Slow door",
+        "summary": "The door takes several times longer to open.",
+        "category": "resilience",
+        "severity": "warning",
+        "durationMs": 20000,
+        "rootCause": "role:primaryGateway",
+        "targets": ["role:primaryGateway"],
+        "phases": [
+            {
+                "name": "Stiff hinge",
+                "atMs": 0,
+                "rampMs": 2000,
+                "status": "active",
+                "effects": [{ "type": "latency", "nodes": "role:primaryGateway", "factor": 6.0 }]
+            },
+            { "name": "Recovery", "atMs": 12000, "rampMs": 3000, "status": "recovering" }
+        ]
+    });
+    vec![
+        json!({ "path": "topologies/front-desk.json", "text": topology.to_string() }),
+        json!({ "path": "scenarios/01-slow-door.json", "text": scenario.to_string() }),
+    ]
 }
 
 async fn post_dynamic(state: &AppState, path: &str) -> Result<Value, AnyError> {

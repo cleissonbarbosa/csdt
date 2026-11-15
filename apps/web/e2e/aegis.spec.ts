@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   clockSeconds,
   collectErrors,
+  exampleWorkspace,
   frameSummary,
   fromMenu,
   KINDS,
@@ -425,4 +426,56 @@ test('the stress topology renders 150+ services in the same few draw calls', asy
   await expect
     .poll(() => page.evaluate(() => window.__aegis?.stats().nodes ?? 0), { timeout: 30_000 })
     .toBe(KINDS);
+});
+
+test('a platform is imported from its files, runs its own incident, and is put back', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await waitForScene(page);
+
+  await fromMenu(page, 'workspace');
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  await expect(dialog.getByTestId('workspace-in-use')).toContainText(
+    'The platform that ships with AEGIS.',
+  );
+
+  // Loose files: the server tells a topology from a scenario from a policy.
+  await dialog.getByTestId('workspace-files').setInputFiles(exampleWorkspace());
+  const check = dialog.getByTestId('workspace-check');
+  await expect(check).toContainText('These files are valid');
+  await expect(check).toContainText('Corner Shop (6 services)');
+  await expect(check).toContainText('3 Cedar policies');
+  // Checking changed nothing.
+  await expect(page.getByTestId('platform-status')).toContainText('51 services');
+
+  await dialog.getByTestId('workspace-apply').click();
+  await expect(dialog).toBeHidden();
+  // Six services of six kinds: the overview is six pieces.
+  await waitForScene(page, 6);
+  await expect(page.getByTestId('platform-status')).toContainText('6 services, all normal');
+  await expect(page.getByTestId('topology-picker')).toHaveValue('corner-shop');
+
+  // Its own scenario runs, and Cedar's answer under its own policies stops
+  // the flow: there is an incident and something on the model has a hue.
+  await page.getByTestId('explore-incident').click();
+  await page.getByTestId('scenario-start-receipt-snooping').click();
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '1');
+  await expect
+    .poll(async () => (await frameSummary(page)).chromatic, { timeout: 30_000 })
+    .toBeGreaterThan(0);
+
+  await fromMenu(page, 'workspace');
+  await expect(dialog.getByTestId('workspace-in-use')).toContainText(
+    'Files imported since this server started',
+  );
+  await dialog.getByTestId('workspace-reset').click();
+  await expect(dialog.getByTestId('workspace-in-use')).toContainText(
+    'The platform that ships with AEGIS.',
+  );
+  await page.keyboard.press('Escape');
+  await waitForScene(page, KINDS);
+  await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
+  expect(errors).toEqual([]);
 });

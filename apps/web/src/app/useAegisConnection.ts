@@ -9,7 +9,7 @@ import { DemoSimulationProvider } from '@/providers/demoProvider';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
-import { queryClient, queryKeys } from './queryClient';
+import { invalidateWorkspaceQueries, queryClient, queryKeys } from './queryClient';
 
 let provider: DemoSimulationProvider | null = null;
 
@@ -95,14 +95,22 @@ export function useAegisConnection(): void {
       source.subscribeTimeline((reason: TimelineReason, playback) => {
         const state = useTelemetry.getState();
         state.setPlayback(playback);
-        if (reason === 'reset' || reason === 'topology' || reason === 'recording') {
+        // The platform's own files were replaced: what was selected, filtered
+        // or traced belongs to a platform that may no longer be there, even
+        // when the new one has the same id.
+        const replaced = reason === 'workspace';
+        if (replaced) useUi.getState().resetForTopology();
+        if (reason === 'reset' || reason === 'topology' || reason === 'recording' || replaced) {
           state.clearTimeline();
         }
         const reload =
-          reason === 'topology' || reason === 'recording' ? loadTopology() : Promise.resolve();
+          reason === 'topology' || reason === 'recording' || replaced
+            ? loadTopology()
+            : Promise.resolve();
         void reload.then(loadTimeline).catch(() => undefined);
         invalidateTimelineQueries();
         void queryClient.invalidateQueries({ queryKey: queryKeys.topologies });
+        if (replaced) invalidateWorkspaceQueries();
       }),
       source.subscribeLatency((ms) => useTelemetry.getState().setLatency(ms)),
     ];

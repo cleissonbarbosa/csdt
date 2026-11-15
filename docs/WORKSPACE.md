@@ -1,10 +1,12 @@
 # Workspace
 
 AEGIS ships with one fictional platform, five incidents and nine Cedar
-policies. A **workspace** is a directory that replaces any of them with your
-own: a topology that describes a platform you care about, scenarios written
-for it, and the Cedar policies you want to see evaluated. The server reads it
-once at start-up; nothing is recompiled.
+policies. A **workspace** is a set of files that replaces any of them with
+your own: a topology that describes a platform you care about, scenarios
+written for it, and the Cedar policies you want to see evaluated. It is a
+directory the server reads when it starts, or files you hand it
+[from the interface](#from-the-interface) while it runs; nothing is
+recompiled either way.
 
 What it shows is still a simulation. A topology file describes a platform; the
 load, latency, failures and authorization traffic on it are computed by the
@@ -52,10 +54,52 @@ services:
       - ./my-platform:/workspace:ro
 ```
 
+## From the interface
+
+**Import or export files**, in the menu at the end of the top bar, does the
+same without a restart.
+
+- **Choose files**, **Choose a folder**, or drop either on the marked area.
+  A folder is read as the layout below. A file on its own is recognised by
+  what it
+  holds: a topology by its `nodes` and `edges`, a scenario by its `phases`, a
+  recording by its `commands`, a catalogue by its `trafficMix`, policies and
+  entities by their first item, and `.cedar` and `.cedarschema` files by
+  their extension.
+- The files are checked as you add them. The dialog shows what applying them
+  would give (the platforms, the scenarios, the share of ordinary requests
+  Cedar would deny, any scenario that could not run and why) or the file a
+  mistake is in and what it is. Nothing changes until **Apply**.
+- An import is laid over **what the server was started with**, not over an
+  earlier import: each kind of file you add replaces that part, and the rest
+  stays. One scenario file is the whole list of scenarios. To add to what is
+  on show instead, use **Start from the files in use**, which stages them
+  for you to add to.
+- **Save as one file** downloads everything in use as a single JSON document,
+  a _bundle_. It can be dropped back on the dialog, and named wherever a
+  directory is: `AEGIS_WORKSPACE=./aegis-workspace.json`, `check-workspace`,
+  `diff-workspace`.
+- An import lives in the server's memory. A restart, or **Return to what the
+  server started with**, brings back the files it started with. To keep an
+  import, save it and start the server with it.
+
+There is one simulation, so applying an import starts a new timeline for
+everyone connected. `AEGIS_IMPORT=off` switches importing off; the dialog then
+only saves. The API behind it:
+
+| Route                                |                                                                |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `GET /api/v1/workspace`              | where the files in use came from and what they amount to       |
+| `GET /api/v1/workspace/export`       | the files in use, as a bundle                                  |
+| `POST /api/v1/demo/workspace/check`  | what `{ "files": [{ "path", "text" }] }` would give; no change |
+| `POST /api/v1/demo/workspace/import` | the same, applied; 422 with the file and reason if invalid     |
+| `POST /api/v1/demo/workspace/reset`  | back to what the server started with                           |
+
 ## Layout
 
 ```text
 <workspace>/
+  workspace.json           optional format version; omitted means version 1
   topologies/*.json         the platforms on offer
   scenarios/*.json          incident scenarios
   recordings/*.json         prerecorded incidents
@@ -92,6 +136,37 @@ Limits: 4 MiB per file, 64 files per directory, 2 000 services and 20 000
 connections per topology, 512 policies. They exist so a mistake fails at
 start-up instead of exhausting memory. The renderer has been exercised at 178
 services; nothing larger has been measured.
+
+## Format version and editor schemas
+
+New exports include `workspace.json`:
+
+```json
+{ "formatVersion": 1 }
+```
+
+This versions all the file formats in the directory together. A workspace
+without a manifest is version 1, so existing files still load. An unsupported
+version, malformed manifest or unknown manifest field is rejected with the
+file name before the contents are loaded. This version is independent of
+the REST/WebSocket contract's `schemaVersion`.
+
+The [published JSON Schemas](../schemas/README.md) cover the manifest,
+the [bundle](../schemas/v1/bundle.schema.json),
+[topology](../schemas/v1/topology.schema.json),
+[scenario](../schemas/v1/scenario.schema.json),
+[recording](../schemas/v1/recording.schema.json),
+[authorization catalogue](../schemas/v1/catalog.schema.json) and
+[policy list](../schemas/v1/policies.schema.json). They provide editor
+completion and structural validation, including selectors, effect ranges and
+the commands and events a file may declare. Entities and `.cedar` files
+continue to use Cedar's own formats.
+
+Schemas are generated from the Rust types with `pnpm workspace:schemas`.
+Tests reject stale schemas and validate the bundled files and the example
+against them. They are self-contained Draft 7 documents; validation needs no
+network access. They do not prove graph acyclicity, uniqueness of ids,
+cross-file references or Cedar validity: run `check-workspace` for those.
 
 ## Topology
 
@@ -258,7 +333,8 @@ id (`eu-west`).
 
 A scenario that names a role, a node, a connection or a request a topology
 does not have is not an error. It is listed as **unavailable** on that
-topology, and `check-workspace` says which name was missing.
+topology. Both `check-workspace` and the incident console say which name was
+missing; the API carries the explanation in `unavailableReason`.
 
 ### Effects
 
@@ -346,7 +422,7 @@ re-simulates it, identically every time.
 ```
 
 It may only start and stop scenarios, on a topology and with scenarios the
-workspace has. The timeline's other commands record an authorization decision
+workspace has, and a command takes no field beyond the ones shown. The timeline's other commands record an authorization decision
 or an imported event; a file is not allowed to put either there by saying so.
 
 ## Cedar
@@ -394,17 +470,91 @@ while every outcome stays Cedar's.
 That makes a workspace a way to ask "what would this policy change do":
 replace `cedar/policies.json`, and the denial rate at rest, the flows that
 reach their resource and the policies named on every decision are the ones
-the new set produces. Run `check-workspace` on both directories to compare the
-share of traffic denied.
+the new set produces. [Comparing two workspaces](#comparing-two-workspaces)
+lists exactly what differs.
 
 When a local cedar-agent is connected with `AEGIS_CEDAR_AGENT_SYNC=true`, what
 is uploaded to it is the policies and entities the embedded engine was built
 from, so the two engines hold the same set.
 
+## Comparing two workspaces
+
+`diff-workspace` builds two workspaces the way start-up would and reports what
+Cedar decides differently under the second. It is the question to ask of a
+policy change before merging it.
+
+```bash
+aegis-server diff-workspace <base> <candidate> [--json] [--exit-code]
+```
+
+Either side can be `@bundled`, the set compiled into the binary. This is the
+bundled platform with the `finance-view-ledger` policy removed:
+
+```text
+base       @bundled
+candidate  candidate
+
+Policies
+  removed  finance-view-ledger
+
+Simulated traffic
+  denied at rest  7.0 % -> 15.0 %
+  15 catalogue requests compared, 2 decided differently
+  allow -> deny  alice-view-ledger (traffic mix)  User::"alice" Action::"viewLedger" Ledger::"acme-ledger-2026"
+                 was permitted by finance-view-ledger; now denied by default
+  allow -> deny  alice-view-ledger (scenario request)  User::"alice" Action::"viewLedger" Ledger::"acme-ledger-2026"
+                 was permitted by finance-view-ledger; now denied by default
+
+Scenario flows
+  cedar-denial / Alice · viewLedger on helios-commerce: reaches its resource -> stops at the authorizer
+  cedar-denial / Alice · viewLedger on hyperscale-stress: reaches its resource -> stops at the authorizer
+
+Access matrix
+  6 principals, 6 actions, 7 resources, 9 contexts: 756 requests compared
+  9 allow -> deny, 0 deny -> allow, 0 decided the same for a different reason
+  allow -> deny  User::"alice" Action::"viewLedger" Ledger::"acme-ledger-2026"  in every context
+                 was permitted by finance-view-ledger; now denied by default
+
+Decisions differ.
+```
+
+- **Policies** are compared by meaning: Cedar's parsed form without
+  annotations. Reformatting a policy, moving it from `policies.json` to a
+  `.cedar` file or adding an `@description` is not a change.
+- **Simulated traffic** is the catalogue's request shapes, with the share of
+  ordinary traffic denied on each side. A request listed without an arrow kept
+  its decision but is now determined by other policies.
+- **Scenario flows** are the flows tied to a catalogue request: stopped at the
+  authorizer on one side and let through on the other. A scenario that can run
+  on only one side is listed with the reason.
+- **Access matrix** is every principal, action and resource the candidate's
+  catalogue lets the request tracer build, with every context key absent,
+  false and true, evaluated by both engines. A change is described by the
+  context keys it depends on (`with mfa absent; mfa=false`). At most 20 000
+  requests are compared: beyond that only the empty context is tried, and the
+  report says so.
+
+Everything above is Cedar's answer on each side; the command only compares.
+It covers what the catalogue names, so a request nobody listed is not
+compared.
+
+`--json` writes the full comparison, including every matrix change and the
+contexts of each, for other tools. Exit status follows `diff`: 0 normally; 1
+with `--exit-code` when a decision differs (a request, a flow or the share
+denied at rest, not a policy rewritten to the same effect); 2 when a side
+cannot be built. In a pipeline that makes "this refactor changes no decision"
+a check:
+
+```bash
+aegis-server diff-workspace ./main-policies ./branch-policies --exit-code
+```
+
 ## What a workspace cannot do
 
-- It is read once, before the server listens, from the one directory named in
-  `AEGIS_WORKSPACE`. There is no route that uploads, lists or reloads files.
+- It cannot make the server open anything. A directory is read once, before
+  the server listens, from the one place named in `AEGIS_WORKSPACE`. An import
+  carries the text of its files; the paths in it only say which part each
+  file belongs to, and nothing is written to disk.
 - It cannot make AEGIS contact anything. Scenarios have no effect that leaves
   the engine, and the `simulation` and `incidents` modules still perform no
   I/O.
@@ -415,9 +565,11 @@ How each of these is enforced is in [SECURITY.md](SECURITY.md).
 
 What it does do is put its contents on the screen: the API returns the
 topology, the scenario texts, the source of every policy and the catalogue to
-whoever can reach it, and AEGIS has no authentication. If the files describe a
-real system, keep the server on loopback or behind something that
-authenticates.
+whoever can reach it, and AEGIS has no authentication. The same people can
+import, which replaces what everyone connected sees. If the files describe a
+real system, or the server is shared, keep it on loopback or behind something
+that authenticates, and set `AEGIS_IMPORT=off` where nobody should replace
+what is on show.
 
 ## What is tested
 
@@ -427,6 +579,9 @@ authenticates.
   for value, including every float of the generated 178-service topology, and
   a simulation whose state digest matches the bundled one.
 - The repository's `fixtures/` directory loads as a workspace.
+- Missing manifests remain compatible; unsupported versions are rejected.
+- Published schemas match the Rust file types; the API exposes the specific
+  resolution failure for each unavailable scenario.
 - `examples/corner-shop` builds; its two scenarios do what they describe, the
   flow Cedar denies stops at the authorizer with the policy Cedar named, and
   its recording replays both incidents.
@@ -434,6 +589,23 @@ authenticates.
   and whether a scenario's flow is stopped.
 - A scenario with every effect at the edge of its range produces no figure
   that is not a number, on both bundled topologies.
+- Importing (`apps/server/tests/import.rs`): the files of a directory held in
+  memory give what the directory gives, with or without their folders; what
+  is exported reads back as the same sources, file by file and as one bundle;
+  a check applies nothing and names the file a mistake is in; an import
+  replaces what runs, decisions then come from the imported policies, and a
+  reset brings back what the server started with; an import over a start-up
+  workspace is laid over that workspace; the routes answer 403 when importing
+  is off, and keep their size limits. An end-to-end test imports the example
+  through the file chooser, runs its incident and puts the bundled platform
+  back, and CI's container job imports a bundle of a few hundred kilobytes
+  through the reverse proxy.
+- Comparing (`apps/server/tests/diff.rs`): identical sources differ in
+  nothing; removing a permit lists the request, the flows and the matrix
+  entries it decided; a change that depends on context names the contexts;
+  the bundled policies rewritten in Cedar syntax with annotations are no
+  change; unrelated workspaces compare without a shared request; and the
+  command's report, JSON and exit statuses are checked through the binary.
 - Each kind of mistake (malformed JSON, an unknown field, a number out of
   range, a cycle, a duplicate id, a forged recording, an oversized file, a
   policy that fails the schema) is refused with the file or the id it is in.

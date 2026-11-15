@@ -14,7 +14,7 @@ use crate::domain::{
 use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
-use super::Assets;
+use super::{Assets, Loaded};
 
 /// Version of the WebSocket message protocol.
 pub const PROTOCOL_VERSION: u32 = 1;
@@ -44,6 +44,8 @@ pub enum ServiceError {
     InvalidSpeed(f64),
     #[error("no scenario is running")]
     NoActiveScenario,
+    #[error("the platform's files were replaced while this was being prepared; try again")]
+    WorkspaceChanged,
     #[error(transparent)]
     Authz(#[from] AuthzError),
 }
@@ -56,6 +58,8 @@ pub enum TimelineReason {
     Seek,
     Topology,
     Recording,
+    /// The topologies, scenarios or policies themselves were replaced.
+    Workspace,
 }
 
 /// Messages sent to stream subscribers.
@@ -138,6 +142,9 @@ pub struct EvaluateInput {
 }
 
 struct Runtime {
+    /// What the timeline runs on. Replaced together with the timeline, under
+    /// the same lock, so the two never disagree.
+    loaded: Loaded,
     timeline: Timeline,
     status: PlaybackStatus,
     speed: f64,
@@ -148,7 +155,9 @@ struct Runtime {
 }
 
 pub struct SimulationService {
-    assets: Arc<Assets>,
+    /// What the server started with: what a reset returns to, and what an
+    /// import is laid over.
+    initial: Loaded,
     seed: u64,
     runtime: Mutex<Runtime>,
     tx: broadcast::Sender<Arc<str>>,
@@ -162,24 +171,30 @@ impl std::fmt::Debug for SimulationService {
     }
 }
 
+/// A fresh timeline on the topology that opens.
+fn opening_timeline(assets: &Assets, seed: u64) -> Timeline {
+    let world = assets.default_world();
+    Timeline::new(
+        Arc::clone(&world.topo),
+        Arc::clone(&world.scenarios),
+        Arc::clone(&assets.decisions),
+        seed,
+    )
+}
+
 fn entity_type(uid: &str) -> &str {
     uid.rsplit_once("::").map_or(uid, |(ty, _)| ty)
 }
 
 impl SimulationService {
-    pub fn new(assets: Arc<Assets>, seed: u64) -> Arc<Self> {
-        let world = assets.default_world();
-        let timeline = Timeline::new(
-            Arc::clone(&world.topo),
-            Arc::clone(&world.scenarios),
-            Arc::clone(&assets.decisions),
-            seed,
-        );
+    pub fn new(loaded: Loaded, seed: u64) -> Arc<Self> {
+        let timeline = opening_timeline(&loaded.assets, seed);
         let (tx, _) = broadcast::channel(STREAM_BUFFER);
         Arc::new(Self {
-            assets,
+            initial: loaded.clone(),
             seed,
             runtime: Mutex::new(Runtime {
+                loaded,
                 timeline,
                 status: PlaybackStatus::Playing,
                 speed: 1.0,
@@ -191,8 +206,32 @@ impl SimulationService {
         })
     }
 
-    pub fn assets(&self) -> &Arc<Assets> {
-        &self.assets
+    /// What is in use right now.
+    pub fn assets(&self) -> Arc<Assets> {
+        Arc::clone(&self.lock().loaded.assets)
+    }
+
+    pub fn loaded(&self) -> Loaded {
+        self.lock().loaded.clone()
+    }
+
+    /// What the server started with.
+    pub fn initial(&self) -> &Loaded {
+        &self.initial
+    }
+
+    /// Replaces the topologies, scenarios and policies in use and starts a
+    /// new timeline on the topology that opens. Subscribers are told to
+    /// refetch everything.
+    pub fn replace(&self, loaded: Loaded) -> PlaybackState {
+        let timeline = opening_timeline(&loaded.assets, self.seed);
+        let mut rt = self.lock();
+        rt.loaded = loaded;
+        rt.timeline = timeline;
+        rt.status = PlaybackStatus::Playing;
+        rt.accumulator_ms = 0.0;
+        self.broadcast_timeline(&mut rt, TimelineReason::Workspace);
+        rt.timeline.playback(rt.status, rt.speed)
     }
 
     fn lock(&self) -> MutexGuard<'_, Runtime> {
@@ -307,7 +346,7 @@ impl SimulationService {
                 if rt.timeline.state().scenario.is_none() {
                     return Err(ServiceError::NoActiveScenario);
                 }
-                let branched = rt.timeline.issue(Command::AbortScenario);
+                let branched = rt.timeline.issue(Command::AbortScenario {});
                 rt.status = PlaybackStatus::Playing;
                 if branched {
                     self.broadcast_timeline(&mut rt, TimelineReason::Branch);
@@ -377,15 +416,15 @@ impl SimulationService {
     }
 
     pub fn select_topology(&self, topology_id: &str) -> Result<PlaybackState, ServiceError> {
-        let world = self
-            .assets
+        let mut rt = self.lock();
+        let assets = Arc::clone(&rt.loaded.assets);
+        let world = assets
             .world(topology_id)
             .ok_or_else(|| ServiceError::UnknownTopology(topology_id.to_string()))?;
-        let mut rt = self.lock();
         rt.timeline = Timeline::new(
             Arc::clone(&world.topo),
             Arc::clone(&world.scenarios),
-            Arc::clone(&self.assets.decisions),
+            Arc::clone(&assets.decisions),
             self.seed,
         );
         rt.status = PlaybackStatus::Playing;
@@ -395,14 +434,13 @@ impl SimulationService {
     }
 
     pub fn load_recording(&self, recording_id: &str) -> Result<PlaybackState, ServiceError> {
-        let recording = self
-            .assets
+        let assets = self.assets();
+        let recording = assets
             .recordings
             .iter()
             .find(|r| r.id == recording_id)
             .ok_or_else(|| ServiceError::UnknownRecording(recording_id.to_string()))?;
-        let world = self
-            .assets
+        let world = assets
             .world(&recording.topology_id)
             .ok_or_else(|| ServiceError::UnknownTopology(recording.topology_id.clone()))?;
         // Simulating the recording takes a few milliseconds; do it before
@@ -410,10 +448,15 @@ impl SimulationService {
         let timeline = Timeline::from_recording(
             Arc::clone(&world.topo),
             Arc::clone(&world.scenarios),
-            Arc::clone(&self.assets.decisions),
+            Arc::clone(&assets.decisions),
             recording,
         );
         let mut rt = self.lock();
+        // An import may have replaced everything in the meantime; a timeline
+        // of what is no longer loaded must not be put in its place.
+        if !Arc::ptr_eq(&rt.loaded.assets, &assets) {
+            return Err(ServiceError::WorkspaceChanged);
+        }
         rt.timeline = timeline;
         rt.status = PlaybackStatus::Playing;
         rt.accumulator_ms = 0.0;
@@ -450,7 +493,7 @@ impl SimulationService {
     /// Validates a request and checks the policy filter before any engine runs.
     pub fn validate_evaluation(&self, input: &EvaluateInput) -> Result<(), ServiceError> {
         validate_request(&input.request)?;
-        let known = self.assets.cedar.policies();
+        let known = self.assets().cedar.policies();
         for id in &input.disabled_policies {
             if !known.iter().any(|p| &p.id == id) {
                 return Err(AuthzError::UnknownPolicy(id.clone()).into());
@@ -465,16 +508,25 @@ impl SimulationService {
         input: EvaluateInput,
     ) -> Result<AuthorizationDecision, ServiceError> {
         self.validate_evaluation(&input)?;
+        // One set of assets for the evaluation and for what it reports.
+        let assets = self.assets();
         let started = Instant::now();
-        let outcome = self
-            .assets
+        let outcome = assets
             .cedar
             .evaluate(&input.request, &input.disabled_policies)?;
         let micros = started.elapsed().as_micros() as u64;
-        Ok(self.record_decision(
+        let mut rt = self.lock();
+        // An import may have replaced the policies while Cedar was working.
+        // A decision made under the old ones has no place on a timeline of
+        // the new: it would be shown as an answer the loaded policies gave.
+        if !Arc::ptr_eq(&rt.loaded.assets, &assets) {
+            return Err(ServiceError::WorkspaceChanged);
+        }
+        Ok(self.record_locked(
+            &mut rt,
             input,
             outcome,
-            self.assets.cedar.engine(),
+            assets.cedar.engine(),
             micros,
             DataSource::Synthetic,
         ))
@@ -490,6 +542,25 @@ impl SimulationService {
         data_source: DataSource,
     ) -> AuthorizationDecision {
         let mut rt = self.lock();
+        self.record_locked(
+            &mut rt,
+            input,
+            outcome,
+            engine,
+            evaluation_micros,
+            data_source,
+        )
+    }
+
+    fn record_locked(
+        &self,
+        rt: &mut Runtime,
+        input: EvaluateInput,
+        outcome: PolicyDecision,
+        engine: EngineInfo,
+        evaluation_micros: u64,
+        data_source: DataSource,
+    ) -> AuthorizationDecision {
         rt.decision_counter += 1;
         let topo = Arc::clone(rt.timeline.topology());
         let allowed = outcome.decision == Decision::Allow;
@@ -513,7 +584,7 @@ impl SimulationService {
             decision: Box::new(decision.clone()),
         });
         if branched {
-            self.broadcast_timeline(&mut rt, TimelineReason::Branch);
+            self.broadcast_timeline(rt, TimelineReason::Branch);
         }
         decision
     }
@@ -529,7 +600,7 @@ impl SimulationService {
     }
 
     pub fn topologies(&self) -> Vec<TopologySummary> {
-        self.assets.worlds.values().map(|w| w.summary()).collect()
+        self.assets().worlds.values().map(|w| w.summary()).collect()
     }
 
     pub fn snapshot(&self) -> TelemetrySnapshot {
@@ -555,7 +626,11 @@ impl SimulationService {
     }
 
     pub fn recordings(&self) -> Vec<RecordingSummary> {
-        self.assets.recordings.iter().map(|r| r.summary()).collect()
+        self.assets()
+            .recordings
+            .iter()
+            .map(|r| r.summary())
+            .collect()
     }
 
     pub fn decisions(&self) -> Vec<AuthorizationDecision> {

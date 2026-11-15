@@ -22,4 +22,23 @@ export const queryKeys = {
   providers: ['providers'] as const,
   catalog: ['authorization', 'catalog'] as const,
   decisions: ['authorization', 'decisions'] as const,
+  workspace: ['workspace'] as const,
 };
+
+/**
+ * Everything that is read from the platform's files. When those are replaced
+ * nothing the client holds about them is true any more.
+ */
+export function invalidateWorkspaceQueries(): void {
+  for (const key of [
+    queryKeys.scenarios,
+    queryKeys.incidents,
+    queryKeys.recordings,
+    queryKeys.topologies,
+    queryKeys.catalog,
+    queryKeys.decisions,
+    queryKeys.workspace,
+  ]) {
+    void queryClient.invalidateQueries({ queryKey: key });
+  }
+}

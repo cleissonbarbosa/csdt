@@ -67,7 +67,7 @@ pub enum CedarSetupError {
 
 /// A policy as stored in `fixtures/cedar/policies.json`. `id` and `content`
 /// match cedar-agent's policy schema; `description` is AEGIS metadata.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PolicyDocument {
     pub id: String,
@@ -76,14 +76,14 @@ pub struct PolicyDocument {
     pub content: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogTenant {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogPrincipal {
     pub uid: String,
@@ -93,7 +93,7 @@ pub struct CatalogPrincipal {
     pub note: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogAction {
     pub uid: String,
@@ -101,7 +101,7 @@ pub struct CatalogAction {
     pub resource_type: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogResource {
     pub uid: String,
@@ -110,7 +110,7 @@ pub struct CatalogResource {
     pub resource_type: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogContextKey {
     pub key: String,
@@ -120,7 +120,7 @@ pub struct CatalogContextKey {
 
 /// The synthetic authorization domain: who exists, what they can attempt and
 /// which request shapes make up simulated traffic.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AuthzCatalog {
     pub tenants: Vec<CatalogTenant>,
@@ -242,6 +242,39 @@ pub fn bundled_entities_json() -> Result<serde_json::Value, serde_json::Error> {
 struct LoadedPolicy {
     info: PolicyInfo,
     policy: Policy,
+}
+
+/// Whether two policies decide the same way: compared in Cedar's JSON form
+/// without their annotations, so neither formatting nor an `@id` or
+/// `@description` is a difference.
+fn same_meaning(a: &Policy, b: &Policy) -> bool {
+    let meaning = |policy: &Policy| {
+        let mut json = policy.to_json().ok()?;
+        json.as_object_mut()?.remove("annotations");
+        Some(json)
+    };
+    match (meaning(a), meaning(b)) {
+        (Some(a), Some(b)) => a == b,
+        // Cedar could not serialise one of them: fall back to its own
+        // comparison, which also looks at annotations.
+        _ => a == b,
+    }
+}
+
+/// How one engine's policies differ from another's, by policy id.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+pub struct PolicyChanges {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    /// Same id, different meaning. Formatting and annotations are not a
+    /// change.
+    pub changed: Vec<String>,
+}
+
+impl PolicyChanges {
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.changed.is_empty()
+    }
 }
 
 /// Embedded Cedar policy decision point.
@@ -395,6 +428,33 @@ impl CedarEngine {
     /// The entity store, in cedar-agent's `PUT /v1/data` shape.
     pub fn entities_json(&self) -> &serde_json::Value {
         &self.entities_json
+    }
+
+    /// What this engine's policies add to, remove from or change in `base`.
+    pub fn changes_from(&self, base: &Self) -> PolicyChanges {
+        let find = |engine: &Self, id: &str| -> Option<Policy> {
+            engine
+                .policies
+                .iter()
+                .find(|p| p.info.id == id)
+                .map(|p| p.policy.clone())
+        };
+        let mut changes = PolicyChanges::default();
+        for loaded in &self.policies {
+            match find(base, &loaded.info.id) {
+                None => changes.added.push(loaded.info.id.clone()),
+                Some(before) if !same_meaning(&before, &loaded.policy) => {
+                    changes.changed.push(loaded.info.id.clone());
+                }
+                Some(_) => {}
+            }
+        }
+        for loaded in &base.policies {
+            if find(self, &loaded.info.id).is_none() {
+                changes.removed.push(loaded.info.id.clone());
+            }
+        }
+        changes
     }
 
     pub fn policies(&self) -> Vec<PolicyInfo> {

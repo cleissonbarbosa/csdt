@@ -29,14 +29,42 @@ browser's `localStorage` (display preferences).
 
 ## Workspace
 
-A workspace (`AEGIS_WORKSPACE`, [WORKSPACE.md](WORKSPACE.md)) is the one place
-AEGIS reads files it was not built with. It is treated as configuration:
-whoever can write the directory already controls how the server starts.
+A workspace ([WORKSPACE.md](WORKSPACE.md)) is the one place AEGIS takes
+topologies, scenarios and policies it was not built with. It arrives in two
+ways, and both go through the same code and the same checks.
 
-- **Read once, by the operator's choice.** Unset by default. The directory is
-  read before the listener is bound. No route uploads, lists or reloads files,
-  so nothing a client sends can cause a file to be read.
-- **Bounded.** 4 MiB per file, 64 files per directory, 2 000 services and
+**From a directory, at start-up.** `AEGIS_WORKSPACE` is unset by default. The
+directory (or bundle file) it names is read once, before the listener is
+bound. This is the only place the server reads the file system, and it is
+configuration: whoever can write the directory already controls how the server
+starts.
+
+**Through the API, while running.** The interface can check and import files
+it holds in the browser. This is what the route can and cannot do:
+
+- **It receives content, never a path to open.** The request carries each
+  file's text. A file's declared path only says which part of the workspace it
+  belongs to; nothing derived from a request is ever opened, listed or
+  written. An import is held in memory and is gone when the server restarts.
+- **It is checked before it is applied.** The files are parsed, validated and
+  compiled exactly as a directory is at start-up. If anything is wrong the
+  import is refused with the file and the reason, and what is running is not
+  touched. `POST /demo/workspace/check` does the same without applying.
+- **It is bounded.** These two routes accept 8 MiB instead of 16 KiB, at most
+  256 files of at most 4 MiB each, under the same per-client limit as every
+  other mutation. Parsing and compiling run off the async workers.
+- **It replaces what everyone sees.** There is one simulation. Whoever can
+  reach the API can already start an incident or reset the timeline for
+  everyone connected; an import is in that class, and goes further: it
+  replaces the platform, the scenarios and the policies on show. On a server
+  that others share, switch it off with `AEGIS_IMPORT=off`. The three routes
+  then answer 403, and the interface says so.
+- **It can always be undone.** `POST /demo/workspace/reset` returns to what
+  the server was started with, which an import never modifies.
+
+Whichever way it arrives, a workspace is held to this:
+
+- **Bounded.** 4 MiB per file, 64 files of a kind, 2 000 services and
   20 000 connections per topology, 512 policies, scenarios of at most 30
   virtual minutes. Files are parsed into typed structures that reject unknown
   fields, and numbers outside their range are refused before anything runs.
@@ -72,7 +100,9 @@ Files in a workspace may describe a real system, and two things follow.
 **Input validation.** Request bodies are deserialised into typed structures
 that reject unknown fields. Identifiers are restricted to a conservative
 character set and length; Cedar entity references and contexts are
-length-bounded and parsed before use; bodies are capped at 16 KiB.
+length-bounded and parsed before use; bodies are capped at 16 KiB, except
+those of a workspace check or import, which carry files and are capped at
+8 MiB.
 
 **Rate limiting.** A per-client token bucket in front of every route, with a
 small burst for mutations (40, refilling at 8/s) and a larger one for reads.
@@ -140,7 +170,9 @@ dropped and logged. Event text is rendered as text, never as HTML.
 
 - Server: distroless image, non-root user, read-only root filesystem, all
   capabilities dropped, `no-new-privileges`.
-- Web: unprivileged nginx, all capabilities dropped, `no-new-privileges`.
+- Web: unprivileged nginx, all capabilities dropped, `no-new-privileges`. It
+  caps request bodies to the API at 32 KiB, and at 8 MiB on the two routes
+  that carry files, which it passes through without buffering them to disk.
 - The API port is not published; it is reachable only through the web
   container. The web port binds to `127.0.0.1` by default.
 

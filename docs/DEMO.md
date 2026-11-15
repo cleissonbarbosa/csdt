@@ -189,11 +189,11 @@ synthetic policies and entities and replaces whatever the agent held. See
 
 ## 10 · Your own platform (optional)
 
-Stop the server and start it on the example workspace:
-
-```bash
-AEGIS_WORKSPACE=examples/corner-shop cargo run --release -p aegis-server
-```
+Open **⋯**, choose **Import or export files**, then **Choose a folder** and
+pick `examples/corner-shop`. The dialog lists what the files amount to; press
+**Apply**. (Starting the server with
+`AEGIS_WORKSPACE=examples/corner-shop` gives the same platform, and keeps it
+across restarts.)
 
 The model is now a six-service shop. **Explore an incident** offers the two
 scenarios written for it; start **Receipt snooping** and the flow Cedar denies
@@ -201,9 +201,13 @@ ends at the Rulebook with a badge. In the request tracer, Ana reading a
 receipt of the other shop is a **Deny** determined by
 `other-shops-are-closed-books`, a policy from `cedar/shop.cedar`.
 
+**Save as one file**, in the same dialog, downloads what is in use to edit
+and import again, and **Return to what the server started with** brings
+Helios back. From a terminal,
 `aegis-server export-workspace ./my-platform` writes the bundled files out to
-start from, and `check-workspace` validates a directory without starting
-anything. The format is in [WORKSPACE.md](WORKSPACE.md).
+start from, `check-workspace` validates a directory without starting
+anything, and `diff-workspace` lists what Cedar decides differently between
+two of them. The format is in [WORKSPACE.md](WORKSPACE.md).
 
 ## Reproducing the screenshots
 

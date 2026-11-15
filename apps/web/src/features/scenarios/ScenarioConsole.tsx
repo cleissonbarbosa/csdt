@@ -79,14 +79,18 @@ function ScenarioCard({ scenario, running }: { scenario: Scenario; running: bool
           onClick={() => void start()}
           icon={running ? <RotateCcw size={12} aria-hidden /> : <Zap size={12} aria-hidden />}
           data-testid={`scenario-start-${scenario.id}`}
-          title={
-            scenario.available ? undefined : 'The active topology lacks a role this scenario needs.'
-          }
+          aria-describedby={scenario.available ? undefined : `scenario-reason-${scenario.id}`}
         >
           {running ? 'Restart' : 'Start'}
         </Button>
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-ink-dim">{scenario.summary}</p>
+      {!scenario.available && (
+        <p id={`scenario-reason-${scenario.id}`} className="mt-1.5 text-xs text-ink-dim">
+          Cannot run:{' '}
+          {scenario.unavailableReason ?? 'This scenario is incompatible with the active platform.'}
+        </p>
+      )}
     </li>
   );
 }

@@ -30,8 +30,10 @@ use crate::integrations::ProviderRegistry;
 use error::ApiError;
 use rate_limit::RateLimiter;
 
-/// Largest request body accepted by any endpoint.
+/// Largest request body accepted by any endpoint but the two below.
 pub const MAX_BODY_BYTES: usize = 16 * 1024;
+/// Largest body of a workspace check or import: the files themselves.
+pub const MAX_IMPORT_BYTES: usize = 8 * 1024 * 1024;
 /// Concurrent WebSocket subscribers.
 pub const MAX_STREAMS: usize = 64;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -103,6 +105,17 @@ pub fn router(state: AppState) -> Router {
         .route("/demo/playback/control", post(routes::playback_control))
         .route("/demo/topology/select", post(routes::topology_select))
         .route("/demo/recordings/load", post(routes::recording_load))
+        .route("/workspace", get(routes::workspace))
+        .route("/workspace/export", get(routes::workspace_export))
+        .route(
+            "/demo/workspace/check",
+            post(routes::workspace_check).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
+        )
+        .route(
+            "/demo/workspace/import",
+            post(routes::workspace_import).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
+        )
+        .route("/demo/workspace/reset", post(routes::workspace_reset))
         .route(
             "/demo/authorization/catalog",
             get(routes::authorization_catalog),

@@ -19,7 +19,7 @@ pub enum ConfigError {
     Seed(String),
     #[error("AEGIS_ALLOWED_ORIGINS entry `{0}` is not an origin such as http://localhost:5173")]
     Origin(String),
-    #[error("{name} `{value}` is not a boolean (use true or false)")]
+    #[error("{name} `{value}` is not a boolean (use true or false, on or off)")]
     Bool { name: &'static str, value: String },
     #[error("AEGIS_RINHA_PROBE_SECONDS `{0}` is not a positive number of seconds")]
     ProbeInterval(String),
@@ -34,6 +34,9 @@ pub struct Config {
     /// Directory of the operator's own topologies, scenarios and policies.
     /// Read once at start-up; unset means the bundled fixtures only.
     pub workspace: Option<PathBuf>,
+    /// Whether topologies, scenarios and policies can be replaced through
+    /// the API while the server runs. On unless `AEGIS_IMPORT` says off.
+    pub import_enabled: bool,
     pub integrations: IntegrationConfig,
 }
 
@@ -97,11 +100,11 @@ impl Config {
             return Err(ConfigError::Origin(bad.clone()));
         }
 
-        let boolean = |name: &'static str| -> Result<bool, ConfigError> {
+        let boolean_or = |name: &'static str, default: bool| -> Result<bool, ConfigError> {
             match get(name).as_deref() {
-                None => Ok(false),
-                Some("true" | "1" | "yes") => Ok(true),
-                Some("false" | "0" | "no") => Ok(false),
+                None => Ok(default),
+                Some("true" | "1" | "yes" | "on") => Ok(true),
+                Some("false" | "0" | "no" | "off") => Ok(false),
                 Some(other) => Err(ConfigError::Bool {
                     name,
                     value: other.to_string(),
@@ -113,7 +116,7 @@ impl Config {
             Some(base_url) => Some(CedarAgentConfig {
                 base_url,
                 token: get("AEGIS_CEDAR_AGENT_TOKEN"),
-                sync: boolean("AEGIS_CEDAR_AGENT_SYNC")?,
+                sync: boolean_or("AEGIS_CEDAR_AGENT_SYNC", false)?,
             }),
             None => None,
         };
@@ -139,6 +142,7 @@ impl Config {
             seed,
             log_filter: get("AEGIS_LOG").unwrap_or_else(|| "info".to_string()),
             workspace: get("AEGIS_WORKSPACE").map(PathBuf::from),
+            import_enabled: boolean_or("AEGIS_IMPORT", true)?,
             integrations: IntegrationConfig {
                 cedar_agent,
                 rinha,
@@ -176,6 +180,22 @@ mod tests {
         assert!(config.integrations.cedar_agent.is_none());
         assert!(config.integrations.rinha.is_none());
         assert!(config.workspace.is_none(), "no file is read by default");
+        assert!(config.import_enabled, "importing is on unless switched off");
+    }
+
+    #[test]
+    fn importing_can_be_switched_off() {
+        for off in ["off", "false", "0", "no"] {
+            assert!(!config(&[("AEGIS_IMPORT", off)]).unwrap().import_enabled);
+        }
+        assert!(config(&[("AEGIS_IMPORT", "on")]).unwrap().import_enabled);
+        assert!(matches!(
+            config(&[("AEGIS_IMPORT", "maybe")]),
+            Err(ConfigError::Bool {
+                name: "AEGIS_IMPORT",
+                ..
+            })
+        ));
     }
 
     #[test]

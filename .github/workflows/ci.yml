@@ -111,6 +111,20 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health | grep -q '"status":"ok"'
           curl --fail --silent --show-error -X POST -H 'content-type: application/json' \
             -d '{"scenarioId":"ddos-surge"}' http://127.0.0.1:8080/api/v1/demo/scenarios/start | grep -q '"playback"'
+      - name: An import larger than the proxy's ordinary limit goes through
+        run: |
+          # The files in use, saved as one bundle and imported again: a few
+          # hundred kilobytes, where every other route is held to 32.
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/workspace/export \
+            | python3 -c 'import json, sys; print(json.dumps({"files": [{"path": "aegis-workspace.json", "text": sys.stdin.read()}]}))' \
+            > import.json
+          test "$(stat -c %s import.json)" -gt 100000
+          curl --fail --silent --show-error -X POST -H 'content-type: application/json' \
+            --data-binary @import.json http://127.0.0.1:8080/api/v1/demo/workspace/import | grep -q '"origin":"imported"'
+          # The larger limit belongs to the routes that carry files only.
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST \
+            -H 'content-type: application/json' --data-binary @import.json \
+            http://127.0.0.1:8080/api/v1/demo/scenarios/start)" = 413
       - name: Logs
         if: ${{ failure() }}
         run: docker compose logs --no-color

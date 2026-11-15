@@ -20,7 +20,8 @@
     "test": "pnpm -r run test",
     "test:rust": "cargo test --workspace",
     "e2e": "pnpm --filter @aegis/web run e2e",
-    "contracts:samples": "cargo run -q -p aegis-server --bin export-contract-samples"
+    "contracts:samples": "cargo run -q -p aegis-server --bin export-contract-samples",
+    "workspace:schemas": "cargo run -q -p aegis-server --bin export-workspace-schemas"
   },
   "devDependencies": {
     "prettier": "^3.10.1"

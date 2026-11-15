@@ -1,0 +1,7 @@
+{
+  "valid": false,
+  "problem": {
+    "path": "scenarios/01-slow-door.json",
+    "message": "missing field `name` at line 1 column 21"
+  }
+}

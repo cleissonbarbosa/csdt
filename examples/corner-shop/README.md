@@ -3,10 +3,17 @@
 A complete AEGIS workspace in six services: the smallest one that uses every
 part of the format. Everything in it is fictional.
 
+`workspace.json` declares format version 1. The [JSON Schemas](../../schemas/README.md)
+provide editor completion for the files below; `check-workspace` also checks
+references, graph structure and Cedar validity.
+
 ```bash
 cargo run -p aegis-server -- check-workspace examples/corner-shop
 AEGIS_WORKSPACE=examples/corner-shop cargo run -p aegis-server
 ```
+
+Or, with the application already open: **⋯**, **Import or export files**,
+**Choose a folder**, this directory, **Apply**.
 
 | File                                 | What it shows                                                                                                                                                   |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,6 +32,12 @@ Things to try:
   end at the Rulebook. Then delete the `other-shops-are-closed-books` policy
   from `cedar/shop.cedar`, restart, and run it again: Cedar now denies by
   default, and the decision names no policy.
+- Copy the directory, delete the `other-shops-are-closed-books` policy from
+  the copy and run `aegis-server diff-workspace examples/corner-shop <copy>`.
+  No decision differs: every request the forbid stopped is denied by default
+  without it, and the report lists the six that are now denied for that other
+  reason. Delete `managers-void` instead and the diff shows who can no longer
+  void a receipt.
 - Change `principal.shop` to `principal.branch` in a policy. With the schema
   in place the server refuses to start and says which policy does not
   type-check; remove `schema.cedarschema` and the same mistake only shows as

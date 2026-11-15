@@ -42,20 +42,24 @@ const ALERT_LATENCY: usize = 3;
 
 /// An input to the simulation, recorded on the timeline with the tick at
 /// which it was issued.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Command {
+    /// Starts a scenario by its id.
     #[serde(rename_all = "camelCase")]
-    StartScenario {
-        scenario_id: String,
-    },
-    AbortScenario,
+    StartScenario { scenario_id: String },
+    /// Stops the scenario that is running.
+    // Braces on purpose: serde lets a unit variant ignore fields it does not
+    // define, and a command in a recording file must refuse them.
+    AbortScenario {},
     /// An authorization decision evaluated on demand by an operator.
+    #[schemars(skip)]
     RecordDecision {
         decision: Box<AuthorizationDecision>,
     },
     /// Events imported from a fixture-backed provider.
     #[serde(rename_all = "camelCase")]
+    #[schemars(skip)]
     ImportEvents {
         provider_id: String,
         events: Vec<ImportedEvent>,
@@ -567,7 +571,7 @@ fn start_scenario(ctx: &StepContext, state: &mut SimState, scenario_id: &str, em
 fn apply_command(ctx: &StepContext, state: &mut SimState, command: &Command, em: &mut Emitter) {
     match command {
         Command::StartScenario { scenario_id } => start_scenario(ctx, state, scenario_id, em),
-        Command::AbortScenario => close_scenario(ctx, state, em, "Stopped by the operator."),
+        Command::AbortScenario {} => close_scenario(ctx, state, em, "Stopped by the operator."),
         Command::RecordDecision { decision } => {
             let denied = decision.decision == Decision::Deny;
             let node_ids = decision

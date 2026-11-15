@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::Severity;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum IncidentStatus {
     Active,
@@ -28,7 +28,7 @@ pub struct Incident {
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ScenarioCategory {
     Availability,
@@ -61,6 +61,9 @@ pub struct Scenario {
     pub target_node_ids: Vec<String>,
     /// False when the active topology lacks a role the scenario needs.
     pub available: bool,
+    /// Specific resolution failure on the active topology; absent when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable_reason: Option<String>,
 }
 
 /// A prerecorded fictional incident that can be loaded onto the timeline.

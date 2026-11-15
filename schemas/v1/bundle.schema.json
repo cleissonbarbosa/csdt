@@ -1,0 +1,49 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/bundle.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bundle",
+  "description": "A whole workspace as one JSON document: what the interface downloads,\nand one of the things an import accepts.",
+  "type": "object",
+  "properties": {
+    "formatVersion": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SourceFile"
+      },
+      "maxItems": 256
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "files"
+  ],
+  "definitions": {
+    "SourceFile": {
+      "description": "One file of a workspace held in memory: what the interface uploads.",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Where the file sits in the workspace, such as\n`scenarios/01-fire.json`. A bare file name is enough: what kind of\nfile it is is then told from its contents.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "text"
+      ]
+    }
+  }
+}

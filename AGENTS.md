@@ -31,6 +31,7 @@ The server also runs on an operator's own files (`docs/WORKSPACE.md`):
 ```bash
 cargo run -p aegis-server -- export-workspace <dir>   # the bundled files, to edit
 cargo run -p aegis-server -- check-workspace <dir>    # validate one; try examples/corner-shop
+cargo run -p aegis-server -- diff-workspace <base> <candidate>   # what Cedar decides differently; @bundled is the bundled set
 AEGIS_WORKSPACE=<dir> cargo run -p aegis-server
 ```
 
@@ -54,7 +55,7 @@ pnpm e2e              # Playwright against the real stack
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -68,7 +69,8 @@ End-to-end notes:
   reuses a running dev instance. The first run compiles the server in release
   mode. `pnpm --filter @aegis/web e2e:install` installs the browser.
 - Every test shares one simulation, so the suite runs serially with one worker
-  and each test begins with `openApp()` from `e2e/support.ts`, which resets it.
+  and each test begins with `openApp()` from `e2e/support.ts`, which resets it
+  (the imported files as well as the timeline).
 - Projects: `chromium` (software WebGL 2, what CI has), `no-3d` (every GPU API
   disabled, table-view fallback) and `chrome-webgpu`, which only exists with
   `AEGIS_E2E_GPU=1` and needs a locally installed Chrome on a real GPU.
@@ -117,12 +119,20 @@ domain`.
 - `authorization`: the embedded `cedar-policy` decision point.
 - `integrations`: opt-in adapters and fixture parsers. Every outbound target
   goes through `guard.rs`.
-- `workspace`: reads the directory named by `AEGIS_WORKSPACE` once, before
-  the server listens, and overlays what it holds on the bundled fixtures. The
-  only file I/O in the server; nothing in it is reachable from the API.
+- `workspace`: sorts files into the parts of a workspace, checks each and
+  lays them over a set of sources. `load` reads the directory (or bundle
+  file) named by `AEGIS_WORKSPACE` once, before the server listens, and is
+  the only file I/O in the server. `from_files` does the same for files
+  already in memory and touches nothing; the import route calls it, so a file
+  is accepted or refused identically whichever way it came.
 - `application`: `Sources` is what everything is built from (the bundled
   fixtures, or those with parts replaced by a workspace). `Assets` is
-  everything immutable, built from them once at start-up.
+  everything immutable, built from them once at start-up. `diff` compares two
+  built `Assets` (policies, catalogued requests, scenario flows and the
+  access matrix); it evaluates with each side's Cedar engine and decides
+  nothing itself. `Loaded` pairs a set of sources with the `Assets` built
+  from it; `SimulationService` keeps the one it started with (what a reset
+  returns to and an import is laid over) and the one in use.
   `SimulationService` owns the single mutable timeline behind one mutex, is
   the only place that advances it (a 50 ms scheduler), and fans messages out
   through a bounded broadcast channel, each serialised once.
@@ -146,6 +156,14 @@ Things that are easy to break:
   `fixtures/cedar/catalog.json`. A file cannot state an outcome either:
   `spec.rs` refuses the event kinds, and `recordings.rs` the commands, that
   would put a decision or an imported event on the timeline.
+- **What the server runs on can be replaced.** An import swaps `Loaded` and
+  the timeline together inside `SimulationService::replace`, under the
+  runtime lock. Nothing may hold on to `Assets` across a request: take
+  `service.assets()` at the moment of use, and anything prepared outside the
+  lock (a recording's timeline) checks that the assets are still the same
+  before it is put in place. The cedar-agent adapter's sync store is updated
+  with every swap. The browser never decides what a file is: classification
+  is `workspace::from_files`, on the server.
 - **Fixtures are compiled in.** Everything under `fixtures/` is embedded with
   `include_str!`, so editing one means rebuilding the server and usually
   regenerating the contract samples.
@@ -155,7 +173,13 @@ Things that are easy to break:
   and `examples/corner-shop`, which a test loads. A new scenario
   effect is three things: a variant in `incidents/spec.rs` with its range
   check in `validate`, its resolution in `incidents/mod.rs`, and a row in the
-  document. Scenario files are listed in file-name order.
+  document. Scenario files are listed in file-name order. The JSON Schemas
+  in `schemas/v1/` are generated from the same Rust types: after changing a
+  type or a `#[schemars(...)]` bound run `pnpm workspace:schemas` and commit
+  the result (a Rust test fails on a stale schema, and a contract test
+  validates the fixtures and the example against them). A change that an
+  existing file would not survive needs a new `FORMAT_VERSION` in
+  `workspace.rs`, not an edit to version 1.
 - **Floats are parsed exactly.** `serde_json` is built with `float_roundtrip`
   so a topology written out and read back is the same bits; a test compares
   the exported stress topology with the generated one.
@@ -329,7 +353,8 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   A topology from a workspace must be `synthetic`: its figures are computed,
   whatever platform it describes.
 - **Simulation only** (`docs/SECURITY.md`). `simulation` and `incidents`
-  perform no I/O; files are read by `workspace` alone, at start-up. No real attacks, scans, cloud SDKs or credentials. No
+  perform no I/O; files are read by `workspace::load` alone, at start-up, and
+  the import route is handed file contents, never a path to open. No real attacks, scans, cloud SDKs or credentials. No
   outbound connection by default: integrations need server configuration and
   an explicit click, and accept loopback targets only unless allow-listed.
 - **Integrations** adapt only public repositories owned by `cleissonbarbosa`,

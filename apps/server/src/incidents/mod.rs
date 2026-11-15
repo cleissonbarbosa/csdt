@@ -395,6 +395,7 @@ fn describe(def: &ScenarioDef, topo: &SimTopology, targets: &[usize], available:
             .map(|n| topo.node_id(*n).to_string())
             .collect(),
         available,
+        unavailable_reason: None,
     }
 }
 
@@ -419,8 +420,10 @@ pub fn resolve(
         Ok(resolved) => resolved,
         Err(reason) => {
             tracing::warn!(scenario = %def.id, topology = %topo.spec.id, %reason, "scenario unavailable");
+            let mut info = describe(def, topo, &[], false);
+            info.unavailable_reason = Some(reason);
             ResolvedScenario {
-                info: describe(def, topo, &[], false),
+                info,
                 duration_ticks: 0,
                 root_cause: None,
                 targets: Vec::new(),

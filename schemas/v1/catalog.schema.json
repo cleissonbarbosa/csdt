@@ -1,0 +1,209 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/catalog.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuthzCatalog",
+  "description": "The synthetic authorization domain: who exists, what they can attempt and\nwhich request shapes make up simulated traffic.",
+  "type": "object",
+  "properties": {
+    "tenants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CatalogTenant"
+      }
+    },
+    "principals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CatalogPrincipal"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CatalogAction"
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CatalogResource"
+      }
+    },
+    "contextKeys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CatalogContextKey"
+      }
+    },
+    "trafficMix": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RequestTemplate"
+      }
+    },
+    "scenarioRequests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RequestTemplate"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "tenants",
+    "principals",
+    "actions",
+    "resources",
+    "contextKeys",
+    "trafficMix",
+    "scenarioRequests"
+  ],
+  "definitions": {
+    "CatalogTenant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "CatalogPrincipal": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tenant": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "label",
+        "tenant",
+        "roles",
+        "note"
+      ]
+    },
+    "CatalogAction": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "resourceType": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "label",
+        "resourceType"
+      ]
+    },
+    "CatalogResource": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tenant": {
+          "type": "string"
+        },
+        "resourceType": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "label",
+        "tenant",
+        "resourceType"
+      ]
+    },
+    "CatalogContextKey": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "description"
+      ]
+    },
+    "RequestTemplate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0,
+          "default": 0.0
+        },
+        "principal": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "principal",
+        "action",
+        "resource"
+      ]
+    }
+  }
+}

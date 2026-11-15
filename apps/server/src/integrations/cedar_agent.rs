@@ -106,7 +106,7 @@ pub struct CedarAgentProvider {
     client: reqwest::Client,
     state: Mutex<AgentState>,
     /// What a sync uploads. `None` means the bundled fixtures.
-    store: Option<(Vec<PolicyDocument>, serde_json::Value)>,
+    store: Mutex<Option<(Vec<PolicyDocument>, serde_json::Value)>>,
 }
 
 impl CedarAgentProvider {
@@ -124,20 +124,25 @@ impl CedarAgentProvider {
             target,
             client,
             state: Mutex::new(AgentState::default()),
-            store: None,
+            store: Mutex::new(None),
         }
     }
 
     /// Makes a sync upload these policies and entities (the ones the
     /// embedded engine was built from) instead of the bundled fixtures.
     #[must_use]
-    pub fn with_store(
-        mut self,
-        policies: Vec<PolicyDocument>,
-        entities: serde_json::Value,
-    ) -> Self {
-        self.store = Some((policies, entities));
+    pub fn with_store(self, policies: Vec<PolicyDocument>, entities: serde_json::Value) -> Self {
+        self.set_store(policies, entities);
         self
+    }
+
+    /// Replaces what a later sync uploads, after an import changed what the
+    /// embedded engine holds.
+    pub fn set_store(&self, policies: Vec<PolicyDocument>, entities: serde_json::Value) {
+        *self
+            .store
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((policies, entities));
     }
 
     fn state(&self) -> std::sync::MutexGuard<'_, AgentState> {
@@ -209,8 +214,13 @@ impl CedarAgentProvider {
         }
 
         if config.sync {
-            let (documents, entities) = match &self.store {
-                Some((documents, entities)) => (documents.clone(), entities.clone()),
+            let store = self
+                .store
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            let (documents, entities) = match store {
+                Some(store) => store,
                 None => (
                     bundled_policy_documents()
                         .map_err(|e| ProviderError::Protocol(e.to_string()))?,

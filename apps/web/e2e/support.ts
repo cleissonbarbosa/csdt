@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** Settings that make the scene deterministic: no camera drift, no easing. */
 const SETTINGS = { autoRotate: false, motion: 'reduced', quality: 'low' };
@@ -11,6 +13,8 @@ export async function resetSimulation(page: Page): Promise<void> {
     const response = await page.request.post(`${API}${path}`, { data });
     expect(response.ok(), `${path} → ${response.status()}`).toBeTruthy();
   };
+  // A test may have imported another platform; the bundled one comes first.
+  await post('/demo/workspace/reset', {});
   await post('/demo/topology/select', { topologyId: 'helios-commerce' });
   await post('/demo/playback/control', { action: 'setSpeed', speed: 1 });
   await post('/demo/playback/control', { action: 'play' });
@@ -48,6 +52,16 @@ export async function openExplorer(page: Page): Promise<void> {
 export async function openOverview(page: Page): Promise<void> {
   await fromMenu(page, 'overview');
   await expect(page.getByTestId('overview')).toBeVisible();
+}
+
+/** The files of the example workspace, as someone would pick them one by one. */
+export function exampleWorkspace(): string[] {
+  const root = join(process.cwd(), '../../examples/corner-shop');
+  return ['', 'topologies', 'scenarios', 'recordings', 'cedar'].flatMap((part) =>
+    readdirSync(join(root, part))
+      .filter((name) => /\.(json|cedar|cedarschema)$/.test(name))
+      .map((name) => join(root, part, name)),
+  );
 }
 
 /** How many pieces the overview of the bundled topology has: one per kind of service. */

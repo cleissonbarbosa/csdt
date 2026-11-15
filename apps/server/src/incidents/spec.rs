@@ -34,8 +34,9 @@ pub const MAX_RPS: f64 = 1.0e9;
 ///
 /// Written as a string: `role:primaryGateway`, `node:use-gateway` or
 /// `gatewayOf:outageRegion`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(try_from = "String", into = "String")]
+#[schemars(extend("pattern" = "^(role|node|gatewayOf):[\\s\\S]+$"))]
 pub enum NodeSel {
     /// The node a topology role points at. Keeps a scenario independent of
     /// any one topology.
@@ -48,8 +49,9 @@ pub enum NodeSel {
 
 /// Picks one or more nodes: any [`NodeSel`], or `region:outageRegion` for
 /// every node of a region named by a role or by its id.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(try_from = "String", into = "String")]
+#[schemars(extend("pattern" = "^(role|node|gatewayOf|region):[\\s\\S]+$"))]
 pub enum NodeSet {
     One(NodeSel),
     Region(String),
@@ -126,14 +128,14 @@ impl From<NodeSel> for NodeSet {
 }
 
 /// One existing connection, by its two ends.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EdgeRef {
     pub from: NodeSel,
     pub to: NodeSel,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum EdgeSet {
     /// One connection.
@@ -142,41 +144,74 @@ pub enum EdgeSet {
     InboundSync(NodeSel),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Rate {
     /// Requests per second.
-    Rps(f64),
+    Rps(#[schemars(range(min = 0, max = MAX_RPS))] f64),
     /// A multiple of a node's capacity on the active topology, so the same
     /// scenario overloads a small platform and a large one alike.
-    OfCapacity { node: NodeSel, factor: f64 },
+    OfCapacity {
+        node: NodeSel,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
 }
 
 /// What a phase holds the model to. Anything a phase does not list ramps
 /// back to nominal.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Effect {
     /// Multiplies the demand an external client generates.
-    Demand { node: NodeSel, factor: f64 },
+    Demand {
+        node: NodeSel,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
     /// Multiplies capacity.
-    Capacity { nodes: NodeSet, factor: f64 },
+    Capacity {
+        nodes: NodeSet,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
     /// Multiplies a node's own latency.
-    Latency { nodes: NodeSet, factor: f64 },
+    Latency {
+        nodes: NodeSet,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
     /// Adds a failure rate (0 to 1) at the nodes.
-    ErrorInject { nodes: NodeSet, rate: f64 },
+    ErrorInject {
+        nodes: NodeSet,
+        #[schemars(range(min = 0, max = 1))]
+        rate: f64,
+    },
     /// Makes the nodes unreachable.
     Down { nodes: NodeSet },
     /// Multiplies the calls made on the connections.
-    EdgeWeight { edges: EdgeSet, factor: f64 },
+    EdgeWeight {
+        edges: EdgeSet,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
     /// Multiplies the network latency of the connections.
-    EdgeLatency { edges: EdgeSet, factor: f64 },
+    EdgeLatency {
+        edges: EdgeSet,
+        #[schemars(range(min = 0, max = MAX_FACTOR))]
+        factor: f64,
+    },
     /// Adds a failure rate (0 to 1) on the connections.
-    EdgeError { edges: EdgeSet, rate: f64 },
+    EdgeError {
+        edges: EdgeSet,
+        #[schemars(range(min = 0, max = 1))]
+        rate: f64,
+    },
     /// Moves a fraction of one connection's traffic onto another.
     RouteShift {
         edge: EdgeRef,
         onto: EdgeRef,
+        #[schemars(range(min = 0, max = 1))]
         fraction: f64,
     },
     /// Sets the rate of an injected flow.
@@ -185,42 +220,50 @@ pub enum Effect {
     FlowReject {
         flow: String,
         at: NodeSel,
+        #[schemars(range(min = 0, max = 1))]
         fraction: f64,
         reason: RejectReason,
     },
 }
 
 /// An event a phase announces, `delayMs` after the phase begins.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScriptedEvent {
     pub delay_ms: u64,
     pub severity: Severity,
+    #[schemars(extend("enum" = ["alert", "auth-failure", "mitigation", "reroute"]))]
     pub kind: EventKind,
     pub title: String,
     #[serde(default)]
     pub message: String,
     #[serde(default)]
+    #[schemars(length(max = MAX_LIST))]
     pub nodes: Vec<NodeSel>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PhaseDef {
     pub name: String,
     pub at_ms: u64,
     /// How long the effects take to ease in from what held before.
     pub ramp_ms: u64,
+    #[schemars(extend("enum" = ["active", "mitigating", "recovering"]))]
     pub status: IncidentStatus,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
+    #[schemars(length(max = MAX_LIST))]
     pub effects: Vec<Effect>,
     #[serde(default)]
+    #[schemars(length(max = MAX_LIST))]
     pub events: Vec<ScriptedEvent>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum HopVia {
     /// The single connection between the two nodes.
@@ -236,7 +279,7 @@ impl HopVia {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Hop {
     pub from: NodeSel,
@@ -247,7 +290,7 @@ pub struct Hop {
 
 /// Ties a flow to a request shape Cedar evaluated at start-up, and names the
 /// authorizer that enforces the answer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FlowAuthz {
     /// Id of an entry in the authorization catalogue's `scenarioRequests`.
@@ -256,14 +299,16 @@ pub struct FlowAuthz {
 }
 
 /// A stream of synthetic requests injected along explicit hops.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FlowDef {
+    #[schemars(length(min = 1, max = MAX_ID_LEN), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub id: String,
     pub label: String,
     /// Drawn as hostile traffic.
     #[serde(default)]
     pub suspicious: bool,
+    #[schemars(length(min = 1, max = MAX_LIST))]
     pub hops: Vec<Hop>,
     /// When set, traffic surviving the last hop joins that node's ordinary
     /// fan-out instead of terminating there.
@@ -273,21 +318,26 @@ pub struct FlowDef {
     pub authz: Option<FlowAuthz>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScenarioDef {
+    #[schemars(length(min = 1, max = MAX_ID_LEN), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub id: String,
     pub name: String,
     pub summary: String,
     pub category: ScenarioCategory,
     pub severity: Severity,
+    #[schemars(range(min = TICK_MS, max = MAX_DURATION_MS))]
     pub duration_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_cause: Option<NodeSel>,
     #[serde(default)]
+    #[schemars(length(max = MAX_LIST))]
     pub targets: Vec<NodeSet>,
     #[serde(default)]
+    #[schemars(length(max = MAX_FLOWS))]
     pub flows: Vec<FlowDef>,
+    #[schemars(length(min = 1, max = MAX_PHASES))]
     pub phases: Vec<PhaseDef>,
 }
 

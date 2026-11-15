@@ -566,7 +566,7 @@ fn starting_a_scenario_supersedes_the_running_one_and_abort_recovers() {
     assert_eq!(t.incidents()[0].status, IncidentStatus::Resolved);
     assert_eq!(snapshot(&t).global.active_incidents, 1);
 
-    t.issue(Command::AbortScenario);
+    t.issue(Command::AbortScenario {});
     let events = run(&mut t, secs(30));
     assert!(events
         .iter()

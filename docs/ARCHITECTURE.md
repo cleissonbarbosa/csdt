@@ -163,12 +163,27 @@ one was given), evaluates every request shape, compiles each topology,
 resolves each scenario against it and checks that every recording refers to a
 topology and to scenarios that exist.
 
-The directory is read once, before the listener is bound. It is not part of
-the API, and the bundled set is itself in that layout: a test exports it,
-loads it back and requires the same value and the same simulation digest.
+A directory is read once, before the listener is bound. The same parts and
+checks are reached through the API by `workspace::from_files`, which takes
+files already in memory and touches nothing: the import route hands it what
+the interface uploaded, lays it over the sources the server started with and
+builds a new `Assets`. `SimulationService` then swaps what it runs on and the
+timeline together, under the one lock, and tells subscribers with a
+`timeline` message whose reason is `workspace`; nothing is written to disk
+and a reset swaps the start-up set back. The bundled set is itself in the
+workspace layout: a test exports it, loads it back and requires the same
+value and the same simulation digest.
 JSON floats are parsed exactly (`serde_json`'s `float_roundtrip`), so a
 topology written out and read back is the same bits. The format is documented
-in [WORKSPACE.md](WORKSPACE.md).
+in [WORKSPACE.md](WORKSPACE.md). `application::diff` compares two built
+`Assets` for the `diff-workspace` command: policies by meaning, every
+catalogued request, the scenario flows tied to them and the matrix of
+requests the catalogue allows, each evaluated by its own side's engine. An
+optional `workspace.json` declares the
+file-format version; its absence means version 1. Editor schemas in
+`schemas/v1/` are generated from the Rust deserialization types and checked
+for drift in tests. Unavailable scenarios carry their resolution failure
+through the API as `unavailableReason`, which the incident console displays.
 
 ### Determinism and time travel
 
@@ -218,6 +233,8 @@ are mirrored in `packages/contracts`.
 | `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                     |
 | `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                       |
 | `POST /demo/topology/select` · `/demo/recordings/load` | switch context                               |
+| `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
+| `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
 | `WS /stream`                                           | telemetry and events                         |
 
 ### Stream protocol

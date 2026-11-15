@@ -34,7 +34,7 @@ function initialLayout(): LayoutMode {
   return LAYOUT_MODES.find((mode) => mode === asked) ?? 'layers';
 }
 export type ViewMode = 'scene' | 'table';
-export type PanelId = 'authorization' | 'integrations' | 'settings' | 'help';
+export type PanelId = 'authorization' | 'integrations' | 'settings' | 'help' | 'workspace';
 export type LeftTab = 'explorer' | 'incidents';
 
 export interface Filters {

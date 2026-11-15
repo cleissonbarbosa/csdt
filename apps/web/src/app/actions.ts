@@ -7,6 +7,9 @@ import type {
   ControlAction,
   ControlResponse,
   EvaluateRequest,
+  WorkspaceFile,
+  WorkspaceResponse,
+  WorkspaceStatus,
 } from '@aegis/contracts';
 
 import { api, ApiError } from '@/providers/api';
@@ -14,7 +17,7 @@ import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
-import { queryClient, queryKeys } from './queryClient';
+import { invalidateWorkspaceQueries, queryClient, queryKeys } from './queryClient';
 
 function describe(error: unknown): string {
   return error instanceof ApiError ? error.message : 'Something went wrong.';
@@ -33,6 +36,21 @@ function adopt(response: ControlResponse | null): boolean {
   if (!response) return false;
   useTelemetry.getState().setPlayback(response.playback);
   return true;
+}
+
+/**
+ * The platform's files were replaced. The stream says so too, but the answer
+ * to the request is here first.
+ */
+function adoptWorkspace(response: WorkspaceResponse): WorkspaceStatus {
+  useTelemetry.getState().setPlayback(response.playback);
+  invalidateWorkspaceQueries();
+  queryClient.setQueryData(queryKeys.workspace, response.workspace);
+  return response.workspace;
+}
+
+function asApiError(error: unknown): ApiError {
+  return error instanceof ApiError ? error : new ApiError(0, 'unknown', describe(error));
 }
 
 export const actions = {
@@ -84,6 +102,31 @@ export const actions = {
     else void queryClient.invalidateQueries({ queryKey: queryKeys.providers });
     void queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
     return statuses !== null;
+  },
+
+  /**
+   * Replaces the platform, its scenarios or its policies with these files.
+   * What is wrong with them is returned, for the place that asked to show.
+   */
+  importWorkspace: async (files: WorkspaceFile[]): Promise<WorkspaceStatus | ApiError> => {
+    try {
+      const workspace = adoptWorkspace(await api.importWorkspace(files));
+      useNotices.getState().push('info', 'Now showing the imported files.');
+      return workspace;
+    } catch (error) {
+      return asApiError(error);
+    }
+  },
+
+  /** Back to the files the server was started with. */
+  resetWorkspace: async (): Promise<WorkspaceStatus | ApiError> => {
+    try {
+      const workspace = adoptWorkspace(await api.resetWorkspace());
+      useNotices.getState().push('info', 'Back to the files the server started with.');
+      return workspace;
+    } catch (error) {
+      return asApiError(error);
+    }
   },
 
   evaluate: async (request: EvaluateRequest): Promise<AuthorizationDecision | ApiError> => {

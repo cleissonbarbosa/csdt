@@ -20,12 +20,18 @@ path = "src/main.rs"
 name = "export-contract-samples"
 path = "src/bin/export_contract_samples.rs"
 
+[[bin]]
+name = "export-workspace-schemas"
+path = "src/bin/export_workspace_schemas.rs"
+
 [dependencies]
 async-trait = "0.1"
 axum = { version = "0.8", features = ["ws", "macros"] }
 cedar-policy = "4.14"
 futures-util = "0.3"
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
+# Pin the generator so published schema changes are deliberate.
+schemars = "=1.2.0"
 serde = { version = "1", features = ["derive"] }
 # Exact float parsing: a topology written out and read back is the same bits,
 # which the determinism of a recording depends on.

@@ -2,16 +2,23 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::process::ExitCode;
 
+use aegis_server::application::diff::compare;
 use aegis_server::application::Assets;
 use aegis_server::config::Config;
 use aegis_server::{api, build_state, workspace};
 use tracing_subscriber::EnvFilter;
+
+/// Names the fixtures compiled into the binary where a workspace is expected.
+const BUNDLED: &str = "@bundled";
 
 const USAGE: &str = "\
 usage: aegis-server                          run the server
        aegis-server export-workspace <dir>   write the bundled topologies, scenarios,
                                              recordings and Cedar files into <dir>
        aegis-server check-workspace <dir>    validate a workspace without starting
+       aegis-server diff-workspace <base> <candidate> [--json] [--exit-code]
+                                             what Cedar decides differently under the
+                                             candidate; @bundled names the bundled set
        aegis-server healthcheck              probe the running server
        aegis-server --version";
 
@@ -178,6 +185,68 @@ fn check_workspace(dir: &Path) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// One side of a comparison: a workspace directory, or `@bundled`.
+fn load_side(side: &str) -> Result<Assets, String> {
+    let sources = if side == BUNDLED {
+        aegis_server::application::Sources::bundled().map_err(|e| e.to_string())?
+    } else {
+        workspace::load(Path::new(side))
+            .map_err(|e| e.to_string())?
+            .sources
+    };
+    Assets::build(sources).map_err(|e| format!("{side}: {e}"))
+}
+
+/// `aegis-server diff-workspace <base> <candidate>`: builds both sides the
+/// way start-up would and reports what Cedar decides differently. Exit
+/// status follows `diff`: 0, or 1 with `--exit-code` when a decision
+/// differs, and 2 when a side cannot be built.
+fn diff_workspace(args: &[&str]) -> ExitCode {
+    let (flags, sides): (Vec<&str>, Vec<&str>) = args.iter().partition(|arg| arg.starts_with("--"));
+    let unknown = flags
+        .iter()
+        .find(|flag| !["--json", "--exit-code"].contains(flag));
+    let (Some(base), Some(candidate), None, 2) =
+        (sides.first(), sides.get(1), unknown, sides.len())
+    else {
+        eprintln!("aegis-server diff-workspace: expected <base> <candidate> [--json] [--exit-code]\n{USAGE}");
+        return ExitCode::from(2);
+    };
+    let compared = load_side(base).and_then(|before| {
+        let after = load_side(candidate)?;
+        compare(&before, &after).map_err(|e| e.to_string())
+    });
+    let diff = match compared {
+        Ok(diff) => diff,
+        Err(error) => {
+            eprintln!("aegis-server diff-workspace: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if flags.contains(&"--json") {
+        let report = serde_json::json!({
+            "base": base,
+            "candidate": candidate,
+            "decisionsChanged": diff.decisions_changed(),
+            "diff": diff,
+        });
+        match serde_json::to_string_pretty(&report) {
+            Ok(text) => println!("{text}"),
+            Err(error) => {
+                eprintln!("aegis-server diff-workspace: {error}");
+                return ExitCode::from(2);
+            }
+        }
+    } else {
+        print!("{}", diff.render(base, candidate));
+    }
+    if flags.contains(&"--exit-code") && diff.decisions_changed() {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -194,6 +263,7 @@ async fn main() -> ExitCode {
         }
         ["export-workspace", dir] => return export_workspace(Path::new(dir)),
         ["check-workspace", dir] => return check_workspace(Path::new(dir)),
+        ["diff-workspace", rest @ ..] => return diff_workspace(rest),
         [] | ["healthcheck"] => {}
         _ => {
             eprintln!("aegis-server: unexpected arguments\n{USAGE}");
@@ -226,7 +296,8 @@ async fn main() -> ExitCode {
     };
     let scheduler = state.service.spawn();
 
-    let world = state.service.assets().default_world();
+    let assets = state.service.assets();
+    let world = assets.default_world();
     tracing::info!(
         %bind,
         topology = %world.topo.spec.id,

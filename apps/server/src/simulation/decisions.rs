@@ -14,11 +14,12 @@ use crate::domain::{
     PolicyDecisionPoint,
 };
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestTemplate {
     pub id: String,
     #[serde(default)]
+    #[schemars(range(min = 0))]
     pub weight: f64,
     pub principal: String,
     pub action: String,

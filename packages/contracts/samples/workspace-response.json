@@ -1,0 +1,43 @@
+{
+  "workspace": {
+    "origin": "imported",
+    "importEnabled": true,
+    "formatVersion": 1,
+    "replaced": [
+      "topologies",
+      "scenarios"
+    ],
+    "ignored": [],
+    "topologies": [
+      {
+        "id": "front-desk",
+        "name": "Front Desk",
+        "description": "Fictional two-service platform used for the contract samples.",
+        "nodeCount": 2,
+        "edgeCount": 1,
+        "regionCount": 1,
+        "dataSource": "synthetic"
+      }
+    ],
+    "defaultTopologyId": "front-desk",
+    "scenarioIds": [
+      "slow-door"
+    ],
+    "recordingIds": [],
+    "policyCount": 9,
+    "baselineDenyFraction": 0.07,
+    "unavailable": []
+  },
+  "playback": {
+    "status": "playing",
+    "mode": "live",
+    "speed": 1.0,
+    "tick": 0,
+    "virtualTimeMs": 0,
+    "headTick": 0,
+    "headTimeMs": 0,
+    "windowStartMs": 0,
+    "tickMs": 200,
+    "recordingId": null
+  }
+}

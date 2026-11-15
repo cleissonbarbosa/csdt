@@ -1,0 +1,19 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/workspace.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Manifest",
+  "description": "Optional `workspace.json`. Missing manifests mean version 1 for compatibility.",
+  "type": "object",
+  "properties": {
+    "formatVersion": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1,
+      "maximum": 1
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "formatVersion"
+  ]
+}

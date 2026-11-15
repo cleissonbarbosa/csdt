@@ -4,15 +4,19 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, ResetScope};
+use std::sync::Arc;
+
+use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
 use crate::authorization::{
     CatalogAction, CatalogContextKey, CatalogPrincipal, CatalogResource, CatalogTenant,
 };
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, EngineInfo, EngineKind,
     Incident, IntegrationStatus, MetricsReport, PlaybackState, PolicyDecisionPoint, PolicyInfo,
-    RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary, SCHEMA_VERSION,
+    RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary, WorkspaceCheck,
+    WorkspaceOrigin, WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
 };
+use crate::workspace::{bundle_of, from_files, Bundle, SourceFile};
 
 use super::error::ApiError;
 use super::AppState;
@@ -329,6 +333,164 @@ pub async fn recording_load(
             )
         })??;
     Ok(Json(ControlResponse { playback }))
+}
+
+// -- workspace --------------------------------------------------------------
+
+pub async fn workspace(State(state): State<AppState>) -> Json<WorkspaceStatus> {
+    Json(state.service.loaded().status(state.config.import_enabled))
+}
+
+/// The files in use as one bundle, to save, edit and import again.
+pub async fn workspace_export(State(state): State<AppState>) -> ApiResult<Bundle> {
+    bundle_of(&state.service.loaded().sources)
+        .map(Json)
+        .map_err(|_| internal("the files in use could not be written out"))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportBody {
+    files: Vec<SourceFile>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceResponse {
+    workspace: WorkspaceStatus,
+    playback: PlaybackState,
+}
+
+fn internal(message: &'static str) -> ApiError {
+    ApiError::new(
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        "internal",
+        message,
+    )
+}
+
+fn import_allowed(state: &AppState) -> Result<(), ApiError> {
+    if state.config.import_enabled {
+        Ok(())
+    } else {
+        Err(ApiError::new(
+            axum::http::StatusCode::FORBIDDEN,
+            "import_disabled",
+            "importing is switched off on this server (AEGIS_IMPORT)",
+        ))
+    }
+}
+
+/// Why uploaded files were not turned into something to run on.
+enum ImportFailure {
+    /// The files are not a valid workspace; the problem is theirs.
+    Invalid(WorkspaceProblem),
+    Api(ApiError),
+}
+
+impl From<ImportFailure> for ApiError {
+    fn from(failure: ImportFailure) -> Self {
+        match failure {
+            ImportFailure::Api(error) => error,
+            ImportFailure::Invalid(problem) => Self::new(
+                axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_workspace",
+                match problem.path {
+                    Some(path) => format!("{path}: {}", problem.message),
+                    None => problem.message,
+                },
+            ),
+        }
+    }
+}
+
+/// Sorts, parses and compiles uploaded files over what the server started
+/// with, exactly as start-up does with a directory. Nothing is applied.
+async fn build_import(state: &AppState, files: Vec<SourceFile>) -> Result<Loaded, ImportFailure> {
+    if files.is_empty() {
+        return Err(ImportFailure::Api(ApiError::bad_request(
+            "no files were sent",
+        )));
+    }
+    let base = Arc::clone(&state.service.initial().sources);
+    // Parsing policies and compiling topologies is CPU work; keep it off the
+    // async workers.
+    tokio::task::spawn_blocking(move || {
+        let read = from_files(files, base.as_ref().clone()).map_err(|error| WorkspaceProblem {
+            // A problem with the import as a whole is in no one file.
+            path: (error.path != std::path::Path::new("import"))
+                .then(|| error.path.display().to_string()),
+            message: error.message,
+        })?;
+        read.build(WorkspaceOrigin::Imported)
+            .map_err(|error| WorkspaceProblem {
+                path: None,
+                message: error.to_string(),
+            })
+    })
+    .await
+    .map_err(|_| ImportFailure::Api(internal("the files could not be checked")))?
+    .map_err(ImportFailure::Invalid)
+}
+
+/// Says what applying the files would give, or what is wrong with them.
+pub async fn workspace_check(
+    State(state): State<AppState>,
+    body: Result<Json<ImportBody>, JsonRejection>,
+) -> ApiResult<WorkspaceCheck> {
+    import_allowed(&state)?;
+    let Json(body) = body?;
+    match build_import(&state, body.files).await {
+        Ok(loaded) => Ok(Json(WorkspaceCheck {
+            valid: true,
+            workspace: Some(loaded.status(true)),
+            problem: None,
+        })),
+        Err(ImportFailure::Invalid(problem)) => Ok(Json(WorkspaceCheck {
+            valid: false,
+            workspace: None,
+            problem: Some(problem),
+        })),
+        Err(ImportFailure::Api(error)) => Err(error),
+    }
+}
+
+fn apply(state: &AppState, loaded: Loaded) -> Json<WorkspaceResponse> {
+    // A later sync to a connected agent uploads what the engine now holds.
+    state.providers.cedar_agent().set_store(
+        loaded.assets.cedar.documents(),
+        loaded.assets.cedar.entities_json().clone(),
+    );
+    let workspace = loaded.status(state.config.import_enabled);
+    let playback = state.service.replace(loaded);
+    Json(WorkspaceResponse {
+        workspace,
+        playback,
+    })
+}
+
+/// Replaces the topologies, scenarios and policies in use with the uploaded
+/// files. They are held in memory only: a restart returns to what the server
+/// was started with.
+pub async fn workspace_import(
+    State(state): State<AppState>,
+    body: Result<Json<ImportBody>, JsonRejection>,
+) -> ApiResult<WorkspaceResponse> {
+    import_allowed(&state)?;
+    let Json(body) = body?;
+    let loaded = build_import(&state, body.files).await?;
+    tracing::info!(
+        replaced = ?loaded.replaced,
+        topologies = loaded.assets.worlds.len(),
+        "workspace imported"
+    );
+    Ok(apply(&state, loaded))
+}
+
+/// Returns to what the server was started with.
+pub async fn workspace_reset(State(state): State<AppState>) -> ApiResult<WorkspaceResponse> {
+    import_allowed(&state)?;
+    Ok(apply(&state, state.service.initial().clone()))
 }
 
 // -- authorization ----------------------------------------------------------

@@ -1,0 +1,33 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/policies.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Array_of_PolicyDocument",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/PolicyDocument"
+  },
+  "maxItems": 512,
+  "definitions": {
+    "PolicyDocument": {
+      "description": "A policy as stored in `fixtures/cedar/policies.json`. `id` and `content`\nmatch cedar-agent's policy schema; `description` is AEGIS metadata.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "content"
+      ]
+    }
+  }
+}

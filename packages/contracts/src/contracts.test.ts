@@ -23,6 +23,10 @@ import {
   StreamMessageSchema,
   TopologiesResponseSchema,
   TopologySchema,
+  WorkspaceBundleSchema,
+  WorkspaceCheckSchema,
+  WorkspaceResponseSchema,
+  WorkspaceStatusSchema,
 } from './index';
 
 const SAMPLES = join(dirname(fileURLToPath(import.meta.url)), '..', 'samples');
@@ -44,6 +48,7 @@ const CASES: Record<string, z.ZodType> = {
   events: EventsResponseSchema,
   incidents: IncidentsResponseSchema,
   scenarios: ScenariosResponseSchema,
+  'scenarios-unavailable': ScenariosResponseSchema,
   recordings: z.array(RecordingSummarySchema),
   providers: z.array(IntegrationStatusSchema),
   'authorization-catalog': AuthorizationCatalogSchema,
@@ -55,6 +60,12 @@ const CASES: Record<string, z.ZodType> = {
   'stream-snapshot': StreamMessageSchema,
   'stream-events': StreamMessageSchema,
   'stream-timeline': StreamMessageSchema,
+  'stream-timeline-workspace': StreamMessageSchema,
+  workspace: WorkspaceStatusSchema,
+  'workspace-check': WorkspaceCheckSchema,
+  'workspace-check-invalid': WorkspaceCheckSchema,
+  'workspace-response': WorkspaceResponseSchema,
+  'workspace-export': WorkspaceBundleSchema,
   'stream-lagged': StreamMessageSchema,
   'stream-pong': StreamMessageSchema,
 };

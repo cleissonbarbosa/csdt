@@ -37,7 +37,9 @@ export interface CommandContext {
     setViewMode: (mode: 'scene' | 'table') => void;
     setLayoutMode: (mode: LayoutMode) => void;
     setTheme: (theme: 'system' | 'light' | 'night') => void;
-    openPanel: (panel: 'authorization' | 'integrations' | 'settings' | 'help') => void;
+    openPanel: (
+      panel: 'authorization' | 'integrations' | 'settings' | 'help' | 'workspace',
+    ) => void;
     toggleOverlay: () => void;
   };
 }
@@ -108,6 +110,13 @@ export function buildCommands(context: CommandContext): Command[] {
       group: 'Actions',
       title: 'Open integrations',
       run: () => act.openPanel('integrations'),
+    },
+    {
+      id: 'workspace',
+      group: 'Actions',
+      title: 'Import or export the platform files',
+      hint: 'topology, scenarios, Cedar policies',
+      run: () => act.openPanel('workspace'),
     },
     {
       id: 'settings',

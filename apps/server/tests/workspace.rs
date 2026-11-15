@@ -4,9 +4,10 @@
 
 mod common;
 
+use common::TempDir;
+
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::path::Path;
 use std::sync::Arc;
 
 use aegis_server::application::{Assets, BootstrapError, Sources};
@@ -17,44 +18,6 @@ use aegis_server::workspace::{self, WorkspaceError, MAX_FILE_BYTES};
 use aegis_server::{build_state, StartupError};
 use axum::http::StatusCode;
 use serde_json::{json, Value};
-
-/// A directory under the system's temporary directory, removed on drop.
-struct TempDir(PathBuf);
-
-impl TempDir {
-    fn new() -> Self {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "aegis-workspace-test-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::SeqCst)
-        ));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-
-    fn write(&self, relative: &str, contents: &str) -> PathBuf {
-        let path = self.0.join(relative);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(&path, contents).unwrap();
-        path
-    }
-
-    fn write_json(&self, relative: &str, value: &Value) -> PathBuf {
-        self.write(relative, &serde_json::to_string_pretty(value).unwrap())
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn build(dir: &TempDir) -> Result<Assets, BootstrapError> {
     Assets::build(
@@ -153,7 +116,7 @@ fn run_scenario(assets: &Assets, topology: &str, scenario: &str, ticks: u64) -> 
 fn an_exported_workspace_is_the_bundled_set_bit_for_bit() {
     let dir = TempDir::new();
     let written = workspace::export(dir.path()).expect("exports");
-    assert_eq!(written.len(), 12);
+    assert_eq!(written.len(), 13);
     assert!(written.iter().all(|path| path.is_file()));
 
     let loaded = workspace::load(dir.path()).expect("loads");
@@ -314,6 +277,76 @@ fn an_empty_workspace_changes_nothing() {
     assert_eq!(loaded.sources, Sources::bundled().unwrap());
     assert!(loaded.replaced.is_empty());
     assert_eq!(loaded.ignored, [dir.path().join("README.md")]);
+}
+
+#[test]
+fn workspace_versions_are_explicit_and_legacy_files_remain_valid() {
+    let dir = TempDir::new();
+    let legacy = workspace::load(dir.path()).expect("no manifest means version 1");
+    dir.write_json("workspace.json", &json!({ "formatVersion": 1 }));
+    let versioned = workspace::load(dir.path()).expect("version 1 loads");
+    assert_eq!(versioned.sources, legacy.sources);
+    assert!(versioned.ignored.is_empty());
+
+    for version in [0, 2, 100] {
+        dir.write_json("workspace.json", &json!({ "formatVersion": version }));
+        let error = load_error(&dir);
+        assert!(error.path.ends_with("workspace.json"));
+        assert!(
+            error.message.contains("unsupported formatVersion"),
+            "{error}"
+        );
+    }
+    for invalid in [
+        json!({}),
+        json!({ "formatVersion": "1" }),
+        json!({ "formatVersion": 1, "typo": true }),
+    ] {
+        dir.write_json("workspace.json", &invalid);
+        assert!(load_error(&dir).path.ends_with("workspace.json"));
+    }
+}
+
+#[test]
+fn published_workspace_schemas_match_the_file_types() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schemas/v1");
+    let generated = workspace::schemas::documents();
+    let files: Vec<_> = fs::read_dir(&root).unwrap().collect();
+    assert_eq!(
+        files.len(),
+        generated.len(),
+        "every published schema is generated"
+    );
+    for (name, schema) in generated {
+        let path = root.join(format!("{name}.schema.json"));
+        let committed: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            serde_json::to_value(schema).unwrap(),
+            committed,
+            "{} is stale: run pnpm workspace:schemas",
+            path.display()
+        );
+    }
+}
+
+#[tokio::test]
+async fn unavailable_scenarios_explain_their_resolution_failure_through_the_api() {
+    let dir = TempDir::new();
+    dir.write_json("topologies/shop.json", &shop());
+    let state = build_state(config(dir.path())).expect("state builds");
+    let scenarios = common::get(&state, "/api/v1/scenarios").await;
+    let listed = scenarios.body["scenarios"].as_array().unwrap();
+    let assets = state.service.assets();
+    assert_eq!(listed.len(), assets.unavailable.len());
+    for scenario in listed {
+        assert_eq!(scenario["available"], false);
+        let diagnosis = assets
+            .unavailable
+            .iter()
+            .find(|entry| entry.scenario == scenario["id"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(scenario["unavailableReason"], diagnosis.reason);
+    }
 }
 
 // ---------------------------------------------------------------------------

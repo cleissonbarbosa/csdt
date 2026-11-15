@@ -12,22 +12,25 @@ use crate::simulation::engine::Command;
 
 use super::spec::{MAX_DURATION_MS, MAX_LIST};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RecordedCommand {
     pub at_ms: u64,
     pub command: Command,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Recording {
+    #[schemars(length(min = 1, max = crate::domain::MAX_ID_LEN), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub id: String,
     pub name: String,
     pub description: String,
     pub topology_id: String,
     pub seed: u64,
+    #[schemars(range(min = 1, max = MAX_DURATION_MS))]
     pub duration_ms: u64,
+    #[schemars(length(min = 1, max = MAX_LIST))]
     pub commands: Vec<RecordedCommand>,
 }
 
@@ -64,7 +67,7 @@ impl Recording {
             }
             if !matches!(
                 recorded.command,
-                Command::StartScenario { .. } | Command::AbortScenario
+                Command::StartScenario { .. } | Command::AbortScenario {}
             ) {
                 return Err(
                     "a recording may only contain `startScenario` and `abortScenario` commands"
@@ -162,5 +165,18 @@ mod tests {
             "events": []
         }));
         assert!(forged.is_err(), "unknown fields are rejected");
+    }
+
+    #[test]
+    fn a_command_takes_no_field_it_does_not_define() {
+        let command = |value: serde_json::Value| serde_json::from_value::<Command>(value);
+        assert!(command(serde_json::json!({ "type": "startScenario", "scenarioId": "x" })).is_ok());
+        assert!(command(serde_json::json!({ "type": "abortScenario" })).is_ok());
+        for extra in [
+            serde_json::json!({ "type": "startScenario", "scenarioId": "x", "note": "junk" }),
+            serde_json::json!({ "type": "abortScenario", "decision": {} }),
+        ] {
+            assert!(command(extra.clone()).is_err(), "{extra}");
+        }
     }
 }

@@ -21,8 +21,7 @@ pub const TICK_MS: u64 = 200;
 /// Largest topology accepted. The engine is linear in both; the limits are
 /// there so a mistake in a file fails at start-up instead of exhausting
 /// memory. The renderer has been exercised at 178 services.
-pub const MAX_NODES: usize = 2_000;
-pub const MAX_EDGES: usize = 20_000;
+pub use crate::domain::{MAX_EDGES, MAX_NODES};
 /// Virtual seconds per simulation tick.
 pub const DT: f64 = TICK_MS as f64 / 1000.0;
 

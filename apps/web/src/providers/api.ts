@@ -16,8 +16,13 @@ import {
   ScenariosResponseSchema,
   TopologiesResponseSchema,
   TopologySchema,
+  WorkspaceBundleSchema,
+  WorkspaceCheckSchema,
+  WorkspaceResponseSchema,
+  WorkspaceStatusSchema,
   type ControlAction,
   type EvaluateRequest,
+  type WorkspaceFile,
 } from '@aegis/contracts';
 import { z } from 'zod';
 
@@ -130,6 +135,16 @@ export const api = {
     request(z.array(AuthorizationDecisionSchema), '/demo/authorization/decisions'),
   evaluate: (body: EvaluateRequest) =>
     request(AuthorizationDecisionSchema, '/demo/authorization/evaluate', body),
+  /** The files the platform, its scenarios and its policies come from. */
+  workspace: () => request(WorkspaceStatusSchema, '/workspace'),
+  exportWorkspace: () => request(WorkspaceBundleSchema, '/workspace/export'),
+  /** Says what applying the files would give, without applying them. */
+  checkWorkspace: (files: WorkspaceFile[]) =>
+    request(WorkspaceCheckSchema, '/demo/workspace/check', { files }),
+  importWorkspace: (files: WorkspaceFile[]) =>
+    request(WorkspaceResponseSchema, '/demo/workspace/import', { files }),
+  /** Back to what the server was started with. */
+  resetWorkspace: () => request(WorkspaceResponseSchema, '/demo/workspace/reset', {}),
 };
 
 export type AegisApi = typeof api;

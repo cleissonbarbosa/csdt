@@ -23,6 +23,8 @@ services:
       AEGIS_CEDAR_AGENT_SYNC: ${AEGIS_CEDAR_AGENT_SYNC:-false}
       AEGIS_RINHA_URL: ${AEGIS_RINHA_URL:-}
       AEGIS_INTEGRATION_ALLOWED_HOSTS: ${AEGIS_INTEGRATION_ALLOWED_HOSTS:-}
+      # Importing files from the interface. Set to off where others share it.
+      AEGIS_IMPORT: ${AEGIS_IMPORT:-on}
       # Your own topologies, scenarios and policies (docs/WORKSPACE.md):
       # uncomment this line and the volume below.
       # AEGIS_WORKSPACE: /workspace

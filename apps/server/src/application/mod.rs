@@ -7,6 +7,7 @@
 //! recordings). [`SimulationService`] owns the single mutable timeline and is
 //! the only place that advances it.
 
+pub mod diff;
 mod service;
 
 use std::collections::BTreeMap;
@@ -16,7 +17,10 @@ use crate::authorization::{
     bundled_entities_json, bundled_policy_documents, AuthzCatalog, CedarEngine, CedarSetupError,
     PolicyDocument,
 };
-use crate::domain::{DataSource, PolicyDecisionPoint, TopologySpec, TopologySummary};
+use crate::domain::{
+    DataSource, PolicyDecisionPoint, TopologySpec, TopologySummary, UnavailableScenario,
+    WorkspaceOrigin, WorkspaceStatus,
+};
 use crate::incidents::recordings::{self, Recording};
 use crate::incidents::{catalog, check, resolve_all, ResolvedScenario, ScenarioDef};
 use crate::simulation::topologies;
@@ -288,8 +292,88 @@ impl Assets {
         self.worlds.get(id)
     }
 
+    /// Scenario ids, in the order they are offered.
+    pub fn scenario_ids(&self) -> Vec<String> {
+        self.default_world()
+            .scenarios
+            .iter()
+            .map(|scenario| scenario.info.id.clone())
+            .collect()
+    }
+
     pub fn default_world(&self) -> &World {
         // `build` refuses to return without the default topology.
         &self.worlds[&self.default_topology]
+    }
+}
+
+/// A set of sources together with what was built from it: what the server
+/// runs on at one moment. Cheap to clone; nothing in it changes.
+#[derive(Debug, Clone)]
+pub struct Loaded {
+    pub sources: Arc<Sources>,
+    pub assets: Arc<Assets>,
+    pub origin: WorkspaceOrigin,
+    /// Parts a workspace replaced in what it was laid over.
+    pub replaced: Vec<String>,
+    /// Files of the workspace that were not read.
+    pub ignored: Vec<String>,
+}
+
+impl Loaded {
+    /// The fixtures compiled into the binary.
+    pub fn bundled() -> Result<Self, BootstrapError> {
+        Self::build(
+            Sources::bundled()?,
+            WorkspaceOrigin::Bundled,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    pub fn build(
+        sources: Sources,
+        origin: WorkspaceOrigin,
+        replaced: Vec<String>,
+        ignored: Vec<String>,
+    ) -> Result<Self, BootstrapError> {
+        let assets = Arc::new(Assets::build(sources.clone())?);
+        Ok(Self {
+            sources: Arc::new(sources),
+            assets,
+            origin,
+            replaced,
+            ignored,
+        })
+    }
+
+    pub fn status(&self, import_enabled: bool) -> WorkspaceStatus {
+        let assets = &self.assets;
+        // The topology that opens first, then the others by id.
+        let mut topologies: Vec<TopologySummary> =
+            assets.worlds.values().map(World::summary).collect();
+        topologies.sort_by_key(|topology| topology.id != assets.default_topology);
+        WorkspaceStatus {
+            origin: self.origin,
+            import_enabled,
+            format_version: crate::workspace::FORMAT_VERSION,
+            replaced: self.replaced.clone(),
+            ignored: self.ignored.clone(),
+            topologies,
+            default_topology_id: assets.default_topology.clone(),
+            scenario_ids: assets.scenario_ids(),
+            recording_ids: assets.recordings.iter().map(|r| r.id.clone()).collect(),
+            policy_count: assets.cedar.policies().len(),
+            baseline_deny_fraction: assets.decisions.baseline_deny_fraction,
+            unavailable: assets
+                .unavailable
+                .iter()
+                .map(|entry| UnavailableScenario {
+                    topology_id: entry.topology.clone(),
+                    scenario_id: entry.scenario.clone(),
+                    reason: entry.reason.clone(),
+                })
+                .collect(),
+        }
     }
 }

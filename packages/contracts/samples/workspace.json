@@ -1,0 +1,42 @@
+{
+  "origin": "bundled",
+  "importEnabled": true,
+  "formatVersion": 1,
+  "replaced": [],
+  "ignored": [],
+  "topologies": [
+    {
+      "id": "helios-commerce",
+      "name": "Helios Commerce",
+      "description": "Fictional multi-region commerce platform. Every service, metric and incident is synthetic.",
+      "nodeCount": 51,
+      "edgeCount": 75,
+      "regionCount": 4,
+      "dataSource": "synthetic"
+    },
+    {
+      "id": "hyperscale-stress",
+      "name": "Hyperscale Stress",
+      "description": "Procedurally generated six-region platform used to exercise the renderer and engine at scale. Entirely synthetic.",
+      "nodeCount": 178,
+      "edgeCount": 648,
+      "regionCount": 7,
+      "dataSource": "synthetic"
+    }
+  ],
+  "defaultTopologyId": "helios-commerce",
+  "scenarioIds": [
+    "ddos-surge",
+    "credential-stuffing",
+    "cedar-denial",
+    "cascading-failure",
+    "regional-outage"
+  ],
+  "recordingIds": [
+    "black-friday-flood",
+    "insider-and-outage"
+  ],
+  "policyCount": 9,
+  "baselineDenyFraction": 0.07,
+  "unavailable": []
+}

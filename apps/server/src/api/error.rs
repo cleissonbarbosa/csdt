@@ -92,7 +92,9 @@ impl From<ServiceError> for ApiError {
             ServiceError::UnknownScenario(_)
             | ServiceError::UnknownTopology(_)
             | ServiceError::UnknownRecording(_) => Self::not_found(error.to_string()),
-            ServiceError::ScenarioUnavailable(_) | ServiceError::NoActiveScenario => {
+            ServiceError::ScenarioUnavailable(_)
+            | ServiceError::NoActiveScenario
+            | ServiceError::WorkspaceChanged => {
                 Self::new(StatusCode::CONFLICT, "conflict", error.to_string())
             }
             ServiceError::InvalidSpeed(_) => Self::bad_request(error.to_string()),

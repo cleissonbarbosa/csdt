@@ -465,6 +465,8 @@ export const ScenarioSchema = z.object({
   targetNodeIds: z.array(z.string()),
   /** False when the active topology lacks a role the scenario needs. */
   available: z.boolean(),
+  /** Specific reason this scenario cannot run on the active topology. */
+  unavailableReason: z.string().optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
@@ -634,6 +636,77 @@ export const HealthResponseSchema = z.object({
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
+// ---------------------------------------------------------------------------
+// Workspace: the files the platform, its scenarios and its policies come from
+// ---------------------------------------------------------------------------
+
+/**
+ * Where the files in use came from: compiled into the server, a workspace it
+ * was started with, or an import made since (held in memory, gone on restart).
+ */
+export const WorkspaceOriginSchema = z.enum(['bundled', 'startup', 'imported']);
+export type WorkspaceOrigin = z.infer<typeof WorkspaceOriginSchema>;
+
+export const UnavailableScenarioSchema = z.object({
+  topologyId: z.string(),
+  scenarioId: z.string(),
+  reason: z.string(),
+});
+export type UnavailableScenario = z.infer<typeof UnavailableScenarioSchema>;
+
+export const WorkspaceStatusSchema = z.object({
+  origin: WorkspaceOriginSchema,
+  /** Whether this server accepts imports. */
+  importEnabled: z.boolean(),
+  formatVersion: count,
+  /** Parts taken from the workspace, such as `topologies` or `cedar/policies`. */
+  replaced: z.array(z.string()),
+  /** Files of the workspace that were not read. */
+  ignored: z.array(z.string()),
+  topologies: z.array(TopologySummarySchema),
+  /** The topology that opens. */
+  defaultTopologyId: z.string(),
+  scenarioIds: z.array(z.string()),
+  recordingIds: z.array(z.string()),
+  policyCount: count,
+  /** Share of ordinary authorization traffic Cedar denies. */
+  baselineDenyFraction: fraction,
+  unavailable: z.array(UnavailableScenarioSchema),
+});
+export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
+
+export const WorkspaceProblemSchema = z.object({
+  /** The file the problem is in, when it is in one file. */
+  path: z.string().optional(),
+  message: z.string(),
+});
+export type WorkspaceProblem = z.infer<typeof WorkspaceProblemSchema>;
+
+/** The outcome of checking files without applying them. */
+export const WorkspaceCheckSchema = z.object({
+  valid: z.boolean(),
+  workspace: WorkspaceStatusSchema.optional(),
+  problem: WorkspaceProblemSchema.optional(),
+});
+export type WorkspaceCheck = z.infer<typeof WorkspaceCheckSchema>;
+
+/** One file of a workspace: where it sits (a bare name is enough) and its text. */
+export const WorkspaceFileSchema = z.object({ path: z.string(), text: z.string() });
+export type WorkspaceFile = z.infer<typeof WorkspaceFileSchema>;
+
+/** A whole workspace as one document: what is downloaded, and can be imported. */
+export const WorkspaceBundleSchema = z.object({
+  formatVersion: count,
+  files: z.array(WorkspaceFileSchema),
+});
+export type WorkspaceBundle = z.infer<typeof WorkspaceBundleSchema>;
+
+export const WorkspaceResponseSchema = z.object({
+  workspace: WorkspaceStatusSchema,
+  playback: PlaybackStateSchema,
+});
+export type WorkspaceResponse = z.infer<typeof WorkspaceResponseSchema>;
+
 export const ApiErrorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
@@ -643,7 +716,15 @@ export type ApiErrorBody = z.infer<typeof ApiErrorSchema>;
 // Stream (WS /api/v1/stream)
 // ---------------------------------------------------------------------------
 
-export const TimelineReasonSchema = z.enum(['reset', 'branch', 'seek', 'topology', 'recording']);
+export const TimelineReasonSchema = z.enum([
+  'reset',
+  'branch',
+  'seek',
+  'topology',
+  'recording',
+  /** The topologies, scenarios or policies themselves were replaced. */
+  'workspace',
+]);
 export type TimelineReason = z.infer<typeof TimelineReasonSchema>;
 
 export const StreamMessageSchema = z.discriminatedUnion('type', [

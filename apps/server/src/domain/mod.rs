@@ -11,6 +11,7 @@ pub mod integration;
 pub mod playback;
 pub mod telemetry;
 pub mod topology;
+pub mod workspace;
 
 pub use authorization::*;
 pub use events::*;
@@ -19,6 +20,7 @@ pub use integration::*;
 pub use playback::*;
 pub use telemetry::*;
 pub use topology::*;
+pub use workspace::*;
 
 /// Version of the JSON contracts. Bumped on any breaking change.
 pub const SCHEMA_VERSION: &str = "1.0";
@@ -39,7 +41,17 @@ pub fn is_valid_id(id: &str) -> bool {
 
 /// Provenance of a piece of data. AEGIS never presents one as another.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum DataSource {

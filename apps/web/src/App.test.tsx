@@ -34,6 +34,11 @@ const api = vi.hoisted(() => ({
   authorizationCatalog: vi.fn(),
   authorizationDecisions: vi.fn(),
   evaluate: vi.fn(),
+  workspace: vi.fn(),
+  exportWorkspace: vi.fn(),
+  checkWorkspace: vi.fn(),
+  importWorkspace: vi.fn(),
+  resetWorkspace: vi.fn(),
 }));
 
 vi.mock('@/providers/api', async (original) => ({
@@ -96,6 +101,14 @@ beforeEach(() => {
   api.authorizationCatalog.mockResolvedValue(fixtures.catalog());
   api.authorizationDecisions.mockResolvedValue([]);
   api.evaluate.mockResolvedValue(fixtures.decisionDeny());
+  api.workspace.mockResolvedValue(fixtures.workspace());
+  api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
+  api.checkWorkspace.mockResolvedValue(fixtures.workspaceCheck());
+  api.importWorkspace.mockResolvedValue(fixtures.workspaceResponse());
+  api.resetWorkspace.mockResolvedValue({
+    workspace: fixtures.workspace(),
+    playback: fixtures.snapshot().playback,
+  });
   for (const command of [
     api.control,
     api.startScenario,
@@ -488,6 +501,28 @@ describe('incident console', () => {
     expect(api.startScenario).toHaveBeenCalledWith('ddos-surge');
   });
 
+  it('explains why a scenario cannot run on the active platform', async () => {
+    const reason = 'unknown node `ledger`';
+    const scenarios = fixtures.scenarios();
+    api.scenarios.mockResolvedValue({
+      ...scenarios,
+      scenarios: scenarios.scenarios.map((scenario) =>
+        scenario.id === 'ddos-surge'
+          ? { ...scenario, available: false, unavailableReason: reason }
+          : scenario,
+      ),
+    });
+    const user = userEvent.setup();
+    renderOpen();
+    await openConsole(user);
+    const start = await screen.findByTestId('scenario-start-ddos-surge');
+    expect(start).toBeDisabled();
+    expect(start).toHaveAccessibleDescription(`Cannot run: ${reason}`);
+    expect(screen.getByText(`Cannot run: ${reason}`)).toBeVisible();
+    await user.click(start);
+    expect(api.startScenario).not.toHaveBeenCalled();
+  });
+
   it('shows the active incident, its phase and what it impacted', async () => {
     const user = userEvent.setup();
     renderOpen();
@@ -741,6 +776,148 @@ describe('authorization explorer', () => {
     const engines = await screen.findByRole('radiogroup', { name: 'Policy engine' });
     expect(within(engines).getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByText(/Connect a local cedar-agent/)).toBeInTheDocument();
+  });
+});
+
+describe('platform files', () => {
+  const scenario = () =>
+    new File(['{"id":"slow-door","phases":[]}'], 'slow-door.json', { type: 'application/json' });
+
+  async function openFiles(user: ReturnType<typeof userEvent.setup>) {
+    await fromMenu(user, 'Import or export files');
+    return screen.findByRole('dialog', { name: 'Platform files' });
+  }
+
+  it('says what is in use and where it came from', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    // Nothing of it is on screen until it is asked for.
+    expect(screen.queryByRole('dialog', { name: 'Platform files' })).not.toBeInTheDocument();
+    const dialog = await openFiles(user);
+    const inUse = await within(dialog).findByTestId('workspace-in-use');
+    expect(inUse).toHaveTextContent('The platform that ships with AEGIS.');
+    expect(inUse).toHaveTextContent('2 platforms');
+    expect(inUse).toHaveTextContent('Helios Commerce (51 services)');
+    expect(inUse).toHaveTextContent('5 scenarios');
+    expect(inUse).toHaveTextContent('9 Cedar policies');
+    expect(inUse).toHaveTextContent('Cedar denies 7.00% of ordinary requests');
+    // Nothing was imported, so there is nothing to go back from.
+    expect(within(dialog).queryByTestId('workspace-reset')).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('workspace-apply')).not.toBeInTheDocument();
+  });
+
+  it('checks staged files before anything is applied, then applies them', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openFiles(user);
+    await user.upload(within(dialog).getByTestId('workspace-files'), scenario());
+
+    const staged = await within(dialog).findByTestId('workspace-staged');
+    expect(within(staged).getByText('slow-door.json')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.checkWorkspace).toHaveBeenCalledWith([
+        { path: 'slow-door.json', text: '{"id":"slow-door","phases":[]}' },
+      ]),
+    );
+    const check = within(dialog).getByTestId('workspace-check');
+    await waitFor(() => expect(check).toHaveTextContent('These files are valid'));
+    expect(check).toHaveTextContent('Front Desk (2 services)');
+    expect(check).toHaveTextContent('1 scenario');
+    expect(api.importWorkspace).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByTestId('workspace-apply'));
+    expect(api.importWorkspace).toHaveBeenCalledWith([
+      { path: 'slow-door.json', text: '{"id":"slow-door","phases":[]}' },
+    ]);
+    // The dialog gets out of the way of what changed, and says what happened.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Platform files' })).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('Now showing the imported files.')).toBeInTheDocument();
+  });
+
+  it('names the file a mistake is in and will not apply it', async () => {
+    api.checkWorkspace.mockResolvedValue(fixtures.workspaceCheckInvalid());
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openFiles(user);
+    await user.upload(within(dialog).getByTestId('workspace-files'), scenario());
+    const problem = await within(dialog).findByTestId('workspace-problem');
+    expect(problem).toHaveTextContent('scenarios/01-slow-door.json');
+    expect(problem).toHaveTextContent('missing field `name`');
+    expect(within(dialog).getByTestId('workspace-apply')).toBeDisabled();
+
+    // Taking the file away takes the complaint with it.
+    await user.click(within(dialog).getByRole('button', { name: 'Remove slow-door.json' }));
+    expect(within(dialog).queryByTestId('workspace-problem')).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('workspace-staged')).not.toBeInTheDocument();
+  });
+
+  it('leaves out what cannot be part of a workspace and says so', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    renderApp();
+    const dialog = await openFiles(user);
+    await user.upload(within(dialog).getByTestId('workspace-files'), [
+      new File(['# notes'], 'README.md'),
+      scenario(),
+    ]);
+    expect(await within(dialog).findByTestId('workspace-skipped')).toHaveTextContent(
+      'README.md (not a .json, .cedar or .cedarschema file)',
+    );
+    await waitFor(() =>
+      expect(api.checkWorkspace).toHaveBeenCalledWith([
+        expect.objectContaining({ path: 'slow-door.json' }),
+      ]),
+    );
+  });
+
+  it('adds to the files in use when asked to start from them', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openFiles(user);
+    await user.upload(within(dialog).getByTestId('workspace-files'), scenario());
+    await user.click(within(dialog).getByTestId('workspace-start-from-current'));
+    const staged = await within(dialog).findByTestId('workspace-staged');
+    await waitFor(() => expect(within(staged).getAllByRole('listitem').length).toBeGreaterThan(2));
+    expect(within(staged).getByText('cedar/policies.json')).toBeInTheDocument();
+    expect(within(staged).getByText('slow-door.json')).toBeInTheDocument();
+  });
+
+  it('offers the way back once files were imported, and saves what is in use', async () => {
+    api.workspace.mockResolvedValue(fixtures.workspaceResponse().workspace);
+    const createObjectURL = vi.fn(() => 'blob:aegis');
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openFiles(user);
+    const inUse = await within(dialog).findByTestId('workspace-in-use');
+    expect(inUse).toHaveTextContent('Files imported since this server started');
+    expect(inUse).toHaveTextContent('From them: topologies, scenarios.');
+
+    await user.click(within(dialog).getByTestId('workspace-export'));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    expect(api.exportWorkspace).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:aegis');
+
+    await user.click(within(dialog).getByTestId('workspace-reset'));
+    expect(api.resetWorkspace).toHaveBeenCalled();
+    expect(
+      await screen.findByText('Back to the files the server started with.'),
+    ).toBeInTheDocument();
+  });
+
+  it('says so when the server does not accept imports', async () => {
+    api.workspace.mockResolvedValue({ ...fixtures.workspace(), importEnabled: false });
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openFiles(user);
+    expect(await within(dialog).findByTestId('workspace-import-off')).toHaveTextContent(
+      'AEGIS_IMPORT=off',
+    );
+    expect(within(dialog).queryByTestId('workspace-files')).not.toBeInTheDocument();
+    // What is in use can still be read and saved.
+    expect(within(dialog).getByTestId('workspace-export')).toBeEnabled();
   });
 });
 

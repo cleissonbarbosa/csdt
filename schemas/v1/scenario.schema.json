@@ -1,0 +1,762 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/scenario.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScenarioDef",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "category": {
+      "$ref": "#/definitions/ScenarioCategory"
+    },
+    "severity": {
+      "$ref": "#/definitions/Severity"
+    },
+    "durationMs": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 200,
+      "maximum": 1800000
+    },
+    "rootCause": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/NodeSel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/NodeSet"
+      },
+      "maxItems": 64,
+      "default": []
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/FlowDef"
+      },
+      "maxItems": 16,
+      "default": []
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PhaseDef"
+      },
+      "minItems": 1,
+      "maxItems": 32
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "summary",
+    "category",
+    "severity",
+    "durationMs",
+    "phases"
+  ],
+  "definitions": {
+    "ScenarioCategory": {
+      "type": "string",
+      "enum": [
+        "availability",
+        "identity",
+        "authorization",
+        "resilience"
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "notice",
+        "warning",
+        "critical"
+      ]
+    },
+    "NodeSel": {
+      "description": "Picks one node of the active topology.\n\nWritten as a string: `role:primaryGateway`, `node:use-gateway` or\n`gatewayOf:outageRegion`.",
+      "type": "string",
+      "pattern": "^(role|node|gatewayOf):[\\s\\S]+$"
+    },
+    "NodeSet": {
+      "description": "Picks one or more nodes: any [`NodeSel`], or `region:outageRegion` for\nevery node of a region named by a role or by its id.",
+      "type": "string",
+      "pattern": "^(role|node|gatewayOf|region):[\\s\\S]+$"
+    },
+    "FlowDef": {
+      "description": "A stream of synthetic requests injected along explicit hops.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "label": {
+          "type": "string"
+        },
+        "suspicious": {
+          "description": "Drawn as hostile traffic.",
+          "type": "boolean",
+          "default": false
+        },
+        "hops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Hop"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "spill": {
+          "description": "When set, traffic surviving the last hop joins that node's ordinary\nfan-out instead of terminating there.",
+          "type": "boolean",
+          "default": false
+        },
+        "authz": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlowAuthz"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "hops"
+      ]
+    },
+    "Hop": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/NodeSel"
+        },
+        "to": {
+          "$ref": "#/definitions/NodeSel"
+        },
+        "via": {
+          "$ref": "#/definitions/HopVia"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "HopVia": {
+      "oneOf": [
+        {
+          "description": "The single connection between the two nodes.",
+          "type": "string",
+          "const": "edge"
+        },
+        {
+          "description": "The shortest synchronous path between them.",
+          "type": "string",
+          "const": "path"
+        }
+      ]
+    },
+    "FlowAuthz": {
+      "description": "Ties a flow to a request shape Cedar evaluated at start-up, and names the\nauthorizer that enforces the answer.",
+      "type": "object",
+      "properties": {
+        "request": {
+          "description": "Id of an entry in the authorization catalogue's `scenarioRequests`.",
+          "type": "string"
+        },
+        "authorizer": {
+          "$ref": "#/definitions/NodeSel"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "request",
+        "authorizer"
+      ]
+    },
+    "PhaseDef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "atMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "rampMs": {
+          "description": "How long the effects take to ease in from what held before.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "active",
+            "mitigating",
+            "recovering"
+          ],
+          "allOf": [
+            {
+              "$ref": "#/definitions/IncidentStatus"
+            }
+          ]
+        },
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Effect"
+          },
+          "maxItems": 64,
+          "default": []
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ScriptedEvent"
+          },
+          "maxItems": 64,
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "atMs",
+        "rampMs",
+        "status"
+      ]
+    },
+    "IncidentStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "mitigating",
+        "recovering",
+        "resolved"
+      ]
+    },
+    "Effect": {
+      "description": "What a phase holds the model to. Anything a phase does not list ramps\nback to nominal.",
+      "oneOf": [
+        {
+          "description": "Multiplies the demand an external client generates.",
+          "type": "object",
+          "properties": {
+            "node": {
+              "$ref": "#/definitions/NodeSel"
+            },
+            "factor": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000.0
+            },
+            "type": {
+              "type": "string",
+              "const": "demand"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "node",
+            "factor"
+          ]
+        },
+        {
+          "description": "Multiplies capacity.",
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "$ref": "#/definitions/NodeSet"
+            },
+            "factor": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000.0
+            },
+            "type": {
+              "type": "string",
+              "const": "capacity"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "nodes",
+            "factor"
+          ]
+        },
+        {
+          "description": "Multiplies a node's own latency.",
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "$ref": "#/definitions/NodeSet"
+            },
+            "factor": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000.0
+            },
+            "type": {
+              "type": "string",
+              "const": "latency"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "nodes",
+            "factor"
+          ]
+        },
+        {
+          "description": "Adds a failure rate (0 to 1) at the nodes.",
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "$ref": "#/definitions/NodeSet"
+            },
+            "rate": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "type": {
+              "type": "string",
+              "const": "errorInject"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "nodes",
+            "rate"
+          ]
+        },
+        {
+          "description": "Makes the nodes unreachable.",
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "$ref": "#/definitions/NodeSet"
+            },
+            "type": {
+              "type": "string",
+              "const": "down"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "nodes"
+          ]
+        },
+        {
+          "description": "Multiplies the calls made on the connections.",
+          "type": "object",
+          "properties": {
+            "edges": {
+              "$ref": "#/definitions/EdgeSet"
+            },
+            "factor": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000.0
+            },
+            "type": {
+              "type": "string",
+              "const": "edgeWeight"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "edges",
+            "factor"
+          ]
+        },
+        {
+          "description": "Multiplies the network latency of the connections.",
+          "type": "object",
+          "properties": {
+            "edges": {
+              "$ref": "#/definitions/EdgeSet"
+            },
+            "factor": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000.0
+            },
+            "type": {
+              "type": "string",
+              "const": "edgeLatency"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "edges",
+            "factor"
+          ]
+        },
+        {
+          "description": "Adds a failure rate (0 to 1) on the connections.",
+          "type": "object",
+          "properties": {
+            "edges": {
+              "$ref": "#/definitions/EdgeSet"
+            },
+            "rate": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "type": {
+              "type": "string",
+              "const": "edgeError"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "edges",
+            "rate"
+          ]
+        },
+        {
+          "description": "Moves a fraction of one connection's traffic onto another.",
+          "type": "object",
+          "properties": {
+            "edge": {
+              "$ref": "#/definitions/EdgeRef"
+            },
+            "onto": {
+              "$ref": "#/definitions/EdgeRef"
+            },
+            "fraction": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "type": {
+              "type": "string",
+              "const": "routeShift"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "edge",
+            "onto",
+            "fraction"
+          ]
+        },
+        {
+          "description": "Sets the rate of an injected flow.",
+          "type": "object",
+          "properties": {
+            "flow": {
+              "type": "string"
+            },
+            "rate": {
+              "$ref": "#/definitions/Rate"
+            },
+            "type": {
+              "type": "string",
+              "const": "flowRate"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "flow",
+            "rate"
+          ]
+        },
+        {
+          "description": "Rejects a fraction of an injected flow when it arrives at a node.",
+          "type": "object",
+          "properties": {
+            "flow": {
+              "type": "string"
+            },
+            "at": {
+              "$ref": "#/definitions/NodeSel"
+            },
+            "fraction": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "reason": {
+              "$ref": "#/definitions/RejectReason"
+            },
+            "type": {
+              "type": "string",
+              "const": "flowReject"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "flow",
+            "at",
+            "fraction",
+            "reason"
+          ]
+        }
+      ]
+    },
+    "EdgeSet": {
+      "oneOf": [
+        {
+          "description": "One connection.",
+          "type": "object",
+          "properties": {
+            "between": {
+              "$ref": "#/definitions/EdgeRef"
+            }
+          },
+          "required": [
+            "between"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Every synchronous connection pointing at the node.",
+          "type": "object",
+          "properties": {
+            "inboundSync": {
+              "$ref": "#/definitions/NodeSel"
+            }
+          },
+          "required": [
+            "inboundSync"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EdgeRef": {
+      "description": "One existing connection, by its two ends.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/NodeSel"
+        },
+        "to": {
+          "$ref": "#/definitions/NodeSel"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ]
+    },
+    "Rate": {
+      "oneOf": [
+        {
+          "description": "Requests per second.",
+          "type": "object",
+          "properties": {
+            "rps": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "maximum": 1000000000.0
+            }
+          },
+          "required": [
+            "rps"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "A multiple of a node's capacity on the active topology, so the same\nscenario overloads a small platform and a large one alike.",
+          "type": "object",
+          "properties": {
+            "ofCapacity": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "$ref": "#/definitions/NodeSel"
+                },
+                "factor": {
+                  "type": "number",
+                  "format": "double",
+                  "minimum": 0,
+                  "maximum": 1000.0
+                }
+              },
+              "required": [
+                "node",
+                "factor"
+              ]
+            }
+          },
+          "required": [
+            "ofCapacity"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RejectReason": {
+      "type": "string",
+      "enum": [
+        "waf",
+        "rate-limit",
+        "auth-failure",
+        "session-revoked",
+        "policy-deny"
+      ]
+    },
+    "ScriptedEvent": {
+      "description": "An event a phase announces, `delayMs` after the phase begins.",
+      "type": "object",
+      "properties": {
+        "delayMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        },
+        "kind": {
+          "enum": [
+            "alert",
+            "auth-failure",
+            "mitigation",
+            "reroute"
+          ],
+          "allOf": [
+            {
+              "$ref": "#/definitions/EventKind"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "default": ""
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NodeSel"
+          },
+          "maxItems": 64,
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "delayMs",
+        "severity",
+        "kind",
+        "title"
+      ]
+    },
+    "EventKind": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "incident-started",
+            "incident-phase",
+            "incident-resolved",
+            "auth-failure"
+          ]
+        },
+        {
+          "description": "A node changed health.",
+          "type": "string",
+          "const": "health-transition"
+        },
+        {
+          "description": "A Cedar authorization decision.",
+          "type": "string",
+          "const": "authz-decision"
+        },
+        {
+          "description": "A mitigation control engaged (rate limit, WAF rule, circuit breaker…).",
+          "type": "string",
+          "const": "mitigation"
+        },
+        {
+          "description": "Traffic was re-routed.",
+          "type": "string",
+          "const": "reroute"
+        },
+        {
+          "description": "An alert raised by the threat-detection rules.",
+          "type": "string",
+          "const": "alert"
+        },
+        {
+          "description": "A vulnerability advisory imported from a fixture.",
+          "type": "string",
+          "const": "cve-advisory"
+        },
+        {
+          "description": "A port-scan finding imported from a fixture.",
+          "type": "string",
+          "const": "scan-finding"
+        },
+        {
+          "description": "Operator or system action (reset, timeline branch, import…).",
+          "type": "string",
+          "const": "system"
+        }
+      ]
+    }
+  }
+}

@@ -14,6 +14,10 @@ import {
   StreamMessageSchema,
   TopologiesResponseSchema,
   TopologySchema,
+  WorkspaceBundleSchema,
+  WorkspaceCheckSchema,
+  WorkspaceResponseSchema,
+  WorkspaceStatusSchema,
   type InfrastructureNode,
   type ServiceType,
   type TelemetrySnapshot,
@@ -41,6 +45,11 @@ export const providers = () => sample('providers', z.array(IntegrationStatusSche
 export const catalog = () => sample('authorization-catalog', AuthorizationCatalogSchema);
 export const decisionAllow = () => sample('decision-allow', AuthorizationDecisionSchema);
 export const decisionDeny = () => sample('decision-deny', AuthorizationDecisionSchema);
+export const workspace = () => sample('workspace', WorkspaceStatusSchema);
+export const workspaceCheck = () => sample('workspace-check', WorkspaceCheckSchema);
+export const workspaceCheckInvalid = () => sample('workspace-check-invalid', WorkspaceCheckSchema);
+export const workspaceResponse = () => sample('workspace-response', WorkspaceResponseSchema);
+export const workspaceExport = () => sample('workspace-export', WorkspaceBundleSchema);
 
 /** A snapshot taken mid-incident (credential stuffing). */
 export function snapshot(): TelemetrySnapshot {
