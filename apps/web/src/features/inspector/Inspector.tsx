@@ -11,9 +11,10 @@ import { ArrowRight, Crosshair, X } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { useThrottledSnapshot } from '@/app/hooks';
+import { showRegion } from '@/app/navigate';
 import { DecisionTag, HealthBadge, HealthGlyph, HealthMark } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
-import { EmptyState, Section, Stat } from '@/components/ui/Section';
+import { EmptyState, Fold, Section, Stat } from '@/components/ui/Section';
 import { RangeBar, Sparkline } from '@/components/ui/Sparkline';
 import { Hud } from '@/features/hud/Hud';
 import { foldEvents } from '@/features/scenarios/events';
@@ -37,6 +38,8 @@ import {
 } from '@/stores/telemetry';
 import { useUi, type Selection } from '@/stores/ui';
 
+import { GroupCard } from './GroupCard';
+
 /** How long an alert stays under "Needs attention", in virtual time. */
 const ALERT_WINDOW_MS = 90_000;
 
@@ -54,7 +57,7 @@ function EventRow({ event }: { event: SecurityEvent }) {
       <button
         type="button"
         onClick={() => useUi.getState().inspectEvent(event.seq)}
-        className="grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+        className="grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-control px-1.5 py-1 text-left hover:bg-raised"
       >
         <span className="self-center">
           <HealthGlyph health={SEVERITY_GLYPH[event.severity]} size={8} />
@@ -149,6 +152,8 @@ function NodeInspector({
   const region = topology.regions.find((r) => r.id === node.region);
   const decisions = nodeEvents.filter((event) => event.kind === 'authz-decision').slice(0, 6);
   const other = nodeEvents.filter((event) => event.kind !== 'authz-decision').slice(0, 8);
+  const outgoing = index.outgoing[nodeIndex] ?? [];
+  const incoming = index.incoming[nodeIndex] ?? [];
   const errorTone = grade(live.errorRate, 0.04, 0.2);
   const baselineLatency = Math.max(0.1, node.baselineLatencyMs);
   const latencyTone = grade(live.latencyMs / baselineLatency, 2.5, 6);
@@ -171,7 +176,7 @@ function NodeInspector({
           // How the two are related is one hover away, and in full when the
           // connection itself is inspected.
           title={`${RELATIONSHIP_LABEL[edge.edge.relationship]}, ${edge.edge.protocol.toUpperCase()}${edge.edge.crossRegion ? ', cross-region' : ''}`}
-          className="flex min-w-0 flex-1 items-baseline gap-2 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+          className="flex min-w-0 flex-1 items-baseline gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
         >
           <SecurityMark status={status} />
           <span className="min-w-0 flex-1 truncate text-xs text-ink">
@@ -247,7 +252,7 @@ function NodeInspector({
                 length={history.length}
                 normal={baselineRps > 0 ? [baselineRps * 0.5, baselineRps * 1.5] : undefined}
                 label="Throughput over the last 90 seconds"
-                width={136}
+                width={132}
               />
             )}
           </div>
@@ -260,7 +265,7 @@ function NodeInspector({
                 color={latencyTone}
                 normal={[0, baselineLatency * 2.5]}
                 label="Latency over the last 90 seconds"
-                width={136}
+                width={132}
               />
             )}
           </div>
@@ -274,7 +279,7 @@ function NodeInspector({
                 max={Math.max(0.1, live.errorRate * 1.3)}
                 normal={[0, 0.04]}
                 label="Error rate over the last 90 seconds"
-                width={136}
+                width={132}
               />
             )}
           </div>
@@ -290,7 +295,7 @@ function NodeInspector({
                 max={1.2}
                 normal={[0, 0.88]}
                 tone={saturationTone}
-                className="mb-2 mt-2.5 w-[136px]"
+                className="mb-2 mt-2.5 w-[132px]"
               />
             )}
             <p className="caption">
@@ -308,34 +313,27 @@ function NodeInspector({
         </p>
       </Section>
 
-      <Section
-        title="Calls"
-        aside={
-          <span className="numeric text-[11px] text-ink-faint">
-            {index.outgoing[nodeIndex]?.length ?? 0}
-          </span>
-        }
-      >
-        {index.outgoing[nodeIndex]?.length ? (
-          <ul>{index.outgoing[nodeIndex]!.map((e) => connection(e, true))}</ul>
+      {/* What it depends on and what depends on it: a short list is shown,
+          a long one waits to be asked for. */}
+      <Fold title="Calls" count={outgoing.length} open={outgoing.length <= 3} testId="node-calls">
+        {outgoing.length > 0 ? (
+          <ul className="-mx-1.5">{outgoing.map((e) => connection(e, true))}</ul>
         ) : (
           <p className="text-xs text-ink-faint">This service calls nothing.</p>
         )}
-      </Section>
-      <Section
+      </Fold>
+      <Fold
         title="Called by"
-        aside={
-          <span className="numeric text-[11px] text-ink-faint">
-            {index.incoming[nodeIndex]?.length ?? 0}
-          </span>
-        }
+        count={incoming.length}
+        open={incoming.length <= 3}
+        testId="node-callers"
       >
-        {index.incoming[nodeIndex]?.length ? (
-          <ul>{index.incoming[nodeIndex]!.map((e) => connection(e, false))}</ul>
+        {incoming.length > 0 ? (
+          <ul className="-mx-1.5">{incoming.map((e) => connection(e, false))}</ul>
         ) : (
           <p className="text-xs text-ink-faint">Nothing calls this service.</p>
         )}
-      </Section>
+      </Fold>
 
       {decisions.length > 0 && (
         <Section title="Authorization decisions">
@@ -348,7 +346,7 @@ function NodeInspector({
                   <button
                     type="button"
                     onClick={() => useUi.getState().inspectEvent(event.seq)}
-                    className="w-full rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+                    className="w-full rounded-control px-1.5 py-1 text-left hover:bg-raised"
                   >
                     <span className="flex items-center gap-2">
                       <DecisionTag decision={denied ? 'deny' : 'allow'} />
@@ -373,17 +371,15 @@ function NodeInspector({
         </Section>
       )}
 
-      <Section title="Event history">
-        {other.length > 0 ? (
-          <ul data-testid="inspector-events">
+      {other.length > 0 && (
+        <Fold title="Events" count={other.length} open={other.length <= 3}>
+          <ul className="-mx-1.5" data-testid="inspector-events">
             {other.map((event) => (
               <EventRow key={event.seq} event={event} />
             ))}
           </ul>
-        ) : (
-          <p className="text-xs text-ink-faint">No events involve this service yet.</p>
-        )}
-      </Section>
+        </Fold>
+      )}
     </div>
   );
 }
@@ -409,7 +405,7 @@ function EdgeInspector({
     <button
       type="button"
       onClick={() => useUi.getState().selectNode(id)}
-      className="min-w-0 flex-1 rounded-[3px] border border-line px-2 py-1.5 text-left hover:border-line-strong hover:bg-raised"
+      className="min-w-0 flex-1 rounded-control border border-line px-2 py-1.5 text-left hover:border-line-strong hover:bg-raised"
     >
       <span className="caption block">{label}</span>
       <span className="block truncate text-xs text-ink">{name ?? id}</span>
@@ -526,7 +522,7 @@ function Overview({
                     type="button"
                     onClick={() => useUi.getState().setLeftTab('incidents')}
                     title="Show these events"
-                    className="grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+                    className="grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                   >
                     <span className="self-center">
                       <HealthGlyph health={SEVERITY_GLYPH[entry.severity]} size={8} />
@@ -555,9 +551,9 @@ function Overview({
               <li key={status.id}>
                 <button
                   type="button"
-                  onClick={() => sceneHandle.current?.frameRegion(status.id)}
+                  onClick={() => showRegion(status.id)}
                   title={`Frame ${region?.name ?? status.id}`}
-                  className="flex w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+                  className="flex w-full items-center gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                   data-testid={`region-${status.id}`}
                   data-health={status.health}
                 >
@@ -633,6 +629,9 @@ export function Inspector({ selection }: { selection: Selection }) {
   if (!topology || !index) return <EmptyState title="Loading" />;
   const live = snapshot?.topologyId === topology.id ? snapshot : null;
 
+  if (selection?.kind === 'group') {
+    return <GroupCard key={selection.id} topology={topology} snapshot={live} id={selection.id} />;
+  }
   if (selection?.kind === 'node') {
     const nodeIndex = index.nodeIndex.get(selection.id);
     if (nodeIndex !== undefined) {

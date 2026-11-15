@@ -5,31 +5,39 @@
 @import '@fontsource/b612-mono/latin-400.css';
 
 /*
- * Sinótico — design tokens.
+ * Signal Field — design tokens.
  *
- * Neutral plate, neutral ink. The only hues are the three signals (warning,
- * critical, hostile) and they are reserved for things that deviate. Values
- * below are the light theme; the night theme overrides them further down.
- * Keep `lib/palette.ts` in step: the 3D scene takes its colours from there.
+ * A porcelain field, graphite ink and a cool grey for structure. Two hues
+ * are answers: focus (blue) to the viewer, for what is selected and the path
+ * being followed, and the signals (warning, critical, hostile) to the data,
+ * for what deviates. Nothing normal has a hue. Values below are the light
+ * theme; the night theme overrides them further down. Keep `lib/palette.ts`
+ * in step: the 3D scene takes its colours from there.
  */
 @theme {
-  --color-plate: #e3e5e4;
-  --color-sunken: #d8dbda;
-  --color-paper: #f3f4f2;
-  --color-raised: #e8eae8;
-  --color-line: #cdd0d0;
-  --color-line-strong: #a4a9ab;
+  --color-plate: #f5f4f0;
+  --color-sunken: #ebeae5;
+  --color-paper: #fdfcfa;
+  --color-raised: #f0efea;
+  --color-line: #dddcd7;
+  --color-line-strong: #a9afb1;
 
-  --color-ink: #191b1d;
-  --color-ink-dim: #4f545a;
-  --color-ink-faint: #676d73;
-  /* Selection, focus and primary actions are ink, never a hue. */
-  --color-accent: #191b1d;
-  --color-on-accent: #f3f4f2;
+  --color-ink: #252b30;
+  --color-ink-dim: #545c63;
+  --color-ink-faint: #697177;
+  /* Primary actions are ink: a command is not a signal. */
+  --color-accent: #252b30;
+  --color-on-accent: #fdfcfa;
+  /* The viewer's own attention: selection, links, the keyboard focus. */
+  --color-focus: #3b5fc0;
 
-  --color-warning: #9a5c00;
-  --color-critical: #c8231a;
+  --color-warning: #8f5a00;
+  --color-critical: #bf4631;
   --color-hostile: #a81577;
+
+  /* Controls are a little rounded, cards a little more; nothing is a pill. */
+  --radius-control: 6px;
+  --radius-card: 10px;
 
   /* B612 was drawn for aircraft cockpit displays: legible, unglamorous. */
   --font-sans: 'B612', ui-sans-serif, system-ui, sans-serif;
@@ -95,19 +103,20 @@
 
   :root[data-theme='night'] {
     color-scheme: dark;
-    --color-plate: #1d1f20;
-    --color-sunken: #151718;
-    --color-paper: #26282a;
-    --color-raised: #303335;
-    --color-line: #3a3d40;
-    --color-line-strong: #5a5f63;
-    --color-ink: #ecedec;
-    --color-ink-dim: #b4b9bc;
-    --color-ink-faint: #8f9599;
-    --color-accent: #ecedec;
-    --color-on-accent: #1d1f20;
+    --color-plate: #1e2226;
+    --color-sunken: #171a1d;
+    --color-paper: #272c31;
+    --color-raised: #31373c;
+    --color-line: #3b4248;
+    --color-line-strong: #5b6369;
+    --color-ink: #ecedea;
+    --color-ink-dim: #b5babd;
+    --color-ink-faint: #90979b;
+    --color-accent: #ecedea;
+    --color-on-accent: #1e2226;
+    --color-focus: #8fabf3;
     --color-warning: #ffb224;
-    --color-critical: #ff5d4f;
+    --color-critical: #f47c66;
     --color-hostile: #f26bc4;
   }
 
@@ -115,19 +124,20 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme]) {
       color-scheme: dark;
-      --color-plate: #1d1f20;
-      --color-sunken: #151718;
-      --color-paper: #26282a;
-      --color-raised: #303335;
-      --color-line: #3a3d40;
-      --color-line-strong: #5a5f63;
-      --color-ink: #ecedec;
-      --color-ink-dim: #b4b9bc;
-      --color-ink-faint: #8f9599;
-      --color-accent: #ecedec;
-      --color-on-accent: #1d1f20;
+      --color-plate: #1e2226;
+      --color-sunken: #171a1d;
+      --color-paper: #272c31;
+      --color-raised: #31373c;
+      --color-line: #3b4248;
+      --color-line-strong: #5b6369;
+      --color-ink: #ecedea;
+      --color-ink-dim: #b5babd;
+      --color-ink-faint: #90979b;
+      --color-accent: #ecedea;
+      --color-on-accent: #1e2226;
+      --color-focus: #8fabf3;
       --color-warning: #ffb224;
-      --color-critical: #ff5d4f;
+      --color-critical: #f47c66;
       --color-hostile: #f26bc4;
     }
   }
@@ -151,14 +161,14 @@
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--color-ink) 22%, transparent);
+    background: color-mix(in oklab, var(--color-focus) 26%, transparent);
   }
 
   /* One consistent, clearly visible focus treatment for keyboard users. */
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: var(--radius-control);
   }
 
   button,
@@ -186,9 +196,9 @@
 
 @layer components {
   /*
-   * A sheet of paper lying on the plate.
+   * A card lying on the field.
    *
-   * No blur, gradient or shadow. `backdrop-filter` in particular is out:
+   * No blur and no gradient. `backdrop-filter` in particular is out:
    * blurring what is behind a panel makes the compositor re-sample the 3D
    * canvas under it every frame, which was measured to cost more than
    * rendering the scene itself (docs/PERFORMANCE.md).
@@ -197,6 +207,19 @@
     position: relative;
     background: var(--color-paper);
     border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+  }
+
+  /*
+   * A card that floats over the model casts a shadow on it, as the pieces
+   * do on their plates: porcelain on porcelain is told apart by shadow, not
+   * by a heavier line. A plain box shadow costs the compositor nothing that
+   * the blur did.
+   */
+  .floating {
+    box-shadow:
+      0 1px 2px rgb(20 24 28 / 0.05),
+      0 10px 28px -6px rgb(20 24 28 / 0.14);
   }
 
   /*

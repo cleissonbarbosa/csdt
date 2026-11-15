@@ -1,6 +1,6 @@
 import { PLAYBACK_SPEEDS, type Incident, type PlaybackSpeed } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { History, Pause, Play, Radio, SkipForward } from 'lucide-react';
+import { History, Pause, Play, Radio, SkipForward, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { actions } from '@/app/actions';
@@ -12,6 +12,7 @@ import { formatClock } from '@/lib/format';
 import { COLOR, SEVERITY_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
+import { useUi } from '@/stores/ui';
 
 const SPEED_OPTIONS = PLAYBACK_SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }));
 /** Height of the open track; closed, it is the same drawing pressed flat. */
@@ -147,7 +148,7 @@ function Track({ incidents }: TrackProps) {
         aria-valuetext={`${formatClock(cursor)} of ${formatClock(head)}`}
         data-testid="timeline-track"
         data-dragging={held}
-        className="timeline-track absolute inset-x-0 bottom-0 cursor-ew-resize touch-none select-none overflow-hidden rounded-[3px] border border-line bg-sunken"
+        className="timeline-track absolute inset-x-0 bottom-0 cursor-ew-resize touch-none select-none overflow-hidden rounded-control border border-line bg-sunken"
         onPointerDown={(event) => {
           dragging.current = true;
           setHeld(true);
@@ -271,13 +272,51 @@ function Track({ incidents }: TrackProps) {
   );
 }
 
+/** Height of the bar, for whoever has to make room for it. */
+export const TIMELINE_HEIGHT = 48;
+
 /**
- * The transport: one row. Play and the clock, the strip of history, then the
- * few controls that change how time runs. Recorded incidents are loaded from
- * the incidents panel, where the scenarios are.
+ * Whether there is anything on the timeline to reach for: an incident under
+ * way or in the recorded window, time that is paused or being replayed.
+ */
+function useTimelineNeeded(): boolean {
+  const moved = useTelemetry((state) => {
+    const playback = state.playback;
+    if (!playback) return false;
+    return (
+      playback.mode !== 'live' || playback.status !== 'playing' || state.snapshot?.incident != null
+    );
+  });
+  const { data: recorded } = useQuery({
+    queryKey: queryKeys.incidents,
+    queryFn: api.incidents,
+    select: (response) => response.incidents.length > 0,
+  });
+  return moved || recorded === true;
+}
+
+/**
+ * The timeline is not on screen while there is nothing on it. It comes when
+ * time stops being simply "now" (an incident, a pause, a replay) and when it
+ * is asked for, and goes again when neither holds.
+ */
+export function useTimelineVisible(): boolean {
+  const asked = useUi((state) => state.timelineOpen);
+  const needed = useTimelineNeeded();
+  const ready = useTelemetry((state) => state.playback !== null);
+  return ready && (asked || needed);
+}
+
+/**
+ * The transport: one row, floating at the foot of the stage. Play and the
+ * clock, the strip of history, then the few controls that change how time
+ * runs. Recorded incidents are loaded from the incidents panel, where the
+ * scenarios are.
  */
 export function Timeline() {
   const playback = useTelemetry((state) => state.playback);
+  const visible = useTimelineVisible();
+  const needed = useTimelineNeeded();
   const { data: incidents } = useQuery({
     queryKey: queryKeys.incidents,
     queryFn: api.incidents,
@@ -288,14 +327,15 @@ export function Timeline() {
     queryFn: api.recordings,
   });
 
-  if (!playback) return null;
+  if (!playback || !visible) return null;
   const playing = playback.status === 'playing';
   const live = playback.mode === 'live';
   const recording = recordings?.find((r) => r.id === playback.recordingId);
 
   return (
     <section
-      className="relative z-20 flex h-11 shrink-0 items-center gap-3 border-t border-line bg-paper px-2"
+      className="panel floating absolute inset-x-3 bottom-3 z-20 flex animate-rise items-center gap-3 px-2"
+      style={{ height: TIMELINE_HEIGHT }}
       aria-label="Timeline and playback"
       data-testid="timeline"
       data-status={playback.status}
@@ -354,14 +394,18 @@ export function Timeline() {
       <Track incidents={incidents ?? []} />
 
       <div className="flex shrink-0 items-center gap-1">
-        <IconButton
-          label="Replay the latest incident"
+        <Button
+          variant="ghost"
           size="sm"
+          icon={<History size={13} aria-hidden />}
+          disabled={(incidents ?? []).length === 0}
           onClick={() => void actions.control({ action: 'replay' })}
+          title="Go back to where the latest incident began and watch it again"
           data-testid="playback-replay"
         >
-          <History size={14} />
-        </IconButton>
+          <span className="max-lg:hidden">Replay the incident</span>
+          <span className="lg:hidden">Replay</span>
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -384,6 +428,16 @@ export function Timeline() {
             onChange={(speed) => void actions.control({ action: 'setSpeed', speed })}
           />
         </div>
+        {!needed && (
+          <IconButton
+            label="Put the timeline away"
+            size="sm"
+            onClick={() => useUi.getState().setTimelineOpen(false)}
+            data-testid="timeline-close"
+          >
+            <X size={14} />
+          </IconButton>
+        )}
       </div>
     </section>
   );

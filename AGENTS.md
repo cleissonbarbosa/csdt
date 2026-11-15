@@ -172,16 +172,43 @@ everything drawn inside it and is fed through store subscriptions set up in
   service type, one each for connections, beads, labels and ground marks. An
   E2E test fails if switching to the 178-service topology adds more than six
   draw calls.
+- The model has two levels. The application opens on the **overview**
+  (`layoutMode: 'layers'`): the platform reduced to one piece per kind of
+  service, in the four layers a request crosses. `lib/overview.ts` derives
+  it, as a real `Topology` with columnar snapshots, as a pure function of the
+  server's topology and snapshot; every figure is summed or traffic-weighted
+  from the services it stands for, never invented. The two detailed
+  arrangements (`regions`, `dependencies`) draw the server's topology as it
+  is. `SceneController` draws whichever topology it is handed and does not
+  know which; the bridge in `features/scene/SceneCanvas.tsx` translates ids
+  both ways (selection, hover, incident route, traced request), and
+  `window.__aegis.projectNode` accepts a service id at either level.
+  `useTelemetry` always holds the server's own topology and snapshot.
 - The service pieces are a built asset, not code. `apps/web/scripts/build-pieces.py`
   models all twelve in Blender and writes `src/graphics/pieces.glb`, which is
   committed and read by the small parser in `graphics/pieces.ts` (a general
   glTF loader is deliberately not in the bundle). After changing a piece,
-  rebuild and commit the file; a test fails if a service type has no model:
+  rebuild and commit the file; a test fails if a service type has no model
+  or no working part:
 
   ```bash
   blender --background --python "$PWD/apps/web/scripts/build-pieces.py"   # absolute path
   ```
 
+- A piece's working part is a _mechanism_: a kind of motion (spin, index,
+  swing, slide, convey) about a pivot and an axis, declared in
+  `build-pieces.py` where the part is modelled and carried in the GLB.
+  `pieces.ts` lays the mechanisms out as a small table (one column each,
+  `aPart.y` is a vertex's column) and `createPieceMaterial` moves the
+  vertices from it, so there is still one material and one draw call per
+  service type. The CPU only keeps two numbers per piece: the seconds its
+  mechanism has worked, advanced at the pace `graphics/pace.ts` derives
+  from throughput, and the state it works in, which travels toward the
+  service's health code. Hesitating and jamming are the same arithmetic for
+  every kind and live in the material; how a part hangs when down is its
+  `slump`, declared with the mechanism. A new kind of motion has to be
+  added in all three places, and a period has to divide `WORK_CYCLE`, which
+  a test checks.
 - Beads are stateless. The CPU updates one small per-edge data texture, and
   position, shape and colour are derived in the vertex shader.
 - Materials are written in TSL only (`three/webgpu`, `three/tsl`) with no
@@ -204,36 +231,60 @@ origin.
 
 ## Interface design rules
 
-`docs/DESIGN.md` is the standard a UI change is judged against. Read it before
-touching anything visual. In short:
+`docs/DESIGN.md` ("Signal Field") is the standard a UI change is judged
+against. Read it before touching anything visual. In short:
 
-1. **Hue is a signal.** Amber for deviation, red for failure, magenta for
-   hostile traffic. Nothing normal has a hue: no "healthy green", no brand
-   colour, no coloured service types. Selection, focus and primary actions are
-   ink.
+1. **Hue is an answer.** Blue (focus) answers the viewer: the selection, the
+   request being traced, keyboard focus, links. Amber, red and magenta answer
+   the data: deviation, failure or a request that was stopped, hostile
+   traffic. Nothing normal has a hue: no "healthy green", no brand colour, no
+   coloured service types. Primary actions are ink, and blue is used for
+   nothing but focus.
 2. **Normal is silent.** No dot, badge or label on a healthy thing. The same
-   goes for the interface: panels are closed until asked for, the inspector
-   comes and goes with the selection, and a platform signal shows in the top
-   bar only while it is out of range.
-3. **A model, not a hologram.** No glow, bloom, gradients, additive blending
-   or grid floors.
-4. **A number comes with its normal range.**
-5. **Shape before colour.** Nothing depends on telling two hues apart.
-6. **Motion means something.** Everything that moves answers an action or a
-   change in the data, and does it once (the model assembling, pieces walking
-   to a new layout, a selection's connections being redrawn, a panel sliding
-   in). Nothing idles; the only looping animation is the unacknowledged-alarm
-   blink. All of it respects reduced motion, which the E2E suite runs with.
+   goes for the interface: at rest the screen holds the top bar and the
+   model. Cards come with a selection and leave with it, lists and the
+   request tracer come when asked for, the timeline is on screen only while
+   there is something on it, and a platform signal shows in the top bar only
+   while it is out of range.
+3. **Overview first, then one path, then the detail.** The opening view is
+   the twelve kinds of service; a selection, a traced request or an
+   incident's route brings one path forward; opening a service goes to the
+   detailed arrangements. A new element belongs to one of these levels and
+   appears there, not before.
+4. **Depth is distance along the path.** Nothing is raised for emphasis. The
+   default view is nearly parallel (a 14° lens).
+5. **A model, not a hologram.** Matte porcelain pieces read from shading and
+   shadow. No glow, bloom, gradients, additive blending or grid floors.
+6. **A number comes with its normal range.**
+7. **Shape before colour.** Nothing depends on telling two hues apart.
+8. **Motion means something.** Traffic moves because requests do: the beads,
+   and the one working part of each piece (a door that turns, a line that
+   advances), which runs at the pace of its service's throughput and stands
+   still when nothing passes. How it moves is the service's state, the same
+   way for every piece: evenly when healthy, hesitating when degraded,
+   jammed and pushing when critical, hanging crooked and still when down.
+   Everything else that moves answers an action
+   or a change in the data, and does it once (the model assembling, pieces
+   walking to a new arrangement, a selection's connections being redrawn,
+   the camera moving in on a traced path, a card sliding in). A piece never
+   spins, bobs or pulses as a whole, and nothing else repeats but the
+   unacknowledged-alarm blink. The camera never moves by itself once the
+   viewer has taken it. All of it respects reduced motion, which the E2E
+   suite runs with and which leaves every mechanism as it was modelled.
 
 Tokens are CSS custom properties in `apps/web/src/index.css`, mirrored as
 literals in `apps/web/src/lib/palette.ts` because the 3D scene cannot read
 custom properties. Change both together, for both themes (light and night).
-Type is B612 in two weights; B612 Mono only for literal code; sentence case
-throughout.
+Controls use the `rounded-control` radius; a `.panel` takes the card radius
+from its class, and one that floats over the model also takes `.floating`
+for its shadow. Type is B612 in two weights; B612 Mono only for literal code;
+sentence case throughout.
 
-Two of these rules are tested: `lib/palette.test.ts` holds the palette to
-them, and an E2E test reads the rendered frame back and asserts no sampled
-pixel has a hue while the platform is healthy.
+These rules are tested: `lib/palette.test.ts` holds the palette to them,
+`lib/overview.test.ts` holds the overview to its arithmetic, and E2E tests
+read the rendered frame back and assert that no sampled pixel has a hue while
+the platform is healthy and nothing is selected, and that hue comes and goes
+with a selection, a traced request and an incident.
 
 Do not put `backdrop-filter` over the canvas. It was measured to cost several
 times more than the scene itself (`docs/PERFORMANCE.md`).

@@ -1,12 +1,15 @@
 import type { Health } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Activity,
   Box,
   CircleHelp,
+  Ellipsis,
+  History,
   KeyRound,
-  PanelLeft,
-  PanelRight,
-  Plug,
+  List,
+  Play,
+  Search,
   Settings,
   Table2,
 } from 'lucide-react';
@@ -14,8 +17,9 @@ import {
 import { actions } from '@/app/actions';
 import { queryKeys } from '@/app/queryClient';
 import { HealthGlyph } from '@/components/ui/Badge';
-import { Button, IconButton } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
+import { Menu } from '@/components/ui/Menu';
 import { Deviations } from '@/features/hud/Hud';
 import { cn } from '@/lib/cn';
 import { COLOR, DATA_SOURCE_HINT, DATA_SOURCE_LABEL, HEALTH_COLOR } from '@/lib/palette';
@@ -75,8 +79,8 @@ function PlatformStatus() {
       <button
         type="button"
         className={cn(
-          'flex min-w-0 max-w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left text-xs transition-colors hover:bg-raised',
-          abnormal ? 'font-bold' : 'text-ink-dim hover:text-ink',
+          'flex min-w-0 max-w-full items-center gap-2 rounded-control px-1.5 py-1 text-left text-xs transition-colors hover:bg-raised',
+          abnormal ? 'font-bold' : 'text-ink-faint hover:text-ink',
         )}
         style={abnormal ? { color: HEALTH_COLOR[level] } : undefined}
         title={abnormal ? 'Show the incident' : 'Show the platform overview'}
@@ -137,8 +141,8 @@ function ConnectionHealth() {
 }
 
 /**
- * Where the data comes from, in words: simulation, and any live adapters.
- * The statement is also the way to the integrations that could change it.
+ * Where the data comes from, in a word, on every screen: this is a
+ * simulation. It is also the way to the integrations that could add to it.
  */
 function Provenance() {
   const topology = useTelemetry((state) => state.topology);
@@ -147,7 +151,6 @@ function Provenance() {
     queryFn: api.providers,
     refetchInterval: 5000,
   });
-  const openPanel = useUi((state) => state.openPanel);
   const setPanel = useUi((state) => state.setPanel);
   const live =
     providers?.filter((p) => p.kind === 'live-adapter' && p.state === 'connected').length ?? 0;
@@ -158,22 +161,23 @@ function Provenance() {
       'Everything shown is produced by the built-in simulation.';
   return (
     <div data-testid="mode-switch" data-mode={connected ? 'connected' : 'demo'}>
-      <Button
-        size="sm"
-        variant="ghost"
-        icon={<Plug size={13} aria-hidden />}
-        pressed={openPanel === 'integrations'}
+      <button
+        type="button"
         onClick={() => setPanel('integrations')}
-        aria-label="Integrations"
+        aria-label={`Simulated: ${hint} Open integrations.`}
         title={`${hint} Open integrations.`}
         data-testid="open-integrations"
+        className="inline-flex h-7 items-center gap-2 rounded-control bg-sunken px-2.5 text-[11px] text-ink-dim transition-colors hover:text-ink"
       >
-        <span className="hidden lg:inline">
+        {/* A mark, not a lamp: it has no state to show. */}
+        <span aria-hidden className="size-1.5 rounded-full border border-current" />
+        <span className="max-xl:hidden">
           {connected
-            ? `Simulation with ${live} live integration${live === 1 ? '' : 's'}`
-            : `${topology ? DATA_SOURCE_LABEL[topology.dataSource] : 'Synthetic'} data, simulated`}
+            ? `Simulated, with ${live} live integration${live === 1 ? '' : 's'}`
+            : `Simulated, ${(topology ? DATA_SOURCE_LABEL[topology.dataSource] : 'Synthetic').toLowerCase()} data`}
         </span>
-      </Button>
+        <span className="xl:hidden">Simulated</span>
+      </button>
     </div>
   );
 }
@@ -186,9 +190,10 @@ function TopologyPicker() {
     <Select
       label="Environment"
       hideLabel
+      quiet
       value={topology.id}
       onChange={(event) => void actions.selectTopology(event.target.value)}
-      className="w-44"
+      className="w-40"
       data-testid="topology-picker"
     >
       {data.topologies.map((t) => (
@@ -200,116 +205,127 @@ function TopologyPicker() {
   );
 }
 
+/**
+ * The bar: what this is, how it is, and the two things to do first. The rest
+ * of the application is one step away, in the menu at its end and in the
+ * model itself.
+ */
 export function TopNav() {
   const viewMode = useUi((state) => state.viewMode);
-  const setViewMode = useUi((state) => state.setViewMode);
-  const openPanel = useUi((state) => state.openPanel);
-  const togglePanel = useUi((state) => state.togglePanel);
-  const explorerOpen = useUi((state) => state.explorerOpen);
-  const inspectorOpen = useUi((state) => state.inspectorOpen);
-  const setExplorerOpen = useUi((state) => state.setExplorerOpen);
-  const setInspectorOpen = useUi((state) => state.setInspectorOpen);
+  const incidentsOpen = useUi((state) => state.explorerOpen && state.leftTab === 'incidents');
+  const timelineOpen = useUi((state) => state.timelineOpen);
+  const incidentActive = useTelemetry((state) => {
+    const incident = state.snapshot?.incident;
+    return incident != null && incident.status !== 'resolved';
+  });
 
   return (
     // On a narrow screen the controls drop to a second row, so the sentence
     // that says how the platform is keeps its place.
-    <header className="relative z-30 flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 border-b border-line bg-paper px-2">
-      <IconButton
-        label={explorerOpen ? 'Hide explorer' : 'Show explorer'}
-        pressed={explorerOpen}
-        onClick={() => setExplorerOpen(!explorerOpen)}
-        data-testid="toggle-explorer"
-      >
-        <PanelLeft size={16} />
-      </IconButton>
+    <header className="relative z-30 flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 border-b border-line bg-plate px-3">
       <div className="flex items-center gap-2 text-ink">
         <Logo />
         <h1 className="text-sm font-bold">AEGIS</h1>
       </div>
-
+      <span aria-hidden className="h-4 w-px bg-line-strong max-md:hidden" />
       <div className="hidden md:block">
         <TopologyPicker />
       </div>
+      {/* The sentence comes first and keeps its width; the instruments take
+          what is left of the row. */}
       <div className="flex min-w-0 flex-[1_1_11rem] items-center gap-5">
         <PlatformStatus />
-        <div className="hidden shrink-0 md:block">
+        <div className="hidden min-w-0 flex-1 basis-0 md:block">
           <Deviations />
         </div>
       </div>
 
-      <div className="ml-auto flex h-11 shrink-0 items-center gap-1.5">
+      <div className="ml-auto flex h-12 shrink-0 items-center gap-2">
         <ConnectionHealth />
+        <Provenance />
         <button
           type="button"
           onClick={() => useUi.getState().setCommandOpen(true)}
-          className="hidden h-7 items-center gap-2 rounded-[3px] border border-line px-2 text-[11px] text-ink-faint transition-colors hover:border-line-strong hover:text-ink xl:flex"
-          aria-label="Go to anything"
+          className="inline-flex h-8 items-center gap-2 rounded-control border border-line bg-paper px-2.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+          aria-label="Search services and commands"
           data-testid="open-command"
         >
-          Go to
-          <kbd className="code text-[10px]">Ctrl K</kbd>
+          <Search size={14} aria-hidden />
+          <span className="max-lg:hidden">Search</span>
+          <kbd className="code text-[10px] text-ink-faint max-xl:hidden">Ctrl K</kbd>
         </button>
-        <Provenance />
-        <div
-          role="radiogroup"
-          aria-label="Topology view"
-          className="flex overflow-hidden rounded-[3px] border border-line-strong"
+        <Button
+          variant="primary"
+          icon={<Play size={13} aria-hidden />}
+          aria-expanded={incidentsOpen}
+          onClick={() => {
+            const ui = useUi.getState();
+            if (incidentsOpen) ui.setExplorerOpen(false);
+            else ui.setLeftTab('incidents');
+          }}
+          data-testid="explore-incident"
         >
-          {(
-            [
-              ['scene', '3D view', Box],
-              ['table', 'Table view', Table2],
-            ] as const
-          ).map(([mode, label, Icon]) => (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={viewMode === mode}
-              aria-label={label}
-              title={label}
-              onClick={() => setViewMode(mode)}
-              className={cn(
-                'flex size-7 items-center justify-center border-r border-line-strong transition-colors last:border-r-0',
-                viewMode === mode
-                  ? 'bg-accent text-on-accent'
-                  : 'bg-paper text-ink-dim hover:bg-raised hover:text-ink',
-              )}
-            >
-              <Icon size={14} aria-hidden />
-            </button>
-          ))}
-        </div>
-        <IconButton
-          label="Authorization explorer"
-          pressed={openPanel === 'authorization'}
-          onClick={() => togglePanel('authorization')}
-          data-testid="open-authorization"
-        >
-          <KeyRound size={16} />
-        </IconButton>
-        <IconButton
-          label="Settings"
-          pressed={openPanel === 'settings'}
-          onClick={() => togglePanel('settings')}
-        >
-          <Settings size={16} />
-        </IconButton>
-        <IconButton
-          label="Help and legend"
-          pressed={openPanel === 'help'}
-          onClick={() => togglePanel('help')}
-        >
-          <CircleHelp size={16} />
-        </IconButton>
-        <IconButton
-          label={inspectorOpen ? 'Hide inspector' : 'Show inspector'}
-          pressed={inspectorOpen}
-          onClick={() => setInspectorOpen(!inspectorOpen)}
-          data-testid="toggle-inspector"
-        >
-          <PanelRight size={16} />
-        </IconButton>
+          {incidentActive ? 'Follow the incident' : 'Explore an incident'}
+        </Button>
+        <Menu
+          label="More"
+          testId="open-menu"
+          icon={<Ellipsis size={17} />}
+          items={[
+            {
+              id: 'trace',
+              label: 'Trace a request through Cedar',
+              icon: <KeyRound size={14} />,
+              onSelect: () => useUi.getState().togglePanel('authorization'),
+            },
+            {
+              id: 'services',
+              label: 'List every service',
+              hint: '/',
+              icon: <List size={14} />,
+              onSelect: () => useUi.getState().setLeftTab('explorer'),
+            },
+            {
+              id: 'overview',
+              label: 'Platform signals',
+              icon: <Activity size={14} />,
+              onSelect: () => {
+                const ui = useUi.getState();
+                ui.select(null);
+                ui.setPanel(null);
+                ui.setInspectorOpen(true);
+              },
+            },
+            {
+              id: 'timeline',
+              label: 'Timeline and playback',
+              icon: <History size={14} />,
+              checked: timelineOpen,
+              onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
+            },
+            {
+              id: 'view',
+              label: viewMode === 'scene' ? 'Table view' : '3D model',
+              hint: 'T',
+              icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
+              onSelect: () =>
+                useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+            },
+            {
+              id: 'settings',
+              label: 'Settings',
+              icon: <Settings size={14} />,
+              onSelect: () => useUi.getState().setPanel('settings'),
+            },
+            {
+              id: 'help',
+              label: 'Help and legend',
+              hint: '?',
+              icon: <CircleHelp size={14} />,
+              onSelect: () => useUi.getState().setPanel('help'),
+            },
+          ]}
+        />
       </div>
     </header>
   );

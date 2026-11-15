@@ -39,6 +39,68 @@ describe('selection', () => {
   });
 });
 
+describe('the two levels', () => {
+  it('opens on the overview', () => {
+    expect(useUi.getState().layoutMode).toBe('layers');
+  });
+
+  it('selects a kind of service without leaving the overview', () => {
+    useUi.getState().select({ kind: 'group', id: 'kind:database' });
+    const state = useUi.getState();
+    expect(state.layoutMode).toBe('layers');
+    expect(state.selection).toEqual({ kind: 'group', id: 'kind:database' });
+    expect(state.inspectorOpen).toBe(true);
+  });
+
+  it('opens a service in the detailed arrangement last used', () => {
+    useUi.getState().selectNode('use-orders-db');
+    expect(useUi.getState().layoutMode).toBe('regions');
+    // The choice between the two detailed arrangements is remembered.
+    useUi.getState().setLayoutMode('dependencies');
+    useUi.getState().setLayoutMode('layers');
+    expect(useUi.getState().selection).toBeNull();
+    useUi.getState().select({ kind: 'edge', id: 'use-gateway->use-cedar' });
+    expect(useUi.getState().layoutMode).toBe('dependencies');
+  });
+
+  it('keeps a selection between the two detailed arrangements, not across levels', () => {
+    useUi.getState().selectNode('use-gateway');
+    useUi.getState().setLayoutMode('dependencies');
+    expect(useUi.getState().selection).toEqual({ kind: 'node', id: 'use-gateway' });
+    useUi.getState().setLayoutMode('layers');
+    expect(useUi.getState().selection).toBeNull();
+    expect(useUi.getState().inspectorOpen).toBe(false);
+
+    useUi.getState().select({ kind: 'group', id: 'kind:api-gateway' });
+    useUi.getState().setLayoutMode('regions');
+    expect(useUi.getState().selection).toBeNull();
+  });
+});
+
+describe('a traced request', () => {
+  it('stays drawn after it has arrived, until something else is asked for', () => {
+    useUi.getState().togglePanel('authorization');
+    useUi.getState().traceDecision(decisionDeny());
+    expect(useUi.getState().tracing).toBe(true);
+    // The scene reports the request has arrived: the path is still there.
+    useUi.getState().setTracing(false);
+    expect(useUi.getState().tracedDecision).not.toBeNull();
+
+    // A selection takes the stage from it.
+    useUi.getState().select({ kind: 'group', id: 'kind:cedar-authorizer' });
+    expect(useUi.getState().tracedDecision).toBeNull();
+  });
+
+  it('is put away with the panel it was asked for in', () => {
+    useUi.getState().togglePanel('authorization');
+    useUi.getState().traceDecision(decisionDeny());
+    useUi.getState().setInspectorOpen(false);
+    expect(useUi.getState().tracedDecision).toBeNull();
+    expect(useUi.getState().tracing).toBe(false);
+    expect(useUi.getState().openPanel).toBeNull();
+  });
+});
+
 describe('filters', () => {
   it('toggle membership and report whether anything is active', () => {
     const ui = useUi.getState();

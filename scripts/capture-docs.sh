@@ -39,25 +39,25 @@ shot() { (cd "$ROOT/apps/web" && node scripts/capture.mjs --url "$URL" --reset "
 echo "Capturing to $OUT"
 # The compositor can only capture the WebGL 2 canvas in headless Chrome, so
 # interface screenshots use that backend (same shaders, real GPU).
-shot --webgl2 --settings "$LIGHT" --wait 55 --node use-gateway --settle 2 --out "$OUT/overview.png"
-shot --webgl2 --settings "$LIGHT" --wait 10 --click toggle-explorer,tab-incidents,scenario-start-ddos-surge --settle 27 --out "$OUT/incident-ddos.png"
-shot --webgl2 --settings "$NIGHT" --wait 10 --click toggle-explorer,tab-incidents,scenario-start-regional-outage --settle 19 --out "$OUT/incident-regional-outage.png"
-shot --webgl2 --settings "$LIGHT" --wait 10 --click open-authorization \
+# The overview, with a kind of service selected: the opening view and its card.
+shot --webgl2 --settings "$LIGHT" --wait 55 --node kind:api-gateway --settle 2 --out "$OUT/overview.png"
+shot --webgl2 --settings "$LIGHT" --wait 10 --click explore-incident,scenario-start-ddos-surge --settle 27 --out "$OUT/incident-ddos.png"
+# A regional failure is read by place: the arrangement by region.
+shot --webgl2 --settings "$NIGHT" --arrangement regions --wait 10 --click explore-incident,scenario-start-regional-outage --settle 19 --out "$OUT/incident-regional-outage.png"
+shot --webgl2 --settings "$LIGHT" --wait 10 --click open-menu,menu-trace \
   --select 'authz-principal=User::"mallory",authz-action=Action::"exportLedger"' --then authz-evaluate \
-  --settle 1.6 --out "$OUT/cedar-denial.png"
-shot --webgl2 --settings "$LIGHT" --wait 10 --focus use-gateway --settle 2 --out "$OUT/closeup.png"
-shot hyperscale-stress --webgl2 --settings "$LIGHT" --wait 12 --out "$OUT/stress-regions.png"
-shot hyperscale-stress --webgl2 --settings "$LIGHT" --wait 9 \
-  --eval "document.querySelector('[aria-label=\"Topology layout\"] [role=radio]:last-child').click()" \
-  --settle 4 --out "$OUT/stress-dependencies.png"
-shot --webgl2 --settings "$LIGHT" --wait 8 \
-  --eval "document.querySelector('[aria-label=\"Table view\"]').click()" --settle 2 --out "$OUT/table-view.png"
+  --settle 5 --out "$OUT/cedar-denial.png"
+shot --webgl2 --settings "$LIGHT" --arrangement regions --wait 10 --focus use-gateway --settle 2 --out "$OUT/closeup.png"
+shot hyperscale-stress --webgl2 --settings "$LIGHT" --wait 10 --out "$OUT/stress-overview.png"
+shot hyperscale-stress --webgl2 --settings "$LIGHT" --arrangement regions --wait 12 --out "$OUT/stress-regions.png"
+shot hyperscale-stress --webgl2 --settings "$LIGHT" --arrangement dependencies --wait 12 --out "$OUT/stress-dependencies.png"
+shot --webgl2 --settings "$LIGHT" --wait 8 --click open-menu,menu-view --settle 2 --out "$OUT/table-view.png"
 # A frame straight from the WebGPU backend, read back from an offscreen target.
 shot --settings "$LIGHT" --wait 9 --scenario ddos-surge --after 24 --readback --out "$OUT/webgpu-frame.png"
 
 # A short clip of an incident from start to mitigation, at 2x.
 shot --webgl2 --settings '{"quality":"high","autoRotate":false,"theme":"light"}' --width 1280 --height 720 --wait 6 \
-  --speed 2 --click toggle-explorer,tab-incidents,scenario-start-ddos-surge --video "$OUT/demo.webm" --duration 27 --out "$OUT/demo.webm"
+  --speed 2 --click explore-incident,scenario-start-ddos-surge --video "$OUT/demo.webm" --duration 27 --out "$OUT/demo.webm"
 if command -v ffmpeg >/dev/null; then
   ffmpeg -loglevel error -y -ss 5 -i "$OUT/demo.webm" -an -c:v libx264 -pix_fmt yuv420p -crf 26 -movflags +faststart "$OUT/demo.mp4"
   # The GIF is a shorter, smaller cut for the README; the MP4 is the full clip.

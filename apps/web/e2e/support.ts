@@ -29,30 +29,58 @@ export async function openApp(page: Page): Promise<void> {
   await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '0');
 }
 
+/** What is used now and then is in the menu at the end of the top bar. */
+export async function fromMenu(page: Page, item: string): Promise<void> {
+  await page.getByTestId('open-menu').click();
+  await page.getByTestId(`menu-${item}`).click();
+}
+
 /**
  * The application opens with the model alone on the stage; panels come when
  * they are asked for. These bring the two that most tests read from.
  */
 export async function openExplorer(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Show explorer' }).click();
+  await fromMenu(page, 'services');
   await expect(page.getByTestId('explorer-count')).toBeVisible();
 }
 
-/** The platform overview: the inspector with nothing selected. */
+/** The platform's own signals: the inspector with nothing selected. */
 export async function openOverview(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Show inspector' }).click();
+  await fromMenu(page, 'overview');
   await expect(page.getByTestId('overview')).toBeVisible();
 }
 
-/** Waits until the 3D scene has been built for the loaded topology. */
-export async function waitForScene(page: Page): Promise<void> {
+/** How many pieces the overview of the bundled topology has: one per kind of service. */
+export const KINDS = 12;
+/** How many services the bundled topology has. */
+export const SERVICES = 51;
+
+/**
+ * Waits until the 3D scene has been built. The application opens on the
+ * overview, which draws one piece per kind of service.
+ */
+export async function waitForScene(page: Page, nodes = KINDS): Promise<void> {
   await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => window.__aegis?.stats().nodes ?? 0), { timeout: 30_000 })
-    .toBe(51);
+    .toBe(nodes);
 }
 
+/** Leaves the overview for an arrangement that shows every service. */
+export async function showEveryService(
+  page: Page,
+  arrangement: 'Regions' | 'Dependencies' = 'Regions',
+): Promise<void> {
+  await page
+    .getByRole('toolbar', { name: 'Scene controls' })
+    .getByRole('radio', { name: arrangement })
+    .click();
+  await waitForScene(page, SERVICES);
+}
+
+/** The timeline is not on screen until there is something on it, or it is asked for. */
 export async function setSpeed(page: Page, speed: 0.5 | 1 | 2 | 4): Promise<void> {
+  if ((await page.getByTestId('timeline').count()) === 0) await fromMenu(page, 'timeline');
   await page
     .getByRole('radiogroup', { name: 'Playback speed' })
     .getByRole('radio', { name: `${speed}×` })

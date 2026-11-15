@@ -28,6 +28,15 @@ cargo build --release -p aegis-server && pnpm build
 The raw output of the run reported here is in
 [`assets/benchmark-2026-11-15.json`](assets/benchmark-2026-11-15.json).
 
+> **These figures predate the current interface.** They were measured on the
+> build named above, before the scene was redrawn around the overview
+> ([DESIGN.md](DESIGN.md)): the pieces were darker, and the application opened
+> on the arrangement by region. The application now opens on an overview of at
+> most twelve pieces, which has not been measured. The benchmark still measures
+> what this page describes, the arrangement that draws every service: it opens
+> the application with `?arrangement=regions`. Run it again before relying on
+> the numbers below for the current build.
+
 ## Frame cost
 
 Frames produced with the frame-rate limit and vsync disabled

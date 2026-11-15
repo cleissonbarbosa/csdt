@@ -25,6 +25,48 @@ export function Section({
   );
 }
 
+/**
+ * A block that stays folded until it is asked for: its title and how much is
+ * inside are on show, the contents are one click away. What a card shows at
+ * once is what answers the first question; the rest waits here.
+ */
+export function Fold({
+  title,
+  count,
+  open,
+  children,
+  testId,
+}: {
+  title: string;
+  count?: number;
+  /** Whether it starts open. */
+  open?: boolean;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <details
+      className="group border-b border-line last:border-b-0"
+      open={open}
+      data-testid={testId}
+    >
+      <summary className="flex list-none items-baseline justify-between gap-2 px-3 py-2.5 hover:bg-raised [&::-webkit-details-marker]:hidden">
+        <h3 className="text-xs font-bold text-ink">{title}</h3>
+        <span className="flex items-baseline gap-2 text-[11px] text-ink-faint">
+          {count !== undefined && <span className="numeric">{count}</span>}
+          <span aria-hidden className="group-open:hidden">
+            Show
+          </span>
+          <span aria-hidden className="hidden group-open:inline">
+            Hide
+          </span>
+        </span>
+      </summary>
+      <div className="px-3 pb-3">{children}</div>
+    </details>
+  );
+}
+
 /** A labelled figure: the building block of every metric readout. */
 export function Stat({
   label,

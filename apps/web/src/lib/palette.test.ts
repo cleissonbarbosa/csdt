@@ -32,24 +32,62 @@ function chroma(hex: string): number {
   return Math.max(...rgb) - Math.min(...rgb);
 }
 
+/** Which of red, green and blue a colour has most of. */
+function dominant(hex: string): number {
+  const rgb = [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16));
+  return rgb.indexOf(Math.max(...rgb));
+}
+
 describe('the palette', () => {
-  it('keeps hue for signals: everything normal is neutral, in both themes', () => {
+  it('keeps hue for answers: everything normal is neutral, in both themes', () => {
     for (const palette of Object.values(SCENE_PALETTE)) {
-      for (const key of ['table', 'plate', 'piece', 'ghost', 'ink', 'inkDim', 'track'] as const) {
+      for (const key of [
+        'table',
+        'plate',
+        'plateSide',
+        'plateLine',
+        'piece',
+        'pieceCore',
+        'ghost',
+        'ink',
+        'inkDim',
+        'track',
+      ] as const) {
         expect(palette[key], key).toMatch(HEX);
         expect(chroma(palette[key]), key).toBeLessThan(16);
       }
       for (const key of ['warning', 'critical', 'hostile'] as const) {
         expect(chroma(palette[key]), key).toBeGreaterThan(120);
       }
+      expect(chroma(palette.focus), 'focus').toBeGreaterThan(100);
     }
   });
 
-  it('makes a signal stand out from the plate it appears on', () => {
+  it('keeps the viewer’s colour apart from the data’s', () => {
+    // Focus answers the viewer and the signals answer the data. Focus is
+    // the only blue; no signal could be taken for it.
     for (const palette of Object.values(SCENE_PALETTE)) {
-      for (const key of ['warning', 'critical', 'hostile', 'ink', 'piece'] as const) {
+      expect(dominant(palette.focus), 'focus').toBe(2);
+      for (const key of ['warning', 'critical', 'hostile'] as const) {
+        expect(dominant(palette[key]), key).toBe(0);
+      }
+    }
+  });
+
+  it('makes an answer stand out from the plate it appears on', () => {
+    for (const palette of Object.values(SCENE_PALETTE)) {
+      for (const key of ['warning', 'critical', 'hostile', 'focus', 'ink'] as const) {
         expect(contrast(palette[key], palette.plate), key).toBeGreaterThanOrEqual(3);
       }
+    }
+  });
+
+  it('draws a piece with light, not with a darker colour', () => {
+    // A piece is the lightest thing on its plate; its shaded sides and its
+    // shadow are what give it a shape. Its mark is the dark thing on it.
+    for (const palette of Object.values(SCENE_PALETTE)) {
+      expect(luminance(palette.piece)).toBeGreaterThan(luminance(palette.plate));
+      expect(contrast(palette.pieceCore, palette.piece)).toBeGreaterThanOrEqual(3);
     }
   });
 

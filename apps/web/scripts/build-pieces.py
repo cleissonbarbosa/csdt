@@ -24,8 +24,20 @@ Each piece is one object named after its service type. It carries:
     it stands on. It is what makes a matte piece read as a solid object
     under the scene's single light. It needs no render engine, so the build
     runs the same in any Blender.
+  * its mechanisms: every piece has one part that works (a door that turns,
+    a line that advances), and the client moves it at the pace of the
+    service's traffic and in the manner of its state: evenly, hesitating,
+    jammed, or hanging crooked and still when the service is down. A
+    mechanism is declared here, where the part is modelled, as a kind of
+    motion about a pivot and an axis, with the way it hangs when it is down
+    (`slump`: an axis through the same pivot and an angle). The faces that
+    belong to it carry its number in the first coordinate of the UV map
+    `mechanism` (exported as TEXCOORD_0; the pieces have no textures), and
+    the list itself travels as a JSON string in the node's `extras`,
+    already in glTF's axes (Y up).
 """
 
+import json
 import math
 import os
 import sys
@@ -47,6 +59,33 @@ SHARP_ANGLE = math.radians(38)
 AO_SAMPLES = 96
 AO_REACH = 1.1
 COLLECTION_NAME = "AEGIS pieces"
+
+# The kinds of motion a mechanism can have. The client's piece material
+# (`src/graphics/materials.ts`) implements each of them; the numbers are the
+# contract between the two.
+#   SPIN    turns about its axis, once per period; `amount` is +1 or -1.
+#   INDEX   turns one notch per period and rests: `amount` notches make a
+#           turn (negative turns the other way) and `extra` is the share of
+#           the period spent moving.
+#   SWING   turns by `amount` radians, holds, and turns back.
+#   SLIDE   moves `amount` along its axis, holds, and moves back.
+#   CONVEY  moves `amount` along its axis and starts again; with `extra` +1
+#           the part grows from nothing as it goes, with -1 it shrinks to
+#           nothing, so a line of equal parts advances without a seam.
+# How a part hesitates or jams is the same for every kind and lives in the
+# client; how it hangs when its service is down is its `slump`, given here
+# as (axis, degrees): the part is turned by that much about that axis,
+# through its pivot, and stays there.
+SPIN, INDEX, SWING, SLIDE, CONVEY = 1, 2, 3, 4, 5
+# The client counts working time in seconds and starts again at this many,
+# so a period has to divide it (and an INDEX has to come round whole) for
+# the wrap not to show.
+WORK_CYCLE = 720
+# A face's mechanism number is stored as this fraction of the U coordinate.
+MECHANISM_STEP = 1 / 16
+# Added to a face's material index while a piece is being modelled when the
+# face is a line drawn on a surface and should not shade it.
+DRAWN = 3 * (round(1 / MECHANISM_STEP) + 1)
 
 HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 DEFAULT_OUTPUT = os.path.normpath(os.path.join(HERE, "..", "src", "graphics", "pieces.glb"))
@@ -105,13 +144,76 @@ class Piece:
     def __init__(self, name):
         self.name = name
         self.bm = bmesh.new()
+        self.mechanisms = []
 
-    def _commit(self, bm, part, matrix=None, flat=False):
+    def mechanism(
+        self,
+        kind,
+        pivot=(0.0, 0.0, 0.0),
+        axis=(0.0, 0.0, 1.0),
+        period=4.0,
+        amount=1.0,
+        offset=0.0,
+        extra=0.0,
+        slump=((1.0, 0.0, 0.0), 0.0),
+    ):
+        """Declares a part that works and returns the number to model it with.
+
+        `period` is in seconds at the pace of normal traffic, and `offset`
+        is where in its period the part starts, 0 to 1. `slump` is how the
+        part hangs when the service is down: an axis and degrees.
+        """
+        turns = WORK_CYCLE / period
+        if abs(turns - round(turns)) > 1e-9:
+            raise ValueError(f"{self.name}: a period of {period} s does not divide {WORK_CYCLE}")
+        if kind == INDEX and round(turns) % round(abs(amount)) != 0:
+            raise ValueError(f"{self.name}: {amount} notches do not come round in {WORK_CYCLE} s")
+        self.mechanisms.append(
+            {
+                "kind": kind,
+                "pivot": tuple(pivot),
+                "axis": tuple(Vector(axis).normalized()),
+                "period": period,
+                "amount": amount,
+                "offset": offset,
+                "extra": extra,
+                "slump_axis": tuple(Vector(slump[0]).normalized()),
+                "slump_angle": math.radians(slump[1]),
+            }
+        )
+        if len(self.mechanisms) * MECHANISM_STEP > 1:
+            raise ValueError(f"{self.name}: too many mechanisms for one coordinate")
+        return len(self.mechanisms)
+
+    def exported_mechanisms(self):
+        """The mechanisms as the client reads them: glTF axes, Y up."""
+
+        def yup(v):
+            return [round(v[0], 6), round(v[2], 6), round(-v[1], 6)]
+
+        return [
+            {
+                "kind": m["kind"],
+                "pivot": yup(m["pivot"]),
+                "axis": yup(m["axis"]),
+                "period": m["period"],
+                "amount": round(m["amount"], 6),
+                "offset": round(m["offset"], 6),
+                "extra": m["extra"],
+                "slump": yup(m["slump_axis"]) + [round(m["slump_angle"], 6)],
+            }
+            for m in self.mechanisms
+        ]
+
+    def _commit(self, bm, part, matrix=None, flat=False, moves=0, drawn=False):
         if matrix is not None:
             bmesh.ops.transform(bm, matrix=matrix, verts=bm.verts[:])
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         for face in bm.faces:
-            face.material_index = part
+            # The mechanism, and whether the face is only drawn on, ride in
+            # the material index until the piece is finished: it is the one
+            # per-face value every operation keeps.
+            face.material_index = part + 3 * moves + (DRAWN if drawn else 0)
             face.smooth = True
         if flat:
             for edge in bm.edges:
@@ -122,12 +224,14 @@ class Piece:
         self.bm.from_mesh(mesh)
         bpy.data.meshes.remove(mesh)
 
-    def lathe(self, profile, part, segments=40, closed=False, matrix=None, flat=False):
+    def lathe(self, profile, part, segments=40, closed=False, matrix=None, flat=False, moves=0, drawn=False):
         """Revolves `profile`, a list of (radius, z), around the Z axis.
 
         A point with radius 0 becomes a pole, so a profile that starts and
         ends on the axis makes a closed solid; `closed` joins the last point
-        back to the first, for rings.
+        back to the first, for rings. `drawn` marks a line drawn on another
+        surface: it is shaded like anything else but casts no occlusion, so
+        the surface under it is not darkened vertex by vertex.
         """
         bm = bmesh.new()
         rings = []
@@ -161,9 +265,9 @@ class Piece:
                     bm.faces.new((a[k], a[n], b[0]))
                 else:
                     bm.faces.new((a[k], a[n], b[n], b[k]))
-        self._commit(bm, part, matrix, flat)
+        self._commit(bm, part, matrix, flat, moves, drawn)
 
-    def prism(self, points, z0, z1, part, bevel=CHAMFER, matrix=None, flat=False):
+    def prism(self, points, z0, z1, part, bevel=CHAMFER, matrix=None, flat=False, moves=0):
         """Extrudes a polygon in XY from `z0` to `z1` and chamfers its corners."""
         bm = bmesh.new()
         bottom = [bm.verts.new((x, y, z0)) for x, y in points]
@@ -193,24 +297,24 @@ class Piece:
                 affect="EDGES",
                 clamp_overlap=True,
             )
-        self._commit(bm, part, matrix, flat)
+        self._commit(bm, part, matrix, flat, moves)
 
-    def box(self, center, size, part, bevel=CHAMFER, matrix=None):
+    def box(self, center, size, part, bevel=CHAMFER, matrix=None, moves=0):
         cx, cy, cz = center
         sx, sy, sz = size
-        self.prism(rect(sx, sy, cx, cy), cz - sz / 2, cz + sz / 2, part, bevel, matrix)
+        self.prism(rect(sx, sy, cx, cy), cz - sz / 2, cz + sz / 2, part, bevel, matrix, moves=moves)
 
-    def slab(self, points, thickness, part, bevel=CHAMFER, y=0.0):
+    def slab(self, points, thickness, part, bevel=CHAMFER, y=0.0, moves=0):
         """A profile drawn in the XZ plane, `thickness` deep along Y."""
         matrix = Matrix.Translation((0.0, y, 0.0)) @ UPRIGHT
-        self.prism(points, -thickness / 2, thickness / 2, part, bevel, matrix)
+        self.prism(points, -thickness / 2, thickness / 2, part, bevel, matrix, moves=moves)
 
-    def sphere(self, center, radius, part, segments=40, rings=18):
+    def sphere(self, center, radius, part, segments=40, rings=18, moves=0):
         profile = [
             (radius * math.sin(math.pi * k / rings), -radius * math.cos(math.pi * k / rings))
             for k in range(rings + 1)
         ]
-        self.lathe(profile, part, segments, matrix=Matrix.Translation(center))
+        self.lathe(profile, part, segments, matrix=Matrix.Translation(center), moves=moves)
 
     def plinth(self, radius=0.64, height=0.12, part=BODY):
         self.lathe(
@@ -238,6 +342,14 @@ class Piece:
         mesh = bpy.data.meshes.new(self.name)
         bm.to_mesh(mesh)
         bm.free()
+        # Take what rode in the material index back out of it.
+        moves = mesh.attributes.new("moves", "INT", "FACE")
+        drawn = mesh.attributes.new("drawn", "BOOLEAN", "FACE")
+        for polygon in mesh.polygons:
+            index = polygon.material_index
+            drawn.data[polygon.index].value = index >= DRAWN
+            moves.data[polygon.index].value = index % DRAWN // 3
+            polygon.material_index = index % 3
         return mesh
 
 
@@ -247,7 +359,7 @@ class Piece:
 
 
 def api_gateway():
-    """A gate: everything that enters the region passes under it."""
+    """A gate with a revolving door: everything that enters passes through it."""
     p = Piece("api-gateway")
     p.box((0, 0, 0.07), (1.96, 1.0, 0.14), BODY)
     base, spring, outer, inner = 0.12, 0.92, 0.82, 0.44
@@ -261,6 +373,19 @@ def api_gateway():
     p.slab(profile, 0.52, BODY, bevel=0.045)
     # The threshold: the way through, marked on the floor of the gate.
     p.box((0, 0, 0.152), (inner * 2 - 0.1, 0.9, 0.024), MARK, bevel=0)
+    # The door turns as requests pass: a quarter of a turn lets one through.
+    # Down, it leans out of the gate.
+    door = p.mechanism(SPIN, pivot=(0, 0, 0.16), period=6, slump=((1, 0, 0), 10))
+    p.lathe([(0, 0.16), (0.045, 0.16), (0.045, 1.03), (0, 1.03)], DETAIL, segments=12, moves=door)
+    for turn in (45, 135):
+        p.box(
+            (0, 0, 0.6),
+            (0.74, 0.05, 0.78),
+            DETAIL,
+            bevel=0.015,
+            matrix=Matrix.Rotation(math.radians(turn), 4, "Z"),
+            moves=door,
+        )
     return p
 
 
@@ -273,15 +398,35 @@ def network_gateway():
     )
     centre = (0.0, 0.0, 1.14)
     radius = 0.7
-    p.sphere(centre, radius, BODY)
     tilt = Matrix.Translation(centre) @ Matrix.Rotation(math.radians(21), 4, "Y")
+    # The globe turns on its tilted axis, inside the meridian that carries it.
+    # Down, it has rolled off its axis: its lines no longer meet the pins.
+    globe = p.mechanism(
+        SPIN,
+        pivot=centre,
+        axis=tilt.to_3x3() @ Vector((0, 0, 1)),
+        period=8,
+        slump=((0.35, 1, 0), 34),
+    )
+    p.sphere(centre, radius, BODY, moves=globe)
     # The equator, standing a little proud of the sphere.
     p.lathe(
         [(radius - 0.02, -0.045), (radius + 0.03, -0.045), (radius + 0.03, 0.045), (radius - 0.02, 0.045)],
         MARK,
         closed=True,
         matrix=tilt,
+        moves=globe,
     )
+    # Two great circles through the poles: the lines its turning is read from.
+    for turn in (45, 135):
+        p.lathe(
+            [(radius - 0.02, -0.028), (radius + 0.018, -0.028), (radius + 0.018, 0.028), (radius - 0.02, 0.028)],
+            MARK,
+            closed=True,
+            matrix=tilt @ Matrix.Rotation(math.radians(turn), 4, "Z") @ UPRIGHT,
+            moves=globe,
+            drawn=True,
+        )
     # The meridian that carries it, pole to pole, and its two pins.
     band = arc(0, 0, 0.9, -90, 90, 24) + arc(0, 0, 0.8, 90, -90, 24)
     p.prism(band, -0.055, 0.055, DETAIL, bevel=0.02, matrix=tilt @ UPRIGHT)
@@ -308,9 +453,14 @@ def security_monitor():
         [(0, 0.84), (tower(0.84), 0.84), (tower(1.2), 1.2), (0.5, 1.24), (0.5, 1.31), (0.2, 1.31), (0, 1.31)],
         BODY,
     )
-    # The lantern room is the mark: the one part that is the light.
-    p.lathe([(0, 1.31), (0.27, 1.31), (0.27, 1.62), (0, 1.62)], MARK)
-    p.lathe([(0, 1.62), (0.4, 1.62), (0.4, 1.67), (0.06, 1.98), (0, 1.98)], BODY)
+    # The lantern room is the mark: the one part that is the light. A hood
+    # turns round it, so the lamp looks one way at a time and sweeps.
+    # Down, the whole head of the tower sits crooked, roof and all.
+    lantern = p.mechanism(SPIN, pivot=(0, 0, 1.31), period=6, slump=((1, -0.4, 0), 11))
+    p.lathe([(0, 1.31), (0.27, 1.31), (0.27, 1.62), (0, 1.62)], MARK, moves=lantern)
+    hood = arc(0, 0, 0.315, -30, 210, 24) + arc(0, 0, 0.25, 210, -30, 24)
+    p.prism(hood, 1.31, 1.62, BODY, bevel=0, moves=lantern)
+    p.lathe([(0, 1.62), (0.4, 1.62), (0.4, 1.67), (0.06, 1.98), (0, 1.98)], BODY, moves=lantern)
     return p
 
 
@@ -326,7 +476,17 @@ def auth_service():
     )
     p.slab(profile, 0.3, BODY, bevel=0.05)
     keyhole = arc(0, 1.3, 0.19, -62, 242, 22) + [(-0.13, 0.74), (0.13, 0.74)]
-    p.slab(keyhole, 0.34, MARK, bevel=0)
+    # The lock turns a quarter for each sign-in, and turns back.
+    # Down, it hangs turned the wrong way.
+    lock = p.mechanism(
+        SWING,
+        pivot=(0, 0, 1.3),
+        axis=(0, -1, 0),
+        period=3,
+        amount=math.radians(90),
+        slump=((0, -1, 0), -38),
+    )
+    p.slab(keyhole, 0.34, MARK, bevel=0, moves=lock)
     return p
 
 
@@ -339,7 +499,21 @@ def cedar_authorizer():
     for index, (z, radius, height) in enumerate(tiers):
         last = index == len(tiers) - 1
         top = [(0, z + height)] if last else [(radius * 0.3, z + height), (0, z + height)]
-        p.lathe([(0, z), (radius, z), (radius, z + 0.04)] + top, BODY, segments=8, flat=True)
+        # A decision weighs three things (who, what, on which resource): the
+        # tiers turn a notch one after another, from the foot up, each
+        # against the one below it.
+        # Down, every tier sits crooked on the one below, each its own way.
+        lean = (((1, 0.2, 0), 7), ((-0.4, 1, 0), -10), ((-0.8, -0.6, 0), 13))[index]
+        notch = p.mechanism(
+            INDEX,
+            pivot=(0, 0, z),
+            period=2.5,
+            amount=8 if index % 2 == 0 else -8,
+            offset=(len(tiers) - index) % len(tiers) / len(tiers),
+            extra=0.3,
+            slump=lean,
+        )
+        p.lathe([(0, z), (radius, z), (radius, z + 0.04)] + top, BODY, segments=8, flat=True, moves=notch)
     return p
 
 
@@ -348,13 +522,16 @@ def microservice():
     p = Piece("microservice")
     p.prism(polygon(6, 0.88), 0.0, 0.46, BODY, bevel=0.045)
     p.prism(polygon(6, 0.78), 0.44, 0.56, DETAIL, bevel=0)
-    p.prism(polygon(6, 0.88), 0.54, 0.82, BODY, bevel=0.045)
-    p.prism(polygon(6, 0.42), 0.8, 0.846, MARK, bevel=0)
+    # The lid turns one side on for each piece of work it takes.
+    # Down, the lid is knocked askew and one side of the cell stands open.
+    lid = p.mechanism(INDEX, pivot=(0, 0, 0.55), period=2, amount=6, extra=0.35, slump=((0.3, 1, 0), 9))
+    p.prism(polygon(6, 0.88), 0.54, 0.82, BODY, bevel=0.045, moves=lid)
+    p.prism(polygon(6, 0.42), 0.8, 0.846, MARK, bevel=0, moves=lid)
     return p
 
 
 def container():
-    """A shipping container, corrugated sides and all."""
+    """A shipping container, corrugated sides and all, its doors at work."""
     p = Piece("container")
     length, width, height, floor = 1.84, 0.86, 0.9, 0.06
     p.box((0, 0, floor + height / 2), (length, width, height), BODY, bevel=0.03)
@@ -367,9 +544,24 @@ def container():
         for sy in (-1, 1):
             p.box((x, sy * (width / 2 + 0.012), floor + height / 2), (0.085, 0.05, height - 0.2), DETAIL, bevel=0.012)
         p.box((x, 0, floor + height + 0.008), (0.085, width - 0.2, 0.04), DETAIL, bevel=0.012)
-    # The door end, with its two locking bars.
+    # The door end faces the way work arrives. Its two leaves swing open to
+    # take a load in and close on it; what is behind them is dark.
+    end = -length / 2
+    middle = floor + height / 2
+    leaf = 0.34
+    p.box((end - 0.004, 0, middle), (0.02, leaf * 2, height - 0.18), MARK, bevel=0)
     for sy in (-1, 1):
-        p.box((length / 2 + 0.01, sy * 0.14, floor + height / 2), (0.04, 0.05, height - 0.16), MARK, bevel=0)
+        # Down, the doors are left hanging, one wide and one ajar.
+        door = p.mechanism(
+            SWING,
+            pivot=(end - 0.03, sy * leaf, middle),
+            period=6,
+            amount=-sy * math.radians(105),
+            slump=((0, 0, 1), 62 if sy < 0 else -20),
+        )
+        p.box((end - 0.03, sy * leaf / 2, middle), (0.03, leaf, height - 0.14), BODY, bevel=0.01, moves=door)
+        # Its locking bar.
+        p.box((end - 0.05, sy * 0.13, middle), (0.03, 0.05, height - 0.22), MARK, bevel=0, moves=door)
     return p
 
 
@@ -378,20 +570,47 @@ def serverless():
     p = Piece("serverless")
     p.plinth(0.66)
     bolt = [(0.09, 1.96), (-0.6, 0.86), (-0.03, 0.86), (-0.11, 0.08), (0.6, 1.2), (0.03, 1.2)]
-    p.slab(bolt, 0.3, BODY, bevel=0.045)
+    # It strikes once for each call, a whole turn, and stands still between.
+    # Down, the bolt has keeled over.
+    strike = p.mechanism(INDEX, pivot=(0, 0, 0.1), period=2.5, amount=1, extra=0.45, slump=((0, 1, 0), 24))
+    p.slab(bolt, 0.3, BODY, bevel=0.045, moves=strike)
     return p
 
 
 def message_queue():
-    """Messages standing in line; the next one out is marked."""
+    """Messages standing in line; where the next one leaves is marked."""
     p = Piece("message-queue")
     p.box((0, 0, 0.07), (1.96, 0.92, 0.14), BODY)
     for sy in (-1, 1):
         p.box((0, sy * 0.4, 0.19), (1.96, 0.07, 0.12), DETAIL, bevel=0.02)
-    slots = 5
-    for k in range(slots):
-        x = (k - (slots - 1) / 2) * 0.36
-        p.box((x, 0, 0.14 + 0.36), (0.17, 0.64, 0.72), MARK if k == slots - 1 else BODY, bevel=0.03)
+    slots, pitch = 5, 0.36
+    first = -(slots - 1) / 2 * pitch
+    head = first + (slots - 1) * pitch
+    # The head of the line, marked on the floor of the tray.
+    p.box((head + 0.1, 0, 0.152), (0.34, 0.7, 0.024), MARK, bevel=0)
+
+    def message(x, moves):
+        p.box((x, 0, 0.14 + 0.36), (0.17, 0.64, 0.72), BODY, bevel=0.03, moves=moves)
+
+    # The line moves up one place at a time. The message at the head goes
+    # as it leaves the tray and a new one comes at the tail, so the line is
+    # the same after every step. Each message is a mechanism of its own
+    # because, down, each leans on its own foot: the line has fallen forward.
+    def place(x, amount, extra=0):
+        return p.mechanism(
+            CONVEY,
+            pivot=(x, 0, 0.14),
+            axis=(1, 0, 0),
+            period=2,
+            amount=amount,
+            extra=extra,
+            slump=((0, 1, 0), 17),
+        )
+
+    for k in range(slots - 1):
+        message(first + k * pitch, place(first + k * pitch, pitch))
+    message(head, place(head, pitch, -1))
+    message(first, place(first, 0, 1))
     return p
 
 
@@ -399,8 +618,14 @@ def database():
     """The stack of platters every diagram draws."""
     p = Piece("database")
     radius, platter, gap = 0.8, 0.42, 0.09
+    # The platters turn together. A round thing turning shows nothing, so
+    # each carries a tick on its rim and the mark on top has a slot. Each is
+    # a mechanism of its own because, down, the stack has slipped: the upper
+    # two sit crooked on the one that still stands.
+    slips = (((1, 0, 0), 0), ((1, 0.3, 0), 4.5), ((-0.5, 1, 0), -6))
     for k in range(3):
         z = k * (platter + gap)
+        turning = p.mechanism(SPIN, pivot=(0, 0, z), period=6, slump=slips[k])
         p.lathe(
             [
                 (0, z),
@@ -413,15 +638,28 @@ def database():
             ],
             BODY,
             segments=48,
+            moves=turning,
         )
         if k < 2:
             p.lathe(
                 [(0, z + platter - 0.01), (radius - 0.1, z + platter - 0.01), (radius - 0.1, z + platter + gap + 0.01), (0, z + platter + gap + 0.01)],
                 DETAIL,
                 segments=48,
+                moves=turning,
             )
+        p.box(
+            (radius + 0.004, 0, z + platter / 2),
+            (0.05, 0.08, platter - 0.16),
+            MARK,
+            bevel=0,
+            matrix=Matrix.Rotation(math.radians(250 + 120 * k), 4, "Z"),
+            moves=turning,
+        )
     top = 3 * platter + 2 * gap
-    p.lathe([(0, top - 0.01), (0.5, top - 0.01), (0.5, top + 0.022), (0, top + 0.022)], MARK, segments=48)
+    slot = 0.04
+    opening = math.degrees(math.asin(slot / 0.5))
+    disc = arc(0, 0, 0.5, opening, 360 - opening, 46) + [(0.16, -slot), (0.16, slot)]
+    p.prism(disc, top - 0.01, top + 0.022, MARK, bevel=0, moves=turning)
     return p
 
 
@@ -438,13 +676,24 @@ def storage():
         ((0.24, 0.16, 0.9), 0.44, -24, -12),
         ((0.02, -0.02, 1.22), 0.4, 40, 16),
     )
-    for centre, size, turn, lean in blocks:
+    for index, (centre, size, turn, lean) in enumerate(blocks):
         matrix = (
             Matrix.Translation(centre)
             @ Matrix.Rotation(math.radians(turn), 4, "Z")
             @ Matrix.Rotation(math.radians(lean), 4, "X")
         )
-        p.box((0, 0, 0), (size, size, size), MARK, bevel=0.035, matrix=matrix)
+        # Objects are lifted out and put back, one after another.
+        # Down, they lie as they fell.
+        tumble = (((1, 0.5, 0), 34), ((-0.3, 1, 0), -28), ((0.8, -1, 0), 40))[index]
+        lift = p.mechanism(
+            SLIDE,
+            pivot=centre,
+            period=3,
+            amount=0.24,
+            offset=index / len(blocks),
+            slump=tumble,
+        )
+        p.box((0, 0, 0), (size, size, size), MARK, bevel=0.035, matrix=matrix, moves=lift)
     return p
 
 
@@ -468,7 +717,10 @@ def external_client():
         ],
         BODY,
     )
-    p.sphere((0, 0, 1.46), 0.32, MARK)
+    # The head lifts each time it asks for something.
+    # Down, it hangs.
+    ask = p.mechanism(SLIDE, pivot=(0, 0, 1.17), period=2.5, amount=0.16, slump=((0, 1, 0), 32))
+    p.sphere((0, 0, 1.46), 0.32, MARK, moves=ask)
     return p
 
 
@@ -505,10 +757,24 @@ def hemisphere(count):
     return directions
 
 
+def tag_mechanisms(mesh):
+    """Writes the mechanism each face belongs to into the `mechanism` UV map."""
+    moves = [item.value for item in mesh.attributes["moves"].data]
+    layer = mesh.uv_layers.new(name="mechanism")
+    for polygon in mesh.polygons:
+        for loop_index in polygon.loop_indices:
+            layer.data[loop_index].uv = (moves[polygon.index] * MECHANISM_STEP, 0.0)
+
+
 def bake_occlusion(mesh):
-    """Writes how open each corner is to the sky into the `ao` attribute."""
+    """Writes how open each corner is to the sky into the `ao` attribute.
+
+    A part that moves keeps the shading it has where it was modelled, which
+    is why every mechanism rests in a pose its surroundings shade evenly.
+    """
     vertices = [v.co.copy() for v in mesh.vertices]
-    triangles = [tuple(p.vertices) for p in mesh.polygons]
+    drawn = [item.value for item in mesh.attributes["drawn"].data]
+    triangles = [tuple(p.vertices) for p in mesh.polygons if not drawn[p.index]]
     # The plate the piece stands on shades its foot.
     base = len(vertices)
     reach = 6.0
@@ -592,11 +858,15 @@ def build_all():
     materials = [export_material(index) for index in range(3)]
     objects = []
     for builder in BUILDERS:
-        mesh = builder().finish()
+        piece = builder()
+        mesh = piece.finish()
         for material in materials:
             mesh.materials.append(material)
         bake_occlusion(mesh)
+        tag_mechanisms(mesh)
         obj = bpy.data.objects.new(mesh.name, mesh)
+        # A custom property is exported as the node's `extras`.
+        obj["mechanisms"] = json.dumps(piece.exported_mechanisms(), separators=(",", ":"))
         collection.objects.link(obj)
         objects.append(obj)
     return scene, objects
@@ -619,7 +889,7 @@ def export(scene, objects, path=DEFAULT_OUTPUT):
         export_apply=True,
         export_yup=True,
         export_normals=True,
-        export_texcoords=False,
+        export_texcoords=True,
         export_tangents=False,
         export_materials="EXPORT",
         export_vertex_color="ACTIVE",
@@ -627,7 +897,7 @@ def export(scene, objects, path=DEFAULT_OUTPUT):
         export_animations=False,
         export_skins=False,
         export_morph=False,
-        export_extras=False,
+        export_extras=True,
         export_cameras=False,
         export_lights=False,
     )

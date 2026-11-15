@@ -6,28 +6,28 @@ import { COLOR, HEALTH_LABEL, SERVICE_TYPE, TRAFFIC_LEGEND, type BeadShape } fro
 import { useUi } from '@/stores/ui';
 
 const SHAPES: Record<(typeof SERVICE_TYPES)[number], string> = {
-  'api-gateway': 'A gate: an arch requests pass under',
-  'auth-service': 'A shield with a keyhole',
-  'cedar-authorizer': 'A cedar tree',
-  microservice: 'A hexagonal cell with its lid on',
-  container: 'A shipping container',
-  serverless: 'A lightning bolt',
-  'message-queue': 'Slabs standing in line; the next one out is marked',
-  database: 'A stack of platters',
-  storage: 'A bucket with objects in it',
-  'network-gateway': 'A desk globe',
-  'security-monitor': 'A lighthouse, on a mast above the edge',
-  'external-client': 'A pawn',
+  'api-gateway': 'A gate; its door turns as requests pass',
+  'auth-service': 'A shield; its lock turns for each sign-in',
+  'cedar-authorizer': 'A cedar; its tiers turn a notch for each decision',
+  microservice: 'A hexagonal cell; its lid turns one side on',
+  container: 'A shipping container; its doors open to take work in',
+  serverless: 'A lightning bolt; it strikes once for each call',
+  'message-queue': 'Slabs standing in line; the line moves up as they are taken',
+  database: 'A stack of platters, turning',
+  storage: 'A bucket; objects are lifted out and put back',
+  'network-gateway': 'A desk globe, turning',
+  'security-monitor': 'A lighthouse above the edge; its lamp sweeps round',
+  'external-client': 'A pawn; its head lifts as it asks',
 };
 
 const KEYS: [string, string][] = [
   ['Space', 'Play or pause the simulation'],
   ['R', 'Reset the camera'],
-  ['F', 'Focus the selected service'],
+  ['F', 'Move in on what is selected'],
   ['Esc', 'Let go of the selection, then put the panels away'],
   ['Ctrl K', 'Go to anything: a service, a region, a scenario, an action'],
   ['/', 'Search services'],
-  ['L', 'Switch layout: regions or dependencies'],
+  ['L', 'Next arrangement: overview, by region, by dependency'],
   ['T', 'Switch between the 3D view and the table'],
   ['P', 'Toggle the performance overlay'],
   ['?', 'Open this help'],
@@ -65,7 +65,7 @@ function Heading({ children, first }: { children: string; first?: boolean }) {
 
 function Key({ children }: { children: string }) {
   return (
-    <kbd className="code inline-flex h-5 min-w-5 items-center justify-center rounded-[3px] border border-line-strong bg-sunken px-1.5 text-[11px] text-ink">
+    <kbd className="code inline-flex h-5 min-w-5 items-center justify-center rounded-control border border-line-strong bg-sunken px-1.5 text-[11px] text-ink">
       {children}
     </kbd>
   );
@@ -83,7 +83,16 @@ export function HelpDialog() {
     >
       <div className="grid gap-6 md:grid-cols-2">
         <section>
-          <Heading first>Camera</Heading>
+          <Heading first>Two levels</Heading>
+          <p className="mb-5 text-xs leading-relaxed text-ink-dim">
+            The <span className="text-ink">overview</span> shows the platform as its kinds of
+            service, in the four layers a request crosses: entry, identity, compute, data. A piece
+            there stands for every service of its kind and says how many; its figures are theirs,
+            added up. The two detailed arrangements show every service on its own, by region or by
+            dependency tier. Opening a service from a list or from a kind takes you to it there.
+          </p>
+
+          <Heading>Camera</Heading>
           <ul className="space-y-1.5 text-xs text-ink-dim">
             <li>
               <span className="text-ink">Drag</span> to orbit
@@ -107,6 +116,10 @@ export function HelpDialog() {
               <span className="text-ink">Point</span> at a service to see what it is connected to;
               selecting it keeps that neighbourhood in front while the rest recedes
             </li>
+            <li>
+              Tracing a request, or an incident among every service, takes the camera to its path;
+              taking the camera yourself stops that
+            </li>
           </ul>
 
           <Heading>Keyboard</Heading>
@@ -123,8 +136,9 @@ export function HelpDialog() {
 
           <Heading>State of a service</Heading>
           <p className="mb-2 text-xs leading-relaxed text-ink-dim">
-            Colour means something is not normal. A service that is well is neutral, and has no mark
-            in any list.
+            Colour is an answer. <span style={{ color: COLOR.focus }}>Blue</span> answers you: what
+            you selected, the request you are following. The other colours answer the data:
+            something is not normal. A service that is well is neutral, and has no mark in any list.
           </p>
           <ul className="space-y-1.5">
             {(['healthy', 'degraded', 'critical', 'down'] as const).map((health) => (
@@ -133,13 +147,18 @@ export function HelpDialog() {
                   <HealthGlyph health={health} />
                 </span>
                 <span className="w-16 text-ink">{HEALTH_LABEL[health]}</span>
-                {health === 'healthy' && 'Neutral piece, no mark'}
-                {health === 'degraded' && 'Amber piece, a lamp on its plate'}
-                {health === 'critical' && 'Red piece, a lamp on its plate'}
-                {health === 'down' && 'Pale piece, drained of presence'}
+                {health === 'healthy' && 'Neutral piece, no mark; its part runs evenly'}
+                {health === 'degraded' && 'Amber piece and a lamp; its part hesitates'}
+                {health === 'critical' && 'Red piece and a lamp; its part is jammed'}
+                {health === 'down' && 'Pale piece; its part hangs crooked and still'}
               </li>
             ))}
           </ul>
+          <p className="caption mt-2 leading-relaxed">
+            In the overview a lamp under a neutral piece means some of that kind are affected, and
+            its part hesitates; the piece itself takes the colour, and the manner, when all of them
+            are. A red badge with a cross marks where a request was stopped.
+          </p>
         </section>
 
         <section>
@@ -169,6 +188,10 @@ export function HelpDialog() {
               </li>
             ))}
           </ul>
+          <p className="caption mt-2 leading-relaxed">
+            The part of a piece that moves runs at the pace of its service&apos;s traffic: faster
+            under a surge, slower as traffic thins, and still when nothing passes.
+          </p>
         </section>
       </div>
       <p className="caption mt-6 border-t border-line pt-3 leading-relaxed">

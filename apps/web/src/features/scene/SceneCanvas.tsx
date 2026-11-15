@@ -3,6 +3,13 @@
  * device pixel ratio and the render loop; a `SceneController` owns everything
  * drawn inside it. State reaches the controller through store subscriptions,
  * so telemetry never causes this component to re-render.
+ *
+ * The bridge is also where the two levels of the model meet. In the overview
+ * the controller is handed the platform reduced to its kinds of service
+ * (`lib/overview.ts`), and everything that names a service or a connection
+ * (the selection, an incident's route, a traced request) is translated to
+ * the kind it belongs to on the way in, and back on the way out. The
+ * controller itself draws a topology and does not know which it was given.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -19,6 +26,15 @@ import {
   type SceneStats,
 } from '@/graphics/SceneController';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
+import {
+  overviewOf,
+  partialGroups,
+  projectHops,
+  projectMask,
+  projectNodeIds,
+  projectSnapshot,
+  type Overview,
+} from '@/lib/overview';
 import type { ThemeName } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
@@ -79,71 +95,153 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       backend,
       {
         onHover: (id) => useUi.getState().setHovered(id),
-        onSelect: (selection) => useUi.getState().select(selection),
+        // In the overview a piece is a kind of service, and only pieces can
+        // be selected there: a connection between two kinds is a summary.
+        onSelect: (selection) => {
+          if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
+          else if (selection?.kind === 'node') {
+            useUi.getState().select({ kind: 'group', id: selection.id });
+          } else useUi.getState().select(null);
+        },
         onQuality: (level) => onQualityRef.current(level),
-        onTraceEnd: () => useUi.getState().traceDecision(null),
+        onTraceEnd: () => useUi.getState().setTracing(false),
       },
       sceneOptions(themeRef.current),
       pieces,
     );
     controller.current = instance;
     sceneHandle.current = instance;
+
+    /** The overview being shown, or null in the detailed arrangements. */
+    const summary = (): Overview | null => {
+      const { topology } = useTelemetry.getState();
+      return topology && useUi.getState().layoutMode === 'layers' ? overviewOf(topology) : null;
+    };
+    /** A service's id, as the id of the piece that stands for it right now. */
+    const shownAs = (id: string | null): string | null => {
+      const overview = summary();
+      return id && overview ? (overview.groupOfNode.get(id) ?? id) : id;
+    };
+
     // Read-only handle for the developer console, benchmarks and E2E tests.
     window.__aegis = {
       backend,
       stats: () => instance.getStats(),
-      projectNode: (id) => instance.projectNode(id),
+      projectNode: (id) => instance.projectNode(shownAs(id) ?? id),
       captureFrame: () => instance.captureFrame(),
       ...(import.meta.env.DEV ? { debug: { scene, renderer: gl } } : {}),
     };
 
+    const applyTopology = () => {
+      const { topology } = useTelemetry.getState();
+      if (!topology) return;
+      const overview = summary();
+      instance.setTopology(
+        overview?.topology ?? topology,
+        useUi.getState().layoutMode,
+        overview?.labels ?? null,
+      );
+    };
+    const applySelection = () => {
+      const { selection } = useUi.getState();
+      const overview = summary();
+      if (!selection) instance.setSelection(null);
+      else if (selection.kind === 'group') {
+        instance.setSelection(overview ? { kind: 'node', id: selection.id } : null);
+      } else instance.setSelection(overview ? null : selection);
+    };
     const applyVisibility = () => {
       const { topology, snapshot } = useTelemetry.getState();
       if (!topology) return;
-      instance.setVisibility(computeVisibilityMask(topology, snapshot, useUi.getState().filters));
+      const mask = computeVisibilityMask(topology, snapshot, useUi.getState().filters);
+      const overview = summary();
+      instance.setVisibility(overview ? projectMask(overview, mask) : mask);
     };
-    const applyImpacted = () => {
-      const incident = useTelemetry.getState().snapshot?.incident;
-      instance.setImpacted(incident ? incident.impactedNodeIds : []);
+    /** Everything the scene takes from a snapshot, in the level being shown. */
+    const applySnapshot = () => {
+      const { topology, snapshot } = useTelemetry.getState();
+      if (!topology || !snapshot) return;
+      // A snapshot of another topology (mid-switch) cannot be read against this one.
+      if (
+        snapshot.topologyId !== topology.id ||
+        snapshot.nodes.health.length !== topology.nodes.length ||
+        snapshot.edges.trafficRps.length !== topology.edges.length
+      ) {
+        return;
+      }
+      const overview = summary();
+      const shown = overview ? projectSnapshot(overview, snapshot) : snapshot;
+      instance.applySnapshot(shown);
+      instance.setPartial(overview ? partialGroups(overview, snapshot) : null);
+      instance.setImpacted(shown.incident ? shown.incident.impactedNodeIds : []);
+      // The route of an incident: every connection its injected traffic
+      // crosses, and the pieces at which that traffic is being stopped.
+      const hops = new Set<string>();
+      const stopped = new Set<string>();
+      for (const flow of shown.flows) {
+        for (const hop of flow.hops) hops.add(hop);
+        if (flow.blockedAt !== null) stopped.add(flow.blockedAt);
+      }
+      instance.setRoute([...hops], [...stopped]);
+    };
+    const applyTrace = () => {
+      const decision = useUi.getState().tracedDecision;
+      if (!decision) {
+        instance.clearTrace();
+        return;
+      }
+      const overview = summary();
+      instance.playDecision(
+        overview
+          ? {
+              decision: decision.decision,
+              hops: projectHops(overview, decision.hops),
+              blockedAt:
+                decision.blockedAt === null
+                  ? null
+                  : (projectNodeIds(overview, [decision.blockedAt])[0] ?? null),
+            }
+          : decision,
+      );
+    };
+    /** Hands the scene a topology and everything that is read against it. */
+    const applyAll = () => {
+      applyTopology();
+      applySnapshot();
+      applySelection();
+      applyVisibility();
+      if (useUi.getState().tracedDecision) applyTrace();
     };
 
-    const telemetry = useTelemetry.getState();
-    if (telemetry.topology) instance.setTopology(telemetry.topology, useUi.getState().layoutMode);
-    if (telemetry.snapshot) instance.applySnapshot(telemetry.snapshot);
-    instance.setSelection(useUi.getState().selection);
-    applyVisibility();
-    applyImpacted();
+    applyAll();
 
     const unsubscribe = [
       useTelemetry.subscribe((state, previous) => {
-        if (state.topology && state.topology !== previous.topology) {
-          instance.setTopology(state.topology, useUi.getState().layoutMode);
-          instance.setSelection(useUi.getState().selection);
-          applyVisibility();
-        }
+        if (state.topology && state.topology !== previous.topology) applyAll();
         if (state.snapshot && state.snapshot !== previous.snapshot) {
-          instance.applySnapshot(state.snapshot);
-          if (state.snapshot.incident !== previous.snapshot?.incident) applyImpacted();
+          applySnapshot();
           // Health and impact filters depend on live data.
           const { filters } = useUi.getState();
           if (filters.health.length > 0 || filters.impactedOnly) applyVisibility();
         }
       }),
       useUi.subscribe((state, previous) => {
-        if (state.selection !== previous.selection) instance.setSelection(state.selection);
+        if (state.layoutMode !== previous.layoutMode) {
+          // Between the two detailed arrangements the pieces walk; to and
+          // from the overview the model is a different one, and is rebuilt.
+          const level = (state.layoutMode === 'layers') !== (previous.layoutMode === 'layers');
+          if (level) applyAll();
+          else {
+            instance.setLayoutMode(state.layoutMode);
+            applySelection();
+            applyVisibility();
+          }
+        } else if (state.selection !== previous.selection) applySelection();
         if (state.hoveredNodeId !== previous.hoveredNodeId) {
-          instance.setHoveredNode(state.hoveredNodeId);
+          instance.setHoveredNode(shownAs(state.hoveredNodeId));
         }
         if (state.filters !== previous.filters) applyVisibility();
-        if (state.layoutMode !== previous.layoutMode) {
-          instance.setLayoutMode(state.layoutMode);
-          instance.setSelection(state.selection);
-          applyVisibility();
-        }
-        if (state.tracedDecision !== previous.tracedDecision) {
-          if (state.tracedDecision) instance.playDecision(state.tracedDecision);
-          else instance.clearTrace();
-        }
+        if (state.tracedDecision !== previous.tracedDecision) applyTrace();
       }),
       useSettings.subscribe(() => instance.setOptions(sceneOptions(themeRef.current))),
     ];

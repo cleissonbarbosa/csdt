@@ -4,7 +4,8 @@
  * TSL compiles to WGSL on the WebGPU backend and to GLSL ES 3.0 on the WebGL 2
  * fallback, so there is exactly one implementation of every effect. Nothing
  * here uses compute shaders or storage buffers, which the fallback cannot
- * provide: animation is a pure function of time and per-instance data.
+ * provide: animation is a pure function of time, per-instance data and small
+ * data textures.
  *
  * The look is a scale model on a table: matte pieces under one fixed light,
  * no glow, no additive blending. Materials are unlit in the engine's sense
@@ -20,21 +21,27 @@ import {
   cross,
   dot,
   float,
+  floor,
   fract,
   fwidth,
+  instanceIndex,
   int,
   ivec2,
   length,
   max,
   min,
   mix,
+  mod,
   modelWorldMatrix,
+  normalGeometry,
   normalLocal,
   normalWorld,
   normalize,
   oneMinus,
   positionGeometry,
+  positionLocal,
   saturate,
+  sign,
   sin,
   cos,
   smoothstep,
@@ -52,6 +59,8 @@ import {
 import * as THREE from 'three/webgpu';
 
 import { BEAD_SHAPE_ID, type ScenePalette } from '@/lib/palette';
+
+import { MOTION } from './pieces';
 
 /**
  * TSL nodes are composed dynamically; the generated typings cannot follow a
@@ -81,6 +90,7 @@ const THEME_COLORS = [
   'ink',
   'inkDim',
   'track',
+  'focus',
   'shadow',
   'warning',
   'critical',
@@ -96,10 +106,14 @@ type ThemeColor = (typeof THEME_COLORS)[number];
  */
 export type SceneTheme = Record<ThemeColor, ShaderNode & Uniform<THREE.Color>> & {
   shadowOpacity: ShaderNode & Uniform<number>;
+  pieceDetail: ShaderNode & Uniform<number>;
 };
 
 export function createSceneTheme(palette: ScenePalette): SceneTheme {
-  const theme = { shadowOpacity: uniform(palette.shadowOpacity) } as SceneTheme;
+  const theme = {
+    shadowOpacity: uniform(palette.shadowOpacity),
+    pieceDetail: uniform(palette.pieceDetail),
+  } as SceneTheme;
   for (const name of THEME_COLORS) theme[name] = uniform(new THREE.Color(palette[name]));
   return theme;
 }
@@ -107,6 +121,7 @@ export function createSceneTheme(palette: ScenePalette): SceneTheme {
 export function applyPalette(theme: SceneTheme, palette: ScenePalette): void {
   for (const name of THEME_COLORS) theme[name].value.set(palette[name]);
   theme.shadowOpacity.value = palette.shadowOpacity;
+  theme.pieceDetail.value = palette.pieceDetail;
 }
 
 function flat<M extends THREE.NodeMaterial>(material: M): M {
@@ -167,32 +182,206 @@ function over(below: Layer, color: ShaderNode, alpha: ShaderNode): Layer {
 // Service pieces
 // ---------------------------------------------------------------------------
 
+/** How many times in a cycle a degraded service's mechanism catches. */
+const HESITATIONS = 3;
+/** How unevenly it then runs: 0 is evenly, 1 would stop dead at each catch. */
+const HESITATION = 0.85;
+/** How often, per second, a jammed mechanism tries again. */
+const JAM_RATE = 1.6;
+/** How hard its part shakes while it pushes, in piece units, and how fast, in hertz. */
+const STRAIN = 0.022;
+const STRAIN_RATE = 13;
+
+/** `v` turned by `angle` about the unit vector `axis` (Rodrigues' rotation). */
+function turned(v: ShaderNode, axis: ShaderNode, angle: ShaderNode): ShaderNode {
+  const c = cos(angle);
+  return v
+    .mul(c)
+    .add(cross(axis, v).mul(sin(angle)))
+    .add(axis.mul(dot(axis, v)).mul(oneMinus(c)));
+}
+
 /**
- * A solid, matte piece.
+ * The part of a piece that works: where one of its vertices is, and which
+ * way its surface faces, once its mechanism has run for `work` seconds in
+ * the manner of the service's `state`.
  *
- * Geometry: `aPart` (0 body, 1 lighter detail, 2 mark) and `aAo`, how open
- *           each vertex is to the sky, baked when the piece was modelled.
+ * A mechanism is one column of `table` (see `PieceSet.table`): a kind of
+ * motion about a pivot and an axis. A vertex names its column in `aPart.y`,
+ * and column 0, all zeros, leaves a vertex where it was modelled, so the
+ * same few lines move a door, a globe and a line of messages, and one
+ * material draws every piece.
+ *
+ *   spin    turns about the axis, once per period
+ *   index   turns one notch, then rests for the remainder of the period
+ *   swing   turns by an angle, holds, and turns back
+ *   slide   moves along the axis, holds, and moves back
+ *   convey  moves along the axis and starts again, growing from nothing or
+ *           shrinking to nothing on the way if it is the part that joins or
+ *           leaves, so a line of equal parts advances without a seam
+ *
+ * `state` is the service's health as a number that travels between the
+ * codes (0 healthy, 1 degraded, 2 critical, 3 down), and it changes how the
+ * part moves, in the same way whatever the kind:
+ *
+ *   healthy   it runs evenly
+ *   degraded  it hesitates: the same cycle, gone through in fits and starts
+ *   critical  it is jammed: it pushes a little way into its motion, slips
+ *             back and tries again, and gets nowhere
+ *   down      it stands still and hangs crooked, turned about its slump axis
+ *
+ * A negative `work` means motion is off. Every part then rests as it was
+ * modelled, except that one whose service is down still hangs: that is a
+ * state, not a movement.
+ */
+function mechanism(
+  table: THREE.DataTexture,
+  work: ShaderNode,
+  state: ShaderNode,
+): { shift: ShaderNode; normal: ShaderNode } {
+  const column = int(attribute('aPart', 'vec2').y);
+  const row0 = textureLoad(table, ivec2(column, 0));
+  const row1 = textureLoad(table, ivec2(column, 1));
+  const row2 = textureLoad(table, ivec2(column, 2));
+  const row3 = textureLoad(table, ivec2(column, 3));
+  const pivot = row0.xyz;
+  const kind = row0.w;
+  const axis = row1.xyz;
+  const amount = row2.y;
+  const extra = row2.z;
+  const is = (id: number) => oneMinus(step(0.5, abs(kind.sub(id))));
+  const notches = max(abs(amount), float(1));
+  /** The share of an index's period it spends moving. */
+  const share = max(extra, float(0.01));
+
+  // How much of each manner applies while the state passes from one code
+  // to the next.
+  const running = step(0, work);
+  const hesitating = saturate(state)
+    .mul(oneMinus(saturate(state.sub(1))))
+    .mul(running);
+  const jammed = saturate(state.sub(1))
+    .mul(oneMinus(saturate(state.sub(2))))
+    .mul(running);
+  const fallen = saturate(state.sub(2));
+
+  // Where the part is in its period: whole cycles done, and the share of
+  // the one under way.
+  const cycles = work.mul(row1.w).add(row2.x).mul(running);
+  const done = floor(cycles);
+  const even = cycles.sub(done);
+  // Hesitating, the cycle takes as long as ever but is uneven: nearly
+  // stopped, then catching up, a few times over.
+  const catches = Math.PI * 2 * HESITATIONS;
+  const fits = even.add(sin(even.mul(catches)).mul(HESITATION / catches));
+  // Jammed, the part is held near the start of its motion. On every beat it
+  // pushes on as far as `reach` and slips back, each piece in its own time.
+  const beat = fract(time.mul(JAM_RATE).add(float(instanceIndex).mul(0.37)));
+  const push = smoothstep(0, 0.72, beat).sub(smoothstep(0.78, 1, beat));
+  const from = is(MOTION.spin)
+    .mul(0.1)
+    .add(is(MOTION.index).mul(share).mul(0.2))
+    .add(is(MOTION.swing).mul(0.105))
+    .add(is(MOTION.slide).mul(0.07))
+    .add(is(MOTION.convey).mul(0.09));
+  const reach = is(MOTION.spin)
+    .mul(0.065)
+    .add(
+      is(MOTION.index)
+        .mul(share)
+        .mul(min(notches.mul(0.065), float(0.6))),
+    )
+    .add(is(MOTION.swing).mul(0.09))
+    .add(is(MOTION.slide).mul(0.2))
+    .add(is(MOTION.convey).mul(0.24));
+  const t = mix(mix(even, fits, hesitating), from.add(reach.mul(push)), jammed);
+
+  const thereAndBack = smoothstep(0, 0.35, t).sub(smoothstep(0.5, 0.85, t));
+  const carried = smoothstep(0, 0.6, t);
+  const notch = mod(done, notches)
+    .add(smoothstep(0, share, t))
+    .div(notches)
+    .mul(sign(amount));
+
+  const angle = is(MOTION.spin)
+    .mul(t)
+    .mul(amount)
+    .add(is(MOTION.index).mul(notch))
+    .mul(Math.PI * 2)
+    .add(is(MOTION.swing).mul(thereAndBack).mul(amount));
+  const travel = is(MOTION.slide).mul(thereAndBack).add(is(MOTION.convey).mul(carried)).mul(amount);
+  const joins = step(0.5, extra);
+  const leaves = step(0.5, extra.negate());
+  const size = float(1).add(
+    is(MOTION.convey).mul(joins.mul(carried.sub(1)).sub(leaves.mul(carried))),
+  );
+
+  // Down, the part drops into the way it hangs and settles there: a little
+  // too far, then back.
+  const short = fallen.sub(1);
+  const settled = float(1).add(short.mul(short).mul(short).mul(2.4)).add(short.mul(short).mul(1.4));
+  const hang = row3.w.mul(settled);
+
+  // The harder a jammed part pushes, the more it shakes: across the piece,
+  // never up and down, so it stays on what carries it.
+  const shake = sin(time.mul(Math.PI * 2 * STRAIN_RATE).add(float(instanceIndex).mul(2.1)))
+    .mul(push)
+    .mul(jammed)
+    .mul(step(0.5, kind))
+    .mul(STRAIN);
+
+  // Its own motion first, then the way it hangs, then where it has got to.
+  const pose = (v: ShaderNode) => turned(turned(v, axis, angle), row3.xyz, hang);
+  const arm = positionGeometry.sub(pivot).mul(size);
+  const moved = pivot
+    .add(pose(arm))
+    .add(axis.mul(travel))
+    .add(vec3(0.8, 0, 0.6).mul(shake));
+  return { shift: moved.sub(positionGeometry), normal: pose(normalGeometry) };
+}
+
+/**
+ * A solid, matte piece, with the one part of it that works.
+ *
+ * Geometry: `aPart` = (0 body, 1 lighter detail, 2 mark; mechanism column)
+ *           and `aAo`, how open each vertex is to the sky, baked when the
+ *           piece was modelled.
  * Instance: `aTint` rgb — the piece colour, already decided by the scene
  *           (neutral when healthy, a signal colour when not) — and
- *           `aFx` = (_, _, visibility, _).
+ *           `aFx` = (seconds its mechanism has worked or -1 for at rest,
+ *           the state it works in from 0 healthy to 3 down,
+ *           visibility, size).
  */
-export function createPieceMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
+export function createPieceMaterial(
+  theme: SceneTheme,
+  mechanisms: THREE.DataTexture,
+): THREE.MeshBasicNodeMaterial {
   const material = flat(new THREE.MeshBasicNodeMaterial());
   const tint = attribute('aTint', 'vec3');
-  const visibility = attribute('aFx', 'vec4').z;
-  const part = attribute('aPart', 'float');
+  const fx = attribute('aFx', 'vec4');
+  const visibility = fx.z;
+  const part = attribute('aPart', 'vec2').x;
   const detail = saturate(part);
   const mark = saturate(part.sub(1));
 
-  // Details are a slightly lighter tone of the same piece; marks take the
+  // By the time this runs the instance has been placed and scaled. A piece
+  // is never turned, so what its mechanism adds only needs the piece's size,
+  // and the turned normal is already in world space.
+  const working = mechanism(mechanisms, fx.x, fx.y);
+  material.positionNode = positionLocal.add(working.shift.mul(fx.w));
+  const normal = normalize(varying(working.normal));
+
+  // Details are a neighbouring tone of the same piece; marks take the
   // contrasting "core" colour so a silhouette's defining feature stays readable.
-  const surface = mix(mix(tint, tint.mul(1.22), detail), theme.pieceCore, mark);
+  const surface = mix(mix(tint, tint.mul(theme.pieceDetail), detail), theme.pieceCore, mark);
   // A little more modelling than the plates get: the key light does more of
   // the work, and the baked occlusion darkens what the piece itself shades,
-  // which is what turns a silhouette into a solid.
-  const key = saturate(dot(normalWorld, vec3(KEY_LIGHT.x, KEY_LIGHT.y, KEY_LIGHT.z)));
-  const sky = normalWorld.y.mul(0.5).add(0.5);
-  const light = float(0.56).add(key.mul(0.34)).add(sky.mul(0.1));
+  // which is what turns a silhouette into a solid. A face turned to the
+  // light shows the palette colour itself, so a porcelain piece is as light
+  // as the field it stands on and is read from its sides and its shadow.
+  const key = saturate(dot(normal, vec3(KEY_LIGHT.x, KEY_LIGHT.y, KEY_LIGHT.z)));
+  const sky = normal.y.mul(0.5).add(0.5);
+  const light = float(0.6).add(key.mul(0.36)).add(sky.mul(0.1));
   const occlusion = mix(float(0.4), float(1), attribute('aAo', 'float'));
   const lit = surface.mul(light).mul(occlusion);
   // Filtered-out pieces recede into the plate instead of going dark.
@@ -515,8 +704,8 @@ export function createGroundMaterial(theme: SceneTheme): THREE.MeshBasicNodeMate
     lampColor,
     band(saturate(age.div(1.1)).mul(0.34).add(0.62), 0.014).mul(alive),
   );
-  // Selection: a plain ink ring.
-  layer = over(layer, theme.ink, band(0.74, 0.028).mul(ring.w));
+  // Selection: a ring in the colour of the viewer's attention.
+  layer = over(layer, theme.focus, band(0.74, 0.034).mul(ring.w));
 
   material.colorNode = layer.rgb.div(max(layer.alpha, float(0.0001)));
   material.opacityNode = layer.alpha;
@@ -621,20 +810,32 @@ export function createCastShadowMaterial(
 // ---------------------------------------------------------------------------
 
 /**
- * Sprites positioned on the CPU: the head and tail of a traced request, and
- * the ring that marks where it arrived or was stopped.
+ * Sprites positioned on the CPU: the head and tail of a traced request, the
+ * ring that opens where it arrived, and the badge that marks where a request
+ * was stopped.
+ *
+ * Instance: `aPos`, `aColor`, `aTracerFx` = (size, opacity, form, _) where
+ *           form is 0 for a disc, 1 for a ring and 2 for a badge: a solid
+ *           disc with a cross cut out of it, so "stopped here" is a shape
+ *           before it is a colour.
  */
-export function createTracerMaterial(): THREE.SpriteNodeMaterial {
+export function createTracerMaterial(theme: SceneTheme): THREE.SpriteNodeMaterial {
   const material = blended(new THREE.SpriteNodeMaterial());
   material.depthTest = false;
   const fx = attribute('aTracerFx', 'vec4');
   material.positionNode = attribute('aPos', 'vec3');
   material.scaleNode = vec2(fx.x, fx.x);
-  const r = length(uv().sub(0.5).mul(2));
+  const p = uv().sub(0.5).mul(2);
+  const r = length(p);
   const disc = coverage(r.sub(0.72));
-  // `fx.z` > 0 turns the sprite into a ring.
   const ring = coverage(abs(r.sub(0.82)).sub(0.07));
-  material.colorNode = attribute('aColor', 'vec3');
-  material.opacityNode = mix(disc, ring, fx.z).mul(fx.y);
+  const isRing = oneMinus(step(0.5, abs(fx.z.sub(1))));
+  const isBadge = step(1.5, fx.z);
+  const plate = coverage(r.sub(0.9));
+  // The two arms of the cross, each measured from its own diagonal.
+  const arm = min(abs(p.x.add(p.y)), abs(p.x.sub(p.y))).mul(0.7071);
+  const cross = coverage(arm.sub(0.1)).mul(coverage(r.sub(0.52)));
+  material.colorNode = mix(attribute('aColor', 'vec3'), theme.plate, cross.mul(isBadge));
+  material.opacityNode = mix(mix(disc, ring, isRing), plate, isBadge).mul(fx.y);
   return material;
 }

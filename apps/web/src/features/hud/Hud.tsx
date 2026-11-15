@@ -130,7 +130,13 @@ export function Deviations() {
   const signals = usePlatformSignals();
   const abnormal = signals?.filter((signal) => signal.tone) ?? [];
   return (
-    <dl className="flex items-center gap-4" aria-label="Signals outside their normal range">
+    // One row, and only whole instruments: one that does not fit beside the
+    // others wraps out of sight instead of running under what is next to it.
+    // The gap between rows is taller than the row, so none of it shows.
+    <dl
+      className="flex h-[30px] flex-wrap content-start items-center gap-x-4 gap-y-10 overflow-hidden"
+      aria-label="Signals outside their normal range"
+    >
       {abnormal.map((signal) => (
         <div
           key={signal.key}

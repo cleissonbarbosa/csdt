@@ -52,7 +52,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
     provider.state === 'connecting';
   return (
     <li
-      className="rounded-[3px] border border-line p-3"
+      className="rounded-control border border-line p-3"
       data-testid={`provider-${provider.id}`}
       data-state={provider.state}
     >
@@ -116,7 +116,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
       {provider.lastError && (
         <p
           role="alert"
-          className="mt-2 rounded-[3px] border border-critical/40 bg-critical/10 px-2 py-1 text-[11px] text-critical"
+          className="mt-2 rounded-control border border-critical/40 bg-critical/10 px-2 py-1 text-[11px] text-critical"
         >
           {provider.lastError}
         </p>

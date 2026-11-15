@@ -4,11 +4,15 @@ import {
   clockSeconds,
   collectErrors,
   frameSummary,
+  fromMenu,
+  KINDS,
   openApp,
   openExplorer,
   openOverview,
   percent,
+  SERVICES,
   setSpeed,
+  showEveryService,
   waitForScene,
 } from './support';
 
@@ -21,9 +25,11 @@ test('the application loads and reports its rendering backend', async ({ page })
   await expect(page).toHaveTitle(/AEGIS/);
   await expect(page.getByRole('heading', { name: 'AEGIS', level: 1 })).toBeVisible();
   await expect(page.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'demo');
-  // Overview first: no panel and no instrument is on show until asked for.
+  // Overview first: no panel, no instrument and no timeline until there is
+  // something to show or someone asks.
   await expect(page.getByTestId('explorer')).toHaveCount(0);
   await expect(page.getByTestId('hud')).toHaveCount(0);
+  await expect(page.getByTestId('timeline')).toHaveCount(0);
   await openOverview(page);
   await expect(page.getByTestId('hud')).toBeVisible();
 
@@ -33,14 +39,33 @@ test('the application loads and reports its rendering backend', async ({ page })
   expect(errors).toEqual([]);
 });
 
-test('the topology is displayed and actually rendered', async ({ page }) => {
+test('the overview shows the platform by kind, and every service one step away', async ({
+  page,
+}) => {
   await openApp(page);
   await waitForScene(page);
+  // Fifty-one services are drawn as the twelve kinds they are.
+  const overview = await page.evaluate(() => window.__aegis!.stats());
+  expect(overview.nodes).toBe(KINDS);
+  expect(overview.edges).toBeGreaterThan(12);
+  expect(overview.edges).toBeLessThan(40);
+
+  // The frame is not blank: read it back and look for what was drawn on the
+  // field. With everything normal and nothing selected, none of it has a
+  // hue: colour is an answer, and nothing has been asked.
+  await expect
+    .poll(async () => (await frameSummary(page)).drawn, { timeout: 30_000 })
+    .toBeGreaterThan(60);
+  expect((await frameSummary(page)).chromatic).toBe(0);
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-level', 'healthy');
+  await expect(page.getByTestId('platform-status')).toHaveText('51 services, all normal');
+
+  // The same platform with every service on its own.
+  await showEveryService(page);
   const stats = await page.evaluate(() => window.__aegis!.stats());
-  expect(stats.nodes).toBe(51);
+  expect(stats.nodes).toBe(SERVICES);
   expect(stats.edges).toBe(75);
   expect(stats.particleCapacity).toBeGreaterThan(2_000);
-
   // Every region and its services are listed.
   await openExplorer(page);
   await openOverview(page);
@@ -48,33 +73,39 @@ test('the topology is displayed and actually rendered', async ({ page }) => {
     await expect(page.getByRole('region', { name: region })).toBeVisible();
   }
   await expect(page.getByTestId('region-us-east')).toHaveAttribute('data-health', 'healthy');
-
-  // The frame is not blank: read it back and look for what was drawn on the
-  // table. With everything normal, none of it has a hue: colour is a signal.
-  await expect
-    .poll(async () => (await frameSummary(page)).drawn, { timeout: 30_000 })
-    .toBeGreaterThan(60);
   expect((await frameSummary(page)).chromatic).toBe(0);
-  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-level', 'healthy');
-  await expect(page.getByTestId('platform-status')).toHaveText('51 services, all normal');
   // A handful of draw calls regardless of how many services there are.
   expect(stats.drawCalls).toBeLessThan(80);
 });
 
-test('a service can be selected in the 3D scene and its metrics appear', async ({ page }) => {
+test('a kind of service can be selected, and a service opened from it', async ({ page }) => {
   await openApp(page);
   await waitForScene(page);
   const canvas = page.getByRole('img', { name: /Interactive 3D view/ });
   const box = (await canvas.boundingBox())!;
+  const where = (id: string) => page.evaluate((node) => window.__aegis!.projectNode(node), id);
 
-  // Click where the scene says the gateway is: this exercises real picking.
-  await expect
-    .poll(() => page.evaluate(() => window.__aegis!.projectNode('use-gateway')))
-    .not.toBeNull();
-  const at = (await page.evaluate(() => window.__aegis!.projectNode('use-gateway')))!;
+  // Click where the scene says the gateways are: this exercises real picking.
+  // A service is drawn as the kind it belongs to, so its id finds that piece.
+  await expect.poll(() => where('kind:api-gateway')).not.toBeNull();
+  const at = (await where('kind:api-gateway'))!;
+  expect(await where('use-gateway')).toEqual(at);
   await page.mouse.click(box.x + at.x, box.y + at.y);
 
-  // Selecting brings the inspector with it.
+  // Selecting brings a card about the kind as a whole.
+  const card = page.getByTestId('group-card');
+  await expect(card).toHaveAttribute('data-group-id', 'kind:api-gateway');
+  await expect(card.getByTestId('inspector-title')).toHaveText('API gateways');
+  await expect(card).toContainText('3 API gateways in the entry layer');
+  await expect(card.getByTestId('inspector-metrics')).toContainText('req/s');
+  // The selection is the one thing with a hue: the viewer asked for it.
+  await page.mouse.move(box.x + 8, box.y + box.height - 8);
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(0);
+
+  // One of its instances, opened: the model changes to the arrangement
+  // where that service stands on its own.
+  await card.getByTestId('member-use-gateway').click();
+  await waitForScene(page, SERVICES);
   const inspector = page.getByTestId('node-inspector');
   await expect(inspector).toHaveAttribute('data-node-id', 'use-gateway');
   await expect(inspector.getByTestId('inspector-title')).toHaveText('API Gateway');
@@ -83,7 +114,9 @@ test('a service can be selected in the 3D scene and its metrics appear', async (
   await expect(metrics).toContainText('Throughput');
   await expect(metrics).toContainText('req/s');
   await expect(metrics).toContainText(/\d+(\.\d+)? ms/);
-  await expect(inspector).toContainText('Cedar Authorizer');
+  // What it calls is folded until asked for: there are nine of them.
+  await inspector.getByTestId('node-calls').locator('summary').click();
+  await expect(inspector.getByTestId('node-calls')).toContainText('Cedar Authorizer');
   await openExplorer(page);
   await expect(page.getByTestId('service-use-gateway')).toHaveAttribute('aria-current', 'true');
 
@@ -92,9 +125,17 @@ test('a service can be selected in the 3D scene and its metrics appear', async (
   await expect(inspector).toHaveCount(0);
   await expect(page.getByTestId('overview')).toHaveCount(0);
 
-  // The explorer selects too, and a connection can be followed.
+  // The explorer selects too.
   await page.getByTestId('service-use-orders-db').click();
   await expect(page.getByTestId('inspector-title')).toHaveText('Orders DB');
+
+  // Back in the overview the selection is let go of: it belonged to the detail.
+  await page
+    .getByRole('toolbar', { name: 'Scene controls' })
+    .getByRole('radio', { name: 'Overview' })
+    .click();
+  await waitForScene(page, KINDS);
+  await expect(page.getByTestId('node-inspector')).toHaveCount(0);
 });
 
 test('an incident can be started and alerts and metrics update', async ({ page }) => {
@@ -102,14 +143,14 @@ test('an incident can be started and alerts and metrics update', async ({ page }
   await waitForScene(page);
   const status = page.getByTestId('platform-status');
   await expect(status).toHaveAttribute('data-incidents', '0');
-  await openExplorer(page);
   await openOverview(page);
   expect(await percent(page, 'hud-errors')).toBeLessThan(1);
   // The dark cockpit: with every reading in range, the top bar shows none.
   await expect(page.getByTestId('deviation-errors')).toHaveCount(0);
   await setSpeed(page, 4);
 
-  await page.getByTestId('tab-incidents').click();
+  // The one command in the top bar leads to the incidents.
+  await page.getByTestId('explore-incident').click();
   await page.getByTestId('scenario-start-ddos-surge').click();
 
   const active = page.getByTestId('active-incident');
@@ -117,13 +158,15 @@ test('an incident can be started and alerts and metrics update', async ({ page }
   await expect(status).toHaveAttribute('data-incidents', '1');
   await expect(status).toContainText('DDoS Surge');
   await expect(active.getByTestId('incident-phase')).toBeVisible();
+  // There is now something on the timeline, so it is on the screen.
+  await expect(page.getByTestId('timeline')).toBeVisible();
 
   // The surge saturates the gateway: errors climb and alerts fire.
   await expect.poll(() => percent(page, 'hud-errors'), { timeout: 30_000 }).toBeGreaterThan(10);
   // Out of its range, the reading comes forward into the top bar.
   await expect(page.getByTestId('deviation-errors')).toBeVisible();
   await expect(page.getByTestId('region-us-east')).toHaveAttribute('data-health', 'critical');
-  // Now, and only now, the model shows colour.
+  // Now, and only now, the model shows the colours of the data.
   await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(20);
   await expect(page.getByTestId('event-log')).toContainText('Volumetric attack detected');
   await expect(active.getByTestId('impacted-services')).toContainText('API Gateway');
@@ -142,9 +185,8 @@ test('playback can be paused, the timeline rewound and the scenario reset', asyn
   await openApp(page);
   await waitForScene(page);
   await setSpeed(page, 4);
-  await openExplorer(page);
   await openOverview(page);
-  await page.getByTestId('tab-incidents').click();
+  await page.getByTestId('explore-incident').click();
   await page.getByTestId('scenario-start-regional-outage').click();
   await expect(page.getByTestId('region-eu-west')).toHaveAttribute('data-health', 'down', {
     timeout: 30_000,
@@ -192,10 +234,11 @@ test('playback can be paused, the timeline rewound and the scenario reset', asyn
   await expect(page.getByText('Simulation reset to a clean baseline.')).toBeVisible();
 });
 
-test('a Cedar decision is evaluated by the real engine and traced', async ({ page }) => {
+test('a Cedar decision is evaluated by the real engine and its path drawn', async ({ page }) => {
   await openApp(page);
   await waitForScene(page);
-  await page.getByRole('button', { name: 'Authorization explorer' }).click();
+  expect((await frameSummary(page)).chromatic).toBe(0);
+  await fromMenu(page, 'trace');
   const form = page.getByTestId('authz-form');
   await form.getByTestId('authz-principal').selectOption('User::"mallory"');
   await form.getByTestId('authz-action').selectOption('Action::"exportLedger"');
@@ -206,6 +249,10 @@ test('a Cedar decision is evaluated by the real engine and traced', async ({ pag
   await expect(card.getByTestId('decision-policies')).toContainText('forbid-cross-tenant');
   await expect(card.getByTestId('decision-engine')).toContainText(/Embedded Cedar 4\.\d+/);
   await expect(card.getByTestId('decision-path')).toContainText('Cedar Authorizer');
+  // The request's path stays drawn on the model after it has been stopped:
+  // the path in the colour of what is being followed, the stop in its own.
+  await expect(card.getByTestId('decision-trace')).toHaveText('Trace again');
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(5);
 
   // The same principal's own tenant: Cedar permits it and names the policy.
   await form.getByTestId('authz-principal').selectOption('User::"alice"');
@@ -214,6 +261,11 @@ test('a Cedar decision is evaluated by the real engine and traced', async ({ pag
   await expect(card).toHaveAttribute('data-decision', 'allow');
   await expect(card.getByTestId('decision-policies')).toContainText('finance-view-ledger');
   await expect(page.getByTestId('recent-decisions').getByRole('listitem')).toHaveCount(2);
+
+  // Putting the panel away puts the path away with it.
+  await page.getByRole('button', { name: 'Close and put the path away' }).click();
+  await expect(page.getByTestId('authz-form')).toHaveCount(0);
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBe(0);
 });
 
 test('filters, the table view and keyboard shortcuts work together', async ({ page }) => {
@@ -232,8 +284,9 @@ test('filters, the table view and keyboard shortcuts work together', async ({ pa
   await table.getByTestId('table-service-euw-orders-db').click();
   await expect(page.getByTestId('inspector-title')).toHaveText('Orders DB');
 
+  // A service was opened, so the model comes back in a detailed arrangement.
   await page.keyboard.press('t');
-  await waitForScene(page);
+  await waitForScene(page, SERVICES);
   await page
     .getByRole('button', { name: /Clear filters/ })
     .first()
@@ -253,9 +306,10 @@ test('filters, the table view and keyboard shortcuts work together', async ({ pa
   await expect(page.getByTestId('dev-overlay')).toContainText(/WebGL 2|WebGPU/);
 });
 
-test('scene controls move the camera and switch the layout', async ({ page }) => {
+test('scene controls move the camera and switch the arrangement', async ({ page }) => {
   await openApp(page);
   await waitForScene(page);
+  await showEveryService(page);
   const where = (id: string) => page.evaluate((node) => window.__aegis!.projectNode(node), id);
   await expect.poll(() => where('use-orders-db')).not.toBeNull();
   const home = (await where('use-orders-db'))!;
@@ -294,8 +348,13 @@ test('scene controls move the camera and switch the layout', async ({ page }) =>
       return gateway && database ? database.x - gateway.x : 0;
     })
     .toBeGreaterThan(150);
+  // The key goes round the arrangements: after the last, the overview.
+  await page.keyboard.press('l');
+  await expect(toolbar.getByRole('radio', { name: 'Overview' })).toBeChecked();
+  await waitForScene(page, KINDS);
   await page.keyboard.press('l');
   await expect(toolbar.getByRole('radio', { name: 'Regions' })).toBeChecked();
+  await waitForScene(page, SERVICES);
 
   // Dragging orbits the camera; "frame everything" brings the whole topology back.
   const offset = async () => {
@@ -320,7 +379,7 @@ test('the theme can be switched and the model follows', async ({ page }) => {
     return background[0] + background[1] + background[2];
   };
   const setTheme = async (name: 'Light' | 'Night') => {
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await fromMenu(page, 'settings');
     const dialog = page.getByRole('dialog', { name: 'Settings' });
     await dialog.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name }).click();
     await page.keyboard.press('Escape');
@@ -341,6 +400,7 @@ test('the theme can be switched and the model follows', async ({ page }) => {
 test('the stress topology renders 150+ services in the same few draw calls', async ({ page }) => {
   await openApp(page);
   await waitForScene(page);
+  await showEveryService(page);
   const before = await page.evaluate(() => window.__aegis!.stats().drawCalls);
   await openExplorer(page);
   await page.getByTestId('topology-picker').selectOption('hyperscale-stress');
@@ -356,4 +416,13 @@ test('the stress topology renders 150+ services in the same few draw calls', asy
   await page.waitForTimeout(1500);
   const after = await page.evaluate(() => window.__aegis!.stats().drawCalls);
   expect(after).toBeLessThanOrEqual(before + 6);
+
+  // And its overview is the same twelve pieces: the kinds do not multiply.
+  await page
+    .getByRole('toolbar', { name: 'Scene controls' })
+    .getByRole('radio', { name: 'Overview' })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => window.__aegis?.stats().nodes ?? 0), { timeout: 30_000 })
+    .toBe(KINDS);
 });

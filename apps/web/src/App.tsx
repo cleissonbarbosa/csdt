@@ -1,11 +1,12 @@
 import * as Tabs from '@radix-ui/react-tabs';
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
 import { useAegisConnection } from '@/app/useAegisConnection';
 import { usePresence } from '@/app/usePresence';
 import { useTheme } from '@/app/useTheme';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { AuthorizationExplorer } from '@/features/authorization/AuthorizationExplorer';
 import { CommandPalette } from '@/features/command/CommandPalette';
 import { Explorer } from '@/features/explorer/Explorer';
@@ -18,7 +19,7 @@ import { SceneCanvas } from '@/features/scene/SceneCanvas';
 import { HoverCard, Notices, SceneToolbar } from '@/features/scene/SceneOverlays';
 import { TopologyTable } from '@/features/scene/TopologyTable';
 import { SettingsDialog } from '@/features/settings/SettingsDialog';
-import { Timeline } from '@/features/timeline/Timeline';
+import { Timeline, TIMELINE_HEIGHT, useTimelineVisible } from '@/features/timeline/Timeline';
 import { TopNav } from '@/features/topnav/TopNav';
 import { sceneHandle } from '@/graphics/handle';
 import {
@@ -29,11 +30,11 @@ import {
 } from '@/graphics/renderer';
 import { cn } from '@/lib/cn';
 import { useTelemetry } from '@/stores/telemetry';
-import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
+import { LAYOUT_MODES, prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
 const LEFT_WIDTH = 300;
-const RIGHT_WIDTH = 340;
-/** Space between a sheet and the edges of the stage it floats over. */
+const RIGHT_WIDTH = 332;
+/** Space between a card and the edges of the stage it floats over. */
 const GUTTER = 12;
 /** Room the scene keeps clear at the top (its toolbar) and the bottom. */
 const TOP_INSET = 28;
@@ -43,27 +44,34 @@ const tabClass =
   'relative z-10 flex-1 px-3 py-2 text-xs text-ink-faint transition-colors hover:text-ink data-[state=active]:font-bold data-[state=active]:text-ink';
 
 /**
- * A panel that is called for rather than always there: a sheet of paper laid
- * on the stage, clear of its edges, sliding in from the side it belongs to.
+ * A panel that is called for rather than always there: a card laid on the
+ * stage, clear of its edges, sliding in from the side it belongs to. A
+ * `compact` card is only as tall as what it has to say, up to the height of
+ * the stage; the other kind fills the side it is on.
  */
 function Sheet({
   side,
   open,
   width,
   label,
+  compact,
+  foot,
   children,
 }: {
   side: 'left' | 'right';
   open: boolean;
   width: number;
   label: string;
+  compact?: boolean;
+  /** Room to leave at the bottom of the stage, for the timeline. */
+  foot: number;
   children: ReactNode;
 }) {
   const presence = usePresence(open);
   if (!presence.mounted) return null;
   return (
     <aside
-      className="sheet panel absolute z-20 flex flex-col overflow-hidden rounded-[3px]"
+      className="sheet panel floating absolute z-20 flex flex-col overflow-hidden"
       data-side={side}
       data-state={presence.state}
       // Out of reach while it leaves; reachable from the first frame it is
@@ -72,7 +80,9 @@ function Sheet({
       style={{
         width: `min(${width}px, calc(100% - ${GUTTER * 2}px))`,
         top: GUTTER,
-        bottom: GUTTER,
+        ...(compact
+          ? { maxHeight: `calc(100% - ${GUTTER * 2 + foot}px)` }
+          : { bottom: GUTTER + foot }),
         [side]: GUTTER,
       }}
       aria-label={label}
@@ -129,12 +139,17 @@ function useShortcuts() {
           break;
         case 'f':
         case 'F':
-          if (ui.selection?.kind === 'node') sceneHandle.current?.focusNode(ui.selection.id);
-          else sceneHandle.current?.frameAll();
+          // A piece, whether it is one service or a kind of them.
+          if (ui.selection && ui.selection.kind !== 'edge') {
+            sceneHandle.current?.focusNode(ui.selection.id);
+          } else sceneHandle.current?.frameAll();
           break;
         case 'l':
         case 'L':
-          ui.setLayoutMode(ui.layoutMode === 'regions' ? 'dependencies' : 'regions');
+          // The next arrangement: overview, by region, by dependency.
+          ui.setLayoutMode(
+            LAYOUT_MODES[(LAYOUT_MODES.indexOf(ui.layoutMode) + 1) % LAYOUT_MODES.length]!,
+          );
           break;
         case 't':
         case 'T':
@@ -175,11 +190,11 @@ function useShortcuts() {
 function Unreachable({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
-      <div className="panel max-w-md rounded-[3px] p-6">
+      <div className="panel max-w-md p-6">
         <h2 className="text-base font-bold text-ink">The AEGIS server is not answering</h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">{message}</p>
         <p className="mt-3 text-xs text-ink-dim">Start it with:</p>
-        <p className="numeric mt-1 rounded-[3px] border border-line bg-sunken px-2 py-1.5 text-xs text-ink">
+        <p className="numeric mt-1 rounded-control border border-line bg-sunken px-2 py-1.5 text-xs text-ink">
           cargo run -p aegis-server
         </p>
         <p className="caption mt-3">
@@ -239,12 +254,15 @@ export function App() {
 
   const left = explorerOpen ? LEFT_WIDTH + GUTTER : 0;
   const right = inspectorOpen ? RIGHT_WIDTH + GUTTER : 0;
+  // The timeline floats at the foot of the stage when there is one.
+  const foot = useTimelineVisible() ? TIMELINE_HEIGHT + GUTTER : 0;
+  const bottom = BOTTOM_INSET + foot;
   useEffect(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom: BOTTOM_INSET });
-  }, [left, right, showScene, hasTopology]);
+    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom });
+  }, [left, right, bottom, showScene, hasTopology]);
   const onRuntime = useCallback(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom: BOTTOM_INSET });
-  }, [left, right]);
+    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom });
+  }, [left, right, bottom]);
 
   const unavailable =
     sceneError !== null
@@ -261,7 +279,7 @@ export function App() {
     >
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-[3px] focus:border focus:border-ink focus:bg-paper focus:px-3 focus:py-2 focus:text-xs"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-control focus:border focus:border-ink focus:bg-paper focus:px-3 focus:py-2 focus:text-xs"
       >
         Skip to the topology
       </a>
@@ -287,7 +305,7 @@ export function App() {
           ) : (
             <div
               className="h-full transition-[padding] duration-200 ease-arrive"
-              style={{ paddingLeft: left, paddingRight: right }}
+              style={{ paddingLeft: left, paddingRight: right, paddingBottom: foot }}
             >
               <TopologyTable notice={viewMode === 'scene' ? unavailable : null} />
             </div>
@@ -315,36 +333,49 @@ export function App() {
 
         {showScene && devOverlay && (
           <div
-            className="absolute bottom-3 z-10 transition-[left] duration-200 ease-arrive"
-            style={{ left: left + GUTTER }}
+            className="absolute z-10 transition-[left,bottom] duration-200 ease-arrive"
+            style={{ left: left + GUTTER, bottom: GUTTER + foot }}
           >
             <DevOverlay />
           </div>
         )}
 
-        <Sheet side="left" open={explorerOpen} width={LEFT_WIDTH} label="Explorer and incidents">
+        <Sheet
+          side="left"
+          open={explorerOpen}
+          width={LEFT_WIDTH}
+          foot={foot}
+          label="Services and incidents"
+        >
           <Tabs.Root
             value={leftTab}
             onValueChange={(value) => useUi.getState().setLeftTab(value as typeof leftTab)}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <Tabs.List
-              className="relative flex shrink-0 border-b border-line"
-              aria-label="Left panel"
-            >
-              <Tabs.Trigger value="explorer" className={tabClass} data-testid="tab-explorer">
-                Explorer
-              </Tabs.Trigger>
-              <Tabs.Trigger value="incidents" className={tabClass} data-testid="tab-incidents">
-                Incidents
-                {incidentActive && (
-                  <span className="ml-1.5 inline-block size-[7px] bg-critical align-baseline">
-                    <span className="sr-only">(incident active)</span>
-                  </span>
-                )}
-              </Tabs.Trigger>
-              <TabMarker index={leftTab === 'explorer' ? 0 : 1} count={2} />
-            </Tabs.List>
+            <div className="flex shrink-0 items-center border-b border-line pr-1">
+              <Tabs.List className="relative flex flex-1" aria-label="Left panel">
+                <Tabs.Trigger value="explorer" className={tabClass} data-testid="tab-explorer">
+                  Services
+                </Tabs.Trigger>
+                <Tabs.Trigger value="incidents" className={tabClass} data-testid="tab-incidents">
+                  Incidents
+                  {incidentActive && (
+                    <span className="ml-1.5 inline-block size-[7px] bg-critical align-baseline">
+                      <span className="sr-only">(incident active)</span>
+                    </span>
+                  )}
+                </Tabs.Trigger>
+                <TabMarker index={leftTab === 'explorer' ? 0 : 1} count={2} />
+              </Tabs.List>
+              <IconButton
+                label="Close this panel"
+                size="sm"
+                onClick={() => useUi.getState().setExplorerOpen(false)}
+                data-testid="close-explorer"
+              >
+                <X size={14} />
+              </IconButton>
+            </div>
             <Tabs.Content
               value="explorer"
               className="flex min-h-0 flex-1 animate-fade flex-col data-[state=inactive]:hidden"
@@ -360,55 +391,27 @@ export function App() {
           </Tabs.Root>
         </Sheet>
 
+        {/* What the selection, or the request being traced, has to say. Both
+            stay mounted so a decision survives a trip to the inspector. */}
         <Sheet
           side="right"
           open={inspectorOpen}
           width={RIGHT_WIDTH}
-          label="Inspector and authorization"
+          foot={foot}
+          compact
+          label={authorizationOpen ? 'Trace a request' : 'Inspector'}
         >
-          <Tabs.Root
-            value={authorizationOpen ? 'authorization' : 'inspector'}
-            onValueChange={(value) =>
-              useUi.getState().setPanel(value === 'authorization' ? 'authorization' : null)
-            }
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            <Tabs.List
-              className="relative flex shrink-0 border-b border-line"
-              aria-label="Right panel"
-            >
-              <Tabs.Trigger value="inspector" className={tabClass} data-testid="tab-inspector">
-                Inspector
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="authorization"
-                className={tabClass}
-                data-testid="tab-authorization"
-              >
-                Authorization
-              </Tabs.Trigger>
-              <TabMarker index={authorizationOpen ? 1 : 0} count={2} />
-            </Tabs.List>
-            {/* Both stay mounted so a decision survives a trip to the inspector. */}
-            <Tabs.Content
-              value="inspector"
-              forceMount
-              className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}
-            >
-              <Inspector selection={inspectorOpen ? selection : inspected} />
-            </Tabs.Content>
-            <Tabs.Content
-              value="authorization"
-              forceMount
-              className={cn('flex min-h-0 flex-1 flex-col', !authorizationOpen && 'hidden')}
-            >
-              <AuthorizationExplorer />
-            </Tabs.Content>
-          </Tabs.Root>
+          <div className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}>
+            <Inspector selection={inspectorOpen ? selection : inspected} />
+          </div>
+          <div className={cn('flex min-h-0 flex-1 flex-col', !authorizationOpen && 'hidden')}>
+            <AuthorizationExplorer />
+          </div>
         </Sheet>
+
+        <Timeline />
       </div>
 
-      <Timeline />
       <IntegrationsDialog />
       <SettingsDialog />
       <HelpDialog />

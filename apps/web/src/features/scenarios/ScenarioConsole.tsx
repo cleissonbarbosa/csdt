@@ -301,7 +301,7 @@ function EventDetail({ event, onBack }: { event: SecurityEvent; onBack: () => vo
         {event.details !== undefined && (
           <div className="mt-3">
             <p className="caption mb-1">Details</p>
-            <pre className="code max-h-72 overflow-auto rounded-[3px] border border-line bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
+            <pre className="code max-h-72 overflow-auto rounded-control border border-line bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
               {JSON.stringify(event.details, null, 2)}
             </pre>
           </div>
@@ -336,7 +336,7 @@ function EventRow({
       data-kind={event.kind}
       data-severity={event.severity}
       className={cn(
-        'grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised',
+        'grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-control px-1.5 py-1 text-left hover:bg-raised',
         nested && 'pl-5',
         // Events ahead of the cursor belong to the recorded future.
         event.virtualTimeMs > cursor && 'opacity-45',
@@ -401,7 +401,7 @@ function EventLog() {
                   onClick={() => setOpen(open === entry.key ? null : entry.key)}
                   data-testid="event-run"
                   className={cn(
-                    'grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised',
+                    'grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-control px-1.5 py-1 text-left hover:bg-raised',
                     entry.events[0]!.virtualTimeMs > cursor && 'opacity-45',
                   )}
                 >

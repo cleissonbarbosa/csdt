@@ -2,6 +2,7 @@
 //
 //   node scripts/capture.mjs --out shot.png [--url http://localhost:5173]
 //        [--width 1920 --height 1080] [--wait 6] [--webgl2] [--readback]
+//        [--arrangement regions|dependencies]  (the default is the overview)
 //        [--settings '{"quality":"ultra"}'] [--reset]
 //        [--scenario ddos-surge --after 24] [--speed 2]
 //        [--click tab-incidents,scenario-start-ddos-surge]
@@ -73,7 +74,7 @@ if (args.webgl2 || args.settings) {
     window.localStorage.setItem('aegis.settings.v1', JSON.stringify({ state: value, version: 1 }));
   }, settings);
 }
-await page.goto(url);
+await page.goto(args.arrangement ? `${url}/?arrangement=${args.arrangement}` : url);
 await page.waitForTimeout(Number(args.wait ?? 6) * 1000);
 if (args.scenario) {
   await page.evaluate(async (scenarioId) => {

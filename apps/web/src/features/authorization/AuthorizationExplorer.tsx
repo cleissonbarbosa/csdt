@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { actions } from '@/app/actions';
 import { queryKeys } from '@/app/queryClient';
 import { Badge, DecisionTag, SourceBadge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select, Switch } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
 import { cn } from '@/lib/cn';
@@ -39,22 +39,27 @@ const STAGE_LABEL = {
 
 function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
   const topology = useTelemetry((state) => state.topology);
-  const tracing = useUi((state) => state.tracedDecision?.id === decision.id);
+  const traced = useUi((state) => state.tracedDecision?.id === decision.id);
+  const tracing = useUi((state) => state.tracing) && traced;
   const allowed = decision.decision === 'allow';
   const nameOf = (id: string) => topology?.nodes.find((n) => n.id === id)?.name ?? id;
   return (
     <div
-      className="overflow-hidden rounded-[3px] border border-ink"
+      className={cn(
+        'overflow-hidden rounded-control border',
+        allowed ? 'border-line-strong' : 'border-critical',
+      )}
       data-testid="decision-card"
       data-decision={decision.decision}
       aria-live="polite"
     >
-      {/* Allow and Deny are both ordinary outcomes, so they differ in form,
-          not in hue: Deny is the solid one, because it stops something. */}
+      {/* The request the viewer is following either arrived or was stopped.
+          Stopped is the event: it takes the incident colour, and a cross,
+          and the solid form, so it is not told from Allow by hue alone. */}
       <div
         className={cn(
           'flex items-center justify-between gap-2 px-3 py-2',
-          allowed ? 'border-b border-line text-ink' : 'bg-ink text-on-accent',
+          allowed ? 'border-b border-line text-ink' : 'bg-critical text-on-accent',
         )}
       >
         <div className="flex items-center gap-2">
@@ -69,8 +74,9 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
           icon={<Play size={12} aria-hidden />}
           disabled={tracing || decision.hops.length === 0}
           onClick={() => useUi.getState().traceDecision({ ...decision })}
+          data-testid="decision-trace"
         >
-          {tracing ? 'Tracing…' : 'Trace again'}
+          {tracing ? 'Tracing…' : traced ? 'Trace again' : 'Show the path'}
         </Button>
       </div>
       <div className="p-3">
@@ -103,7 +109,7 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
               {decision.errors.map((error) => (
                 <li
                   key={error}
-                  className="numeric rounded-[3px] border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] leading-relaxed text-warning"
+                  className="numeric rounded-control border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] leading-relaxed text-warning"
                 >
                   {error}
                 </li>
@@ -126,7 +132,7 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
                     className={cn(
                       'flex size-4 shrink-0 items-center justify-center',
                       blocked
-                        ? 'bg-ink text-on-accent'
+                        ? 'rounded-full bg-critical text-on-accent'
                         : stage.reached
                           ? 'text-ink'
                           : 'text-ink-faint',
@@ -146,7 +152,7 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
                     className={cn(
                       'min-w-0 flex-1 truncate text-left hover:underline hover:underline-offset-2',
                       blocked
-                        ? 'font-bold text-ink'
+                        ? 'font-bold text-critical'
                         : stage.reached
                           ? 'text-ink'
                           : 'text-ink-faint',
@@ -357,7 +363,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           {error && (
             <p
               role="alert"
-              className="rounded-[3px] border border-critical/50 bg-critical/10 px-2 py-1.5 text-xs text-critical"
+              className="rounded-control border border-critical/50 bg-critical/10 px-2 py-1.5 text-xs text-critical"
             >
               {error}
             </p>
@@ -394,7 +400,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
               <li
                 key={policy.id}
                 className={cn(
-                  'rounded-[3px] border px-2 py-1.5',
+                  'rounded-control border px-2 py-1.5',
                   determining ? 'border-ink bg-raised' : 'border-line',
                   off && 'opacity-55',
                 )}
@@ -402,7 +408,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
-                      'inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-[3px] border border-ink text-[11px]',
+                      'inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-control border border-ink text-[11px]',
                       policy.effect === 'forbid' ? 'bg-ink text-on-accent' : 'text-ink',
                     )}
                   >
@@ -426,7 +432,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
                   <summary className="text-[11px] text-ink-dim hover:text-ink">
                     Cedar source
                   </summary>
-                  <pre className="code mt-1 overflow-x-auto whitespace-pre-wrap rounded-[3px] bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
+                  <pre className="code mt-1 overflow-x-auto whitespace-pre-wrap rounded-control bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
                     {policy.content}
                   </pre>
                 </details>
@@ -453,7 +459,7 @@ function RecentDecisions() {
               <button
                 type="button"
                 onClick={() => useUi.getState().traceDecision({ ...decision })}
-                className="flex w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left hover:bg-raised"
+                className="flex w-full items-center gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                 title="Trace this decision through the scene"
               >
                 <DecisionTag decision={decision.decision} />
@@ -485,10 +491,18 @@ export function AuthorizationExplorer() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="authorization-explorer">
       <header className="border-b border-line px-3 py-3">
-        <h2 className="text-base font-bold text-ink">Authorization explorer</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-base font-bold text-ink">Trace a request</h2>
+          <IconButton
+            label="Close and put the path away"
+            onClick={() => useUi.getState().setInspectorOpen(false)}
+          >
+            <X size={15} />
+          </IconButton>
+        </div>
         <p className="mt-1 text-xs leading-relaxed text-ink-dim">
-          Build a request and watch it travel client → gateway → authentication → Cedar → resource.
-          Decisions are computed by the Cedar policy engine
+          Choose who asks for what, and follow the request across the model to where Cedar allows it
+          or stops it. The decision is computed by the Cedar policy engine
           {embedded?.version ? ` (cedar-policy ${embedded.version})` : ''} over synthetic principals
           and resources; nothing is scripted.
         </p>

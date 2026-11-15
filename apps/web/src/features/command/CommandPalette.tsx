@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { showRegion } from '@/app/navigate';
 import { queryKeys } from '@/app/queryClient';
 import { sceneHandle } from '@/graphics/handle';
 import { cn } from '@/lib/cn';
@@ -42,7 +43,7 @@ export function CommandPalette() {
             useUi.getState().selectNode(id);
             sceneHandle.current?.focusNode(id);
           },
-          frameRegion: (id) => sceneHandle.current?.frameRegion(id),
+          frameRegion: showRegion,
           startScenario: (id) => {
             useUi.getState().setLeftTab('incidents');
             void actions.startScenario(id);
@@ -83,7 +84,7 @@ export function CommandPalette() {
         <RadixDialog.Overlay className="fixed inset-0 z-40 animate-fade bg-black/40" />
         <RadixDialog.Content
           aria-describedby={undefined}
-          className="panel fixed left-1/2 top-[18vh] z-50 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[3px] animate-rise"
+          className="panel fixed left-1/2 top-[18vh] z-50 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 animate-rise"
           data-testid="command-palette"
         >
           <RadixDialog.Title className="sr-only">
@@ -137,7 +138,7 @@ export function CommandPalette() {
                   onMouseMove={() => setActive(i)}
                   onClick={() => run(command)}
                   className={cn(
-                    'flex cursor-pointer items-baseline justify-between gap-3 rounded-[3px] px-2 py-1.5 text-xs',
+                    'flex cursor-pointer items-baseline justify-between gap-3 rounded-control px-2 py-1.5 text-xs',
                     i === active ? 'bg-accent text-on-accent' : 'text-ink',
                   )}
                 >

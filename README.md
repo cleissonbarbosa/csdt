@@ -20,7 +20,7 @@ on the screen is a problem.
 ![Cedar](https://img.shields.io/badge/Cedar-4.14-4F545A)
 ![License](https://img.shields.io/badge/license-MIT-4F545A)
 
-<img src="docs/assets/demo.gif" width="860" alt="A DDoS surge floods the primary API gateway: the region's plate and pieces turn red, edge filtering engages and the model returns to neutral" />
+<img src="docs/assets/demo.gif" width="860" alt="A DDoS surge seen in the overview: suspicious traffic pours through the edge router into the API gateways, lamps light under the kinds of service it reaches, and edge filtering engages" />
 
 <sub>A fictional DDoS surge at 2× speed: flood, saturation, mitigation.
 Recorded from the running application. <a href="docs/assets/demo.mp4">Full clip (MP4)</a></sub>
@@ -47,26 +47,33 @@ revisited exactly, because the engine is deterministic and history is
 event-sourced.
 
 <p align="center">
-  <img src="docs/assets/overview.png" alt="AEGIS in its normal state: a neutral scale model of the Helios Commerce platform. The API Gateway is selected: its piece and connections stand out, the rest of the model recedes, and the inspector shows its signals against their normal range" />
+  <img src="docs/assets/overview.png" alt="AEGIS in its normal state: the Helios Commerce platform as twelve porcelain pieces, one per kind of service, on four plates for the layers a request crosses. The API gateways are selected: their piece and connections are blue, the rest of the model recedes, and a card shows their signals against their normal range" />
 </p>
 
-## One rule
+## Two rules
 
-The interface is drawn as a **mimic board**, the schematic with lamps that
-hangs in a control room, and it follows one rule taken from cockpits and
-industrial control rooms: **normal is silent, and hue is a signal.** A healthy
-service has no colour, no dot and no badge. Amber, red and magenta exist only
-for things that deviate, so when something fails there is nothing else for the
-eye to go to.
+The interface is a **signal field**: a scale model on a quiet porcelain field.
+
+**Overview first, then one path, then the detail.** It opens on the platform
+reduced to its twelve kinds of service, in the four layers a request crosses.
+Selecting a piece, tracing a request or starting an incident brings one path
+forward. Opening a service goes to the arrangement where all fifty-one stand
+on their own.
+
+**Normal is silent, and hue is an answer.** A healthy service has no colour,
+no dot and no badge. Blue answers the viewer: what is selected, the request
+being followed. Amber, red and magenta answer the data, and exist only for
+things that deviate, so when something fails there is nothing else for the eye
+to go to.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/incident-ddos.png" alt="A DDoS surge: the affected region's plate and services are the only coloured things on the screen" /></td>
-    <td width="50%"><img src="docs/assets/incident-regional-outage.png" alt="Night theme during a regional outage: the EU West plate has gone dark, the edge is red" /></td>
+    <td width="50%"><img src="docs/assets/incident-ddos.png" alt="A DDoS surge in the overview: the route of the attack and the kinds of service it has reached are the only coloured things on the screen" /></td>
+    <td width="50%"><img src="docs/assets/incident-regional-outage.png" alt="Night theme, arrangement by region, during a regional outage: the EU West plate has gone dark, the edge is red" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>A DDoS surge. Nothing else on the screen has a hue.</sub></td>
-    <td align="center"><sub>Night theme, regional outage: the region's plate goes dark.</sub></td>
+    <td align="center"><sub>A DDoS surge in the overview. Nothing else on the screen has a hue.</sub></td>
+    <td align="center"><sub>Night theme, by region: the plate of the region that failed goes dark.</sub></td>
   </tr>
 </table>
 
@@ -82,26 +89,37 @@ in [docs/DESIGN.md](docs/DESIGN.md).
   the authorizer, a stack of platters for a database, a lighthouse for the
   threat monitor. The pieces are built in Blender by a script in the
   repository, with ambient occlusion baked per vertex.
-- Deterministic layout by cloud region or by dependency tier; readable at
-  178 services and 648 connections.
-- Orbit, zoom, pan, click to inspect services and connections, double-click to
-  move in on a service or frame a region. Search, and filter by kind, state,
-  region or incident.
+- Two levels of one model. The overview draws one piece per kind of service,
+  each with the figures of every service it stands for, and stays twelve
+  pieces at 51 services or at 178. The detailed arrangements show every
+  service, by cloud region or by dependency tier.
+- Deterministic layout; readable at 178 services and 648 connections.
+- Orbit, zoom, pan, click to inspect a kind, a service or a connection,
+  double-click to move in. Search, and filter by kind, state, region or
+  incident.
 - Light and night themes with the same rules. Names keep one size on screen,
   like the names on a map, and appear as you get closer.
 
 **Quiet until asked**
 
-- At rest the screen holds the model, one sentence saying how the platform
-  is, and a strip of timeline. The explorer comes when asked for, the
-  inspector comes with a selection and leaves with it, the timeline opens
-  into its chart when reached for.
+- At rest the screen holds the model and one bar: what this is, a sentence
+  saying how the platform is, and two things to do. A card comes with a
+  selection and leaves with it, lists come when asked for, and the timeline
+  is on screen only while there is something on it.
+- A traced request and an incident's traffic are each one route across the
+  model: the route stays in front while the rest recedes, a badge marks where
+  it was stopped, and among every service the camera moves in on it.
 - <kbd>Ctrl</kbd> <kbd>K</kbd> reaches any service, region, scenario or
   action by name.
-- Motion happens once and answers something: the model assembles as it
-  loads, pieces walk when the layout changes, a selection lifts its piece and
-  pushes the rest back. Nothing idles and nothing loops, and reduced-motion
-  preferences switch all of it off.
+- Every piece has a part that works, at the pace of its service's traffic:
+  the gateway's door turns, the queue's line moves up, the database's
+  platters spin, and each stands still when nothing passes. How it moves is
+  the service's state: it hesitates when degraded, jams when critical, and
+  hangs crooked and still when the service is down. Everything else
+  that moves happens once and answers something: the model assembles as it
+  loads, pieces walk when the arrangement changes, a selection lifts its
+  piece and pushes the rest back. Reduced-motion preferences switch all of
+  it off.
 
 **Traffic as beads**
 
@@ -146,28 +164,36 @@ _recorded_ or _live_.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/closeup.png" alt="Close view of the US East plate: modelled matte pieces with contact shadows, bead traffic on hairline connections, the selected gateway ringed in ink" /></td>
-    <td width="50%"><img src="docs/assets/cedar-denial.png" alt="Authorization explorer showing a Deny decision determined by the forbid-cross-tenant policy, with the request traced to the Cedar authorizer" /></td>
+    <td width="50%"><img src="docs/assets/closeup.png" alt="Close view in the arrangement by region: porcelain pieces with contact shadows, bead traffic on hairline connections, the selected gateway ringed in blue and its card beside it" /></td>
+    <td width="50%"><img src="docs/assets/cedar-denial.png" alt="The request tracer showing a Deny decision determined by the forbid-cross-tenant policy. On the overview the request's path is drawn in blue as far as the Cedar authorizers, where a red badge with a cross marks where it was stopped" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Up close: pieces, beads, the selection ring</sub></td>
-    <td align="center"><sub>A Cedar denial, traced through the platform</sub></td>
+    <td align="center"><sub>A Cedar denial: the path in blue, the stop in red</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/assets/stress-regions.png" alt="The stress topology: six regional plates around the global edge" /></td>
+    <td><img src="docs/assets/stress-overview.png" alt="The overview of the stress topology: the same twelve pieces, now standing for 178 services" /></td>
+    <td><img src="docs/assets/stress-regions.png" alt="The stress topology with every service drawn: six regional plates around the global edge" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>178 services are still twelve kinds</sub></td>
+    <td align="center"><sub>The same 178, each on its own, in six regions</sub></td>
+  </tr>
+  <tr>
     <td><img src="docs/assets/stress-dependencies.png" alt="178 services laid out by dependency tier on a single board" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>178 services in six regions</sub></td>
-    <td align="center"><sub>The same services by dependency tier</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/webgpu-frame.png" alt="A frame read back from the WebGPU backend during an incident" /></td>
     <td><img src="docs/assets/table-view.png" alt="The same topology as an accessible table grouped by region" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>A frame read back from the WebGPU backend</sub></td>
+    <td align="center"><sub>The same services by dependency tier</sub></td>
     <td align="center"><sub>The non-3D table view</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/webgpu-frame.png" alt="A frame read back from the WebGPU backend during an incident" /></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>A frame read back from the WebGPU backend</sub></td>
+    <td></td>
   </tr>
 </table>
 
@@ -195,13 +221,13 @@ pnpm dev:web                            # UI on http://localhost:5173
 
 Then follow the five-minute tour in [docs/DEMO.md](docs/DEMO.md).
 
-| Key              | Action                           | Key          | Action                 |
-| ---------------- | -------------------------------- | ------------ | ---------------------- |
-| <kbd>Space</kbd> | Play / pause                     | <kbd>/</kbd> | Search services        |
-| <kbd>R</kbd>     | Reset camera                     | <kbd>L</kbd> | Regions / dependencies |
-| <kbd>F</kbd>     | Focus selection                  | <kbd>T</kbd> | 3D / table view        |
-| <kbd>Esc</kbd>   | Clear selection                  | <kbd>P</kbd> | Performance overlay    |
-| <kbd>← →</kbd>   | Step the timeline (when focused) | <kbd>?</kbd> | Help and legend        |
+| Key              | Action                           | Key          | Action              |
+| ---------------- | -------------------------------- | ------------ | ------------------- |
+| <kbd>Space</kbd> | Play / pause                     | <kbd>/</kbd> | Search services     |
+| <kbd>R</kbd>     | Reset camera                     | <kbd>L</kbd> | Next arrangement    |
+| <kbd>F</kbd>     | Focus selection                  | <kbd>T</kbd> | 3D / table view     |
+| <kbd>Esc</kbd>   | Clear selection                  | <kbd>P</kbd> | Performance overlay |
+| <kbd>← →</kbd>   | Step the timeline (when focused) | <kbd>?</kbd> | Help and legend     |
 
 ## Architecture
 
@@ -336,17 +362,18 @@ pnpm test                   # contracts, stores, layout, stream client, interfac
 pnpm e2e                    # Playwright against the real stack
 ```
 
-| Suite      | Tests | Covers                                                                                                                                                                       |
-| ---------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rust       |   115 | Flow model, determinism and replay, scenarios, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters                                                   |
-| Contracts  |    28 | Every zod schema against samples exported by the server binary                                                                                                               |
-| Web        |   155 | Layout, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                        |
-| End to end |    11 | Load, render, select, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, no-GPU fallback |
+| Suite      | Tests | Covers                                                                                                                                                                                                                         |
+| ---------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rust       |   115 | Flow model, determinism and replay, scenarios, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters                                                                                                     |
+| Contracts  |    28 | Every zod schema against samples exported by the server binary                                                                                                                                                                 |
+| Web        |   231 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                         |
+| End to end |    11 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, no-GPU fallback |
 
-All 309 pass locally. The end-to-end suite runs the real server and a production
+All 385 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
-design's central rule: no hue on screen while the platform is healthy, hue once
-an incident is under way. The same suite passes on a real GPU through WebGPU (10
+design's central rule: no hue on screen while the platform is healthy and
+nothing is selected, hue with a selection or a traced request, and hue once an
+incident is under way. The same suite passes on a real GPU through WebGPU (10
 tests; the fallback test does not apply there). One more Rust test compares the
 embedded engine with a real `cedar-agent` binary and is skipped unless
 `AEGIS_TEST_CEDAR_AGENT_BIN` is set.

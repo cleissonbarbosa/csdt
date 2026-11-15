@@ -25,7 +25,7 @@ export function Badge({ color, children, className, title }: BadgeProps) {
     <span
       title={title}
       className={cn(
-        'inline-flex h-5 items-center gap-1 rounded-[3px] border border-line px-1.5 text-[11px] text-ink-dim',
+        'inline-flex h-5 items-center gap-1 rounded-control border border-line px-1.5 text-[11px] text-ink-dim',
         className,
       )}
       style={
@@ -117,17 +117,17 @@ export function SourceBadge({ source, className }: { source: DataSource; classNa
 }
 
 /**
- * A Cedar decision. Allow and Deny are both ordinary outcomes of a policy
- * doing its job, so neither is a signal colour: they differ in form. Deny is
- * the solid one, because it is the one that stops something.
+ * A Cedar decision. A request that was stopped takes the incident colour and
+ * the solid form; one that went through is an outline in ink. The two differ
+ * in form and in word as well as in hue.
  */
 export function DecisionTag({ decision }: { decision: 'allow' | 'deny' }) {
   const deny = decision === 'deny';
   return (
     <span
       className={cn(
-        'inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-[3px] border border-ink text-[11px] font-bold',
-        deny ? 'bg-ink text-on-accent' : 'text-ink',
+        'inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-control border text-[11px] font-bold',
+        deny ? 'border-critical bg-critical text-on-accent' : 'border-line-strong text-ink',
       )}
     >
       {deny ? 'Deny' : 'Allow'}

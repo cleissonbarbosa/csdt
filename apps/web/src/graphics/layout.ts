@@ -30,10 +30,16 @@
  * `dependencies` mode — swimlanes. Tiers are columns that run left to right
  * in the direction requests travel, and each region is a lane of its own
  * across them, so a tier can be compared between regions along one line.
+ *
+ * `layers` mode — the overview. It is given a platform already reduced to
+ * its kinds of service (see `lib/overview.ts`), whose "regions" are the
+ * logical layers a request crosses. Each layer is a low plate, and the
+ * plates stand one after another in the direction requests travel, so depth
+ * into the picture is distance along the path and nothing else.
  */
 import type { InfrastructureNode, ServiceType, Topology } from '@aegis/contracts';
 
-export type LayoutMode = 'regions' | 'dependencies';
+export type LayoutMode = 'layers' | 'regions' | 'dependencies';
 
 export type Vec3 = [number, number, number];
 
@@ -43,6 +49,7 @@ export type Vec3 = [number, number, number];
  * layout faces it, and the scene frames its opening shot from it.
  */
 export const VIEW: Record<LayoutMode, { azimuth: number; elevation: number }> = {
+  layers: { azimuth: -0.3, elevation: 0.66 },
   regions: { azimuth: -0.42, elevation: 0.68 },
   dependencies: { azimuth: -0.3, elevation: 0.74 },
 };
@@ -51,7 +58,8 @@ export const VIEW: Record<LayoutMode, { azimuth: number; elevation: number }> = 
 export interface RegionLayout {
   id: string;
   name: string;
-  kind: 'edge' | 'cloud';
+  /** A layer is a way of looking at the platform, not a place in it. */
+  kind: 'edge' | 'cloud' | 'layer';
   /** Round in the regions arrangement, rectangular in the swimlanes. */
   shape: 'disc' | 'slab';
   /** Middle of the plate's top face. */
@@ -66,6 +74,12 @@ export interface RegionLayout {
    * of the model. The plate's name stands off the rim on this side.
    */
   outward: [number, number];
+  /**
+   * Set when the name is a heading with a fixed place instead: where it is
+   * anchored, and where the middle of the text goes from there, in units of
+   * its own width and height.
+   */
+  heading?: { anchor: Vec3; align: [number, number] };
 }
 
 export interface SceneLayout {
@@ -102,6 +116,24 @@ const LINE_COST = 0.3;
 const COLUMN_CLEAR = 5;
 /** The picture the swimlanes are proportioned for. */
 const PICTURE_ASPECT = 16 / 9;
+/** Table left between a plate's rim and its name. */
+const NAME_GAP = 0.9;
+/**
+ * The overview has a dozen pieces and the whole screen, so it is given air.
+ * Two pieces of one column stand far enough apart that the nearer one, seen
+ * from where the camera first stands, covers neither the farther one nor
+ * the name written at its foot.
+ */
+const LAYER_CLEAR = 5.2;
+const LAYER_COLUMN_CLEAR = 3.6;
+const LAYER_MARGIN = 2.6;
+/** Table left showing between two layers: the line that separates them. */
+const LAYER_GAP = 1.3;
+/**
+ * With so few of them the pieces can be larger, and nearer one another in
+ * size: here a piece stands for a kind, and no kind is the main one.
+ */
+const layerScale = (scale: number) => 1.3 * (0.6 * scale + 0.56);
 
 const TYPE_ORDER: Record<ServiceType, number> = {
   'external-client': 0,
@@ -708,15 +740,89 @@ function layoutDependencies(topology: Topology): SceneLayout {
   };
 }
 
+/**
+ * The overview: one plate per layer, left to right in the order a request
+ * crosses them. Within a layer its tiers are columns, and the pieces of a
+ * column stand side by side across the path. A plate is as deep as what
+ * stands on it, like any other, and all of them are centred on the path.
+ */
+function layoutLayers(topology: Topology): SceneLayout {
+  const { positions, scales, ground, put, byRegion } = stage(topology);
+  for (let i = 0; i < scales.length; i++) scales[i] = layerScale(scales[i]!);
+  const links = neighboursOf(topology);
+  const layers = topology.regions.filter((region) => byRegion.has(region.id));
+
+  const plans = layers.map((region) => {
+    const columns = tiersOf(byRegion.get(region.id)!);
+    const sizes = columns.map((column) => Math.max(...column.map((m) => scales[m.index]!)));
+    const pitches = sizes.map((size) => 2 * size + LAYER_CLEAR);
+    // Where each column stands, measured from the first.
+    const at: number[] = [];
+    let span = 0;
+    columns.forEach((_, k) => {
+      if (k > 0) span += sizes[k - 1]! + sizes[k]! + LAYER_COLUMN_CLEAR;
+      at.push(span);
+    });
+    const half = Math.max(
+      ...columns.map((column, k) => ((column.length - 1) * pitches[k]!) / 2 + sizes[k]!),
+    );
+    const width = 2 * LAYER_MARGIN + sizes[0]! + span + sizes[sizes.length - 1]!;
+    return { region, columns, sizes, pitches, at, half, width };
+  });
+  const total =
+    plans.reduce((sum, plan) => sum + plan.width, 0) + Math.max(0, plans.length - 1) * LAYER_GAP;
+
+  const regions: RegionLayout[] = [];
+  const placed = new Map<number, number>();
+  let left = -total / 2;
+  for (const plan of plans) {
+    const halfDepth = plan.half + LAYER_MARGIN;
+    plan.columns.forEach((column, k) => {
+      const x = left + LAYER_MARGIN + plan.sizes[0]! + plan.at[k]!;
+      arrange(column, links, placed).forEach((entry, r) => {
+        const z = (r - (column.length - 1) / 2) * plan.pitches[k]!;
+        placed.set(entry.index, z);
+        put(entry.index, x, 0, z);
+      });
+    });
+    regions.push({
+      id: plan.region.id,
+      name: plan.region.name,
+      kind: 'layer',
+      shape: 'slab',
+      center: [left + plan.width / 2, 0, 0],
+      radius: Math.hypot(plan.width / 2, halfDepth),
+      halfWidth: plan.width / 2,
+      halfDepth,
+      outward: [0, -1],
+      // A heading: off the far rim, starting at the layer's left corner, so
+      // it stands above the layer on screen and clear of what is on it.
+      heading: {
+        anchor: [left + 0.3, 0, -halfDepth - NAME_GAP],
+        align: [0.5, 0.5],
+      },
+    });
+    left += plan.width + LAYER_GAP;
+  }
+
+  return {
+    mode: 'layers',
+    positions,
+    scales,
+    ground,
+    regions,
+    ...enclose(positions, 6),
+  };
+}
+
 export function computeLayout(topology: Topology, mode: LayoutMode): SceneLayout {
+  if (mode === 'layers') return layoutLayers(topology);
   return mode === 'regions' ? layoutRegions(topology) : layoutDependencies(topology);
 }
 
-/** Table left between a plate's rim and its name. */
-const NAME_GAP = 0.9;
-
 /** The point beside a plate, off its rim on the outward side, where its name is anchored. */
 export function nameAnchor(region: RegionLayout): Vec3 {
+  if (region.heading) return region.heading.anchor;
   const [ox, oz] = region.outward;
   const reach =
     region.shape === 'disc'
@@ -748,10 +854,13 @@ export function hang(x: number, y: number, width: number, height: number): [numb
   return [(ux * reach) / width, (uy * reach) / height];
 }
 
-/** Control point of the quadratic curve an edge is drawn along. */
-export function edgeControl(a: Vec3, b: Vec3): Vec3 {
+/**
+ * Control point of the quadratic curve an edge is drawn along. `arc` scales
+ * how high the curve rises: lower where connections run far over open table.
+ */
+export function edgeControl(a: Vec3, b: Vec3, arc = 1): Vec3 {
   const distance = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-  const lift = Math.min(13, 0.7 + distance * 0.17);
+  const lift = Math.min(13, 0.7 + distance * 0.17) * arc;
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + lift, (a[2] + b[2]) / 2];
 }
 

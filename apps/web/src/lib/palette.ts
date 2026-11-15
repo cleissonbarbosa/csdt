@@ -8,12 +8,19 @@ import type {
 } from '@aegis/contracts';
 
 /**
- * The Sinótico palette.
+ * The Signal Field palette.
  *
- * One rule shapes it: hue is a signal. Everything that is normal is drawn in
- * neutral ink on a neutral plate; amber, red and magenta appear only when
- * something deviates, and never as decoration. Selection and focus are shown
- * with ink, so the three signal hues stay unambiguous.
+ * Five colours do the work. Porcelain is the field everything stands on,
+ * graphite is ink, and a cool grey called structure draws what is merely
+ * there: plates, rules, connections at rest. Two hues are answers. Focus
+ * (blue) is the answer to the viewer: what is selected, the path being
+ * followed. Incident (a warm red) is the answer to the data: what failed,
+ * where a request was stopped. Two rarer signals stand beside it, amber for
+ * a deviation that is not yet a failure and magenta for hostile traffic.
+ *
+ * Nothing normal has a hue. With nothing selected and nothing wrong, the
+ * screen is porcelain, graphite and grey, and it stays that way until there
+ * is something to say.
  *
  * Interface colours are CSS custom properties (defined in `index.css`) and
  * follow the active theme. The 3D scene cannot read custom properties, so it
@@ -27,9 +34,11 @@ export const COLOR = {
   ink: 'var(--color-ink)',
   inkDim: 'var(--color-ink-dim)',
   inkFaint: 'var(--color-ink-faint)',
+  /** The viewer's own attention: selection, the path being followed. */
+  focus: 'var(--color-focus)',
   /** Deviation: degraded, throttled, rejected. */
   warning: 'var(--color-warning)',
-  /** Failure: critical health, errors. */
+  /** Failure: critical health, errors, a request that was stopped. */
   critical: 'var(--color-critical)',
   /** Hostile or suspicious traffic. */
   hostile: 'var(--color-hostile)',
@@ -38,23 +47,29 @@ export const COLOR = {
 export type ThemeName = 'light' | 'night';
 
 export interface ScenePalette {
-  /** The surface the model stands on (the page background). */
+  /** The field the model stands on (the page background). */
   table: string;
-  /** Top, side and outline of a region plate. */
+  /** Top, side and outline of a plate. */
   plate: string;
   plateSide: string;
   plateLine: string;
-  /** A service in its normal state, and its lighter and marked parts. */
+  /** A service in its normal state, and the mark that says what it is. */
   piece: string;
-  pieceAccent: string;
   pieceCore: string;
+  /**
+   * How a piece's secondary parts differ from its body: a little darker on
+   * a light piece, a little lighter on a dark one.
+   */
+  pieceDetail: number;
   /** A service that is down: drained of presence rather than coloured. */
   ghost: string;
-  /** Selection, labels and ordinary traffic. */
+  /** Labels and ordinary traffic. */
   ink: string;
   inkDim: string;
   /** Connections at rest. */
   track: string;
+  /** Selection and the path being followed. */
+  focus: string;
   shadow: string;
   shadowOpacity: number;
   warning: string;
@@ -64,39 +79,41 @@ export interface ScenePalette {
 
 export const SCENE_PALETTE: Record<ThemeName, ScenePalette> = {
   light: {
-    table: '#E3E5E4',
-    plate: '#F1F2F0',
-    plateSide: '#CFD2D2',
-    plateLine: '#B4B8BA',
-    piece: '#5F656B',
-    pieceAccent: '#8B9197',
-    pieceCore: '#F3F4F2',
-    ghost: '#C4C8C9',
-    ink: '#191B1D',
-    inkDim: '#4F545A',
-    track: '#7E848A',
-    shadow: '#1B1D1F',
-    shadowOpacity: 0.2,
-    warning: '#BD7000',
-    critical: '#D0261B',
+    table: '#F5F4F0',
+    plate: '#F0EFEA',
+    plateSide: '#D6D5D0',
+    plateLine: '#C6C8C6',
+    piece: '#FDFCFA',
+    pieceCore: '#7C858A',
+    pieceDetail: 0.9,
+    ghost: '#CDCECB',
+    ink: '#252B30',
+    inkDim: '#545C63',
+    track: '#A9AFB1',
+    focus: '#4269CE',
+    shadow: '#23282C',
+    shadowOpacity: 0.22,
+    warning: '#B07200',
+    critical: '#D95D48',
     hostile: '#B0177E',
   },
   night: {
-    table: '#1D1F20',
-    plate: '#27292B',
-    plateSide: '#151718',
-    plateLine: '#44484B',
-    piece: '#A9AEB1',
-    pieceAccent: '#7C8286',
-    pieceCore: '#1D1F20',
-    ghost: '#3D4043',
-    ink: '#ECEDEC',
-    inkDim: '#B4B9BC',
-    track: '#6A7074',
+    table: '#1E2226',
+    plate: '#262B30',
+    plateSide: '#15181B',
+    plateLine: '#474E54',
+    piece: '#BFC4C7',
+    pieceCore: '#1E2226',
+    pieceDetail: 1.16,
+    ghost: '#3F454A',
+    ink: '#ECEDEA',
+    inkDim: '#B5BABD',
+    track: '#6B7378',
+    focus: '#86A3F0',
     shadow: '#000000',
     shadowOpacity: 0.42,
     warning: '#FFB224',
-    critical: '#FF5D4F',
+    critical: '#F0705A',
     hostile: '#F26BC4',
   },
 };
@@ -150,22 +167,24 @@ interface ServiceTypeInfo {
   label: string;
   /** Short label for dense lists. */
   short: string;
+  /** Several of them, as written in the middle of a sentence. */
+  plural: string;
 }
 
 /** Service types are told apart by silhouette and name, not by colour. */
 export const SERVICE_TYPE: Record<ServiceType, ServiceTypeInfo> = {
-  'api-gateway': { label: 'API gateway', short: 'Gateway' },
-  'auth-service': { label: 'Authentication', short: 'Auth' },
-  'cedar-authorizer': { label: 'Cedar authorizer', short: 'Cedar' },
-  microservice: { label: 'Microservice', short: 'Service' },
-  container: { label: 'Container', short: 'Container' },
-  serverless: { label: 'Serverless', short: 'Function' },
-  'message-queue': { label: 'Message queue', short: 'Queue' },
-  database: { label: 'Database', short: 'Database' },
-  storage: { label: 'Storage', short: 'Storage' },
-  'network-gateway': { label: 'Network gateway', short: 'Network' },
-  'security-monitor': { label: 'Security monitor', short: 'Monitor' },
-  'external-client': { label: 'External client', short: 'Client' },
+  'api-gateway': { label: 'API gateway', short: 'Gateway', plural: 'API gateways' },
+  'auth-service': { label: 'Authentication', short: 'Auth', plural: 'identity services' },
+  'cedar-authorizer': { label: 'Cedar authorizer', short: 'Cedar', plural: 'Cedar authorizers' },
+  microservice: { label: 'Microservice', short: 'Service', plural: 'microservices' },
+  container: { label: 'Container', short: 'Container', plural: 'containers' },
+  serverless: { label: 'Serverless', short: 'Function', plural: 'functions' },
+  'message-queue': { label: 'Message queue', short: 'Queue', plural: 'queues' },
+  database: { label: 'Database', short: 'Database', plural: 'databases' },
+  storage: { label: 'Storage', short: 'Storage', plural: 'object stores' },
+  'network-gateway': { label: 'Network gateway', short: 'Network', plural: 'network gateways' },
+  'security-monitor': { label: 'Security monitor', short: 'Monitor', plural: 'security monitors' },
+  'external-client': { label: 'External client', short: 'Client', plural: 'external clients' },
 };
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {

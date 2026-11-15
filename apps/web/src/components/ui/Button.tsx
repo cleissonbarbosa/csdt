@@ -40,7 +40,7 @@ export function Button({
       type={type}
       aria-pressed={pressed}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-[3px] border transition-[color,background-color,border-color,opacity,scale] duration-150',
+        'inline-flex shrink-0 items-center justify-center rounded-control border transition-[color,background-color,border-color,opacity,scale] duration-150',
         'active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40',
         VARIANT[variant],
         SIZE[size],
@@ -78,7 +78,7 @@ export function IconButton({
       title={label}
       aria-pressed={pressed}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-[3px] border border-transparent text-ink-dim transition-[color,background-color,border-color,scale] duration-150',
+        'inline-flex shrink-0 items-center justify-center rounded-control border border-transparent text-ink-dim transition-[color,background-color,border-color,scale] duration-150',
         'hover:bg-raised hover:text-ink active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40',
         size === 'sm' ? 'size-7' : 'size-8',
         pressed && 'border-line-strong bg-sunken text-ink',

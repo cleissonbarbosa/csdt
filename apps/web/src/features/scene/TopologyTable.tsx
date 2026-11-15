@@ -54,7 +54,7 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
   return (
     <div className="h-full overflow-y-auto px-4 pb-6 pt-4" data-testid="topology-table">
       {notice && (
-        <p role="status" className="panel mb-4 rounded-[3px] px-3 py-2 text-xs text-ink">
+        <p role="status" className="panel mb-4 px-3 py-2 text-xs text-ink">
           {notice}
         </p>
       )}

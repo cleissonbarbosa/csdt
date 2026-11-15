@@ -53,6 +53,7 @@ const RENDERER: { value: RendererSetting; label: string }[] = [
   { value: 'webgl2', label: 'WebGL 2' },
 ];
 const LAYOUT: { value: LayoutMode; label: string }[] = [
+  { value: 'layers', label: 'Overview' },
   { value: 'regions', label: 'Regions' },
   { value: 'dependencies', label: 'Dependencies' },
 ];
@@ -132,7 +133,7 @@ export function SettingsDialog() {
       <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Accessibility</h3>
       <Row
         label="Motion"
-        hint="Reduced motion stops camera animation, the blink of a new alarm and interface transitions."
+        hint="Reduced motion stops camera animation, the working parts of the pieces, the blink of a new alarm and interface transitions."
       >
         <Segmented
           label="Motion"

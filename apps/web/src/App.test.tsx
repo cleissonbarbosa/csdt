@@ -72,6 +72,12 @@ function renderOpen() {
   return renderApp();
 }
 
+/** What is used now and then is in the menu at the end of the top bar. */
+async function fromMenu(user: ReturnType<typeof userEvent.setup>, name: string | RegExp) {
+  await user.click(screen.getByRole('button', { name: 'More' }));
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
 beforeEach(() => {
   window.innerWidth = 1600;
   localStorage.clear();
@@ -120,7 +126,7 @@ describe('loading and fallback rendering', () => {
     renderApp();
     expect(screen.getByTestId('connection-health')).toHaveTextContent('Stream live');
     // Provenance is a plain sentence, not a cluster of badges.
-    expect(screen.getByText('Synthetic data, simulated')).toBeInTheDocument();
+    expect(screen.getByText('Simulated, synthetic data')).toBeInTheDocument();
     expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'demo');
   });
 
@@ -210,13 +216,13 @@ describe('panels on demand', () => {
   it('brings the explorer and the overview when they are asked for', async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole('button', { name: 'Show explorer' }));
+    await fromMenu(user, /List every service/);
     expect(screen.getByTestId('explorer-count')).toHaveTextContent('51 of 51 services');
-    await user.click(screen.getByRole('button', { name: 'Show inspector' }));
+    await fromMenu(user, 'Platform signals');
     expect(screen.getByTestId('overview')).toHaveTextContent('Helios Commerce');
 
     await user.click(screen.getByRole('button', { name: 'Close the overview' }));
-    await user.click(screen.getByRole('button', { name: 'Hide explorer' }));
+    await user.click(screen.getByRole('button', { name: 'Close this panel' }));
     await waitFor(() => {
       expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
       expect(screen.queryByTestId('explorer')).not.toBeInTheDocument();
@@ -250,12 +256,77 @@ describe('panels on demand', () => {
   it('keeps the authorization panel when the selection is cleared', async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole('button', { name: 'Authorization explorer' }));
+    await fromMenu(user, 'Trace a request through Cedar');
     act(() => useUi.getState().select(null));
-    expect(screen.getByRole('tab', { name: 'Authorization' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    expect(screen.getByRole('complementary', { name: 'Trace a request' })).toBeInTheDocument();
+    expect(useUi.getState().openPanel).toBe('authorization');
+  });
+
+  it('opens the incidents from the one command in the top bar', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId('explore-incident'));
+    expect(await screen.findByTestId('scenario-console')).toBeInTheDocument();
+    await user.click(screen.getByTestId('explore-incident'));
+    await waitFor(() => expect(screen.queryByTestId('scenario-console')).not.toBeInTheDocument());
+  });
+
+  it('keeps the timeline off the screen until there is something on it', async () => {
+    const quiet = fixtures.snapshot();
+    quiet.incident = null;
+    quiet.global.activeIncidents = 0;
+    useTelemetry.getState().applySnapshot(quiet);
+    api.incidents.mockResolvedValue({ ...fixtures.incidents(), incidents: [] });
+    const user = userEvent.setup();
+    renderApp();
+    expect(screen.queryByTestId('timeline')).not.toBeInTheDocument();
+    // Asked for, it comes, and can be put away again.
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /Timeline and playback/ }));
+    expect(screen.getByTestId('timeline')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Put the timeline away' }));
+    expect(screen.queryByTestId('timeline')).not.toBeInTheDocument();
+    // Pausing makes time something to look at: it comes by itself.
+    act(() =>
+      useTelemetry.getState().setPlayback({ ...quiet.playback, status: 'paused' as const }),
     );
+    expect(screen.getByTestId('timeline')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Put the timeline away' })).not.toBeInTheDocument();
+  });
+});
+
+describe('the overview', () => {
+  it('describes a kind of service from all of its instances', async () => {
+    renderApp();
+    act(() => useUi.getState().select({ kind: 'group', id: 'kind:api-gateway' }));
+    const card = screen.getByTestId('group-card');
+    expect(within(card).getByTestId('inspector-title')).toHaveTextContent('API gateways');
+    expect(card).toHaveTextContent('3 API gateways in the entry layer');
+    expect(within(card).getByTestId('inspector-metrics')).toHaveTextContent('req/s');
+    // Its instances are listed with the region each is in.
+    const members = within(card).getByTestId('group-members');
+    expect(within(members).getAllByRole('button')).toHaveLength(3);
+    expect(members).toHaveTextContent('EU West');
+    // What it talks to is other kinds, not other services.
+    expect(card).toHaveTextContent('Global Edge Router');
+  });
+
+  it('opens a service where it stands, in the detailed arrangement', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(useUi.getState().layoutMode).toBe('layers');
+    act(() => useUi.getState().select({ kind: 'group', id: 'kind:cedar-authorizer' }));
+    expect(screen.getByTestId('group-authorization')).toHaveTextContent('Denied');
+    await user.click(screen.getByTestId('member-use-cedar'));
+    expect(useUi.getState().layoutMode).toBe('regions');
+    expect(useUi.getState().selection).toEqual({ kind: 'node', id: 'use-cedar' });
+    expect(await screen.findByTestId('node-inspector')).toHaveAttribute(
+      'data-node-id',
+      'use-cedar',
+    );
+    // Going back to the overview lets go of the service.
+    act(() => useUi.getState().setLayoutMode('layers'));
+    expect(useUi.getState().selection).toBeNull();
   });
 });
 
@@ -370,7 +441,7 @@ describe('inspector', () => {
     // Letting go of the selection puts the inspector away.
     await user.click(screen.getByRole('button', { name: 'Clear selection' }));
     expect(useUi.getState().selection).toBeNull();
-    await waitFor(() => expect(screen.queryByTestId('tab-inspector')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument());
   });
 
   it('inspects a connection', async () => {
@@ -570,9 +641,9 @@ describe('authorization explorer', () => {
   it('evaluates a request with Cedar and shows the engine’s answer', async () => {
     const user = userEvent.setup();
     renderApp();
-    // Nothing is open at the start: the key in the top bar brings the panel.
-    expect(screen.queryByRole('tab', { name: 'Authorization' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Authorization explorer' }));
+    // Nothing is open at the start: the menu brings the panel.
+    expect(screen.queryByTestId('authz-form')).not.toBeInTheDocument();
+    await fromMenu(user, 'Trace a request through Cedar');
     const form = await screen.findByTestId('authz-form');
     await user.selectOptions(within(form).getByTestId('authz-principal'), 'User::"mallory"');
     await user.selectOptions(within(form).getByTestId('authz-action'), 'Action::"exportLedger"');
@@ -611,7 +682,7 @@ describe('authorization explorer', () => {
   it('lets policies be switched off for an evaluation', async () => {
     const user = userEvent.setup();
     renderOpen();
-    await user.click(screen.getByRole('tab', { name: 'Authorization' }));
+    await fromMenu(user, 'Trace a request through Cedar');
     const policies = await screen.findByTestId('policy-list');
     expect(within(policies).getAllByRole('listitem')).toHaveLength(9);
     expect(policies).toHaveTextContent('forbid(principal, action, resource)');
@@ -627,7 +698,7 @@ describe('authorization explorer', () => {
     api.evaluate.mockRejectedValue(new ApiError(400, 'invalid_request', 'invalid principal'));
     const user = userEvent.setup();
     renderOpen();
-    await user.click(screen.getByRole('tab', { name: 'Authorization' }));
+    await fromMenu(user, 'Trace a request through Cedar');
     await user.click(await screen.findByTestId('authz-evaluate'));
     expect(await screen.findByRole('alert')).toHaveTextContent('invalid principal');
     expect(screen.queryByTestId('decision-card')).not.toBeInTheDocument();
@@ -636,7 +707,7 @@ describe('authorization explorer', () => {
   it('only offers cedar-agent once one is connected', async () => {
     const user = userEvent.setup();
     renderOpen();
-    await user.click(screen.getByRole('tab', { name: 'Authorization' }));
+    await fromMenu(user, 'Trace a request through Cedar');
     const engines = await screen.findByRole('radiogroup', { name: 'Policy engine' });
     expect(within(engines).getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByText(/Connect a local cedar-agent/)).toBeInTheDocument();
@@ -668,7 +739,7 @@ describe('integrations and settings', () => {
   it('persists settings and applies reduced motion', async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    await fromMenu(user, 'Settings');
     const dialog = await screen.findByRole('dialog', { name: 'Settings' });
     await user.click(
       within(within(dialog).getByRole('radiogroup', { name: 'Motion' })).getByRole('radio', {
@@ -699,7 +770,7 @@ describe('integrations and settings', () => {
     renderApp();
     await user.keyboard('?');
     const dialog = await screen.findByRole('dialog', { name: 'Help and legend' });
-    expect(dialog).toHaveTextContent('A lighthouse, on a mast above the edge');
+    expect(dialog).toHaveTextContent('A lighthouse above the edge; its lamp sweeps round');
     expect(dialog).toHaveTextContent('no real system is observed, scanned or attacked');
   });
 });

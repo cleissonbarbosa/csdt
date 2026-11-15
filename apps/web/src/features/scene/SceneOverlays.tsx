@@ -6,12 +6,15 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Field';
 import { sceneHandle } from '@/graphics/handle';
 import { formatMs, formatRate } from '@/lib/format';
+import { overviewOf, projectSnapshot } from '@/lib/overview';
 import { SERVICE_TYPE } from '@/lib/palette';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { filtersActive, useUi, type LayoutMode } from '@/stores/ui';
 
+/** The overview first, then the two arrangements that show every service. */
 const LAYOUTS: { value: LayoutMode; label: string }[] = [
+  { value: 'layers', label: 'Overview' },
   { value: 'regions', label: 'Regions' },
   { value: 'dependencies', label: 'Dependencies' },
 ];
@@ -21,16 +24,13 @@ export function SceneToolbar() {
   const layoutMode = useUi((state) => state.layoutMode);
   const filters = useUi((state) => state.filters);
   return (
-    <div
-      className="panel flex items-center gap-1.5 rounded-[3px] p-1"
-      role="toolbar"
-      aria-label="Scene controls"
-    >
+    <div className="panel flex items-center gap-1.5 p-1" role="toolbar" aria-label="Scene controls">
       <Segmented
         label="Topology layout"
         size="sm"
         value={layoutMode}
         options={LAYOUTS}
+        testId="layout"
         onChange={(mode) => useUi.getState().setLayoutMode(mode)}
       />
       <IconButton
@@ -58,33 +58,45 @@ export function SceneToolbar() {
   );
 }
 
-/** Contents of the tooltip the scene anchors to the hovered service. */
+/** Contents of the tooltip the scene anchors to the piece being pointed at. */
 export function HoverCard() {
   const hoveredId = useUi((state) => state.hoveredNodeId);
-  const topology = useTelemetry((state) => state.topology);
-  const index = useTelemetry((state) => state.index);
-  const snapshot = useTelemetry((state) => state.snapshot);
-  if (!hoveredId || !topology || !index) return null;
-  const i = index.nodeIndex.get(hoveredId);
-  const node = i === undefined ? undefined : topology.nodes[i];
-  if (!node || i === undefined) return null;
+  const layers = useUi((state) => state.layoutMode === 'layers');
+  const source = useTelemetry((state) => state.topology);
+  const raw = useTelemetry((state) => state.snapshot);
+  if (!hoveredId || !source) return null;
+  // In the overview the piece is a kind of service; a service pointed at in
+  // a list is shown as the kind it belongs to.
+  const overview = layers ? overviewOf(source) : null;
+  const topology = overview?.topology ?? source;
+  const id = overview ? (overview.groupOfNode.get(hoveredId) ?? hoveredId) : hoveredId;
+  const i = topology.nodes.findIndex((node) => node.id === id);
+  const node = topology.nodes[i];
+  if (!node) return null;
+  const current = raw && raw.topologyId === source.id ? raw : null;
+  const snapshot = overview && current ? projectSnapshot(overview, current) : current;
   const health = HEALTH_BY_CODE[snapshot?.nodes.health[i] ?? 0] ?? node.metrics.health;
+  const count = overview?.members[i]?.length ?? 1;
   return (
     <div
-      // Keyed by the service so the card arrives again for each new piece.
-      key={hoveredId}
+      // Keyed by the piece so the card arrives again for each new one.
+      key={id}
       className="-translate-x-1/2 -translate-y-[calc(100%+22px)]"
     >
-      <div className="panel animate-rise whitespace-nowrap rounded-[3px] px-2.5 py-1.5">
+      <div className="panel floating animate-rise whitespace-nowrap px-2.5 py-1.5">
         <p className="text-xs font-bold text-ink">{node.name}</p>
-        <p className="caption">{SERVICE_TYPE[node.serviceType].label}</p>
+        <p className="caption">
+          {count > 1
+            ? `${count} ${SERVICE_TYPE[node.serviceType].plural}`
+            : SERVICE_TYPE[node.serviceType].label}
+        </p>
         <p className="mt-1 flex items-center gap-2.5 text-[11px]">
           {health !== 'healthy' && <HealthBadge health={health} />}
           <span className="numeric text-ink-dim">
-            {formatRate(snapshot?.nodes.throughputRps[i] ?? 0)}/s
+            {formatRate(snapshot?.nodes.throughputRps[i] ?? node.metrics.throughputRps)}/s
           </span>
           <span className="numeric text-ink-dim">
-            {formatMs(snapshot?.nodes.latencyMs[i] ?? 0)}
+            {formatMs(snapshot?.nodes.latencyMs[i] ?? node.metrics.latencyMs)}
           </span>
         </p>
       </div>
@@ -106,7 +118,7 @@ export function Notices() {
           key={notice.id}
           type="button"
           onClick={() => useNotices.getState().dismiss(notice.id)}
-          className={`panel pointer-events-auto max-w-md animate-rise rounded-[3px] px-3 py-1.5 text-left text-xs ${
+          className={`panel pointer-events-auto max-w-md animate-rise px-3 py-1.5 text-left text-xs ${
             notice.tone === 'error' ? 'font-bold text-critical' : 'text-ink'
           }`}
         >

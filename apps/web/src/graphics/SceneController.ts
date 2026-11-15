@@ -4,9 +4,10 @@
  * React mounts the canvas and forwards state; everything that happens per
  * frame happens here, without React.
  *
- * The scene is a scale model on a table: matte pieces standing on plates,
- * connections as hairlines, traffic as beads. It is drawn in neutral tones;
- * a hue appears only where something deviates. The whole topology renders in
+ * The scene is a scale model on a porcelain field: matte pieces standing on
+ * plates, connections as hairlines, traffic as beads. It is drawn in neutral
+ * tones; a hue appears only as an answer, blue to what the viewer is
+ * following and a signal colour to what deviates. The whole topology renders in
  * a small number of draw calls that follows the number of object classes,
  * not the number of objects:
  *
@@ -21,7 +22,11 @@
  * topology is laid out (plates, then pieces, then the connections between
  * them), pieces walk to their new places when the layout changes, a selected
  * piece is lifted and its connections are redrawn outward from it, and a
- * piece that fails is jolted once. Nothing loops and nothing idles.
+ * piece that fails is jolted once. Two things keep moving, and both because
+ * requests do: the beads on the connections, and the one working part of
+ * each piece, which runs at the pace of its service's traffic and in the
+ * manner of its state: evenly, hesitating when degraded, jammed when
+ * critical, and hanging crooked and still when the service is down.
  */
 import {
   HEALTH_BY_CODE,
@@ -72,7 +77,8 @@ import {
   type PlateUniforms,
   type SceneTheme,
 } from './materials';
-import type { PieceSet } from './pieces';
+import { paceOf, referenceThroughput } from './pace';
+import { MECHANISM_ROWS, WORK_CYCLE, type PieceSet } from './pieces';
 import { AdaptiveQuality, FrameStats, QUALITY, type QualityLevel } from './quality';
 import type { Backend } from './renderer';
 
@@ -133,6 +139,11 @@ const EDGE_SEGMENTS = 20;
  * discernible on the busiest connection.
  */
 const PARTICLE_BUDGET = 9_000;
+/**
+ * The overview is read from its lines: each of its connections stands for
+ * many, so the line is drawn firmly and only a few beads ride it.
+ */
+const LAYER_PARTICLES = 0.2;
 const TRAIL = 12;
 /**
  * A long lens: lines that are parallel in the model stay very nearly parallel
@@ -146,6 +157,12 @@ const NODE_LABEL_PX = 19;
 const REGION_LABEL_PX = 27;
 /** Thickness of a region plate, and so the height of the table below it. */
 const PLATE_THICKNESS = 0.6;
+/** A layer of the overview is a lower step: it marks a stage, not a place. */
+const LAYER_THICKNESS = 0.34;
+/** How flat connections are drawn over the overview, where they run far. */
+const LAYER_ARC = 0.42;
+/** Badges that mark where a flow was stopped, beside the traced request's own. */
+const MARKERS = 4;
 /** How far the plinth under a raised plate stands back from its rim. */
 const PLINTH_INSET = 0.55;
 /** Relationship → particle kind understood by the particle shader. */
@@ -168,8 +185,12 @@ const WALK_TIME = 0.85;
 /** How long a connection takes to draw itself, and its beads to follow. */
 const DRAW_TIME = 0.45;
 const BEADS_TIME = 0.6;
+/** How quickly a mechanism takes up a new pace, per second: it has inertia. */
+const WIND = 1.6;
+/** How fast a mechanism passes from one state's manner to the next, in states per second. */
+const MANNER_RATE = 3;
 /** How far the pieces outside a selection's neighbourhood recede. */
-const FOCUS_DIM = 0.36;
+const FOCUS_DIM = 0.48;
 const EDGE_FOCUS_DIM = 0.26;
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -190,6 +211,8 @@ function hex(color: string): Vec3 {
 interface Tones {
   ink: Vec3;
   track: Vec3;
+  /** The viewer's attention: selection and the path being followed. */
+  focus: Vec3;
   /** Piece colour by health code: healthy, degraded, critical, down. */
   piece: [Vec3, Vec3, Vec3, Vec3];
   /** Lamp colour under a piece, by health code. */
@@ -207,6 +230,7 @@ function tonesOf(palette: ScenePalette): Tones {
   return {
     ink,
     track: hex(palette.track),
+    focus: hex(palette.focus),
     piece: [hex(palette.piece), warning, critical, hex(palette.ghost)],
     // A piece that is down gets a quiet mark, not a light: it is off.
     lamp: [ink, warning, critical, hex(palette.track)],
@@ -276,8 +300,16 @@ interface Trace {
   total: number;
   travelled: number;
   edges: number[];
+  /** The pieces the request passed, for the neighbourhood that stays in front. */
+  nodes: number[];
   burstAt: Vec3;
   burstAge: number;
+  /** Where the camera looks while the whole path is in the picture. */
+  home: Vec3;
+  /** Where the camera stood before the path took it, to be given back. */
+  before: { position: Vec3; target: Vec3 };
+  /** The piece the request was stopped at, or -1 when it went through. */
+  blockedAt: number;
   done: boolean;
 }
 
@@ -296,6 +328,8 @@ export class SceneController {
   private quality: QualityLevel = 'high';
   private time = 0;
   private userMoved = false;
+  /** The viewer took the camera while a request was being followed. */
+  private steered = false;
   private disposed = false;
   private frameDrawCalls = 0;
   private frameTriangles = 0;
@@ -308,6 +342,8 @@ export class SceneController {
   private topology: Topology | null = null;
   private layout: SceneLayout | null = null;
   private layoutMode: LayoutMode = 'regions';
+  /** What to write beside each piece, when it is not the node's own name. */
+  private labels: readonly string[] | null = null;
   private n = 0;
   private m = 0;
   private nodeTypeIndex = new Uint8Array(0);
@@ -327,8 +363,22 @@ export class SceneController {
   private visibilityTarget = new Float32Array(0);
   private visibility = new Float32Array(0);
   private impacted = new Uint8Array(0);
+  /** 1 where a piece stands for several services and only some deviate. */
+  private partial = new Uint8Array(0);
+  /** Connections an incident's traffic is taking, and where it was stopped. */
+  private route = new Uint8Array(0);
+  private stopped: number[] = [];
+  private routed = false;
   private tint = new Float32Array(0);
   private shockAt = new Float32Array(0);
+  /** Requests per second through each service, and what counts as its normal. */
+  private throughput = new Float32Array(0);
+  private throughputReference = new Float32Array(0);
+  /** How fast each piece's mechanism runs, and for how long it has worked. */
+  private pace = new Float32Array(0);
+  private work = new Float32Array(0);
+  /** The state each mechanism works in, on its way to the service's health code. */
+  private manner = new Float32Array(0);
   private edgeTraffic = new Float32Array(0);
   private edgeError = new Float32Array(0);
   private edgeRejected = new Float32Array(0);
@@ -405,6 +455,8 @@ export class SceneController {
   /** Height of the top of each service type's geometry, at unit scale. */
   private typeTop: number[] = [];
   private readonly tracerMesh: THREE.Mesh;
+  /** What moves on every piece, as the texture the piece material reads. */
+  private readonly mechanisms: THREE.DataTexture;
   private readonly tracerAttr: {
     pos: THREE.InstancedBufferAttribute;
     color: THREE.InstancedBufferAttribute;
@@ -465,14 +517,27 @@ export class SceneController {
     this.controls.restThreshold = 0.02;
     this.controls.addEventListener('control', this.onControl);
 
+    this.mechanisms = new THREE.DataTexture(
+      pieces.table.data,
+      pieces.table.columns,
+      MECHANISM_ROWS,
+      THREE.RGBAFormat,
+      THREE.FloatType,
+    );
+    this.mechanisms.minFilter = this.mechanisms.magFilter = THREE.NearestFilter;
+    this.mechanisms.generateMipmaps = false;
+    this.mechanisms.needsUpdate = true;
+    this.disposables.push(this.mechanisms);
+
     // Tracer sprites (head, tail and the ring where the request ends).
-    const tracerGeometry = instancedQuad(TRAIL + 1);
+    const sprites = TRAIL + 1 + MARKERS;
+    const tracerGeometry = instancedQuad(sprites);
     this.tracerAttr = {
-      pos: instanced(tracerGeometry, 'aPos', 3, TRAIL + 1),
-      color: instanced(tracerGeometry, 'aColor', 3, TRAIL + 1),
-      fx: instanced(tracerGeometry, 'aTracerFx', 4, TRAIL + 1),
+      pos: instanced(tracerGeometry, 'aPos', 3, sprites),
+      color: instanced(tracerGeometry, 'aColor', 3, sprites),
+      fx: instanced(tracerGeometry, 'aTracerFx', 4, sprites),
     };
-    const tracerMaterial = createTracerMaterial();
+    const tracerMaterial = createTracerMaterial(this.theme);
     this.tracerMesh = new THREE.Mesh(tracerGeometry, tracerMaterial);
     this.tracerMesh.frustumCulled = false;
     this.tracerMesh.visible = false;
@@ -493,7 +558,11 @@ export class SceneController {
   // Topology
   // ---------------------------------------------------------------------------
 
-  setTopology(topology: Topology, mode: LayoutMode): void {
+  /**
+   * `labels`, when given, is what to write beside each node instead of its
+   * name: the overview's pieces stand for several services and say how many.
+   */
+  setTopology(topology: Topology, mode: LayoutMode, labels: readonly string[] | null = null): void {
     const first = this.topology === null;
     const changed = this.topology?.id !== topology.id || this.n !== topology.nodes.length;
     // The same services in another arrangement: they walk there.
@@ -502,6 +571,7 @@ export class SceneController {
     this.clearWorld();
     this.topology = topology;
     this.layoutMode = mode;
+    this.labels = labels;
     const layout = computeLayout(topology, mode);
     this.layout = layout;
     const n = (this.n = topology.nodes.length);
@@ -515,8 +585,19 @@ export class SceneController {
       this.visibilityTarget = new Float32Array(n).fill(1);
       this.visibility = new Float32Array(n).fill(1);
       this.impacted = new Uint8Array(n);
+      this.partial = new Uint8Array(n);
+      this.route = new Uint8Array(m);
+      this.stopped = [];
+      this.routed = false;
       this.tint = new Float32Array(n * 3);
       this.shockAt = new Float32Array(n).fill(-100);
+      this.throughput = Float32Array.from(topology.nodes, (node) => node.metrics.throughputRps);
+      this.throughputReference = referenceThroughput(topology.nodes);
+      this.pace = new Float32Array(n);
+      // Pieces of a kind do not work in step: each starts somewhere in its
+      // cycle, the same place on every load.
+      const start = mulberry(0x3ec4a);
+      this.work = Float32Array.from({ length: n }, () => start() * WORK_CYCLE);
       this.edgeTraffic = new Float32Array(m);
       this.edgeError = new Float32Array(m);
       this.edgeRejected = new Float32Array(m);
@@ -538,10 +619,13 @@ export class SceneController {
       this.hasSnapshot = false;
       this.selectedNode = this.selectedEdge = this.hoveredNode = -1;
       this.trace = null;
+      this.userMoved = false;
       topology.nodes.forEach((node, i) => {
         this.health[i] = HEALTH_BY_CODE.indexOf(node.metrics.health);
         this.tint.set(this.tones.piece[this.health[i]!]!, i * 3);
       });
+      // A model laid out in the middle of an incident is drawn as it is.
+      this.manner = Float32Array.from(this.health);
       topology.edges.forEach((edge, e) => {
         this.edgeTraffic[e] = edge.metrics.trafficRps;
         this.edgeError[e] = edge.metrics.errorRate;
@@ -596,9 +680,15 @@ export class SceneController {
   }
 
   /** The plates, the shadows they cast on the table and the plinth under the hub. */
+  /** How thick the plates of the current arrangement are. */
+  private relief(): number {
+    return this.layoutMode === 'layers' ? LAYER_THICKNESS : PLATE_THICKNESS;
+  }
+
   private buildBase(layout: SceneLayout): void {
     const theme = this.theme;
-    const table = -PLATE_THICKNESS;
+    const thickness = this.relief();
+    const table = -thickness;
     const disc = this.track(new THREE.CylinderGeometry(1, 1, 1, 96).translate(0, -0.5, 0));
     const slab = this.track(new THREE.BoxGeometry(1, 1, 1).translate(0, -0.5, 0));
     const blob = this.track(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2));
@@ -621,8 +711,8 @@ export class SceneController {
       this.track(material);
       const plate = new THREE.Mesh(round ? disc : slab, material);
       plate.position.set(0, region.center[1], 0);
-      if (round) plate.scale.set(region.radius, PLATE_THICKNESS, region.radius);
-      else plate.scale.set(region.halfWidth * 2, PLATE_THICKNESS, region.halfDepth * 2);
+      if (round) plate.scale.set(region.radius, thickness, region.radius);
+      else plate.scale.set(region.halfWidth * 2, thickness, region.halfDepth * 2);
       group.add(plate);
       this.plates.push({ uniforms, regionId: region.id, health: 0, alarm: 0, off: 0 });
 
@@ -633,7 +723,7 @@ export class SceneController {
       group.add(shadow);
 
       // A raised plate stands on a plinth, a step in from its rim.
-      const under = region.center[1] - PLATE_THICKNESS;
+      const under = region.center[1] - thickness;
       if (under - table > 0.05) {
         const plinth = new THREE.Mesh(round ? disc : slab, support);
         plinth.position.set(0, under, 0);
@@ -653,7 +743,7 @@ export class SceneController {
   }
 
   private buildNodes(topology: Topology): void {
-    const material = this.track(createPieceMaterial(this.theme));
+    const material = this.track(createPieceMaterial(this.theme, this.mechanisms));
     const perType = SERVICE_TYPES.map(() => [] as number[]);
     this.nodeTypeIndex = new Uint8Array(this.n);
     this.nodeSlot = new Uint16Array(this.n);
@@ -668,7 +758,7 @@ export class SceneController {
       const members = perType[t]!;
       if (members.length === 0) return null;
       // A copy per layout: instance attributes are attached to the geometry.
-      const geometry = this.track(this.pieces[type].clone());
+      const geometry = this.track(this.pieces.shapes[type].clone());
       this.typeTop[t] = geometry.boundingBox?.max.y ?? 1;
       const mesh = new THREE.InstancedMesh(geometry, material, members.length);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -746,7 +836,7 @@ export class SceneController {
     for (let e = 0; e < m; e++) {
       const a = nodePosition(layout, this.edgeSource[e]!);
       const b = nodePosition(layout, this.edgeTarget[e]!);
-      const c = edgeControl(a, b);
+      const c = edgeControl(a, b, layout.mode === 'layers' ? LAYER_ARC : 1);
       start.setXYZ(e, ...a);
       end.setXYZ(e, ...b);
       ctrl.setXYZ(e, ...c);
@@ -786,7 +876,8 @@ export class SceneController {
     this.edgeCapacity = new Float32Array(m);
     let capacity = 0;
     for (let e = 0; e < m; e++) {
-      const count = Math.min(300, Math.max(4, Math.round((PARTICLE_BUDGET * weights[e]!) / total)));
+      const budget = PARTICLE_BUDGET * (layout.mode === 'layers' ? LAYER_PARTICLES : 1);
+      const count = Math.min(300, Math.max(4, Math.round((budget * weights[e]!) / total)));
       this.edgeCapacity[e] = count;
       capacity += count;
     }
@@ -845,8 +936,9 @@ export class SceneController {
     await loadLabelFonts();
     // The topology may have been replaced while fonts were loading.
     if (this.disposed || this.layout !== layout) return;
+    const names = topology.nodes.map((node, i) => this.labels?.[i] ?? node.name);
     const labels = [
-      ...topology.nodes.map((node) => ({ text: node.name, style: 'node' as const })),
+      ...names.map((text) => ({ text, style: 'node' as const })),
       ...layout.regions.map((region) => ({ text: region.name, style: 'region' as const })),
     ];
     const atlas: LabelAtlas = this.track(buildLabelAtlas(labels));
@@ -857,13 +949,20 @@ export class SceneController {
     const rect = instanced(geometry, 'aRect', 4, count, false);
     const align = instanced(geometry, 'aAlign', 2, count);
     const fx = instanced(geometry, 'aLabelFx', 4, count);
-    topology.nodes.forEach((node, i) => {
-      const r = atlas.rect(node.name, 'node');
+    topology.nodes.forEach((_, i) => {
+      const r = atlas.rect(names[i]!, 'node');
       const p = nodePosition(layout, i);
       const s = layout.scales[i] ?? 1;
-      // A service's name stands above its piece, clear of the silhouette.
-      pos.setXYZ(i, p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * s + 0.25, p[2]);
-      align.setXY(i, 0, 0.5);
+      if (layout.mode === 'layers') {
+        // In the overview a name lies on the plate at the foot of its piece,
+        // toward the viewer, where it covers nothing that stands behind.
+        pos.setXYZ(i, p[0], layout.ground[i] ?? 0, p[2] + s * 1.3);
+        align.setXY(i, 0, -0.5);
+      } else {
+        // A service's name stands above its piece, clear of the silhouette.
+        pos.setXYZ(i, p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * s + 0.25, p[2]);
+        align.setXY(i, 0, 0.5);
+      }
       if (r) {
         size.setXY(i, NODE_LABEL_PX * r.aspect, NODE_LABEL_PX);
         rect.setXYZW(i, r.u, r.v, r.w, r.h);
@@ -904,6 +1003,7 @@ export class SceneController {
       // A node that just turned critical or went down sends out a shockwave.
       if (this.hasSnapshot && next >= 2 && next > this.health[i]!) this.shockAt[i] = this.time;
       this.health[i] = next;
+      this.throughput[i] = snapshot.nodes.throughputRps[i] ?? 0;
     }
     for (let e = 0; e < this.m; e++) {
       this.edgeTraffic[e] = snapshot.edges.trafficRps[e]!;
@@ -968,6 +1068,55 @@ export class SceneController {
     }
   }
 
+  /**
+   * `mask[i]` is 1 where a piece stands for several services of which only
+   * some are unwell: its lamp shows the state, the piece itself stays neutral.
+   */
+  setPartial(mask: Uint8Array | null): void {
+    for (let i = 0; i < this.n; i++) this.partial[i] = mask ? (mask[i] ?? 0) : 0;
+  }
+
+  /**
+   * The route an incident's traffic is taking: the connections it crosses
+   * and the pieces at which it was stopped. While there is one, and nothing
+   * is selected, the route stays in front and the rest of the model recedes;
+   * the first time it appears the camera moves in on it.
+   */
+  setRoute(edgeIds: readonly string[], blockedNodeIds: readonly string[]): void {
+    this.route.fill(0);
+    let any = false;
+    for (const id of edgeIds) {
+      const e = this.edgeIds.indexOf(id);
+      if (e === -1) continue;
+      this.route[e] = 1;
+      any = true;
+    }
+    this.stopped = [];
+    for (const id of blockedNodeIds) {
+      const i = this.nodeIds.indexOf(id);
+      if (i !== -1 && !this.stopped.includes(i) && this.stopped.length < MARKERS) {
+        this.stopped.push(i);
+      }
+    }
+    const began = any && !this.routed;
+    const ended = !any && this.routed;
+    this.routed = any;
+    this.refreshHighlights();
+    if (this.trace || this.userMoved) return;
+    if (began) this.frameSubject(this.routeNodes());
+    else if (ended) this.frameAll(true);
+  }
+
+  private routeNodes(): number[] {
+    const nodes = new Set<number>(this.stopped);
+    for (let e = 0; e < this.m; e++) {
+      if (this.route[e] !== 1) continue;
+      nodes.add(this.edgeSource[e]!);
+      nodes.add(this.edgeTarget[e]!);
+    }
+    return [...nodes];
+  }
+
   setSelection(selection: SceneSelection): void {
     const node = selection?.kind === 'node' ? this.nodeIds.indexOf(selection.id) : -1;
     const edge = selection?.kind === 'edge' ? this.edgeIds.indexOf(selection.id) : -1;
@@ -1007,7 +1156,25 @@ export class SceneController {
     this.related.fill(0);
     this.edgeRelated.fill(0);
     const tracing = this.trace !== null;
-    this.focusActive = !tracing && (this.selectedNode >= 0 || this.selectedEdge >= 0);
+    const selecting = this.selectedNode >= 0 || this.selectedEdge >= 0;
+    this.focusActive = tracing || selecting || this.routed;
+    if (this.trace) {
+      // A traced request is the one thing on stage: its path, and nothing else.
+      for (const e of this.trace.edges) {
+        this.edgeHighlight[e] = 1;
+        this.edgeRelated[e] = 1;
+      }
+      for (const i of this.trace.nodes) this.related[i] = 1;
+      return;
+    }
+    if (!selecting && this.routed) {
+      for (let e = 0; e < this.m; e++) {
+        if (this.route[e] !== 1) continue;
+        this.edgeRelated[e] = 1;
+        this.related[this.edgeSource[e]!] = 1;
+        this.related[this.edgeTarget[e]!] = 1;
+      }
+    }
     if (this.selectedEdge >= 0) {
       const e = this.selectedEdge;
       this.edgeHighlight[e] = 1;
@@ -1027,14 +1194,13 @@ export class SceneController {
       }
     }
     // Pointing at a piece previews what selecting it would show.
-    if (this.hoveredNode >= 0 && this.hoveredNode !== this.selectedNode && !tracing) {
+    if (this.hoveredNode >= 0 && this.hoveredNode !== this.selectedNode) {
       for (let e = 0; e < this.m; e++) {
         if (this.edgeSource[e] === this.hoveredNode || this.edgeTarget[e] === this.hoveredNode) {
           this.edgeHighlight[e] = Math.max(this.edgeHighlight[e]!, 0.42);
         }
       }
     }
-    if (this.trace) for (const e of this.trace.edges) this.edgeHighlight[e] = 1;
   }
 
   // ---------------------------------------------------------------------------
@@ -1138,12 +1304,17 @@ export class SceneController {
     }
   }
 
-  /** Animates an authorization decision along its path through the scene. */
-  playDecision(decision: AuthorizationDecision): void {
+  /**
+   * Follows an authorization decision along its path through the scene. The
+   * camera moves in on the path and goes with the request; when the request
+   * arrives, or is stopped, the path stays drawn until the trace is cleared.
+   */
+  playDecision(decision: Pick<AuthorizationDecision, 'hops' | 'blockedAt' | 'decision'>): void {
     const layout = this.layout;
     if (!layout) return;
     const segments: TraceSegment[] = [];
     const edges: number[] = [];
+    const nodes = new Set<number>();
     let at = -1;
     const push = (from: number, to: number, e: number) => {
       const a = nodePosition(layout, from);
@@ -1162,6 +1333,8 @@ export class SceneController {
       if (at !== -1 && at !== source && previous !== -1) push(at, source, previous);
       push(source, target, e);
       edges.push(e);
+      nodes.add(source);
+      nodes.add(target);
       at = target;
       previous = e;
     }
@@ -1170,23 +1343,56 @@ export class SceneController {
       return;
     }
     const last = segments[segments.length - 1]!;
+    const blockedAt =
+      decision.decision === 'deny' && decision.blockedAt !== null
+        ? this.nodeIds.indexOf(decision.blockedAt)
+        : -1;
+    // One trace after another is still one visit: the camera goes back to
+    // where it was before the first of them.
+    const stood = this.controls.getPosition(this.scratch, true).toArray() as Vec3;
+    const looked = this.controls.getTarget(this.scratch, true).toArray() as Vec3;
+    const before = this.trace?.before ?? { position: stood, target: looked };
     this.trace = {
       segments,
       total: segments.reduce((sum, s) => sum + s.length, 0),
       travelled: 0,
       edges,
+      nodes: [...nodes],
       burstAt: last.b,
       burstAge: -1,
+      home: [0, 0, 0],
+      before,
+      blockedAt,
       done: false,
     };
-    this.tracerMesh.visible = true;
+    this.steered = false;
     this.refreshHighlights();
+    this.trace.home = this.frameSubject(this.trace.nodes) ?? last.b;
   }
 
   clearTrace(): void {
+    const trace = this.trace;
+    if (!trace) return;
     this.trace = null;
-    this.tracerMesh.visible = false;
     this.refreshHighlights();
+    // The path had the camera. With it gone the camera goes back to where
+    // it stood, unless the viewer has taken it in the meantime.
+    if (this.steered) return;
+    void this.controls.setLookAt(
+      ...trace.before.position,
+      ...trace.before.target,
+      !this.options.reducedMotion,
+    );
+  }
+
+  /**
+   * The shot the scene would choose for itself right now: the path of a
+   * traced request, the route of an incident, or else the whole model.
+   */
+  private reframe(): void {
+    if (this.trace) this.trace.home = this.frameSubject(this.trace.nodes) ?? this.trace.home;
+    else if (this.routed) this.frameSubject(this.routeNodes());
+    else this.frameAll(true);
   }
 
   // ---------------------------------------------------------------------------
@@ -1208,7 +1414,7 @@ export class SceneController {
    * fit is nearly linear: a few rounds of measuring and correcting settle it,
    * and the number of rounds is fixed so the shot is always the same one.
    */
-  private framing(): { position: Vec3; target: Vec3 } {
+  private framing(subject: readonly number[] | null = null): { position: Vec3; target: Vec3 } {
     const layout = this.layout;
     const width = this.dom.clientWidth || 1600;
     const height = this.dom.clientHeight || 900;
@@ -1233,7 +1439,25 @@ export class SceneController {
     // are boxes of a fixed size on screen hung from a point of the model.
     const points: Vec3[] = [];
     const names: { anchor: Vec3; width: number; height: number; hang: [number, number] }[] = [];
-    if (layout) {
+    if (layout && subject) {
+      // A few pieces and the room around them: enough of the model stays in
+      // the picture to say where on it they are.
+      for (const i of subject) {
+        const p = nodePosition(layout, i);
+        const scale = layout.scales[i] ?? 1;
+        const top = (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * scale;
+        const room = scale * 2.2 + 2.5;
+        points.push([p[0], p[1] + top + 1.6, p[2]], [p[0], p[1] - scale, p[2]]);
+        for (const [dx, dz] of [
+          [room, 0],
+          [-room, 0],
+          [0, room],
+          [0, -room],
+        ] as const) {
+          points.push([p[0] + dx, p[1] - scale, p[2] + dz]);
+        }
+      }
+    } else if (layout) {
       for (const region of layout.regions) {
         const [cx, top, cz] = region.center;
         const rim: [number, number][] = [];
@@ -1249,7 +1473,7 @@ export class SceneController {
         }
         // The rim of the plate, and the table under it.
         for (const [x, z] of rim) {
-          points.push([cx + x, top, cz + z], [cx + x, -PLATE_THICKNESS, cz + z]);
+          points.push([cx + x, top, cz + z], [cx + x, -this.relief(), cz + z]);
         }
         if (this.options.labels) {
           const outward: Vec3 = [region.outward[0], 0, region.outward[1]];
@@ -1258,7 +1482,9 @@ export class SceneController {
             anchor: nameAnchor(region),
             width: w,
             height: REGION_LABEL_PX,
-            hang: hang(dot(outward, right), dot(outward, up), w, REGION_LABEL_PX),
+            hang:
+              region.heading?.align ??
+              hang(dot(outward, right), dot(outward, up), w, REGION_LABEL_PX),
           });
         }
       }
@@ -1366,7 +1592,7 @@ export class SceneController {
       insets.top !== this.insets.top ||
       insets.bottom !== this.insets.bottom;
     this.insets = insets;
-    if (changed && !this.userMoved && this.layout) this.frameAll(true);
+    if (changed && !this.userMoved && this.layout) this.reframe();
   }
 
   private applyViewOffset(step: number): void {
@@ -1401,9 +1627,46 @@ export class SceneController {
     void this.controls.setLookAt(...position, ...target, animate && !this.options.reducedMotion);
   }
 
+  /**
+   * Moves in on a few pieces, without leaving the attitude the arrangement
+   * is drawn for, and only part of the way: the subject is brought forward
+   * and the model it belongs to stays in the picture. The overview is a
+   * dozen pieces that are all in view already, and moving in would only
+   * push some of them out of it, so there the shot stays the whole model;
+   * among fifty services the camera goes closer.
+   *
+   * Returns where the camera ends up looking.
+   */
+  private frameSubject(nodes: readonly number[]): Vec3 | null {
+    if (nodes.length === 0 || !this.layout) return null;
+    const whole = this.framing();
+    const close = this.framing(nodes);
+    const length = (shot: { position: Vec3; target: Vec3 }) =>
+      Math.hypot(
+        shot.position[0] - shot.target[0],
+        shot.position[1] - shot.target[1],
+        shot.position[2] - shot.target[2],
+      );
+    const far = length(whole);
+    const nearest = Math.min(far, length(close));
+    const limit = far * (this.layoutMode === 'layers' ? 1 : 0.56);
+    // How far along the way from the whole shot to the close one to go.
+    const way = far - nearest < 1e-3 ? 0 : Math.min(1, (far - limit) / (far - nearest));
+    const mix = (a: Vec3, b: Vec3): Vec3 => [
+      a[0] + (b[0] - a[0]) * way,
+      a[1] + (b[1] - a[1]) * way,
+      a[2] + (b[2] - a[2]) * way,
+    ];
+    const target = mix(whole.target, close.target);
+    const position = mix(whole.position, close.position);
+    void this.controls.setLookAt(...position, ...target, !this.options.reducedMotion);
+    return target;
+  }
+
   resetView(): void {
     this.userMoved = false;
-    this.frameAll(true);
+    this.steered = false;
+    this.reframe();
   }
 
   focusNode(nodeId: string): void {
@@ -1451,6 +1714,7 @@ export class SceneController {
   // a piece is not that, and must not stop the shot following the panels.
   private readonly onControl = () => {
     this.userMoved = true;
+    this.steered = true;
   };
 
   private readonly onPointerMove = (event: PointerEvent) => {
@@ -1626,7 +1890,12 @@ export class SceneController {
     if (this.particleUniforms) this.particleUniforms.density.value = profile.particles;
     if (this.labelMesh) this.labelMesh.visible = this.options.labels;
     if (this.labelUniforms && this.layout) {
-      const range = Math.max(34, this.layout.radius * 1.15) * profile.labelRange * LENS;
+      // The overview has a dozen pieces: every one of them is named, at any
+      // distance. Elsewhere names come as the camera gets close enough.
+      const range =
+        this.layoutMode === 'layers'
+          ? 1e6
+          : Math.max(34, this.layout.radius * 1.15) * profile.labelRange * LENS;
       this.labelUniforms.fadeNear.value = range * 0.62;
       this.labelUniforms.fadeFar.value = range;
     }
@@ -1675,7 +1944,7 @@ export class SceneController {
     if (this.assembling) this.applyBases(this.time - this.assembleAt);
     const ease = 1 - Math.exp(-step * 7);
     this.updatePlates(ease);
-    this.updateNodes(ease, 1 - Math.exp(-step * 16), motion);
+    this.updateNodes(step, ease, 1 - Math.exp(-step * 16), motion);
     this.updateEdges(ease, 1 - Math.exp(-step * 12));
     this.hangNames();
     this.updateOverlays(step);
@@ -1695,7 +1964,7 @@ export class SceneController {
     }
   }
 
-  private updateNodes(ease: number, quick: number, motion: boolean): void {
+  private updateNodes(step: number, ease: number, quick: number, motion: boolean): void {
     const layout = this.layout;
     const ring = this.ringAttr;
     if (!layout || !ring) return;
@@ -1704,6 +1973,7 @@ export class SceneController {
     const elapsed = this.time - this.assembleAt;
     const walkFrom = this.assembling ? this.walkFrom : null;
     const shown = this.shown;
+    const wind = 1 - Math.exp(-step * WIND);
     this.quaternion.identity();
     for (let i = 0; i < this.n; i++) {
       const batch = this.batches[this.nodeTypeIndex[i]!];
@@ -1714,8 +1984,10 @@ export class SceneController {
       const hovered = i === this.hoveredNode;
       const impacted = this.impacted[i] === 1;
 
-      // A healthy piece is neutral; only a deviation gives it a colour.
-      const target = tones.piece[code]!;
+      // A healthy piece is neutral; only a deviation gives it a colour. A
+      // piece that stands for several services takes it when all of them
+      // deviate; when only some do, its lamp says so and the piece does not.
+      const target = tones.piece[this.partial[i] === 1 ? 0 : code]!;
       for (let k = 0; k < 3; k++) {
         this.tint[i * 3 + k]! += (target[k]! - this.tint[i * 3 + k]!) * ease;
       }
@@ -1730,7 +2002,6 @@ export class SceneController {
       const emphasis = this.emphasis[i]!;
 
       batch.tint.setXYZ(slot, this.tint[i * 3]!, this.tint[i * 3 + 1]!, this.tint[i * 3 + 2]!);
-      batch.fx.setXYZW(slot, 0, 0, present, 0);
 
       const p = nodePosition(layout, i);
       const base = layout.scales[i] ?? 1;
@@ -1743,6 +2014,8 @@ export class SceneController {
       let arrived = 1;
       // How far above its resting height the piece is, in piece heights.
       let airborne = 0;
+      // Whether it stands on a plate: a piece still on its way down does not work yet.
+      let standing = true;
       if (this.assembling) {
         if (walkFrom) {
           const k = easeInOutCubic(clamp01((elapsed - this.delay[i]!) / WALK_TIME));
@@ -1759,8 +2032,22 @@ export class SceneController {
           arrived = local <= 0 ? 0 : easeOutBack(local);
           size = base * Math.max(arrived, 0.0001);
           airborne = fall / (2 * base);
+          standing = local >= 1;
         }
       }
+      // The part of a piece that works runs at the pace of its service's
+      // traffic. It starts once the piece stands on its plate, takes up a
+      // new pace gradually, and winds down when nothing passes.
+      const pace =
+        motion && standing ? paceOf(this.throughput[i]!, this.throughputReference[i]!) : 0;
+      this.pace[i]! += (pace - this.pace[i]!) * wind;
+      this.work[i] = (this.work[i]! + step * this.pace[i]!) % WORK_CYCLE;
+      // How it runs follows the service's state. A piece that stands for
+      // several services, only some of them unwell, still works, but not
+      // evenly: it hesitates, whatever state the worst of them is in.
+      const state = this.partial[i] === 1 ? Math.min(code, 1) : code;
+      const turn = motion ? step * MANNER_RATE : Infinity;
+      this.manner[i]! += Math.max(-turn, Math.min(turn, state - this.manner[i]!));
       // A piece that has just failed is jolted, once.
       const age = this.time - this.shockAt[i]!;
       if (motion && age >= 0 && age < 0.7)
@@ -1772,6 +2059,8 @@ export class SceneController {
       this.position.set(x, y, z);
       this.scale.setScalar(size);
       batch.mesh.setMatrixAt(slot, this.matrix.compose(this.position, this.quaternion, this.scale));
+      // With motion off every mechanism rests as it was modelled.
+      batch.fx.setXYZW(slot, motion ? this.work[i]! : -1, this.manner[i]!, present, size);
       shown[i * 4] = x;
       shown[i * 4 + 1] = y;
       shown[i * 4 + 2] = z;
@@ -1820,12 +2109,15 @@ export class SceneController {
     layout.regions.forEach((region, k) => {
       const i = this.n + k;
       const [ox, oz] = region.outward;
-      const [ax, ay] = hang(
-        ox * m[0]! + oz * m[2]!,
-        ox * m[4]! + oz * m[6]!,
-        labels.size.getX(i),
-        labels.size.getY(i),
-      );
+      // A heading keeps the place it was given; a name is hung off the rim.
+      const [ax, ay] =
+        region.heading?.align ??
+        hang(
+          ox * m[0]! + oz * m[2]!,
+          ox * m[4]! + oz * m[6]!,
+          labels.size.getX(i),
+          labels.size.getY(i),
+        );
       labels.align.setXY(i, ax, ay);
     });
     labels.align.needsUpdate = true;
@@ -1856,6 +2148,8 @@ export class SceneController {
     // The more connections a topology has, the quieter each one is at rest,
     // so a dense graph stays a drawing instead of turning into a mat.
     const calm = Math.min(1, Math.sqrt(120 / Math.max(1, m)));
+    // In the overview a line is the main thing drawn: firmer, and wider.
+    const firm = this.layoutMode === 'layers' ? 1 : 0;
     for (let e = 0; e < m; e++) {
       const traffic = this.edgeTraffic[e]!;
       // Square root keeps quiet edges visible next to very busy ones.
@@ -1870,8 +2164,9 @@ export class SceneController {
       this.edgeSusShown[e]! += (suspicious - this.edgeSusShown[e]!) * ease;
       this.edgeErrShown[e]! += (error - this.edgeErrShown[e]!) * ease;
 
-      // A connection is a neutral hairline; it takes ink when it is part of
-      // the selection and a signal colour when its traffic is in trouble.
+      // A connection is a neutral hairline; it takes the focus colour when
+      // it is part of what the viewer is following and a signal colour when
+      // its traffic is in trouble.
       const status = this.tones.status[this.edgeSecurity[e]!] ?? null;
       const alarm = Math.min(1, this.edgeErrShown[e]! * 2.5);
       const troubled = status !== null || alarm > 0.05 ? 1 : 0;
@@ -1888,7 +2183,7 @@ export class SceneController {
       const visible = filtered * this.edgeFocus[e]!;
       for (let k = 0; k < 3; k++) {
         let channel = this.tones.track[k]!;
-        channel += (this.tones.ink[k]! - channel) * highlight;
+        channel += (this.tones.focus[k]! - channel) * highlight;
         if (status) channel = status[k]!;
         channel += (this.tones.critical[k]! - channel) * alarm;
         attr.color.array[e * 3 + k] = channel;
@@ -1898,10 +2193,10 @@ export class SceneController {
       const flowing = clamp01((this.time - this.edgeLiveAt[e]!) / BEADS_TIME);
       attr.fx.setXYZW(
         e,
-        Math.min(1, (0.3 + shown * 0.3) * calm + highlight * 0.6 + troubled * 0.35) *
+        Math.min(1, (0.3 + shown * 0.3) * calm + firm * 0.5 + highlight * 0.6 + troubled * 0.35) *
           (0.1 + 0.9 * visible),
         drawn,
-        0.9 + shown * 0.9 + highlight * 1.1 + troubled * 0.6,
+        0.9 + shown * 0.9 + firm * 0.4 + highlight * 1.1 + troubled * 0.6,
         this.edgeDrawFrom[e]!,
       );
       if (data) {
@@ -1933,56 +2228,130 @@ export class SceneController {
     this.updateTrace(step);
   }
 
+  /**
+   * The sprites that are placed by hand: the traced request and its tail,
+   * the mark where it arrived or was stopped, and the badges on pieces at
+   * which an incident's traffic is being stopped.
+   */
   private updateTrace(step: number): void {
-    const trace = this.trace;
-    if (!trace) return;
     const { pos, color, fx } = this.tracerAttr;
-    const speed = this.options.reducedMotion ? 1e6 : Math.max(16, trace.total / 2.6);
-    if (trace.burstAge < 0) {
-      trace.travelled = Math.min(trace.total, trace.travelled + step * speed);
-      if (trace.travelled >= trace.total) trace.burstAge = 0;
-    } else {
-      trace.burstAge += step;
-    }
-    const sample = (distance: number): Vec3 => {
-      let remaining = Math.max(0, distance);
-      for (const segment of trace.segments) {
-        if (remaining <= segment.length) {
-          return bezierPoint(segment.a, segment.c, segment.b, remaining / segment.length);
-        }
-        remaining -= segment.length;
-      }
-      return trace.burstAt;
-    };
-    // The traced request is ink, like any ordinary request: whether it was
-    // allowed or denied is read from where it stops, and from the panel.
-    const ink = this.tones.ink;
-    const fade = trace.burstAge < 0 ? 1 : Math.max(0, 1 - trace.burstAge / 0.5);
-    for (let k = 0; k < TRAIL; k++) {
-      const p = sample(trace.travelled - k * 0.5);
-      const falloff = 1 - k / TRAIL;
-      pos.setXYZ(k, p[0], p[1], p[2]);
-      color.setXYZ(k, ink[0], ink[1], ink[2]);
-      fx.setXYZW(
-        k,
-        k === 0 ? 0.95 : 0.2 + falloff * 0.34,
-        (k === 0 ? 1 : falloff * 0.7) * fade,
-        0,
-        0,
-      );
-    }
-    // A ring opens where the request arrived or was stopped.
-    const burst = trace.burstAge < 0 ? 0 : Math.max(0, 1 - trace.burstAge / 1.3);
-    pos.setXYZ(TRAIL, trace.burstAt[0], trace.burstAt[1], trace.burstAt[2]);
-    color.setXYZ(TRAIL, ink[0], ink[1], ink[2]);
-    fx.setXYZW(TRAIL, trace.burstAge < 0 ? 0 : 1.6 + trace.burstAge * 7, burst, 1, 0);
-    pos.needsUpdate = color.needsUpdate = fx.needsUpdate = true;
+    const trace = this.trace;
+    const focus = this.tones.focus;
+    const stop = this.tones.critical;
+    let any = false;
 
-    if (!trace.done && trace.burstAge > 1.3) {
-      trace.done = true;
-      this.tracerMesh.visible = false;
-      this.hooks.onTraceEnd();
+    if (trace && !trace.done) {
+      const speed = this.options.reducedMotion ? 1e6 : Math.max(11, trace.total / 3.2);
+      if (trace.burstAge < 0) {
+        trace.travelled = Math.min(trace.total, trace.travelled + step * speed);
+        if (trace.travelled >= trace.total) trace.burstAge = 0;
+      } else {
+        trace.burstAge += step;
+      }
+      const sample = (distance: number): Vec3 => {
+        let remaining = Math.max(0, distance);
+        for (const segment of trace.segments) {
+          if (remaining <= segment.length) {
+            return bezierPoint(segment.a, segment.c, segment.b, remaining / segment.length);
+          }
+          remaining -= segment.length;
+        }
+        return trace.burstAt;
+      };
+      // The traced request is drawn in the colour of the viewer's attention:
+      // it is the one request on the model they asked to see.
+      const fade = trace.burstAge < 0 ? 1 : Math.max(0, 1 - trace.burstAge / 0.5);
+      for (let k = 0; k < TRAIL; k++) {
+        const p = sample(trace.travelled - k * 0.5);
+        const falloff = 1 - k / TRAIL;
+        pos.setXYZ(k, p[0], p[1], p[2]);
+        color.setXYZ(k, focus[0], focus[1], focus[2]);
+        fx.setXYZW(
+          k,
+          k === 0 ? 1.05 : 0.22 + falloff * 0.36,
+          (k === 0 ? 1 : falloff * 0.7) * fade,
+          0,
+          0,
+        );
+      }
+      any = true;
+      // The camera goes a little of the way with the request, so the eye is
+      // led along the path without the path ever leaving the picture.
+      const follow = !this.options.reducedMotion && !this.steered;
+      if (follow && trace.burstAge < 0) {
+        const head = sample(trace.travelled);
+        const [hx, hy, hz] = trace.home;
+        // Less in the overview, where the whole model is in the picture and
+        // should stay in it.
+        const lead = this.layoutMode === 'layers' ? 0.1 : 0.22;
+        void this.controls.moveTo(
+          hx + (head[0] - hx) * lead,
+          hy + (head[1] - hy) * lead,
+          hz + (head[2] - hz) * lead,
+          true,
+        );
+      }
+      if (trace.burstAge > 0.55) {
+        trace.done = true;
+        // The request has arrived: the camera settles on the whole path.
+        if (follow) void this.controls.moveTo(...trace.home, true);
+        this.hooks.onTraceEnd();
+      }
+    } else {
+      for (let k = 0; k < TRAIL; k++) fx.setXYZW(k, 0, 0, 0, 0);
     }
+
+    // Where the traced request ended. Allowed, a ring opens there once;
+    // stopped, a badge stays on the piece that stopped it.
+    if (trace && trace.blockedAt >= 0) {
+      const shown = trace.burstAge < 0 ? 0 : Math.min(1, trace.burstAge / 0.18);
+      this.badge(TRAIL, trace.blockedAt, stop, trace.done ? 1 : shown);
+      any = any || shown > 0 || trace.done;
+    } else if (trace && !trace.done) {
+      const burst = trace.burstAge < 0 ? 0 : Math.max(0, 1 - trace.burstAge / 0.55);
+      pos.setXYZ(TRAIL, trace.burstAt[0], trace.burstAt[1], trace.burstAt[2]);
+      color.setXYZ(TRAIL, focus[0], focus[1], focus[2]);
+      fx.setXYZW(TRAIL, trace.burstAge < 0 ? 0 : 1.6 + trace.burstAge * 7, burst, 1, 0);
+    } else {
+      fx.setXYZW(TRAIL, 0, 0, 0, 0);
+    }
+
+    // Where an incident's traffic is being stopped. A trace has the stage
+    // to itself, so these wait while one is shown.
+    for (let k = 0; k < MARKERS; k++) {
+      const i = trace ? undefined : this.stopped[k];
+      if (i === undefined) fx.setXYZW(TRAIL + 1 + k, 0, 0, 0, 0);
+      else {
+        this.badge(TRAIL + 1 + k, i, stop, 1);
+        any = true;
+      }
+    }
+
+    this.tracerMesh.visible = any;
+    if (any) pos.needsUpdate = color.needsUpdate = fx.needsUpdate = true;
+  }
+
+  /**
+   * Pins a badge to a piece: at its upper right as the camera sees it, the
+   * way a mark is put on the corner of a card.
+   */
+  private badge(slot: number, node: number, tone: Vec3, shown: number): void {
+    const { pos, color, fx } = this.tracerAttr;
+    const m = this.camera.matrixWorld.elements;
+    const size = this.shown[node * 4 + 3] || (this.layout?.scales[node] ?? 1);
+    const out = size * 0.82;
+    const up = size * 0.95;
+    // A badge is a mark on a piece, not a part of it: it grows only a
+    // little with the piece it is pinned to.
+    const span = 1.1 + size * 0.35;
+    pos.setXYZ(
+      slot,
+      this.shown[node * 4]! + m[0]! * out + m[4]! * up,
+      this.shown[node * 4 + 1]! + m[1]! * out + m[5]! * up,
+      this.shown[node * 4 + 2]! + m[2]! * out + m[6]! * up,
+    );
+    color.setXYZ(slot, tone[0], tone[1], tone[2]);
+    fx.setXYZW(slot, span * (0.6 + 0.4 * shown), shown, 2, 0);
   }
 
   render(): void {

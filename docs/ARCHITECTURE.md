@@ -248,6 +248,25 @@ to (body, detail, mark) and an ambient-occlusion value baked in Blender; the
 piece material turns those into tone. All instances of a type still share
 one geometry and one draw call.
 
+Each piece also has a **mechanism**, the one part of it that works. The
+build script declares it where the part is modelled, as a kind of motion
+(spin, index, swing, slide or convey) about a pivot and an axis; the faces
+that belong to it carry its number in a texture coordinate, and the list
+travels in the node's `extras`. The parser lays every mechanism out as one
+column of a small float texture and gives each vertex its column
+(`aPart.y`, 0 for what is fixed). The piece material reads that column in
+the vertex shader and turns or moves the vertex and its normal by how long
+the mechanism has worked and by the state it works in. Those are the only
+things the CPU keeps, two numbers per piece: working time, advanced at a
+pace derived from the service's throughput (`graphics/pace.ts`), and a state
+that travels toward the service's health code. The state reshapes the same
+cycle for every kind of motion (uneven when degraded, held near its start
+and pushing when critical) and, when the service is down, turns the part
+into the way it hangs, an axis and an angle declared with the mechanism.
+Twelve different motions in four manners are therefore one material and no
+extra draw calls, and working time wraps at a number of seconds every period
+divides, so the wrap is never seen.
+
 **Beads** own only static data: which edge they live on and four random
 seeds. Everything that changes (how many an edge shows, how fast they move,
 what share is errors, rejections or suspicious) lives in a small float
@@ -273,12 +292,13 @@ There is no post-processing; a frame is one pass to the canvas.
 stay very nearly parallel, as in an axonometric drawing, while orbit, zoom to
 pointer and picking keep a single code path.
 
-**Motion** is driven by the same controller. Everything that moves besides
-the beads is a one-shot answer to an action or to a change in the data (the
-model assembling, pieces walking to a new layout, a selection lifting its
-piece), eased on the CPU into the per-instance buffers that are uploaded
-anyway; there is no animation system and nothing loops. The list, and the
-reason for each entry, is rule 6 of [DESIGN.md](DESIGN.md).
+**Motion** is driven by the same controller. The beads and the mechanisms
+move for as long as requests do, at a rate taken from the data. Everything
+else that moves is a one-shot answer to an action or to a change in the data
+(the model assembling, pieces walking to a new layout, a selection lifting
+its piece), eased on the CPU into the per-instance buffers that are uploaded
+anyway; there is no animation system. The list, and the reason for each
+entry, is rule 8 of [DESIGN.md](DESIGN.md).
 
 **Adaptive quality** watches frame time and steps between four tiers
 (resolution, bead density, label range). A tier that proved too expensive
@@ -292,7 +312,36 @@ on a common base plane, and the layout records the height of the ground under
 each node so the scene can draw contact shadows and supports. _Regions_ mode
 arranges cloud regions as plates on a ring around a raised plate holding the
 global edge; inside a region, tiers run outward from the hub. _Dependencies_
-mode is a layered left-to-right graph on a single board.
+mode is a layered left-to-right graph on a single board. _Layers_ mode lays
+out the overview, described next.
+
+### Two levels of one model
+
+The application opens on an **overview**: the platform reduced to one piece
+per kind of service, in the four layers a request crosses (entry, identity,
+compute, data). `lib/overview.ts` derives it on the client, as a pure
+function of what the server sent:
+
+- `buildOverview(topology)` returns a `Topology` of at most twelve nodes,
+  with one edge for every pair of kinds whose services are connected, and
+  the maps from each service and connection to the group that stands for it.
+- `projectSnapshot(overview, snapshot)` returns a columnar snapshot for that
+  topology. Rates are summed; latency and error rate are averaged by the
+  traffic that experienced them; health and security status are the worst of
+  the members. `partialGroups` says which groups are only partly affected.
+
+Because the summary is itself a topology with columnar snapshots, the scene
+draws it with the code that draws everything else: `SceneController` is
+handed a topology and does not know which level it is. The bridge in
+`features/scene/SceneCanvas.tsx` chooses what to hand it from `layoutMode`
+and translates between the two levels: a selection made on a piece becomes
+a group, an incident's route and a traced request's hops become group
+connections, and `window.__aegis.projectNode` resolves a service id to the
+piece that stands for it. The stores always hold the server's own topology
+and snapshot; nothing derived is written back.
+
+Selecting a service by name, from a list or from a group leaves the overview
+for the detailed arrangement last used, where the service stands on its own.
 
 ### State
 

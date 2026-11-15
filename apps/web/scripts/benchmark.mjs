@@ -52,7 +52,10 @@ async function open(browser, settings) {
   }, settings);
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error('[page exception]', error.message));
-  await page.goto(url);
+  // The application opens on its overview, a dozen pieces whatever the
+  // topology. What is measured here is the arrangement that draws every
+  // service, which is where the number of services can cost anything.
+  await page.goto(`${url}/?arrangement=regions`);
   await page.waitForFunction(() => (window.__aegis?.stats().nodes ?? 0) > 0, null, {
     timeout: 60_000,
   });

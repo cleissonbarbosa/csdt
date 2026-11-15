@@ -34,7 +34,7 @@ export function DevOverlay() {
   ];
   return (
     <aside
-      className="panel pointer-events-none rounded-[3px] px-2.5 py-2"
+      className="panel pointer-events-none px-2.5 py-2"
       aria-label="Performance overlay"
       data-testid="dev-overlay"
     >

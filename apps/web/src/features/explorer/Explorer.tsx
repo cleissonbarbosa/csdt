@@ -34,7 +34,7 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-[3px] border px-1.5 text-[11px] transition-colors',
+        'inline-flex h-6 items-center gap-1.5 rounded-control border px-1.5 text-[11px] transition-colors',
         active
           ? 'border-accent bg-accent text-on-accent'
           : 'border-line text-ink-dim hover:border-line-strong hover:text-ink',
@@ -118,7 +118,7 @@ export function Explorer() {
               placeholder="Search services"
               aria-label="Search services by name, type or region"
               data-testid="explorer-search"
-              className="h-8 w-full rounded-[3px] border border-line-strong bg-paper pl-7 pr-2 text-xs text-ink placeholder:text-ink-faint"
+              className="h-8 w-full rounded-control border border-line-strong bg-paper pl-7 pr-2 text-xs text-ink placeholder:text-ink-faint"
             />
           </div>
           <Button

@@ -8,6 +8,7 @@
 import type { Scenario, Topology } from '@aegis/contracts';
 
 import { SERVICE_TYPE } from '@/lib/palette';
+import type { LayoutMode } from '@/stores/ui';
 
 export type CommandGroup = 'Services' | 'Scenarios' | 'Regions' | 'Actions';
 
@@ -25,7 +26,7 @@ export interface CommandContext {
   scenarios: Scenario[];
   playing: boolean;
   viewMode: 'scene' | 'table';
-  layoutMode: 'regions' | 'dependencies';
+  layoutMode: LayoutMode;
   /** The effects commands have, supplied by the application. */
   do: {
     selectService: (id: string) => void;
@@ -34,12 +35,18 @@ export interface CommandContext {
     togglePlay: () => void;
     resetCamera: () => void;
     setViewMode: (mode: 'scene' | 'table') => void;
-    setLayoutMode: (mode: 'regions' | 'dependencies') => void;
+    setLayoutMode: (mode: LayoutMode) => void;
     setTheme: (theme: 'system' | 'light' | 'night') => void;
     openPanel: (panel: 'authorization' | 'integrations' | 'settings' | 'help') => void;
     toggleOverlay: () => void;
   };
 }
+
+const ARRANGEMENTS: { mode: LayoutMode; title: string }[] = [
+  { mode: 'layers', title: 'Show the overview' },
+  { mode: 'regions', title: 'Show every service, by region' },
+  { mode: 'dependencies', title: 'Show every service, by dependency tier' },
+];
 
 export function buildCommands(context: CommandContext): Command[] {
   const { topology, scenarios } = context;
@@ -63,13 +70,14 @@ export function buildCommands(context: CommandContext): Command[] {
       hint: 'T',
       run: () => act.setViewMode(context.viewMode === 'scene' ? 'table' : 'scene'),
     },
-    {
-      id: 'layout',
+    // The arrangements other than the one on show.
+    ...ARRANGEMENTS.filter((entry) => entry.mode !== context.layoutMode).map((entry): Command => ({
+      id: `layout-${entry.mode}`,
       group: 'Actions',
-      title: context.layoutMode === 'regions' ? 'Lay out by dependency tier' : 'Lay out by region',
+      title: entry.title,
       hint: 'L',
-      run: () => act.setLayoutMode(context.layoutMode === 'regions' ? 'dependencies' : 'regions'),
-    },
+      run: () => act.setLayoutMode(entry.mode),
+    })),
     {
       id: 'theme-light',
       group: 'Actions',
