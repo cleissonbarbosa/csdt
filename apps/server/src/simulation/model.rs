@@ -12,12 +12,17 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::domain::{Relationship, ServiceType, TopologySpec};
+use crate::domain::{is_valid_id, Relationship, ServiceType, TopologySpec};
 
 use super::math::LogNormalMixture;
 
 /// Virtual milliseconds per simulation tick.
 pub const TICK_MS: u64 = 200;
+/// Largest topology accepted. The engine is linear in both; the limits are
+/// there so a mistake in a file fails at start-up instead of exhausting
+/// memory. The renderer has been exercised at 178 services.
+pub const MAX_NODES: usize = 2_000;
+pub const MAX_EDGES: usize = 20_000;
 /// Virtual seconds per simulation tick.
 pub const DT: f64 = TICK_MS as f64 / 1000.0;
 
@@ -38,6 +43,10 @@ const CROSS_REGION_LATENCY_MS: f64 = 60.0;
 pub enum TopologyError {
     #[error("topology has no nodes")]
     Empty,
+    #[error("{kind} id `{id}` must be 1 to 64 letters, digits, `-`, `_` or `.`")]
+    InvalidId { kind: &'static str, id: String },
+    #[error("topology has {nodes} nodes and {edges} edges; at most {MAX_NODES} and {MAX_EDGES} are allowed")]
+    TooLarge { nodes: usize, edges: usize },
     #[error("duplicate node id `{0}`")]
     DuplicateNode(String),
     #[error("duplicate edge `{0}`")]
@@ -96,14 +105,33 @@ impl SimTopology {
         if spec.nodes.is_empty() {
             return Err(TopologyError::Empty);
         }
+        if spec.nodes.len() > MAX_NODES || spec.edges.len() > MAX_EDGES {
+            return Err(TopologyError::TooLarge {
+                nodes: spec.nodes.len(),
+                edges: spec.edges.len(),
+            });
+        }
+        let invalid_id = |kind: &'static str, id: &str| TopologyError::InvalidId {
+            kind,
+            id: id.to_string(),
+        };
+        if !is_valid_id(&spec.id) {
+            return Err(invalid_id("topology", &spec.id));
+        }
         let mut region_index = BTreeMap::new();
         for (i, region) in spec.regions.iter().enumerate() {
+            if !is_valid_id(&region.id) {
+                return Err(invalid_id("region", &region.id));
+            }
             if region_index.insert(region.id.clone(), i).is_some() {
                 return Err(TopologyError::DuplicateRegion(region.id.clone()));
             }
         }
         let mut node_index = BTreeMap::new();
         for (i, node) in spec.nodes.iter().enumerate() {
+            if !is_valid_id(&node.id) {
+                return Err(invalid_id("node", &node.id));
+            }
             if node_index.insert(node.id.clone(), i).is_some() {
                 return Err(TopologyError::DuplicateNode(node.id.clone()));
             }

@@ -1,20 +1,25 @@
 //! Application layer: wires the domain together and exposes use cases.
 //!
-//! [`Assets`] is everything immutable that is built once at start-up (Cedar
-//! engine, compiled topologies, resolved scenarios, recordings).
-//! [`SimulationService`] owns the single mutable timeline and is the only
-//! place that advances it.
+//! [`Sources`] is what the application is built from: the fixtures compiled
+//! into the binary, or those with parts replaced by a workspace directory.
+//! [`Assets`] is everything immutable that is built from them once at
+//! start-up (Cedar engine, compiled topologies, resolved scenarios,
+//! recordings). [`SimulationService`] owns the single mutable timeline and is
+//! the only place that advances it.
 
 mod service;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::authorization::{AuthzCatalog, CedarEngine, CedarSetupError};
-use crate::domain::{AuthzError, TopologySummary};
+use crate::authorization::{
+    bundled_entities_json, bundled_policy_documents, AuthzCatalog, CedarEngine, CedarSetupError,
+    PolicyDocument,
+};
+use crate::domain::{DataSource, PolicyDecisionPoint, TopologySpec, TopologySummary};
 use crate::incidents::recordings::{self, Recording};
-use crate::incidents::{resolve_all, ResolvedScenario};
-use crate::simulation::topologies::{self, HELIOS_ID};
+use crate::incidents::{catalog, check, resolve_all, ResolvedScenario, ScenarioDef};
+use crate::simulation::topologies;
 use crate::simulation::{DecisionTable, SimTopology, TopologyError};
 
 pub use service::{
@@ -22,18 +27,75 @@ pub use service::{
     StreamMessage, TimelineReason, PROTOCOL_VERSION,
 };
 
+/// Most topologies, scenarios or recordings one server offers.
+pub const MAX_ITEMS: usize = 64;
+
 #[derive(Debug, thiserror::Error)]
 pub enum BootstrapError {
-    #[error("authorization fixtures: {0}")]
+    #[error("authorization: {0}")]
     Cedar(#[from] CedarSetupError),
     #[error("fixture JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("there is no topology to open")]
+    NoTopology,
+    #[error("at most {MAX_ITEMS} {what} are allowed, found {found}")]
+    TooMany { what: &'static str, found: usize },
     #[error("topology `{id}`: {source}")]
     Topology { id: String, source: TopologyError },
-    #[error("evaluating the request catalogue: {0}")]
-    Authz(#[from] AuthzError),
+    #[error("topology `{0}` is declared twice")]
+    DuplicateTopology(String),
+    #[error(
+        "topology `{0}` must declare `\"dataSource\": \"synthetic\"`: its figures come from the simulation, whatever the platform it describes"
+    )]
+    TopologyProvenance(String),
+    #[error("scenario `{id}`: {message}")]
+    Scenario { id: String, message: String },
+    #[error("scenario `{0}` is declared twice")]
+    DuplicateScenario(String),
+    #[error("authorization catalogue: {0}")]
+    Catalog(String),
+    #[error("recording `{id}`: {message}")]
+    Recording { id: String, message: String },
+    #[error("recording `{0}` is declared twice")]
+    DuplicateRecording(String),
     #[error("recording `{recording}` refers to unknown topology `{topology}`")]
     RecordingTopology { recording: String, topology: String },
+    #[error("recording `{recording}` starts unknown scenario `{scenario}`")]
+    RecordingScenario { recording: String, scenario: String },
+}
+
+/// Everything the application is built from, before anything is compiled.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sources {
+    /// Topologies on offer. The first one is opened at start-up.
+    pub topologies: Vec<TopologySpec>,
+    /// Scenarios, in the order they are offered.
+    pub scenarios: Vec<ScenarioDef>,
+    pub recordings: Vec<Recording>,
+    pub policies: Vec<PolicyDocument>,
+    /// Cedar entity store, in the JSON shape Cedar itself reads.
+    pub entities: serde_json::Value,
+    pub catalog: AuthzCatalog,
+    /// Cedar schema the policies and entities must validate against.
+    pub schema: Option<String>,
+}
+
+impl Sources {
+    /// The fixtures compiled into the binary.
+    pub fn bundled() -> Result<Self, serde_json::Error> {
+        Ok(Self {
+            topologies: vec![
+                topologies::helios()?,
+                topologies::stress(topologies::STRESS_SEED),
+            ],
+            scenarios: catalog::bundled()?,
+            recordings: recordings::bundled()?,
+            policies: bundled_policy_documents()?,
+            entities: bundled_entities_json()?,
+            catalog: AuthzCatalog::bundled()?,
+            schema: None,
+        })
+    }
 }
 
 /// A topology together with the scenarios resolved against it.
@@ -58,6 +120,14 @@ impl World {
     }
 }
 
+/// Why a scenario cannot run on a topology.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unavailable {
+    pub topology: String,
+    pub scenario: String,
+    pub reason: String,
+}
+
 #[derive(Debug)]
 pub struct Assets {
     pub cedar: Arc<CedarEngine>,
@@ -66,40 +136,139 @@ pub struct Assets {
     pub worlds: BTreeMap<String, World>,
     pub recordings: Vec<Recording>,
     pub default_topology: String,
+    /// Scenarios that cannot run on a topology, and why.
+    pub unavailable: Vec<Unavailable>,
+}
+
+fn at_most(what: &'static str, found: usize) -> Result<(), BootstrapError> {
+    if found > MAX_ITEMS {
+        Err(BootstrapError::TooMany { what, found })
+    } else {
+        Ok(())
+    }
 }
 
 impl Assets {
     /// Builds everything from the fixtures compiled into the binary.
     pub fn bundled() -> Result<Self, BootstrapError> {
-        let cedar = Arc::new(CedarEngine::bundled()?);
-        let catalog = AuthzCatalog::bundled()?;
+        Self::build(Sources::bundled()?)
+    }
+
+    /// Validates and compiles a set of sources. Anything wrong in them is an
+    /// error here, at start-up, except a scenario that names a role, a node
+    /// or a request one topology does not have: that scenario is listed as
+    /// unavailable on that topology.
+    pub fn build(sources: Sources) -> Result<Self, BootstrapError> {
+        let Sources {
+            topologies,
+            scenarios,
+            recordings,
+            policies,
+            entities,
+            catalog,
+            schema,
+        } = sources;
+        at_most("topologies", topologies.len())?;
+        at_most("scenarios", scenarios.len())?;
+        at_most("recordings", recordings.len())?;
+
+        let cedar = Arc::new(CedarEngine::with_schema(
+            policies,
+            entities,
+            schema.as_deref(),
+        )?);
+        catalog.validate().map_err(BootstrapError::Catalog)?;
         // Every request shape the simulation will ever show is evaluated by
         // the real Cedar engine here, once.
-        let decisions = Arc::new(DecisionTable::build(
-            cedar.as_ref(),
-            &catalog.traffic_mix,
-            &catalog.scenario_requests,
-        )?);
+        for template in catalog.traffic_mix.iter().chain(&catalog.scenario_requests) {
+            cedar
+                .evaluate(&template.request(), &[])
+                .map_err(|e| BootstrapError::Catalog(format!("request `{}`: {e}", template.id)))?;
+        }
+        let decisions = Arc::new(
+            DecisionTable::build(
+                cedar.as_ref(),
+                &catalog.traffic_mix,
+                &catalog.scenario_requests,
+            )
+            .map_err(|e| BootstrapError::Catalog(e.to_string()))?,
+        );
 
+        for (i, scenario) in scenarios.iter().enumerate() {
+            scenario
+                .validate()
+                .map_err(|message| BootstrapError::Scenario {
+                    id: scenario.id.clone(),
+                    message,
+                })?;
+            if scenarios[..i].iter().any(|other| other.id == scenario.id) {
+                return Err(BootstrapError::DuplicateScenario(scenario.id.clone()));
+            }
+        }
+
+        let default_topology = topologies
+            .first()
+            .map(|spec| spec.id.clone())
+            .ok_or(BootstrapError::NoTopology)?;
         let mut worlds = BTreeMap::new();
-        for spec in [topologies::helios()?, topologies::stress(0xAE615)] {
+        let mut unavailable = Vec::new();
+        for spec in topologies {
             let id = spec.id.clone();
+            if spec.data_source != DataSource::Synthetic {
+                return Err(BootstrapError::TopologyProvenance(id));
+            }
+            if worlds.contains_key(&id) {
+                return Err(BootstrapError::DuplicateTopology(id));
+            }
             let topo = Arc::new(SimTopology::compile(spec).map_err(|source| {
                 BootstrapError::Topology {
                     id: id.clone(),
                     source,
                 }
             })?);
-            let scenarios = Arc::new(resolve_all(&topo, &decisions));
-            worlds.insert(id, World { topo, scenarios });
+            for scenario in &scenarios {
+                if let Err(reason) = check(scenario, &topo, &decisions) {
+                    unavailable.push(Unavailable {
+                        topology: id.clone(),
+                        scenario: scenario.id.clone(),
+                        reason,
+                    });
+                }
+            }
+            let resolved = Arc::new(resolve_all(&scenarios, &topo, &decisions));
+            worlds.insert(
+                id,
+                World {
+                    topo,
+                    scenarios: resolved,
+                },
+            );
         }
 
-        let recordings = recordings::bundled()?;
-        for recording in &recordings {
+        for (i, recording) in recordings.iter().enumerate() {
+            recording
+                .validate()
+                .map_err(|message| BootstrapError::Recording {
+                    id: recording.id.clone(),
+                    message,
+                })?;
+            if recordings[..i].iter().any(|other| other.id == recording.id) {
+                return Err(BootstrapError::DuplicateRecording(recording.id.clone()));
+            }
             if !worlds.contains_key(&recording.topology_id) {
                 return Err(BootstrapError::RecordingTopology {
                     recording: recording.id.clone(),
                     topology: recording.topology_id.clone(),
+                });
+            }
+            if let Some(scenario) = recording
+                .scenario_ids()
+                .into_iter()
+                .find(|id| !scenarios.iter().any(|s| &s.id == id))
+            {
+                return Err(BootstrapError::RecordingScenario {
+                    recording: recording.id.clone(),
+                    scenario,
                 });
             }
         }
@@ -110,7 +279,8 @@ impl Assets {
             decisions,
             worlds,
             recordings,
-            default_topology: HELIOS_ID.to_string(),
+            default_topology,
+            unavailable,
         })
     }
 
@@ -119,7 +289,7 @@ impl Assets {
     }
 
     pub fn default_world(&self) -> &World {
-        // `bundled` always registers the default topology.
+        // `build` refuses to return without the default topology.
         &self.worlds[&self.default_topology]
     }
 }

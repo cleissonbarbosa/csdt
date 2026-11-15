@@ -1,0 +1,106 @@
+{
+  "tenants": [
+    {
+      "id": "north",
+      "name": "North shop"
+    },
+    {
+      "id": "south",
+      "name": "South shop"
+    }
+  ],
+  "principals": [
+    {
+      "uid": "Clerk::\"ana\"",
+      "label": "Ana",
+      "tenant": "north",
+      "roles": ["clerk"],
+      "note": "Clerk"
+    },
+    {
+      "uid": "Clerk::\"bruno\"",
+      "label": "Bruno",
+      "tenant": "north",
+      "roles": ["manager"],
+      "note": "Manager"
+    },
+    {
+      "uid": "Clerk::\"carla\"",
+      "label": "Carla",
+      "tenant": "south",
+      "roles": ["manager"],
+      "note": "Manager of the other shop"
+    }
+  ],
+  "actions": [
+    {
+      "uid": "Action::\"read\"",
+      "label": "Read receipt",
+      "resourceType": "Receipt"
+    },
+    {
+      "uid": "Action::\"void\"",
+      "label": "Void receipt",
+      "resourceType": "Receipt"
+    }
+  ],
+  "resources": [
+    {
+      "uid": "Receipt::\"north-0412\"",
+      "label": "North receipt 0412",
+      "tenant": "north",
+      "resourceType": "Receipt"
+    },
+    {
+      "uid": "Receipt::\"south-0077\"",
+      "label": "South receipt 0077",
+      "tenant": "south",
+      "resourceType": "Receipt"
+    }
+  ],
+  "contextKeys": [],
+  "trafficMix": [
+    {
+      "id": "clerk-reads-own",
+      "weight": 0.7,
+      "principal": "Clerk::\"ana\"",
+      "action": "Action::\"read\"",
+      "resource": "Receipt::\"north-0412\""
+    },
+    {
+      "id": "manager-voids-own",
+      "weight": 0.2,
+      "principal": "Clerk::\"bruno\"",
+      "action": "Action::\"void\"",
+      "resource": "Receipt::\"north-0412\""
+    },
+    {
+      "id": "clerk-voids-own",
+      "weight": 0.06,
+      "principal": "Clerk::\"ana\"",
+      "action": "Action::\"void\"",
+      "resource": "Receipt::\"north-0412\""
+    },
+    {
+      "id": "manager-reads-other",
+      "weight": 0.04,
+      "principal": "Clerk::\"carla\"",
+      "action": "Action::\"read\"",
+      "resource": "Receipt::\"north-0412\""
+    }
+  ],
+  "scenarioRequests": [
+    {
+      "id": "ana-reads-north",
+      "principal": "Clerk::\"ana\"",
+      "action": "Action::\"read\"",
+      "resource": "Receipt::\"north-0412\""
+    },
+    {
+      "id": "ana-reads-south",
+      "principal": "Clerk::\"ana\"",
+      "action": "Action::\"read\"",
+      "resource": "Receipt::\"south-0077\""
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "id": "corner-shop",
+  "name": "Corner Shop",
+  "description": "Fictional six-service platform: the smallest topology that uses every part of a workspace.",
+  "dataSource": "synthetic",
+  "regions": [
+    {
+      "id": "shop-floor",
+      "name": "Shop floor",
+      "kind": "cloud",
+      "location": "Ground level"
+    }
+  ],
+  "roles": {
+    "partnerClient": "shoppers",
+    "primaryGateway": "front-door",
+    "primaryAuth": "badge-reader",
+    "primaryAuthorizer": "rulebook",
+    "primaryDatabase": "ledger",
+    "resource:Receipt": "ledger"
+  },
+  "nodes": [
+    {
+      "id": "shoppers",
+      "name": "Shoppers",
+      "type": "external-client",
+      "region": "shop-floor",
+      "tier": 0,
+      "baseLatencyMs": 0,
+      "baseRps": 120,
+      "description": "People at the counter."
+    },
+    {
+      "id": "front-door",
+      "name": "Front door",
+      "type": "api-gateway",
+      "region": "shop-floor",
+      "tier": 1,
+      "baseLatencyMs": 4,
+      "description": "Everything comes in through here."
+    },
+    {
+      "id": "badge-reader",
+      "name": "Badge reader",
+      "type": "auth-service",
+      "region": "shop-floor",
+      "tier": 2,
+      "baseLatencyMs": 9,
+      "description": "Says who is asking."
+    },
+    {
+      "id": "rulebook",
+      "name": "Rulebook",
+      "type": "cedar-authorizer",
+      "region": "shop-floor",
+      "tier": 2,
+      "baseLatencyMs": 2,
+      "description": "Says whether they may."
+    },
+    {
+      "id": "till",
+      "name": "Till",
+      "type": "microservice",
+      "region": "shop-floor",
+      "tier": 3,
+      "baseLatencyMs": 12,
+      "description": "Rings up sales and looks up receipts."
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger",
+      "type": "database",
+      "region": "shop-floor",
+      "tier": 4,
+      "baseLatencyMs": 5,
+      "description": "Where receipts are kept."
+    }
+  ],
+  "edges": [
+    {
+      "source": "shoppers",
+      "target": "front-door",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0
+    },
+    {
+      "source": "front-door",
+      "target": "badge-reader",
+      "protocol": "grpc",
+      "relationship": "auth",
+      "weight": 1.0
+    },
+    {
+      "source": "front-door",
+      "target": "rulebook",
+      "protocol": "grpc",
+      "relationship": "authz",
+      "weight": 1.0
+    },
+    {
+      "source": "front-door",
+      "target": "till",
+      "protocol": "grpc",
+      "relationship": "call",
+      "weight": 1.0
+    },
+    {
+      "source": "till",
+      "target": "ledger",
+      "protocol": "sql",
+      "relationship": "data",
+      "weight": 1.4
+    }
+  ]
+}

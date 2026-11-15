@@ -120,6 +120,15 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
 
         <div className="mt-3">
           <p className="caption mb-1.5">Path through the platform</p>
+          {decision.path.length === 0 && (
+            // A topology from a workspace may not say which of its services
+            // are the gateway and the authorizer. The decision is still
+            // Cedar's; there is only nowhere to draw it.
+            <p className="text-xs text-ink-dim" data-testid="decision-path-none">
+              None to draw. This platform does not name its gateway, authentication service and
+              authorizer.
+            </p>
+          )}
           <ol className="space-y-1" data-testid="decision-path">
             {decision.path.map((stage, i) => {
               const blocked = decision.blockedAt === stage.nodeId;
@@ -301,13 +310,20 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           {principalInfo && resourceInfo && (
             <p className="text-[11px] text-ink-faint">
               {principalInfo.label} belongs to tenant{' '}
-              <span className="text-ink-dim">{principalInfo.tenant}</span> with role
-              {principalInfo.roles.length === 1 ? '' : 's'}{' '}
-              <span className="text-ink-dim">{principalInfo.roles.join(', ')}</span>; the resource
-              belongs to <span className="text-ink-dim">{resourceInfo.tenant}</span>.
+              <span className="text-ink-dim">{principalInfo.tenant}</span>
+              {principalInfo.roles.length === 0 ? (
+                ' and has no role'
+              ) : (
+                <>
+                  {' '}
+                  with role{principalInfo.roles.length === 1 ? '' : 's'}{' '}
+                  <span className="text-ink-dim">{principalInfo.roles.join(', ')}</span>
+                </>
+              )}
+              ; the resource belongs to <span className="text-ink-dim">{resourceInfo.tenant}</span>.
             </p>
           )}
-          <fieldset>
+          <fieldset hidden={catalog.contextKeys.length === 0}>
             <legend className="caption mb-1.5">Context</legend>
             <div className="space-y-1.5">
               {catalog.contextKeys.map((key) => (
@@ -503,8 +519,8 @@ export function AuthorizationExplorer() {
         <p className="mt-1 text-xs leading-relaxed text-ink-dim">
           Choose who asks for what, and follow the request across the model to where Cedar allows it
           or stops it. The decision is computed by the Cedar policy engine
-          {embedded?.version ? ` (cedar-policy ${embedded.version})` : ''} over synthetic principals
-          and resources; nothing is scripted.
+          {embedded?.version ? ` (cedar-policy ${embedded.version})` : ''} over the principals and
+          resources in its entity store; nothing is scripted.
         </p>
       </header>
       <RequestForm catalog={catalog} />

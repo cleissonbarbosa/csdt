@@ -1,0 +1,24 @@
+{
+  "id": "a-bad-afternoon",
+  "name": "A bad afternoon",
+  "description": "Fictional recording: receipts are snooped on, and then the ledger catches fire.",
+  "topologyId": "corner-shop",
+  "seed": 1987,
+  "durationMs": 110000,
+  "commands": [
+    {
+      "atMs": 8000,
+      "command": {
+        "type": "startScenario",
+        "scenarioId": "receipt-snooping"
+      }
+    },
+    {
+      "atMs": 56000,
+      "command": {
+        "type": "startScenario",
+        "scenarioId": "ledger-fire"
+      }
+    }
+  ]
+}

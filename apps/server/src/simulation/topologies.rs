@@ -12,11 +12,18 @@ use super::rng::Rng;
 pub const HELIOS_ID: &str = "helios-commerce";
 pub const STRESS_ID: &str = "hyperscale-stress";
 
-/// The default demo topology, authored in `fixtures/topology/`.
+/// Seed of the bundled stress topology.
+pub const STRESS_SEED: u64 = 0xAE615;
+
+/// File name and contents of the default demo topology, authored in
+/// `fixtures/topologies/`.
+pub const HELIOS_FILE: (&str, &str) = (
+    "helios-commerce.json",
+    include_str!("../../../../fixtures/topologies/helios-commerce.json"),
+);
+
 pub fn helios() -> Result<TopologySpec, serde_json::Error> {
-    serde_json::from_str(include_str!(
-        "../../../../fixtures/topology/helios-commerce.json"
-    ))
+    serde_json::from_str(HELIOS_FILE.1)
 }
 
 const STRESS_REGIONS: [(&str, &str, &str); 6] = [

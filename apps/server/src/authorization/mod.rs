@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 use cedar_policy::{
     Authorizer, Context, Decision as CedarDecision, Effect, Entities, EntityUid, Policy, PolicyId,
-    PolicySet, Request,
+    PolicySet, Request, Schema, ValidationMode, Validator,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,8 +27,19 @@ const POLICIES_JSON: &str = include_str!("../../../../fixtures/cedar/policies.js
 const ENTITIES_JSON: &str = include_str!("../../../../fixtures/cedar/entities.json");
 const CATALOG_JSON: &str = include_str!("../../../../fixtures/cedar/catalog.json");
 
+/// File name and contents of the bundled authorization fixtures.
+pub const BUNDLED_FILES: [(&str, &str); 3] = [
+    ("policies.json", POLICIES_JSON),
+    ("entities.json", ENTITIES_JSON),
+    ("catalog.json", CATALOG_JSON),
+];
+
 /// Longest entity reference accepted from clients.
 pub const MAX_ENTITY_REF_LEN: usize = 256;
+/// Longest policy id accepted from a policy file.
+pub const MAX_POLICY_ID_LEN: usize = 128;
+/// Most policies one engine holds.
+pub const MAX_POLICIES: usize = 512;
 /// Largest serialised context accepted from clients.
 pub const MAX_CONTEXT_BYTES: usize = 4096;
 
@@ -40,13 +51,24 @@ pub enum CedarSetupError {
     Policy { id: String, message: String },
     #[error("duplicate policy id `{0}`")]
     DuplicatePolicy(String),
+    #[error("policy id `{0}` must be 1 to {MAX_POLICY_ID_LEN} printable characters")]
+    InvalidPolicyId(String),
+    #[error("at most {MAX_POLICIES} policies are allowed, found {0}")]
+    TooManyPolicies(usize),
+    #[error("policy file `{file}`: {message}")]
+    PolicyFile { file: String, message: String },
     #[error("entity store is invalid: {0}")]
     Entities(String),
+    #[error("schema does not parse: {0}")]
+    Schema(String),
+    #[error("policies do not validate against the schema: {0}")]
+    Validation(String),
 }
 
 /// A policy as stored in `fixtures/cedar/policies.json`. `id` and `content`
 /// match cedar-agent's policy schema; `description` is AEGIS metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicyDocument {
     pub id: String,
     #[serde(default)]
@@ -55,14 +77,14 @@ pub struct PolicyDocument {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogTenant {
     pub id: String,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogPrincipal {
     pub uid: String,
     pub label: String,
@@ -72,7 +94,7 @@ pub struct CatalogPrincipal {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogAction {
     pub uid: String,
     pub label: String,
@@ -80,7 +102,7 @@ pub struct CatalogAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogResource {
     pub uid: String,
     pub label: String,
@@ -89,7 +111,7 @@ pub struct CatalogResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogContextKey {
     pub key: String,
     pub label: String,
@@ -99,7 +121,7 @@ pub struct CatalogContextKey {
 /// The synthetic authorization domain: who exists, what they can attempt and
 /// which request shapes make up simulated traffic.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AuthzCatalog {
     pub tenants: Vec<CatalogTenant>,
     pub principals: Vec<CatalogPrincipal>,
@@ -114,6 +136,97 @@ impl AuthzCatalog {
     pub fn bundled() -> Result<Self, serde_json::Error> {
         serde_json::from_str(CATALOG_JSON)
     }
+
+    /// Checks that every entity reference parses and that request ids are
+    /// unique, so a mistake in a catalogue file is reported where it is
+    /// rather than as a request that never matches.
+    pub fn validate(&self) -> Result<(), String> {
+        let uid = |what: &str, raw: &str| {
+            parse_uid("uid", raw)
+                .map(|_| ())
+                .map_err(|_| format!("{what} `{raw}` is not a Cedar entity reference"))
+        };
+        for principal in &self.principals {
+            uid("principal", &principal.uid)?;
+        }
+        for action in &self.actions {
+            uid("action", &action.uid)?;
+        }
+        for resource in &self.resources {
+            uid("resource", &resource.uid)?;
+        }
+        // The two lists are looked up separately, so an id only has to be
+        // unique within its own.
+        for (list, templates) in [
+            ("trafficMix", &self.traffic_mix),
+            ("scenarioRequests", &self.scenario_requests),
+        ] {
+            for (i, template) in templates.iter().enumerate() {
+                if template.id.trim().is_empty() {
+                    return Err(format!("{list} has a request with an empty id"));
+                }
+                if templates[..i].iter().any(|other| other.id == template.id) {
+                    return Err(format!("{list} has two requests with id `{}`", template.id));
+                }
+                if !(template.weight.is_finite() && template.weight >= 0.0) {
+                    return Err(format!(
+                        "request `{}` has an invalid weight {}",
+                        template.id, template.weight
+                    ));
+                }
+                validate_request(&template.request())
+                    .map_err(|e| format!("request `{}`: {e}", template.id))?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Splits a file in Cedar's own policy syntax into policy documents.
+///
+/// A policy's id is its `@id("…")` annotation, or `<file>-<n>` counting from
+/// one in source order; its description is its `@description("…")`
+/// annotation. Templates are refused: AEGIS evaluates static policies only.
+pub fn policy_documents_from_cedar(
+    file: &str,
+    text: &str,
+) -> Result<Vec<PolicyDocument>, CedarSetupError> {
+    let fail = |message: String| CedarSetupError::PolicyFile {
+        file: file.to_string(),
+        message,
+    };
+    let set = PolicySet::from_str(text).map_err(|e| fail(e.to_string()))?;
+    if set.num_of_templates() > 0 {
+        return Err(fail(
+            "policy templates are not supported; write static policies".into(),
+        ));
+    }
+    // The parser names policies `policy0`, `policy1`… in source order, and
+    // the set does not keep that order.
+    let mut policies: Vec<(usize, &Policy)> = Vec::new();
+    for policy in set.policies() {
+        let id = policy.id().to_string();
+        let position = id
+            .strip_prefix("policy")
+            .and_then(|n| n.parse::<usize>().ok())
+            .ok_or_else(|| fail(format!("unexpected policy id `{id}`")))?;
+        policies.push((position, policy));
+    }
+    policies.sort_by_key(|(position, _)| *position);
+    let stem = file.strip_suffix(".cedar").unwrap_or(file);
+    Ok(policies
+        .into_iter()
+        .map(|(position, policy)| PolicyDocument {
+            id: policy
+                .annotation("id")
+                .map_or_else(|| format!("{stem}-{}", position + 1), str::to_string),
+            description: policy
+                .annotation("description")
+                .unwrap_or_default()
+                .to_string(),
+            content: policy.to_string(),
+        })
+        .collect())
 }
 
 /// The bundled policy documents, in cedar-agent's `PUT /v1/policies` shape.
@@ -135,6 +248,8 @@ struct LoadedPolicy {
 pub struct CedarEngine {
     policies: Vec<LoadedPolicy>,
     entities: Entities,
+    /// The entity store as it was given, for a connected agent to be synced.
+    entities_json: serde_json::Value,
     authorizer: Authorizer,
 }
 
@@ -184,8 +299,28 @@ impl CedarEngine {
         documents: Vec<PolicyDocument>,
         entities: serde_json::Value,
     ) -> Result<Self, CedarSetupError> {
+        Self::with_schema(documents, entities, None)
+    }
+
+    /// Like [`CedarEngine::new`]. When a schema (in Cedar's schema syntax)
+    /// is given, the policies and the entity store must validate against it:
+    /// what the Cedar validator reports is returned as the error.
+    pub fn with_schema(
+        documents: Vec<PolicyDocument>,
+        entities: serde_json::Value,
+        schema: Option<&str>,
+    ) -> Result<Self, CedarSetupError> {
+        if documents.len() > MAX_POLICIES {
+            return Err(CedarSetupError::TooManyPolicies(documents.len()));
+        }
         let mut policies: Vec<LoadedPolicy> = Vec::with_capacity(documents.len());
         for document in documents {
+            let id_ok = !document.id.trim().is_empty()
+                && document.id.len() <= MAX_POLICY_ID_LEN
+                && !document.id.chars().any(char::is_control);
+            if !id_ok {
+                return Err(CedarSetupError::InvalidPolicyId(document.id));
+            }
             if policies.iter().any(|p| p.info.id == document.id) {
                 return Err(CedarSetupError::DuplicatePolicy(document.id));
             }
@@ -208,13 +343,58 @@ impl CedarEngine {
                 policy,
             });
         }
-        let entities = Entities::from_json_value(entities, None)
+
+        let schema = match schema {
+            Some(text) => {
+                let (schema, _warnings) = Schema::from_cedarschema_str(text)
+                    .map_err(|e| CedarSetupError::Schema(e.to_string()))?;
+                Some(schema)
+            }
+            None => None,
+        };
+        if let Some(schema) = &schema {
+            let mut set = PolicySet::new();
+            for loaded in &policies {
+                set.add(loaded.policy.clone())
+                    .map_err(|e| CedarSetupError::Validation(e.to_string()))?;
+            }
+            let result = Validator::new(schema.clone()).validate(&set, ValidationMode::Strict);
+            if !result.validation_passed() {
+                // Cedar's message already names the policy.
+                let mut errors: Vec<String> = result
+                    .validation_errors()
+                    .map(ToString::to_string)
+                    .collect();
+                errors.sort();
+                return Err(CedarSetupError::Validation(errors.join("; ")));
+            }
+        }
+        let entities_json = entities.clone();
+        let entities = Entities::from_json_value(entities, schema.as_ref())
             .map_err(|e| CedarSetupError::Entities(e.to_string()))?;
         Ok(Self {
             policies,
             entities,
+            entities_json,
             authorizer: Authorizer::new(),
         })
+    }
+
+    /// The policies as documents, in cedar-agent's `PUT /v1/policies` shape.
+    pub fn documents(&self) -> Vec<PolicyDocument> {
+        self.policies
+            .iter()
+            .map(|p| PolicyDocument {
+                id: p.info.id.clone(),
+                description: p.info.description.clone(),
+                content: p.info.content.clone(),
+            })
+            .collect()
+    }
+
+    /// The entity store, in cedar-agent's `PUT /v1/data` shape.
+    pub fn entities_json(&self) -> &serde_json::Value {
+        &self.entities_json
     }
 
     pub fn policies(&self) -> Vec<PolicyInfo> {

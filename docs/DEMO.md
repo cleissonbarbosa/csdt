@@ -187,6 +187,24 @@ engine in the request tracer. `AEGIS_CEDAR_AGENT_SYNC=true` uploads the
 synthetic policies and entities and replaces whatever the agent held. See
 [INTEGRATIONS.md](INTEGRATIONS.md).
 
+## 10 · Your own platform (optional)
+
+Stop the server and start it on the example workspace:
+
+```bash
+AEGIS_WORKSPACE=examples/corner-shop cargo run --release -p aegis-server
+```
+
+The model is now a six-service shop. **Explore an incident** offers the two
+scenarios written for it; start **Receipt snooping** and the flow Cedar denies
+ends at the Rulebook with a badge. In the request tracer, Ana reading a
+receipt of the other shop is a **Deny** determined by
+`other-shops-are-closed-books`, a policy from `cedar/shop.cedar`.
+
+`aegis-server export-workspace ./my-platform` writes the bundled files out to
+start from, and `check-workspace` validates a directory without starting
+anything. The format is in [WORKSPACE.md](WORKSPACE.md).
+
 ## Reproducing the screenshots
 
 Every image in `docs/assets` comes from the running application:

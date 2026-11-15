@@ -1,0 +1,193 @@
+{
+  "id": "ddos-surge",
+  "name": "DDoS Surge",
+  "summary": "A volumetric flood from unattributed sources overwhelms the primary API gateway until edge filtering absorbs it.",
+  "category": "availability",
+  "severity": "critical",
+  "durationMs": 96000,
+  "rootCause": "role:primaryGateway",
+  "targets": [
+    "role:primaryGateway",
+    "role:edgeRouter",
+    "role:attackSource"
+  ],
+  "flows": [
+    {
+      "id": "flood",
+      "label": "Volumetric flood",
+      "suspicious": true,
+      "hops": [
+        {
+          "from": "role:attackSource",
+          "to": "role:edgeRouter"
+        },
+        {
+          "from": "role:edgeRouter",
+          "to": "role:primaryGateway"
+        }
+      ],
+      "spill": true
+    }
+  ],
+  "phases": [
+    {
+      "name": "Probing",
+      "atMs": 0,
+      "rampMs": 4000,
+      "status": "active",
+      "description": "Low-rate probes map the public API surface.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "flood",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryGateway",
+              "factor": 0.12
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 2000,
+          "severity": "notice",
+          "kind": "alert",
+          "title": "Unusual request pattern at the edge",
+          "message": "Requests from sources with no reputation are enumerating API routes.",
+          "nodes": [
+            "role:edgeRouter",
+            "role:attackSource"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Volumetric surge",
+      "atMs": 8000,
+      "rampMs": 8000,
+      "status": "active",
+      "description": "Request volume climbs to several times the gateway's capacity. Latency rises and requests are shed.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "flood",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryGateway",
+              "factor": 2.2
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 7000,
+          "severity": "critical",
+          "kind": "alert",
+          "title": "Volumetric attack detected",
+          "message": "Inbound request rate exceeds the gateway's provisioned capacity; legitimate requests are being shed.",
+          "nodes": [
+            "role:securityMonitor",
+            "role:primaryGateway"
+          ]
+        },
+        {
+          "delayMs": 14000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Downstream services saturating",
+          "message": "Traffic that passes the gateway is exhausting service capacity behind it.",
+          "nodes": [
+            "role:primaryGateway"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Edge mitigation",
+      "atMs": 36000,
+      "rampMs": 6000,
+      "status": "mitigating",
+      "description": "Rate-based rules at the edge router drop traffic from the offending sources before it reaches the gateway.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "flood",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryGateway",
+              "factor": 2.2
+            }
+          }
+        },
+        {
+          "type": "flowReject",
+          "flow": "flood",
+          "at": "role:edgeRouter",
+          "fraction": 0.94,
+          "reason": "waf"
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Edge filtering engaged",
+          "message": "Web application firewall rules now reject the flood at the edge router.",
+          "nodes": [
+            "role:edgeRouter"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Attack subsides",
+      "atMs": 62000,
+      "rampMs": 10000,
+      "status": "recovering",
+      "description": "The flood loses intensity while filtering stays in place.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "flood",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryGateway",
+              "factor": 0.25
+            }
+          }
+        },
+        {
+          "type": "flowReject",
+          "flow": "flood",
+          "at": "role:edgeRouter",
+          "fraction": 0.94,
+          "reason": "waf"
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Recovery",
+      "atMs": 80000,
+      "rampMs": 8000,
+      "status": "recovering",
+      "description": "Traffic returns to its normal shape and services recover.",
+      "effects": [],
+      "events": [
+        {
+          "delayMs": 6000,
+          "severity": "info",
+          "kind": "mitigation",
+          "title": "Traffic back to baseline",
+          "message": "Request volume at the edge has returned to its normal range.",
+          "nodes": [
+            "role:edgeRouter"
+          ]
+        }
+      ]
+    }
+  ]
+}

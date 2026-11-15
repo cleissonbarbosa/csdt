@@ -704,6 +704,36 @@ describe('authorization explorer', () => {
     expect(screen.queryByTestId('decision-card')).not.toBeInTheDocument();
   });
 
+  it('leaves out what a workspace’s catalogue and topology do not provide', async () => {
+    // A catalogue written for another platform: no roles, no context keys,
+    // and a topology that names no gateway, so the server returns no path.
+    const catalog = fixtures.catalog();
+    api.authorizationCatalog.mockResolvedValue({
+      ...catalog,
+      principals: catalog.principals.map((principal) => ({ ...principal, roles: [] })),
+      contextKeys: [],
+    });
+    api.evaluate.mockResolvedValue({
+      ...fixtures.decisionDeny(),
+      path: [],
+      hops: [],
+      blockedAt: null,
+    });
+    const user = userEvent.setup();
+    renderOpen();
+    await fromMenu(user, 'Trace a request through Cedar');
+    const form = await screen.findByTestId('authz-form');
+    expect(form).toHaveTextContent(/has no role; the resource belongs to/);
+    expect(within(form).queryByRole('group', { name: 'Context' })).not.toBeInTheDocument();
+
+    await user.click(within(form).getByTestId('authz-evaluate'));
+    const card = await screen.findByTestId('decision-card');
+    // The decision is still Cedar's; there is only no path to draw.
+    expect(within(card).getByTestId('decision-result')).toHaveTextContent('Deny');
+    expect(within(card).getByTestId('decision-path-none')).toHaveTextContent(/None to draw/);
+    expect(within(card).getByTestId('decision-path')).toBeEmptyDOMElement();
+  });
+
   it('only offers cedar-agent once one is connected', async () => {
     const user = userEvent.setup();
     renderOpen();

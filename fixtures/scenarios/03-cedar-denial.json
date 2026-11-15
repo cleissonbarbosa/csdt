@@ -1,0 +1,355 @@
+{
+  "id": "cedar-denial",
+  "name": "Cedar Authorization Denial",
+  "summary": "An authenticated contractor from another tenant repeatedly attempts prohibited actions. Cedar denies every one of them.",
+  "category": "authorization",
+  "severity": "warning",
+  "durationMs": 70000,
+  "rootCause": "role:primaryAuthorizer",
+  "targets": [
+    "role:partnerClient",
+    "role:primaryGateway",
+    "role:primaryAuth",
+    "role:primaryAuthorizer",
+    "role:protectedResource"
+  ],
+  "flows": [
+    {
+      "id": "alice-view-ledger",
+      "label": "Alice · viewLedger",
+      "suspicious": false,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:edgeRouter"
+        },
+        {
+          "from": "role:edgeRouter",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:protectedResource",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "alice-view-ledger",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    },
+    {
+      "id": "mallory-export-ledger",
+      "label": "Mallory · exportLedger",
+      "suspicious": true,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:edgeRouter"
+        },
+        {
+          "from": "role:edgeRouter",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:protectedResource",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "mallory-export-ledger",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    },
+    {
+      "id": "mallory-view-ledger",
+      "label": "Mallory · viewLedger",
+      "suspicious": true,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:edgeRouter"
+        },
+        {
+          "from": "role:edgeRouter",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:protectedResource",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "mallory-view-ledger",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    },
+    {
+      "id": "mallory-delete-customer",
+      "label": "Mallory · deleteCustomer",
+      "suspicious": true,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:edgeRouter"
+        },
+        {
+          "from": "role:edgeRouter",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:resource:Customer",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "mallory-delete-customer",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "name": "Permitted access",
+      "atMs": 0,
+      "rampMs": 3000,
+      "status": "active",
+      "description": "A finance analyst reads her own tenant's ledger. Cedar permits it and the request reaches the resource.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "alice-view-ledger",
+          "rate": {
+            "rps": 22.0
+          }
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Prohibited export",
+      "atMs": 10000,
+      "rampMs": 4000,
+      "status": "active",
+      "description": "A contractor of another tenant requests an export of the ledger. Authentication succeeds; Cedar denies the action.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "alice-view-ledger",
+          "rate": {
+            "rps": 14.0
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-export-ledger",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.1
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 4000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Cross-tenant access attempt",
+          "message": "An authenticated principal is requesting another tenant's ledger.",
+          "nodes": [
+            "role:primaryAuthorizer",
+            "role:protectedResource"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Escalation attempts",
+      "atMs": 26000,
+      "rampMs": 5000,
+      "status": "active",
+      "description": "The principal cycles through other actions and resources. Every request is denied.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "alice-view-ledger",
+          "rate": {
+            "rps": 14.0
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-export-ledger",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.08
+            }
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-view-ledger",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.08
+            }
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-delete-customer",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.048
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 8000,
+          "severity": "critical",
+          "kind": "alert",
+          "title": "Repeated authorization denials for one principal",
+          "message": "The same principal has been denied across several actions and resource types.",
+          "nodes": [
+            "role:securityMonitor",
+            "role:primaryAuthorizer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Session revoked",
+      "atMs": 46000,
+      "rampMs": 3000,
+      "status": "mitigating",
+      "description": "The identity service revokes the principal's sessions; requests now stop at authentication.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "alice-view-ledger",
+          "rate": {
+            "rps": 14.0
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-export-ledger",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.08
+            }
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-view-ledger",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.08
+            }
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "mallory-delete-customer",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.048
+            }
+          }
+        },
+        {
+          "type": "flowReject",
+          "flow": "mallory-export-ledger",
+          "at": "role:primaryAuth",
+          "fraction": 1.0,
+          "reason": "session-revoked"
+        },
+        {
+          "type": "flowReject",
+          "flow": "mallory-view-ledger",
+          "at": "role:primaryAuth",
+          "fraction": 1.0,
+          "reason": "session-revoked"
+        },
+        {
+          "type": "flowReject",
+          "flow": "mallory-delete-customer",
+          "at": "role:primaryAuth",
+          "fraction": 1.0,
+          "reason": "session-revoked"
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Sessions revoked",
+          "message": "All sessions of the offending principal were revoked by the identity service.",
+          "nodes": [
+            "role:primaryAuth"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Recovery",
+      "atMs": 58000,
+      "rampMs": 5000,
+      "status": "recovering",
+      "description": "The attempts stop.",
+      "effects": [],
+      "events": []
+    }
+  ]
+}

@@ -168,7 +168,7 @@ pub enum RegionKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Region {
     pub id: String,
     pub name: String,

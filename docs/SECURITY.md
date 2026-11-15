@@ -17,8 +17,8 @@ enforced.
 
 ## Data
 
-All platform data is synthetic: services, metrics, incidents, principals,
-policies and advisories. Advisories use the reserved-looking `CVE-2099-*` range
+All bundled platform data is synthetic: services, metrics, incidents,
+principals, policies and advisories. Advisories use the reserved-looking `CVE-2099-*` range
 and `*.invalid` URLs so they cannot be mistaken for real ones.
 
 Every piece of data carries a provenance label (`synthetic`, `recording`,
@@ -26,6 +26,46 @@ Every piece of data carries a provenance label (`synthetic`, `recording`,
 
 AEGIS collects no telemetry about its users and stores nothing outside the
 browser's `localStorage` (display preferences).
+
+## Workspace
+
+A workspace (`AEGIS_WORKSPACE`, [WORKSPACE.md](WORKSPACE.md)) is the one place
+AEGIS reads files it was not built with. It is treated as configuration:
+whoever can write the directory already controls how the server starts.
+
+- **Read once, by the operator's choice.** Unset by default. The directory is
+  read before the listener is bound. No route uploads, lists or reloads files,
+  so nothing a client sends can cause a file to be read.
+- **Bounded.** 4 MiB per file, 64 files per directory, 2 000 services and
+  20 000 connections per topology, 512 policies, scenarios of at most 30
+  virtual minutes. Files are parsed into typed structures that reject unknown
+  fields, and numbers outside their range are refused before anything runs.
+- **Data, not behaviour.** A scenario is a list of the eleven effects the
+  engine understands, each a bounded number applied to a node or a connection
+  of the model. No effect reads a file, opens a socket or runs anything, and
+  the `simulation` and `incidents` modules perform no I/O with or without a
+  workspace.
+- **Provenance cannot be forged.** A topology must be labelled `synthetic`,
+  because its figures are computed whatever platform it describes. A scenario
+  may only announce alerts, authentication failures, mitigations and reroutes;
+  a recording may only start and stop scenarios. An authorization decision, an
+  advisory or a scan finding cannot be written into a file: they come from
+  Cedar or from an importer.
+- **Cedar still decides.** Policies from a workspace are parsed and evaluated
+  by `cedar-policy`. A flow is stopped at the authorizer only if Cedar denied
+  its request.
+
+Files in a workspace may describe a real system, and two things follow.
+
+- **They are served to whoever can reach the API.** The topology, the
+  scenario texts, the source of every policy and the catalogue of principals
+  and resources are what the interface displays, so the API returns them.
+  AEGIS has no authentication (see [Deploying beyond
+  localhost](#deploying-beyond-localhost)); keep a server with such a
+  workspace on loopback or behind something that authenticates.
+- **They are sent nowhere else**, with one exception that is opt-in twice: a
+  connected cedar-agent started with `AEGIS_CEDAR_AGENT_SYNC=true` receives the
+  policies and entities the embedded engine holds.
 
 ## Server
 

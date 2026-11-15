@@ -1,0 +1,18 @@
+// Optional. When this file is present, Cedar validates the policies and the
+// entities against it at start-up, and the server refuses to start if they
+// do not fit.
+
+entity Clerk {
+  shop: String,
+  manager: Bool,
+};
+
+entity Receipt {
+  shop: String,
+};
+
+action read, void appliesTo {
+  principal: [Clerk],
+  resource: [Receipt],
+  context: {},
+};

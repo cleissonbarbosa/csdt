@@ -25,7 +25,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::authorization::{bundled_entities_json, bundled_policy_documents};
+use crate::authorization::{bundled_entities_json, bundled_policy_documents, PolicyDocument};
 use crate::domain::{
     AuthorizationRequest, AuthzError, DataSource, Decision, EngineInfo, EngineKind,
     IntegrationKind, IntegrationMetric, IntegrationState, IntegrationStatus, PolicyDecision,
@@ -105,6 +105,8 @@ pub struct CedarAgentProvider {
     target: Result<Option<(Target, CedarAgentConfig)>, ProviderError>,
     client: reqwest::Client,
     state: Mutex<AgentState>,
+    /// What a sync uploads. `None` means the bundled fixtures.
+    store: Option<(Vec<PolicyDocument>, serde_json::Value)>,
 }
 
 impl CedarAgentProvider {
@@ -122,7 +124,20 @@ impl CedarAgentProvider {
             target,
             client,
             state: Mutex::new(AgentState::default()),
+            store: None,
         }
+    }
+
+    /// Makes a sync upload these policies and entities (the ones the
+    /// embedded engine was built from) instead of the bundled fixtures.
+    #[must_use]
+    pub fn with_store(
+        mut self,
+        policies: Vec<PolicyDocument>,
+        entities: serde_json::Value,
+    ) -> Self {
+        self.store = Some((policies, entities));
+        self
     }
 
     fn state(&self) -> std::sync::MutexGuard<'_, AgentState> {
@@ -194,16 +209,21 @@ impl CedarAgentProvider {
         }
 
         if config.sync {
-            let policies: Vec<AgentPolicy> = bundled_policy_documents()
-                .map_err(|e| ProviderError::Protocol(e.to_string()))?
+            let (documents, entities) = match &self.store {
+                Some((documents, entities)) => (documents.clone(), entities.clone()),
+                None => (
+                    bundled_policy_documents()
+                        .map_err(|e| ProviderError::Protocol(e.to_string()))?,
+                    bundled_entities_json().map_err(|e| ProviderError::Protocol(e.to_string()))?,
+                ),
+            };
+            let policies: Vec<AgentPolicy> = documents
                 .into_iter()
                 .map(|p| AgentPolicy {
                     id: p.id,
                     content: p.content,
                 })
                 .collect();
-            let entities =
-                bundled_entities_json().map_err(|e| ProviderError::Protocol(e.to_string()))?;
             for (path, body) in [
                 ("/v1/policies", serde_json::json!(policies)),
                 ("/v1/data", entities),

@@ -53,6 +53,7 @@ apps/
     authorization/   embedded Cedar policy decision point
     integrations/    live adapters, fixture parsers, target guard
     application/     use cases; owns the single mutable timeline
+    workspace.rs     reads an operator's own files from a directory at start-up
     api/             Axum routes, WebSocket, rate limiting, errors
   web/src/
     graphics/        layout, modelled pieces, TSL materials, SceneController
@@ -61,11 +62,14 @@ apps/
     providers/       REST client, stream client, TelemetryProvider
     components/ui/   buttons, badges, dialog, fields, sparkline
 packages/contracts/  zod schemas + samples exported by the server
-fixtures/            topology, Cedar policies/entities, recordings, fixtures
+fixtures/            the bundled topology, scenarios, recordings and Cedar
+                     files, laid out as a workspace; integration fixtures
+examples/            a small workspace to copy from
 ```
 
 Dependencies point inward: `api → application → simulation/authorization →
-domain`. The simulation and scenario modules perform no I/O at all.
+domain`. The simulation and scenario modules perform no I/O at all; the only
+file access is `workspace`, once, before the server listens.
 
 ---
 
@@ -111,15 +115,22 @@ other and with the node figures of the same tick, and carry no sampling noise.
 
 ### Scenarios are data
 
-A scenario (`incidents/catalog.rs`) is a list of phases on a virtual timeline.
-Each phase declares the complete set of effects that hold during it; anything
-it omits ramps back to nominal. Effects compile to **channels**: single
+A scenario is a file: a list of phases on a virtual timeline, in the format
+defined by `incidents/spec.rs`. The five bundled ones are
+`fixtures/scenarios/*.json`, compiled into the binary by
+`incidents/catalog.rs`; a workspace supplies others in the same format. Each
+phase declares the complete set of effects that hold during it; anything it
+omits ramps back to nominal. Effects compile to **channels**: single
 scalars (a capacity factor, an injected error rate, a flow rate…) that ease
 from their current value to a target. Channels live in the simulation state,
 so a checkpoint captures an effect mid-ramp.
 
-Scenarios name topology _roles_ (`primaryGateway`, `outageRegion`) rather than
-node ids, so the same five definitions run on both bundled topologies.
+The bundled scenarios name topology _roles_ (`primaryGateway`,
+`outageRegion`) rather than node ids, so the same five definitions run on both
+bundled topologies. A scenario may also name a node by its id, which ties it
+to the topologies that have that node. Resolving a definition against a
+topology (`incidents::resolve`) either yields channels and node indices or
+marks the scenario unavailable there, with the name that was missing.
 
 Hostile or probing traffic is modelled as **path flows**: a rate injected
 along explicit hops, with a rejection fraction at each node it arrives at
@@ -138,6 +149,26 @@ pure and deterministic while every outcome stays genuine:
 
 On-demand evaluations from the Authorization Explorer go to the engine
 directly and are recorded on the timeline as commands.
+
+### Sources and the workspace
+
+Everything above is built from one value, `application::Sources`: topology
+specifications, scenario definitions, recordings, policy documents, the entity
+store and the authorization catalogue. `Sources::bundled()` is the fixtures
+compiled into the binary. `workspace::load(dir)` starts from that and replaces
+each part the directory supplies, reading and checking one file at a time so
+an error names the file. `Assets::build(sources)` then does what only makes
+sense across files: it loads the Cedar engine (validating against a schema if
+one was given), evaluates every request shape, compiles each topology,
+resolves each scenario against it and checks that every recording refers to a
+topology and to scenarios that exist.
+
+The directory is read once, before the listener is bound. It is not part of
+the API, and the bundled set is itself in that layout: a test exports it,
+loads it back and requires the same value and the same simulation digest.
+JSON floats are parsed exactly (`serde_json`'s `float_roundtrip`), so a
+topology written out and read back is the same bits. The format is documented
+in [WORKSPACE.md](WORKSPACE.md).
 
 ### Determinism and time travel
 

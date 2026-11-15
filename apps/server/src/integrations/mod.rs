@@ -22,6 +22,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
+use crate::authorization::PolicyDocument;
 use crate::domain::{
     DataSource, ImportedEvent, IntegrationKind, IntegrationState, IntegrationStatus,
 };
@@ -172,13 +173,22 @@ pub struct ProviderRegistry {
 }
 
 impl ProviderRegistry {
-    pub fn new(config: &IntegrationConfig) -> Result<Self, reqwest::Error> {
+    /// `policies` and `entities` are what the embedded engine was built
+    /// from; a cedar-agent sync uploads the same ones.
+    pub fn new(
+        config: &IntegrationConfig,
+        policies: Vec<PolicyDocument>,
+        entities: serde_json::Value,
+    ) -> Result<Self, reqwest::Error> {
         let client = http_client()?;
-        let cedar_agent = Arc::new(CedarAgentProvider::new(
-            config.cedar_agent.clone(),
-            &config.allowed_hosts,
-            client.clone(),
-        ));
+        let cedar_agent = Arc::new(
+            CedarAgentProvider::new(
+                config.cedar_agent.clone(),
+                &config.allowed_hosts,
+                client.clone(),
+            )
+            .with_store(policies, entities),
+        );
         let providers: Vec<Arc<dyn TelemetryProvider>> = vec![
             Arc::new(DemoSimulationProvider),
             Arc::clone(&cedar_agent) as Arc<dyn TelemetryProvider>,

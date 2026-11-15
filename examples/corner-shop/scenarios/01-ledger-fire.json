@@ -1,0 +1,92 @@
+{
+  "id": "ledger-fire",
+  "name": "Ledger fire",
+  "summary": "The ledger becomes unreachable. The till fails with it until a copy is brought up.",
+  "category": "resilience",
+  "severity": "critical",
+  "durationMs": 40000,
+  "rootCause": "node:ledger",
+  "targets": ["node:ledger", "node:till"],
+  "phases": [
+    {
+      "name": "Smoke",
+      "atMs": 0,
+      "rampMs": 3000,
+      "status": "active",
+      "description": "Writes to the ledger slow down.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "node:ledger",
+          "factor": 8.0
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 2000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Ledger writes are slow",
+          "message": "Sales take several times longer to record.",
+          "nodes": ["node:ledger"]
+        }
+      ]
+    },
+    {
+      "name": "Dark",
+      "atMs": 8000,
+      "rampMs": 1000,
+      "status": "active",
+      "description": "The ledger stops answering and the till cannot record sales.",
+      "effects": [
+        {
+          "type": "down",
+          "nodes": "node:ledger"
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 2000,
+          "severity": "critical",
+          "kind": "alert",
+          "title": "Ledger unreachable",
+          "message": "Every sale is failing.",
+          "nodes": ["node:ledger", "node:till"]
+        }
+      ]
+    },
+    {
+      "name": "Copy brought up",
+      "atMs": 20000,
+      "rampMs": 4000,
+      "status": "mitigating",
+      "description": "A copy of the ledger takes over with less room than the original.",
+      "effects": [
+        {
+          "type": "capacity",
+          "nodes": "node:ledger",
+          "factor": 0.6
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Ledger copy in service",
+          "message": "Sales are being recorded again.",
+          "nodes": ["node:ledger"]
+        }
+      ]
+    },
+    {
+      "name": "Recovery",
+      "atMs": 30000,
+      "rampMs": 5000,
+      "status": "recovering",
+      "description": "The ledger is back to its usual size.",
+      "effects": [],
+      "events": []
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "id": "regional-outage",
+  "name": "Regional Outage",
+  "summary": "An entire cloud region becomes unreachable. Health checks fail, traffic is re-routed to the failover region, and the region is later restored.",
+  "category": "resilience",
+  "severity": "critical",
+  "durationMs": 100000,
+  "rootCause": "gatewayOf:outageRegion",
+  "targets": [
+    "region:outageRegion",
+    "role:edgeRouter",
+    "gatewayOf:failoverRegion"
+  ],
+  "flows": [],
+  "phases": [
+    {
+      "name": "Network partition",
+      "atMs": 0,
+      "rampMs": 5000,
+      "status": "active",
+      "description": "Connectivity into the region degrades: packets are lost and latency spikes.",
+      "effects": [
+        {
+          "type": "edgeLatency",
+          "edges": {
+            "between": {
+              "from": "role:edgeRouter",
+              "to": "gatewayOf:outageRegion"
+            }
+          },
+          "factor": 6.0
+        },
+        {
+          "type": "edgeError",
+          "edges": {
+            "between": {
+              "from": "role:edgeRouter",
+              "to": "gatewayOf:outageRegion"
+            }
+          },
+          "rate": 0.35
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 3000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Packet loss into region",
+          "message": "Health probes into the region are intermittently failing.",
+          "nodes": [
+            "role:edgeRouter",
+            "gatewayOf:outageRegion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Region dark",
+      "atMs": 9000,
+      "rampMs": 2000,
+      "status": "active",
+      "description": "Every service in the region is unreachable. Requests routed there fail.",
+      "effects": [
+        {
+          "type": "down",
+          "nodes": "region:outageRegion"
+        },
+        {
+          "type": "edgeError",
+          "edges": {
+            "between": {
+              "from": "role:edgeRouter",
+              "to": "gatewayOf:outageRegion"
+            }
+          },
+          "rate": 1.0
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 3000,
+          "severity": "critical",
+          "kind": "alert",
+          "title": "Region unavailable",
+          "message": "All health checks for the region are failing.",
+          "nodes": [
+            "role:securityMonitor",
+            "gatewayOf:outageRegion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Failover",
+      "atMs": 24000,
+      "rampMs": 6000,
+      "status": "mitigating",
+      "description": "The edge router withdraws the region and sends its traffic to the failover region, which absorbs the extra load.",
+      "effects": [
+        {
+          "type": "down",
+          "nodes": "region:outageRegion"
+        },
+        {
+          "type": "edgeError",
+          "edges": {
+            "between": {
+              "from": "role:edgeRouter",
+              "to": "gatewayOf:outageRegion"
+            }
+          },
+          "rate": 1.0
+        },
+        {
+          "type": "routeShift",
+          "edge": {
+            "from": "role:edgeRouter",
+            "to": "gatewayOf:outageRegion"
+          },
+          "onto": {
+            "from": "role:edgeRouter",
+            "to": "gatewayOf:failoverRegion"
+          },
+          "fraction": 1.0
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "reroute",
+          "title": "Traffic re-routed",
+          "message": "The edge router is steering the region's traffic to the failover region.",
+          "nodes": [
+            "role:edgeRouter",
+            "gatewayOf:failoverRegion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Region restored",
+      "atMs": 56000,
+      "rampMs": 6000,
+      "status": "recovering",
+      "description": "Services in the region come back with reduced capacity while caches warm up. Traffic stays on the failover region.",
+      "effects": [
+        {
+          "type": "capacity",
+          "nodes": "region:outageRegion",
+          "factor": 0.5
+        },
+        {
+          "type": "routeShift",
+          "edge": {
+            "from": "role:edgeRouter",
+            "to": "gatewayOf:outageRegion"
+          },
+          "onto": {
+            "from": "role:edgeRouter",
+            "to": "gatewayOf:failoverRegion"
+          },
+          "fraction": 1.0
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 4000,
+          "severity": "info",
+          "kind": "mitigation",
+          "title": "Region reachable again",
+          "message": "Health checks for the region are passing; capacity is still warming up.",
+          "nodes": [
+            "gatewayOf:outageRegion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rebalancing",
+      "atMs": 72000,
+      "rampMs": 14000,
+      "status": "recovering",
+      "description": "Traffic shifts back to the restored region gradually.",
+      "effects": [],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "reroute",
+          "title": "Traffic rebalancing",
+          "message": "The edge router is returning traffic to the restored region.",
+          "nodes": [
+            "role:edgeRouter",
+            "gatewayOf:outageRegion"
+          ]
+        }
+      ]
+    }
+  ]
+}

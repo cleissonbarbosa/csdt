@@ -26,6 +26,14 @@ pnpm dev:web                  # UI on http://localhost:5173, proxies /api and th
 docker compose up --build     # both, containerised, on http://localhost:8080
 ```
 
+The server also runs on an operator's own files (`docs/WORKSPACE.md`):
+
+```bash
+cargo run -p aegis-server -- export-workspace <dir>   # the bundled files, to edit
+cargo run -p aegis-server -- check-workspace <dir>    # validate one; try examples/corner-shop
+AEGIS_WORKSPACE=<dir> cargo run -p aegis-server
+```
+
 `pnpm dev` starts Vite plus a typecheck watch on the contracts; it does not
 start the server.
 
@@ -46,7 +54,7 @@ pnpm e2e              # Playwright against the real stack
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -100,14 +108,21 @@ domain`.
   wraps it with a command log, checkpoints, seek, replay and branching;
   `decisions` holds Cedar outcomes evaluated once at start-up. One tick is
   200 ms of virtual time; a checkpoint is taken every 25 ticks.
-- `incidents`: scenarios as declarative data (`catalog.rs`). They name
-  topology roles (`primaryGateway`, `outageRegion`), not node ids, so the same
-  definitions run on both bundled topologies. A recording is a seed plus a
-  command list.
+- `incidents`: scenarios as data. `spec.rs` is the file format and the checks
+  that need no topology; the five bundled scenarios are
+  `fixtures/scenarios/*.json`, embedded by `catalog.rs`. They name topology
+  roles (`primaryGateway`, `outageRegion`), not node ids, so the same
+  definitions run on both bundled topologies; a scenario may also name a node
+  by id. A recording is a seed plus a command list.
 - `authorization`: the embedded `cedar-policy` decision point.
 - `integrations`: opt-in adapters and fixture parsers. Every outbound target
   goes through `guard.rs`.
-- `application`: `Assets` is everything immutable, built once at start-up.
+- `workspace`: reads the directory named by `AEGIS_WORKSPACE` once, before
+  the server listens, and overlays what it holds on the bundled fixtures. The
+  only file I/O in the server; nothing in it is reachable from the API.
+- `application`: `Sources` is what everything is built from (the bundled
+  fixtures, or those with parts replaced by a workspace). `Assets` is
+  everything immutable, built from them once at start-up.
   `SimulationService` owns the single mutable timeline behind one mutex, is
   the only place that advances it (a 50 ms scheduler), and fans messages out
   through a bounded broadcast channel, each serialised once.
@@ -128,10 +143,22 @@ Things that are easy to break:
 - **Cedar outcomes are looked up, never invented.** A scenario flow is blocked
   at the authorizer only if Cedar denied its request shape in
   `DecisionTable::build`. A new request shape goes into
-  `fixtures/cedar/catalog.json`.
+  `fixtures/cedar/catalog.json`. A file cannot state an outcome either:
+  `spec.rs` refuses the event kinds, and `recordings.rs` the commands, that
+  would put a decision or an imported event on the timeline.
 - **Fixtures are compiled in.** Everything under `fixtures/` is embedded with
   `include_str!`, so editing one means rebuilding the server and usually
   regenerating the contract samples.
+- **The fixture formats are public.** `fixtures/` is laid out as a workspace
+  and operators write files in the same formats. Changing a topology,
+  scenario, recording or catalogue field means updating `docs/WORKSPACE.md`
+  and `examples/corner-shop`, which a test loads. A new scenario
+  effect is three things: a variant in `incidents/spec.rs` with its range
+  check in `validate`, its resolution in `incidents/mod.rs`, and a row in the
+  document. Scenario files are listed in file-name order.
+- **Floats are parsed exactly.** `serde_json` is built with `float_roundtrip`
+  so a topology written out and read back is the same bits; a test compares
+  the exported stress topology with the generated one.
 - **History is bounded** (30 virtual minutes, 8 000 events), as is every
   buffer an outside party can fill.
 
@@ -299,8 +326,10 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   describe something unmeasured as measured.
 - **Provenance is always labelled.** Data is `synthetic`, `recording` or
   `live` from the server to the pixel, and a fixture is never labelled live.
+  A topology from a workspace must be `synthetic`: its figures are computed,
+  whatever platform it describes.
 - **Simulation only** (`docs/SECURITY.md`). `simulation` and `incidents`
-  perform no I/O. No real attacks, scans, cloud SDKs or credentials. No
+  perform no I/O; files are read by `workspace` alone, at start-up. No real attacks, scans, cloud SDKs or credentials. No
   outbound connection by default: integrations need server configuration and
   an explicit click, and accept loopback targets only unless allow-listed.
 - **Integrations** adapt only public repositories owned by `cleissonbarbosa`,
@@ -320,6 +349,7 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
 
 ## Further reading
 
-`docs/ARCHITECTURE.md` (model, API table, stream protocol), `docs/DESIGN.md`,
+`docs/ARCHITECTURE.md` (model, API table, stream protocol),
+`docs/WORKSPACE.md` (the file formats an operator writes), `docs/DESIGN.md`,
 `docs/SECURITY.md`, `docs/INTEGRATIONS.md`, `docs/PERFORMANCE.md`,
 `docs/DEMO.md`.

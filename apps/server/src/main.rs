@@ -1,9 +1,19 @@
 use std::net::SocketAddr;
+use std::path::Path;
 use std::process::ExitCode;
 
+use aegis_server::application::Assets;
 use aegis_server::config::Config;
-use aegis_server::{api, build_state};
+use aegis_server::{api, build_state, workspace};
 use tracing_subscriber::EnvFilter;
+
+const USAGE: &str = "\
+usage: aegis-server                          run the server
+       aegis-server export-workspace <dir>   write the bundled topologies, scenarios,
+                                             recordings and Cedar files into <dir>
+       aegis-server check-workspace <dir>    validate a workspace without starting
+       aegis-server healthcheck              probe the running server
+       aegis-server --version";
 
 async fn shutdown_signal() {
     let ctrl_c = async {
@@ -58,8 +68,138 @@ fn healthcheck(bind: SocketAddr) -> ExitCode {
     }
 }
 
+/// `aegis-server export-workspace <dir>`: the bundled fixtures as files an
+/// operator can edit and point `AEGIS_WORKSPACE` at.
+fn export_workspace(dir: &Path) -> ExitCode {
+    match workspace::export(dir) {
+        Ok(written) => {
+            for path in &written {
+                println!("{}", path.display());
+            }
+            println!(
+                "\n{} files written. Edit them, then start the server with AEGIS_WORKSPACE={}",
+                written.len(),
+                dir.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("aegis-server export-workspace: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `aegis-server check-workspace <dir>`: loads and compiles a workspace the
+/// way start-up would and says what it found, without serving anything.
+fn check_workspace(dir: &Path) -> ExitCode {
+    let loaded = match workspace::load(dir) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!("aegis-server check-workspace: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let scenario_ids: Vec<String> = loaded
+        .sources
+        .scenarios
+        .iter()
+        .map(|s| s.id.clone())
+        .collect();
+    let assets = match Assets::build(loaded.sources) {
+        Ok(assets) => assets,
+        Err(error) => {
+            eprintln!("aegis-server check-workspace: {}: {error}", dir.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let count = |n: usize, noun: &str| format!("{n} {noun}{}", if n == 1 { "" } else { "s" });
+    let list = |items: &[String]| {
+        if items.is_empty() {
+            "none".to_string()
+        } else {
+            items.join(", ")
+        }
+    };
+    println!("{}: valid", dir.display());
+    println!(
+        "  from the workspace: {}",
+        list(
+            &loaded
+                .replaced
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        )
+    );
+    if !loaded.ignored.is_empty() {
+        println!("  not read:");
+        for path in &loaded.ignored {
+            println!("    {}", path.display());
+        }
+    }
+    println!("  topologies ({}):", assets.worlds.len());
+    for (id, world) in &assets.worlds {
+        let summary = world.summary();
+        println!(
+            "    {id}: {}, {}, {}{}",
+            count(summary.node_count, "service"),
+            count(summary.edge_count, "connection"),
+            count(summary.region_count, "region"),
+            if *id == assets.default_topology {
+                " (opens at start-up)"
+            } else {
+                ""
+            }
+        );
+    }
+    println!(
+        "  scenarios ({}): {}",
+        scenario_ids.len(),
+        list(&scenario_ids)
+    );
+    let recordings: Vec<String> = assets.recordings.iter().map(|r| r.id.clone()).collect();
+    println!("  recordings ({}): {}", recordings.len(), list(&recordings));
+    println!(
+        "  policies: {}; baseline traffic denied by Cedar: {:.1} %",
+        assets.cedar.policies().len(),
+        assets.decisions.baseline_deny_fraction * 100.0
+    );
+    if !assets.unavailable.is_empty() {
+        println!("  scenarios that cannot run on a topology:");
+        for entry in &assets.unavailable {
+            println!(
+                "    {} on {}: {}",
+                entry.scenario, entry.topology, entry.reason
+            );
+        }
+    }
+    ExitCode::SUCCESS
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    // Commands that do not serve anything need no server configuration.
+    match args.as_slice() {
+        ["--version" | "-V"] => {
+            println!("aegis-server {}", env!("CARGO_PKG_VERSION"));
+            return ExitCode::SUCCESS;
+        }
+        ["--help" | "-h"] => {
+            println!("{USAGE}");
+            return ExitCode::SUCCESS;
+        }
+        ["export-workspace", dir] => return export_workspace(Path::new(dir)),
+        ["check-workspace", dir] => return check_workspace(Path::new(dir)),
+        [] | ["healthcheck"] => {}
+        _ => {
+            eprintln!("aegis-server: unexpected arguments\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    }
     let config = match Config::from_env() {
         Ok(config) => config,
         Err(error) => {
@@ -67,19 +207,8 @@ async fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match std::env::args().nth(1).as_deref() {
-        None => {}
-        Some("healthcheck") => return healthcheck(config.bind),
-        Some("--version" | "-V") => {
-            println!("aegis-server {}", env!("CARGO_PKG_VERSION"));
-            return ExitCode::SUCCESS;
-        }
-        Some(other) => {
-            eprintln!(
-                "aegis-server: unknown argument `{other}` (expected nothing or `healthcheck`)"
-            );
-            return ExitCode::from(2);
-        }
+    if args == ["healthcheck"] {
+        return healthcheck(config.bind);
     }
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -103,6 +232,7 @@ async fn main() -> ExitCode {
         topology = %world.topo.spec.id,
         nodes = world.topo.node_count(),
         edges = world.topo.edge_count(),
+        workspace = state.config.workspace.is_some(),
         cedar_agent_configured = state.config.integrations.cedar_agent.is_some(),
         rinha_configured = state.config.integrations.rinha.is_some(),
         "AEGIS server starting in demo mode"

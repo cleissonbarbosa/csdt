@@ -1,6 +1,7 @@
 //! Server configuration, read once from the environment.
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::integrations::{CedarAgentConfig, IntegrationConfig, RinhaConfig};
@@ -30,6 +31,9 @@ pub struct Config {
     pub allowed_origins: Vec<String>,
     pub seed: u64,
     pub log_filter: String,
+    /// Directory of the operator's own topologies, scenarios and policies.
+    /// Read once at start-up; unset means the bundled fixtures only.
+    pub workspace: Option<PathBuf>,
     pub integrations: IntegrationConfig,
 }
 
@@ -134,6 +138,7 @@ impl Config {
             allowed_origins,
             seed,
             log_filter: get("AEGIS_LOG").unwrap_or_else(|| "info".to_string()),
+            workspace: get("AEGIS_WORKSPACE").map(PathBuf::from),
             integrations: IntegrationConfig {
                 cedar_agent,
                 rinha,
@@ -170,13 +175,20 @@ mod tests {
             .contains(&"http://localhost:5173".to_string()));
         assert!(config.integrations.cedar_agent.is_none());
         assert!(config.integrations.rinha.is_none());
+        assert!(config.workspace.is_none(), "no file is read by default");
     }
 
     #[test]
     fn blank_values_count_as_unset() {
-        let config = config(&[("AEGIS_CEDAR_AGENT_URL", "   "), ("AEGIS_SEED", "")]).unwrap();
+        let config = config(&[
+            ("AEGIS_CEDAR_AGENT_URL", "   "),
+            ("AEGIS_SEED", ""),
+            ("AEGIS_WORKSPACE", " "),
+        ])
+        .unwrap();
         assert!(config.integrations.cedar_agent.is_none());
         assert_eq!(config.seed, 42);
+        assert!(config.workspace.is_none());
     }
 
     #[test]

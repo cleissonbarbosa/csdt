@@ -1,0 +1,55 @@
+[
+  {
+    "uid": {
+      "type": "Clerk",
+      "id": "ana"
+    },
+    "attrs": {
+      "shop": "north",
+      "manager": false
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Clerk",
+      "id": "bruno"
+    },
+    "attrs": {
+      "shop": "north",
+      "manager": true
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Clerk",
+      "id": "carla"
+    },
+    "attrs": {
+      "shop": "south",
+      "manager": true
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Receipt",
+      "id": "north-0412"
+    },
+    "attrs": {
+      "shop": "north"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Receipt",
+      "id": "south-0077"
+    },
+    "attrs": {
+      "shop": "south"
+    },
+    "parents": []
+  }
+]

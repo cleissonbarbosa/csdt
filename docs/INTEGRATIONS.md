@@ -94,7 +94,9 @@ same interface.
   Decisions are labelled `live`; the engine version is shown as "not reported"
   because the agent does not expose one.
 - Read-only by default. `AEGIS_CEDAR_AGENT_SYNC=true` additionally uploads the
-  synthetic fixtures on connect, which **replaces** the agent's stores.
+  policies and entities the embedded engine holds on connect (the synthetic
+  fixtures, or those of a [workspace](WORKSPACE.md)), which **replaces** the
+  agent's stores.
 - Per-policy toggling in the explorer is an embedded-engine feature: the
   agent's own store is authoritative, so the request is refused rather than
   silently evaluated differently.

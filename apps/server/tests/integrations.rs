@@ -295,6 +295,30 @@ async fn cedar_agent_sync_uploads_the_synthetic_fixtures() {
 }
 
 #[tokio::test]
+async fn cedar_agent_sync_uploads_what_the_embedded_engine_was_built_from() {
+    // With a workspace the embedded engine holds the operator's policies; a
+    // synced agent has to hold the same ones, not the bundled fixtures.
+    let engine = CedarEngine::new(
+        vec![PolicyDocument {
+            id: "only-one".into(),
+            description: "Stands in for a workspace policy.".into(),
+            content: "permit(principal, action, resource);".into(),
+        }],
+        serde_json::json!([]),
+    )
+    .unwrap();
+    let agent = Arc::new(AgentDouble::default());
+    let base = spawn_agent(Arc::clone(&agent)).await;
+    let provider =
+        provider(&base, None, true).with_store(engine.documents(), engine.entities_json().clone());
+    provider.connect().await.expect("connects");
+    let uploaded = agent.policies.lock().unwrap();
+    assert_eq!(uploaded.len(), 1);
+    assert_eq!(uploaded[0].id, "only-one");
+    assert_eq!(*agent.entities.lock().unwrap(), serde_json::json!([]));
+}
+
+#[tokio::test]
 async fn cedar_agent_decisions_match_the_embedded_engine_for_every_request_shape() {
     let agent = preloaded_agent(None);
     let base = spawn_agent(Arc::clone(&agent)).await;

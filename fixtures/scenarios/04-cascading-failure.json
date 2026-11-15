@@ -1,0 +1,200 @@
+{
+  "id": "cascading-failure",
+  "name": "Cascading Service Failure",
+  "summary": "The primary orders database degrades. Dependent services fail, queues back up, and circuit breakers finally stop the spread.",
+  "category": "resilience",
+  "severity": "critical",
+  "durationMs": 104000,
+  "rootCause": "role:primaryDatabase",
+  "targets": [
+    "role:primaryDatabase"
+  ],
+  "flows": [],
+  "phases": [
+    {
+      "name": "Latency creep",
+      "atMs": 0,
+      "rampMs": 8000,
+      "status": "active",
+      "description": "Storage latency on the primary database climbs steadily.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "role:primaryDatabase",
+          "factor": 6.0
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 6000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Database latency above objective",
+          "message": "Query latency on the primary orders database is several times its baseline.",
+          "nodes": [
+            "role:primaryDatabase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Connection exhaustion",
+      "atMs": 14000,
+      "rampMs": 8000,
+      "status": "active",
+      "description": "Slow queries exhaust connection pools. The database serves a fraction of its normal load and callers start timing out.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "role:primaryDatabase",
+          "factor": 14.0
+        },
+        {
+          "type": "capacity",
+          "nodes": "role:primaryDatabase",
+          "factor": 0.3
+        },
+        {
+          "type": "errorInject",
+          "nodes": "role:primaryDatabase",
+          "rate": 0.2
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 8000,
+          "severity": "critical",
+          "kind": "alert",
+          "title": "Dependent services failing",
+          "message": "Services that read or write orders are returning errors; queue consumers are falling behind.",
+          "nodes": [
+            "role:securityMonitor",
+            "role:primaryDatabase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Retry storm",
+      "atMs": 34000,
+      "rampMs": 6000,
+      "status": "active",
+      "description": "Callers retry failed queries, multiplying the load on an already degraded database.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "role:primaryDatabase",
+          "factor": 20.0
+        },
+        {
+          "type": "capacity",
+          "nodes": "role:primaryDatabase",
+          "factor": 0.12
+        },
+        {
+          "type": "errorInject",
+          "nodes": "role:primaryDatabase",
+          "rate": 0.55
+        },
+        {
+          "type": "edgeWeight",
+          "edges": {
+            "inboundSync": "role:primaryDatabase"
+          },
+          "factor": 1.8
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Circuit breakers open",
+      "atMs": 52000,
+      "rampMs": 4000,
+      "status": "mitigating",
+      "description": "Callers stop sending queries and fail fast, giving the database room to recover.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "role:primaryDatabase",
+          "factor": 4.0
+        },
+        {
+          "type": "capacity",
+          "nodes": "role:primaryDatabase",
+          "factor": 0.35
+        },
+        {
+          "type": "errorInject",
+          "nodes": "role:primaryDatabase",
+          "rate": 0.25
+        },
+        {
+          "type": "edgeWeight",
+          "edges": {
+            "inboundSync": "role:primaryDatabase"
+          },
+          "factor": 0.2
+        },
+        {
+          "type": "edgeError",
+          "edges": {
+            "inboundSync": "role:primaryDatabase"
+          },
+          "rate": 0.6
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Circuit breakers opened",
+          "message": "Callers of the orders database are failing fast instead of queueing requests.",
+          "nodes": [
+            "role:primaryDatabase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Replica promoted",
+      "atMs": 66000,
+      "rampMs": 8000,
+      "status": "recovering",
+      "description": "A healthy replica takes over as primary; breakers close gradually.",
+      "effects": [
+        {
+          "type": "latency",
+          "nodes": "role:primaryDatabase",
+          "factor": 1.3
+        },
+        {
+          "type": "capacity",
+          "nodes": "role:primaryDatabase",
+          "factor": 0.85
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Replica promoted to primary",
+          "message": "A replica of the orders database was promoted and is serving traffic.",
+          "nodes": [
+            "role:primaryDatabase"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Backlog drain",
+      "atMs": 84000,
+      "rampMs": 6000,
+      "status": "recovering",
+      "description": "Queue consumers work through the accumulated backlog.",
+      "effects": [],
+      "events": []
+    }
+  ]
+}

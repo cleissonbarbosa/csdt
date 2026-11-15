@@ -154,6 +154,19 @@ restores topology, metrics, health and incident state exactly; replay
 re-simulates recorded history bit for bit. Prerecorded incidents load as a
 seed plus a command list.
 
+**Your own platform**
+
+A workspace directory replaces the bundled platform, incidents and policies
+with yours, without recompiling: topologies and scenarios as JSON files, Cedar
+policies as JSON or in Cedar's own syntax, an optional Cedar schema they must
+validate against. `aegis-server export-workspace` writes the bundled set out as
+a starting point and `check-workspace` validates a directory and says why a
+scenario cannot run on a topology. Replace only the policies and the same
+platform shows what the new set permits and denies. It is still a simulation:
+the figures on your topology are computed, and labelled synthetic. See
+[docs/WORKSPACE.md](docs/WORKSPACE.md) and the six-service
+[example](examples/corner-shop).
+
 **Signals with their range**
 
 Traffic, latency, error rate and saturation, each drawn on a scale with its
@@ -221,6 +234,13 @@ pnpm dev:web                            # UI on http://localhost:5173
 
 Then follow the five-minute tour in [docs/DEMO.md](docs/DEMO.md).
 
+To run it on a platform of your own:
+
+```bash
+cargo run -p aegis-server -- check-workspace examples/corner-shop
+AEGIS_WORKSPACE=examples/corner-shop cargo run --release -p aegis-server
+```
+
 | Key              | Action                           | Key          | Action              |
 | ---------------- | -------------------------------- | ------------ | ------------------- |
 | <kbd>Space</kbd> | Play / pause                     | <kbd>/</kbd> | Search services     |
@@ -259,6 +279,7 @@ flowchart LR
 | `authorization`      | Embedded Cedar policy decision point.                                            |
 | `integrations`       | Adapters for local instances and fixture parsers, behind a target guard.         |
 | `application`        | Use cases; owns the single mutable timeline.                                     |
+| `workspace`          | Reads an operator's topologies, scenarios and policies from a directory, once.   |
 | `api`                | HTTP and WebSocket shell: validation, limits, error mapping.                     |
 | `packages/contracts` | The same contract as zod schemas, verified against real server output.           |
 | `apps/web`           | Rendering engine, interface, stores, provider.                                   |
@@ -345,6 +366,9 @@ Method, raw data and caveats: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
   targets only.
 - **Provenance everywhere.** Synthetic, recorded and live data are labelled
   from the server to the pixel.
+- **Your files, read once.** A workspace is read from one directory before
+  the server listens. No route uploads or reloads files, and a scenario file
+  can only change numbers inside the model.
 - **Hardened edges.** Typed input validation, per-client rate limits,
   origin-checked WebSockets, bounded buffers and history, strict CSP,
   distroless non-root containers with read-only filesystems.
@@ -357,19 +381,19 @@ access control. Full detail in [docs/SECURITY.md](docs/SECURITY.md).
 ## Tests
 
 ```bash
-cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters
+cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters, workspaces
 pnpm test                   # contracts, stores, layout, stream client, interface
 pnpm e2e                    # Playwright against the real stack
 ```
 
 | Suite      | Tests | Covers                                                                                                                                                                                                                         |
 | ---------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Rust       |   115 | Flow model, determinism and replay, scenarios, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters                                                                                                     |
+| Rust       |   141 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces                                                                   |
 | Contracts  |    28 | Every zod schema against samples exported by the server binary                                                                                                                                                                 |
-| Web        |   231 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                         |
+| Web        |   232 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                                         |
 | End to end |    11 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, no-GPU fallback |
 
-All 385 pass locally. The end-to-end suite runs the real server and a production
+All 412 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
@@ -385,7 +409,9 @@ apps/server         Rust backend (domain · simulation · incidents · authoriza
                     · integrations · application · api)
 apps/web            React client (graphics · features · stores · providers)
 packages/contracts  Shared contract: zod schemas + samples exported by the server
-fixtures            Topology, Cedar policies and entities, recordings, fixtures
+fixtures            The bundled topology, scenarios, recordings and Cedar files, laid
+                    out as a workspace; fixtures for the integrations
+examples            A small workspace to copy from
 docs                Design, architecture, integrations, security, performance, demo
 scripts             Screenshot and benchmark runners
 ```
@@ -396,7 +422,8 @@ scripts             Screenshot and benchmark runners
   backend.
 - Generic OpenTelemetry provider (OTLP traces → topology and edge metrics).
 - Merge live probe data into the scene as its own clearly-labelled region.
-- Topology and scenario editors; import a topology from a file.
+- Topology and scenario editors in the interface (files are already read
+  from a [workspace](docs/WORKSPACE.md)).
 - True orthographic projection as an option, with its own picking and zoom.
 - Persist timelines to disk and share them as replayable files.
 

@@ -1,0 +1,170 @@
+{
+  "id": "receipt-snooping",
+  "name": "Receipt snooping",
+  "summary": "A clerk of one shop keeps asking for another shop's receipts. Cedar denies every request.",
+  "category": "authorization",
+  "severity": "warning",
+  "durationMs": 36000,
+  "rootCause": "role:primaryAuthorizer",
+  "targets": ["role:primaryGateway", "role:primaryAuthorizer", "role:resource:Receipt"],
+  "flows": [
+    {
+      "id": "own-receipts",
+      "label": "Ana · own shop",
+      "suspicious": false,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:resource:Receipt",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "ana-reads-north",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    },
+    {
+      "id": "other-receipts",
+      "label": "Ana · another shop",
+      "suspicious": true,
+      "hops": [
+        {
+          "from": "role:partnerClient",
+          "to": "role:primaryGateway"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuth"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:primaryAuthorizer"
+        },
+        {
+          "from": "role:primaryGateway",
+          "to": "role:resource:Receipt",
+          "via": "path"
+        }
+      ],
+      "spill": false,
+      "authz": {
+        "request": "ana-reads-south",
+        "authorizer": "role:primaryAuthorizer"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "name": "Ordinary work",
+      "atMs": 0,
+      "rampMs": 2000,
+      "status": "active",
+      "description": "Ana looks up receipts of her own shop. Cedar permits it.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "own-receipts",
+          "rate": {
+            "rps": 12.0
+          }
+        }
+      ],
+      "events": []
+    },
+    {
+      "name": "Snooping",
+      "atMs": 8000,
+      "rampMs": 3000,
+      "status": "active",
+      "description": "She starts asking for the other shop's receipts as well. Authentication succeeds; Cedar denies the read.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "own-receipts",
+          "rate": {
+            "rps": 12.0
+          }
+        },
+        {
+          "type": "flowRate",
+          "flow": "other-receipts",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.15
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 4000,
+          "severity": "warning",
+          "kind": "alert",
+          "title": "Requests for another shop's receipts",
+          "message": "An authenticated clerk is asking for receipts that are not her shop's.",
+          "nodes": ["role:primaryAuthorizer", "role:resource:Receipt"]
+        }
+      ]
+    },
+    {
+      "name": "Badge suspended",
+      "atMs": 22000,
+      "rampMs": 2000,
+      "status": "mitigating",
+      "description": "Her badge is suspended; the requests now stop at the badge reader.",
+      "effects": [
+        {
+          "type": "flowRate",
+          "flow": "other-receipts",
+          "rate": {
+            "ofCapacity": {
+              "node": "role:primaryAuthorizer",
+              "factor": 0.15
+            }
+          }
+        },
+        {
+          "type": "flowReject",
+          "flow": "other-receipts",
+          "at": "role:primaryAuth",
+          "fraction": 1.0,
+          "reason": "session-revoked"
+        }
+      ],
+      "events": [
+        {
+          "delayMs": 0,
+          "severity": "notice",
+          "kind": "mitigation",
+          "title": "Badge suspended",
+          "message": "The badge reader no longer accepts her badge.",
+          "nodes": ["role:primaryAuth"]
+        }
+      ]
+    },
+    {
+      "name": "Recovery",
+      "atMs": 30000,
+      "rampMs": 3000,
+      "status": "recovering",
+      "description": "The requests stop.",
+      "effects": [],
+      "events": []
+    }
+  ]
+}

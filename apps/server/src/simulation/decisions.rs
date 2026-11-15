@@ -15,7 +15,7 @@ use crate::domain::{
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestTemplate {
     pub id: String,
     #[serde(default)]
