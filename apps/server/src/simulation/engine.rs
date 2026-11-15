@@ -1114,8 +1114,8 @@ pub fn step(ctx: &StepContext, state: &mut SimState, commands: &[Command]) -> Ve
     // Everything unhealthy while an incident is active counts as impacted.
     if let Some(rt) = state.scenario.as_ref() {
         let incident = &mut state.incidents[rt.incident];
-        for node in 0..topo.node_count() {
-            if state.health[node] == Health::Healthy {
+        for (node, health) in state.health.iter().enumerate().take(topo.node_count()) {
+            if *health == Health::Healthy {
                 continue;
             }
             let id = topo.node_id(node);

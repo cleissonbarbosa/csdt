@@ -4,12 +4,6 @@ Everything on this page was measured on the hardware and software listed
 below, with the commands shown. Nothing is estimated. Where a figure does
 **not** answer the question you might expect it to, that is said next to it.
 
-> **Which build.** These figures are from the production build made on
-> 2026-11-15 at 03:45 UTC, when the service pieces were still generated
-> procedurally. They have since been replaced by modelled pieces
-> (`apps/web/src/graphics/pieces.glb`) with a different triangle count. The
-> tables below have not been re-measured on that build yet.
-
 ## Test conditions
 
 |          |                                                                                               |
@@ -20,7 +14,7 @@ below, with the commands shown. Nothing is estimated. Where a figure does
 | OS       | Ubuntu 24.04.5 LTS, Linux 7.0                                                                 |
 | Browser  | Chrome 157.0.8103.78 (headless, offscreen), ANGLE on Vulkan                                   |
 | Viewport | 1920 × 1080 at device pixel ratio 1                                                           |
-| Build    | production (`vite build`) made 2026-11-15 03:45 UTC, served by `vite preview`; release server |
+| Build    | production (`vite build`) made 2026-11-15 04:26 UTC, served by `vite preview`; release server |
 | Settings | quality **ultra**, light theme, camera drifting so every frame is a full redraw               |
 | Method   | 4 s warm-up, then every `requestAnimationFrame` interval for 12 s                             |
 
@@ -41,23 +35,23 @@ Frames produced with the frame-rate limit and vsync disabled
 frames is the time it takes to produce one. The interface is on screen here
 too.
 
-| Scene                    | Services / connections | Backend | Mean frame |     p95 |     p99 | Frames/s | Draw calls | Triangles | Beads shown |
-| ------------------------ | ---------------------: | ------- | ---------: | ------: | ------: | -------: | ---------: | --------: | ----------: |
-| Helios · steady state    |                51 / 75 | WebGPU  |    1.90 ms |  2.6 ms |  4.1 ms |      527 |         29 |    54,525 |       2,372 |
-| Helios · DDoS surge      |                51 / 75 | WebGPU  |    1.92 ms |  2.7 ms |  4.4 ms |      520 |         29 |    54,523 |       2,972 |
-| Stress · steady state    |              178 / 648 | WebGPU  |    1.93 ms |  2.5 ms |  4.5 ms |      519 |         35 |   150,225 |       2,146 |
-| Stress · regional outage |              178 / 648 | WebGPU  |    2.07 ms |  3.1 ms |  6.2 ms |      483 |         35 |   150,225 |       1,979 |
-| Helios · steady state    |                51 / 75 | WebGL 2 |    6.98 ms |  8.3 ms |  9.4 ms |      143 |         29 |    54,523 |       2,383 |
-| Helios · DDoS surge      |                51 / 75 | WebGL 2 |    6.98 ms |  8.3 ms | 10.0 ms |      143 |         29 |    54,523 |       2,972 |
-| Stress · steady state    |              178 / 648 | WebGL 2 |    7.17 ms |  9.0 ms | 13.3 ms |      140 |         35 |   150,225 |       2,141 |
-| Stress · regional outage |              178 / 648 | WebGL 2 |    7.36 ms | 10.4 ms | 14.7 ms |      136 |         35 |   150,225 |       1,979 |
+| Scene                    | Services / connections | Backend | Mean frame |    p95 |     p99 | Frames/s | Draw calls | Triangles | Beads shown |
+| ------------------------ | ---------------------: | ------- | ---------: | -----: | ------: | -------: | ---------: | --------: | ----------: |
+| Helios · steady state    |                51 / 75 | WebGPU  |    1.71 ms | 2.1 ms |  2.7 ms |      584 |         29 |    77,033 |       2,368 |
+| Helios · DDoS surge      |                51 / 75 | WebGPU  |    1.95 ms | 2.6 ms |  4.0 ms |      513 |         29 |    77,031 |       2,972 |
+| Stress · steady state    |              178 / 648 | WebGPU  |    1.85 ms | 2.4 ms |  3.4 ms |      542 |         35 |   252,625 |       2,141 |
+| Stress · regional outage |              178 / 648 | WebGPU  |    1.93 ms | 2.7 ms |  4.5 ms |      518 |         35 |   252,625 |       1,979 |
+| Helios · steady state    |                51 / 75 | WebGL 2 |    7.05 ms | 8.1 ms |  8.9 ms |      142 |         29 |    77,031 |       2,384 |
+| Helios · DDoS surge      |                51 / 75 | WebGL 2 |    7.32 ms | 8.8 ms | 10.5 ms |      137 |         29 |    77,029 |       2,978 |
+| Stress · steady state    |              178 / 648 | WebGL 2 |    7.48 ms | 9.0 ms | 10.3 ms |      134 |         35 |   252,625 |       2,141 |
+| Stress · regional outage |              178 / 648 | WebGL 2 |    8.05 ms | 9.8 ms | 11.9 ms |      124 |         35 |   252,625 |       1,979 |
 
 **What this shows**
 
-- **WebGPU:** 2.0 ms per frame on average, worst p99
-  6.2 ms, across all four scenes (483–527 frames/s).
-- **WebGL 2:** 7.1 ms per frame on average, worst p99 14.7 ms
-  (136–143 frames/s), running the same TSL materials.
+- **WebGPU:** 1.9 ms per frame on average, worst p99
+  4.5 ms, across all four scenes (513–584 frames/s).
+- **WebGL 2:** 7.5 ms per frame on average, worst p99 11.9 ms
+  (124–142 frames/s), running the same TSL materials.
 - A 60 Hz display allows 16.7 ms per frame. Both backends produce a 1080p
   frame inside that budget with room to spare on this GPU.
 - **Scale barely matters.** Going from 51 services and 75 connections to 178
@@ -71,31 +65,22 @@ too.
 
 The same scenes with Chrome's default frame pacing: `requestAnimationFrame`
 is throttled to the 60 Hz the compositor asks for, and every frame has to
-composite the 3D canvas together with the panels, charts and timeline.
+composite the 3D canvas together with the interface drawn over it. The page
+is in its default state: the model, the top bar and the timeline strip.
 
 | Scene                    | Services / connections | Backend | Mean frame |     p95 |     p99 | Frames/s | Draw calls | Triangles | Beads shown |
 | ------------------------ | ---------------------: | ------- | ---------: | ------: | ------: | -------: | ---------: | --------: | ----------: |
-| Helios · steady state    |                51 / 75 | WebGPU  |   16.67 ms | 16.7 ms | 16.8 ms |       60 |         29 |    54,523 |       2,383 |
-| Helios · DDoS surge      |                51 / 75 | WebGPU  |   16.66 ms | 16.7 ms | 16.8 ms |       60 |         29 |    54,523 |       2,972 |
-| Stress · steady state    |              178 / 648 | WebGPU  |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   150,225 |       2,141 |
-| Stress · regional outage |              178 / 648 | WebGPU  |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   150,225 |       1,979 |
-| Helios · steady state    |                51 / 75 | WebGL 2 |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         29 |    54,523 |       2,383 |
-| Helios · DDoS surge      |                51 / 75 | WebGL 2 |   16.65 ms | 16.8 ms | 16.8 ms |       60 |         29 |    54,523 |       2,972 |
-| Stress · steady state    |              178 / 648 | WebGL 2 |   18.06 ms | 33.3 ms | 49.9 ms |       55 |         35 |   150,225 |       2,141 |
-| Stress · regional outage |              178 / 648 | WebGL 2 |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   150,225 |       1,979 |
+| Helios · steady state    |                51 / 75 | WebGPU  |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         29 |    77,033 |       2,369 |
+| Helios · DDoS surge      |                51 / 75 | WebGPU  |   16.66 ms | 16.7 ms | 16.8 ms |       60 |         29 |    77,031 |       2,972 |
+| Stress · steady state    |              178 / 648 | WebGPU  |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   252,625 |       2,146 |
+| Stress · regional outage |              178 / 648 | WebGPU  |   16.66 ms | 16.7 ms | 16.8 ms |       60 |         35 |   252,625 |       1,979 |
+| Helios · steady state    |                51 / 75 | WebGL 2 |   16.66 ms | 16.7 ms | 16.8 ms |       60 |         29 |    77,031 |       2,384 |
+| Helios · DDoS surge      |                51 / 75 | WebGL 2 |   16.66 ms | 16.8 ms | 16.8 ms |       60 |         29 |    77,031 |       2,973 |
+| Stress · steady state    |              178 / 648 | WebGL 2 |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   252,625 |       2,141 |
+| Stress · regional outage |              178 / 648 | WebGL 2 |   16.65 ms | 16.7 ms | 16.8 ms |       60 |         35 |   252,625 |       1,979 |
 
-7 of the 8 cases held 60.0–60.1 frames/s with a p95 interval of 16.8 ms or
-less.
-
-The exception was the stress topology at rest on WebGL 2: 55.4 frames/s, with
-7.1 % of intervals longer than one refresh period and 1.5 % longer than two.
-The same scene costs 7.2 ms a frame in the table above, well inside the
-budget, so this was not the scene running out of time. In a second complete
-run ([`assets/benchmark-2026-11-15-run2.json`](assets/benchmark-2026-11-15-run2.json))
-the same case held 60.0 frames/s with a p95 of 16.7 ms. Other software was
-running on the machine during both runs, more of it during the second, which
-is why the first is the one tabulated; the dip is reported rather than
-explained.
+Every scene held 60.0–60.1 frames/s on both backends, with a worst p95
+interval of 16.8 ms.
 
 **What this does not show**
 
@@ -147,11 +132,15 @@ geometry, material and texture.
 | -------------- | -----: | --------------------------------------------------------- |
 | GPU geometries |     20 | 20 every time                                             |
 | GPU textures   |      4 | 4 every time                                              |
-| JS heap (MB)   |     15 | 17 · 16 · 18 · 18 · 18 · 18 · 18 · 20 · 18 · 20 · 18 · 20 |
+| JS heap (MB)   |     15 | 15 · 15 · 16 · 15 · 16 · 16 · 16 · 16 · 16 · 16 · 17 · 16 |
 
 GPU resource counts return to exactly the same values after every rebuild:
-nothing is leaked. The heap alternates with the size of the loaded topology
-(15.3–20.2 MB) without trending upward.
+nothing is leaked on the GPU. The JS heap alternates with the size of the
+loaded topology and, underneath that, rose from 15.0 to 16.1 MB over the
+twelve rebuilds: about 0.1 MB per rebuild, flattening towards the end. The
+application's own history buffers are bounded and still filling during a run
+this short, which would account for growth of that size, but that was not
+isolated, and twelve rebuilds are too few to rule out a slow leak.
 
 **Repeated playback.** A recorded incident was loaded and the timeline was
 sought to six different points per round, for six rounds (36 seeks),
@@ -159,10 +148,11 @@ at 4× speed.
 
 |                | Start | After each round                        |
 | -------------- | ----: | --------------------------------------- |
-| JS heap (MB)   |  19.9 | 17.7 · 18.0 · 18.1 · 18.2 · 18.3 · 18.3 |
+| JS heap (MB)   |  16.2 | 16.4 · 16.6 · 16.7 · 16.8 · 16.9 · 17.0 |
 | GPU geometries |    20 | 20 every time                           |
 
-The heap settles within about a megabyte of where it started.
+The heap rose from 16.2 to 17.0 MB over the 36 seeks, by a little less each
+round. The same caveat applies.
 
 ## Simulation engine
 
@@ -188,8 +178,8 @@ density and the distance at which labels are shown.
 
 This was observed on the measured build with software rendering (SwiftShader
 WebGL 2, 1280 × 720, quality on auto): the scene started on `high`, stepped to
-`medium` after about 16 s and to `low` after about 20 s, and stayed there.
-Software rasterisation remained slow at every tier, around 7 to 8 frames/s,
+`medium` after about 12 s and to `low` after about 20 s, and stayed there.
+Software rasterisation remained slow at every tier, around 7 frames/s,
 so the controller lowers the cost of a frame but cannot make a machine
 without a GPU fast.
 
@@ -200,25 +190,25 @@ by an end-to-end test.
 
 ## How the scene stays cheap
 
-| Technique                                                                                                                                         | Where                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| GPU instancing: one draw per service type, one for all connections, one for all beads, one for all labels, one for everything lying on the plates | `graphics/SceneController.ts`                    |
-| Stateless beads: animation is a function of `time` and four seeds, evaluated in the vertex shader                                                 | `graphics/materials.ts`                          |
-| Per-connection data texture: the CPU updates one small float texture, never per-bead buffers                                                      | `createParticleMaterial`                         |
-| Text atlas: every label drawn once to a canvas, rendered as instanced billboards                                                                  | `graphics/labels.ts`                             |
-| No post-processing and no lights: materials shade themselves, one pass per frame                                                                  | `graphics/materials.ts`                          |
-| Level of detail: labels fade with distance; quality tiers scale bead density and resolution                                                       | `graphics/quality.ts`                            |
-| No React in the frame loop: stores are read through subscriptions, lists throttle to 1 Hz                                                         | `features/scene/SceneCanvas.tsx`, `app/hooks.ts` |
-| Columnar snapshots: struct-of-arrays on the wire, copied straight into typed arrays                                                               | `domain/telemetry.rs`                            |
-| Serialise once, fan out: each stream message is encoded one time for all subscribers                                                              | `application/service.rs`                         |
+| Technique                                                                                                                                                                                     | Where                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| GPU instancing: one draw per service type (modelled pieces, one shared geometry each), one for all connections, one for all beads, one for all labels, one for everything lying on the plates | `graphics/SceneController.ts`                    |
+| Stateless beads: animation is a function of `time` and four seeds, evaluated in the vertex shader                                                                                             | `graphics/materials.ts`                          |
+| Per-connection data texture: the CPU updates one small float texture, never per-bead buffers                                                                                                  | `createParticleMaterial`                         |
+| Text atlas: every label drawn once to a canvas, rendered as instanced billboards                                                                                                              | `graphics/labels.ts`                             |
+| No post-processing and no lights: materials shade themselves, one pass per frame                                                                                                              | `graphics/materials.ts`                          |
+| Level of detail: labels fade with distance; quality tiers scale bead density and resolution                                                                                                   | `graphics/quality.ts`                            |
+| No React in the frame loop: stores are read through subscriptions, lists throttle to 1 Hz                                                                                                     | `features/scene/SceneCanvas.tsx`, `app/hooks.ts` |
+| Columnar snapshots: struct-of-arrays on the wire, copied straight into typed arrays                                                                                                           | `domain/telemetry.rs`                            |
+| Serialise once, fan out: each stream message is encoded one time for all subscribers                                                                                                          | `application/service.rs`                         |
 
 ## Test suite timings
 
 Wall-clock on the same machine.
 
-| Suite                                                                                              | Tests |       Time |
-| -------------------------------------------------------------------------------------------------- | ----: | ---------: |
-| Rust: engine, timeline, Cedar, API, stream, adapters (`cargo test --workspace`, warm build)        |   115 |        6 s |
-| Contracts and web: schemas, palette rules, layout, stores, stream client, components (`pnpm test`) |   150 |       13 s |
-| End to end on software WebGL 2, plus the no-GPU fallback (`pnpm e2e`)                              |    11 | 3 min 40 s |
-| End to end on WebGPU, real GPU (`AEGIS_E2E_GPU=1`, project `chrome-webgpu`)                        |    10 |       34 s |
+| Suite                                                                                              | Tests |      Time |
+| -------------------------------------------------------------------------------------------------- | ----: | --------: |
+| Rust: engine, timeline, Cedar, API, stream, adapters (`cargo test --workspace`, warm build)        |   115 |       6 s |
+| Contracts and web: schemas, palette rules, layout, stores, stream client, components (`pnpm test`) |   183 |      14 s |
+| End to end on software WebGL 2, plus the no-GPU fallback (`pnpm e2e`)                              |    11 | 4 min 2 s |
+| End to end on WebGPU, real GPU (`AEGIS_E2E_GPU=1`, project `chrome-webgpu`)                        |    10 |      35 s |

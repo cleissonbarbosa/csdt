@@ -118,6 +118,46 @@ Arrivals share one curve (fast out of the gate, a long settle) and journeys
 between two places another, so the motion has one hand. Reduced-motion
 preferences, the system's or the application's own, switch all of it off.
 
+## The arrangement
+
+Where a piece stands is the first thing the model says about it, before its
+shape and long before its name. The two arrangements
+([`graphics/layout.ts`](../apps/web/src/graphics/layout.ts)) follow the same
+few decisions.
+
+**A tier is a line, and space is what draws it.** The services of one tier
+stand in a straight line. Two tiers are about twice as far apart as two
+neighbours within a tier, so the lines can be read without a rule, a band or
+a caption being drawn to mark them. Within a line, pieces of a kind stand
+together, and among those each stands nearest to what it is connected to in
+the lines before it, so connections cross no more than they have to.
+
+**A plate is as large as what stands on it.** A region of twenty-three
+services has a larger plate than one of eight, which is itself information,
+and no plate carries table it does not use.
+
+**Nothing stands over anything else.** The edge is a low plinth, one step
+above the regions and beside them, not a deck above them: a plate that
+covers another hides whatever stands under its rim.
+
+**The model faces the viewer.** The first region is turned toward the
+opening shot, so its lines run straight across the picture, and the clients
+on the hub keep off the line of sight through the router, where one would
+hide behind it.
+
+**A name stands off the rim.** A plate's name is hung from a point just
+outside the plate, on the side that faces away from the rest of the model,
+whichever way that is on screen as the camera turns. It never lies across
+the plate it names, and the opening shot is framed to include it.
+
+By region, the model is a hub and its spokes: the edge at the centre, each
+region a round plate beside it with its gateway at the hub's side and its
+tiers running outward, so requests travel away from the centre everywhere.
+By dependency, it is a set of swimlanes: tiers are columns from left to
+right, each region is a lane across them, and a tier lines up between
+regions. A lane is a plate like any other, so it takes its region's state
+colour and goes dark with it.
+
 ## Tokens
 
 Defined in [`apps/web/src/index.css`](../apps/web/src/index.css) for the
@@ -176,8 +216,16 @@ Text is set in sentence case throughout.
   certain density. The bead budget is about a third of what the glowing
   version drew, which keeps single beads discernible on the busiest
   connection. Density still follows request rate.
-- **No labels at overview distance in the dependency layout.** Names appear
-  as the camera approaches; the explorer and the table view list everything.
+- **No service names at overview distance.** At that distance only the
+  plates are named. Service names appear as the camera approaches; the
+  explorer and the table view list everything.
+- **A round plate for a region that is not round.** A small region with a
+  long chain of tiers gets a plate wider than its lines need, because a
+  circle is as wide as it is deep. The plates stay round by region so that
+  the two arrangements can be told apart at a glance.
+- **The edge is not the tallest thing.** A high deck made the edge the
+  obvious centre, and hid the gateways of the regions behind it. One step
+  up is enough to mark it, and its position does the rest.
 - **Two weights of type.** Hierarchy has to come from size, position and
   weight, with no medium or semibold to hide behind.
 - **The pieces are a file.** They are built in Blender by

@@ -12,7 +12,7 @@
  *
  *   pieces        one instanced mesh per service type (≤ 12)
  *   ground marks  1      connections  1      beads  1      labels  1
- *   plates        one per region, plus what they rest on
+ *   plates        one per region, its shadow, and the plinth under the hub
  *
  * Snapshots set targets; the controller eases displayed values toward them
  * every frame, so the scene moves continuously between 5 Hz updates.
@@ -43,7 +43,10 @@ import {
   computeLayout,
   curveLength,
   edgeControl,
+  hang,
+  nameAnchor,
   nodePosition,
+  VIEW,
   type LayoutMode,
   type SceneLayout,
   type Vec3,
@@ -62,6 +65,7 @@ import {
   createSupportMaterial,
   createTracerMaterial,
   EDGE_ROWS,
+  SHADOW_REACH,
   type EdgeUniforms,
   type LabelUniforms,
   type ParticleUniforms,
@@ -142,6 +146,8 @@ const NODE_LABEL_PX = 19;
 const REGION_LABEL_PX = 27;
 /** Thickness of a region plate, and so the height of the table below it. */
 const PLATE_THICKNESS = 0.6;
+/** How far the plinth under a raised plate stands back from its rim. */
+const PLINTH_INSET = 0.55;
 /** Relationship → particle kind understood by the particle shader. */
 const KIND: Record<Relationship, number> = {
   route: 0,
@@ -171,6 +177,9 @@ const easeOutCubic = (x: number) => 1 - (1 - x) ** 3;
 const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
 /** Ease out with a small overshoot: a piece settling where it was put. */
 const easeOutBack = (x: number) => 1 + 2.4 * (x - 1) ** 3 + 1.4 * (x - 1) ** 2;
+
+/** A plate's name is drawn at a fixed size; this is about how wide it comes out. */
+const nameWidth = (name: string) => 12 * name.length + 8;
 
 function hex(color: string): Vec3 {
   const c = new THREE.Color(color);
@@ -376,7 +385,11 @@ export class SceneController {
   private particleData: THREE.DataTexture | null = null;
   private particleUniforms: ParticleUniforms | null = null;
   private particleCapacity = 0;
-  private labelAttr: { fx: THREE.InstancedBufferAttribute } | null = null;
+  private labelAttr: {
+    fx: THREE.InstancedBufferAttribute;
+    align: THREE.InstancedBufferAttribute;
+    size: THREE.InstancedBufferAttribute;
+  } | null = null;
   private labelUniforms: LabelUniforms | null = null;
   private labelMesh: THREE.Mesh | null = null;
   private plates: {
@@ -387,7 +400,7 @@ export class SceneController {
     off: number;
   }[] = [];
   /** Everything that belongs to one plate, so it can open as one thing. */
-  private bases: { group: THREE.Group; delay: number; board: boolean; label: number }[] = [];
+  private bases: { group: THREE.Group; delay: number; slab: boolean; label: number }[] = [];
   private stems: { mesh: THREE.InstancedMesh; nodes: number[] } | null = null;
   /** Height of the top of each service type's geometry, at unit scale. */
   private typeTop: number[] = [];
@@ -582,14 +595,18 @@ export class SceneController {
     this.labelMesh = null;
   }
 
-  /** Plates, the board, and what they rest on and cast onto. */
+  /** The plates, the shadows they cast on the table and the plinth under the hub. */
   private buildBase(layout: SceneLayout): void {
     const theme = this.theme;
     const table = -PLATE_THICKNESS;
     const disc = this.track(new THREE.CylinderGeometry(1, 1, 1, 96).translate(0, -0.5, 0));
+    const slab = this.track(new THREE.BoxGeometry(1, 1, 1).translate(0, -0.5, 0));
     const blob = this.track(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2));
-    const tableShadow = this.track(createCastShadowMaterial(theme, true, 0.55));
-    const raisedShadow = this.track(createCastShadowMaterial(theme, true, 0.4));
+    const shadows = {
+      disc: this.track(createCastShadowMaterial(theme, true, 0.55)),
+      slab: this.track(createCastShadowMaterial(theme, false, 0.55)),
+    };
+    const support = this.track(createSupportMaterial(theme));
 
     layout.regions.forEach((region, k) => {
       // Children are placed relative to the plate's axis, so the group can
@@ -597,50 +614,42 @@ export class SceneController {
       const group = new THREE.Group();
       group.position.set(region.center[0], 0, region.center[2]);
       this.world.add(group);
-      this.bases.push({ group, delay: 0, board: false, label: k });
+      const round = region.shape === 'disc';
+      this.bases.push({ group, delay: 0, slab: !round, label: k });
 
-      const { material, uniforms } = createPlateMaterial(theme, true);
+      const { material, uniforms } = createPlateMaterial(theme, round);
       this.track(material);
-      const plate = new THREE.Mesh(disc, material);
+      const plate = new THREE.Mesh(round ? disc : slab, material);
       plate.position.set(0, region.center[1], 0);
-      plate.scale.set(region.radius, PLATE_THICKNESS, region.radius);
+      if (round) plate.scale.set(region.radius, PLATE_THICKNESS, region.radius);
+      else plate.scale.set(region.halfWidth * 2, PLATE_THICKNESS, region.halfDepth * 2);
       group.add(plate);
       this.plates.push({ uniforms, regionId: region.id, health: 0, alarm: 0, off: 0 });
 
-      const raised = region.center[1] > 0.5;
-      const shadow = new THREE.Mesh(blob, raised ? raisedShadow : tableShadow);
-      // A raised plate throws its shadow onto the plates below it.
-      shadow.position.set(0, raised ? 0.02 : table + 0.01, 0);
-      shadow.scale.setScalar(region.radius * (raised ? 1.02 : 1.14));
-      shadow.renderOrder = raised ? 1 : -1;
-      group.add(shadow);
-
-      if (raised) {
-        const column = new THREE.Mesh(disc, this.track(createSupportMaterial(theme)));
-        column.position.set(0, region.center[1] - PLATE_THICKNESS, 0);
-        column.scale.set(1.5, region.center[1] - PLATE_THICKNESS - table, 1.5);
-        group.add(column);
-      }
-    });
-
-    if (layout.board) {
-      const { center, halfWidth, halfDepth } = layout.board;
-      const group = new THREE.Group();
-      group.position.set(center[0], 0, center[2]);
-      this.world.add(group);
-      this.bases.push({ group, delay: 0, board: true, label: -1 });
-      const slab = this.track(new THREE.BoxGeometry(1, 1, 1).translate(0, -0.5, 0));
-      const { material } = createPlateMaterial(theme, false);
-      const board = new THREE.Mesh(slab, this.track(material));
-      board.position.set(0, center[1], 0);
-      board.scale.set(halfWidth * 2, PLATE_THICKNESS, halfDepth * 2);
-      group.add(board);
-      const shadow = new THREE.Mesh(blob, this.track(createCastShadowMaterial(theme, false, 0.55)));
+      const shadow = new THREE.Mesh(blob, shadows[region.shape]);
       shadow.position.set(0, table + 0.01, 0);
-      shadow.scale.set(halfWidth * 1.1, 1, halfDepth * 1.1);
+      shadow.scale.set(region.halfWidth + SHADOW_REACH, 1, region.halfDepth + SHADOW_REACH);
       shadow.renderOrder = -1;
       group.add(shadow);
-    }
+
+      // A raised plate stands on a plinth, a step in from its rim.
+      const under = region.center[1] - PLATE_THICKNESS;
+      if (under - table > 0.05) {
+        const plinth = new THREE.Mesh(round ? disc : slab, support);
+        plinth.position.set(0, under, 0);
+        if (round) {
+          const radius = Math.max(0.5, region.radius - PLINTH_INSET);
+          plinth.scale.set(radius, under - table, radius);
+        } else {
+          plinth.scale.set(
+            Math.max(0.5, (region.halfWidth - PLINTH_INSET) * 2),
+            under - table,
+            Math.max(0.5, (region.halfDepth - PLINTH_INSET) * 2),
+          );
+        }
+        group.add(plinth);
+      }
+    });
   }
 
   private buildNodes(topology: Topology): void {
@@ -842,51 +851,37 @@ export class SceneController {
     ];
     const atlas: LabelAtlas = this.track(buildLabelAtlas(labels));
     const count = this.n + layout.regions.length;
-    // Labels stand on their anchor point: above a piece, at the rim of a plate.
-    const geometry = this.track(instancedQuad(count, false, 0.5));
+    const geometry = this.track(instancedQuad(count));
     const pos = instanced(geometry, 'aPos', 3, count, false);
     const size = instanced(geometry, 'aSize', 2, count, false);
     const rect = instanced(geometry, 'aRect', 4, count, false);
+    const align = instanced(geometry, 'aAlign', 2, count);
     const fx = instanced(geometry, 'aLabelFx', 4, count);
     topology.nodes.forEach((node, i) => {
       const r = atlas.rect(node.name, 'node');
       const p = nodePosition(layout, i);
       const s = layout.scales[i] ?? 1;
-      // Above the piece, clear of its silhouette.
+      // A service's name stands above its piece, clear of the silhouette.
       pos.setXYZ(i, p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * s + 0.25, p[2]);
+      align.setXY(i, 0, 0.5);
       if (r) {
         size.setXY(i, NODE_LABEL_PX * r.aspect, NODE_LABEL_PX);
         rect.setXYZW(i, r.u, r.v, r.w, r.h);
       }
       fx.setXYZW(i, 1, 0, 0, 0);
     });
-    // The hub's own name goes where no region is: in the gap after the first
-    // one, which faces the default camera.
-    const spokes = layout.regions.filter((region) => region.kind === 'cloud').length;
-    const gap = Math.PI / 2 + (spokes > 0 ? Math.PI / spokes : 0);
+    // A plate's name stands on the table just off its rim, on the side that
+    // faces away from the rest of the model. Which way that is on screen
+    // depends on the camera, so the text is hung from the anchor every frame.
     layout.regions.forEach((region, k) => {
       const i = this.n + k;
       const r = atlas.rect(region.name, 'region');
-      // Region names stand at the outer rim of their plate, away from the hub.
-      const reach = Math.hypot(region.center[0], region.center[2]);
-      const rim = region.radius + 1.6;
-      const [dx, dz] =
-        reach > 0.01
-          ? [region.center[0] / reach, region.center[2] / reach]
-          : [Math.cos(gap), Math.sin(gap)];
-      pos.setXYZ(
-        i,
-        region.center[0] + dx * rim,
-        region.center[1] + 0.2,
-        region.center[2] + dz * rim,
-      );
-      if (r) {
-        size.setXY(i, REGION_LABEL_PX * r.aspect, REGION_LABEL_PX);
-        rect.setXYZW(i, r.u, r.v, r.w, r.h);
-      }
+      pos.setXYZ(i, ...nameAnchor(region));
+      size.setXY(i, REGION_LABEL_PX * (r?.aspect ?? 1), REGION_LABEL_PX);
+      if (r) rect.setXYZW(i, r.u, r.v, r.w, r.h);
       fx.setXYZW(i, 1, 1, 0, 0);
     });
-    this.labelAttr = { fx };
+    this.labelAttr = { fx, align, size };
     const { material, uniforms } = createLabelMaterial(atlas.texture, this.theme);
     this.labelUniforms = uniforms;
     this.labelMesh = new THREE.Mesh(geometry, this.track(material));
@@ -1047,10 +1042,10 @@ export class SceneController {
   // ---------------------------------------------------------------------------
 
   /**
-   * Schedules how a freshly built layout comes together: plates open from
-   * the hub outward, pieces land on them in a wave (or walk over from where
-   * they stood in the previous layout), each connection draws itself once
-   * both of its ends are in place, and its traffic follows.
+   * Schedules how a freshly built layout comes together: plates open one
+   * after another, the edge first, pieces land on them in a wave (or walk
+   * over from where they stood in the previous layout), each connection
+   * draws itself once both of its ends are in place, and its traffic follows.
    */
   private beginAssembly(
     topology: Topology,
@@ -1078,14 +1073,15 @@ export class SceneController {
       // A short ripple so the pieces do not move as one block.
       for (let i = 0; i < n; i++) this.delay[i] = (i / Math.max(1, n)) * 0.22;
       landed = 0.22 + WALK_TIME;
-    } else if (layout.regions.length > 0) {
-      // The hub first, then the regions around it, one after another.
+    } else {
+      // The edge first, then the regions, one after another.
       const order = layout.regions
         .map((region, k) => ({ k, id: region.id, edge: region.kind === 'edge' }))
         .sort((a, b) => Number(b.edge) - Number(a.edge) || a.k - b.k);
+      const pace = Math.min(0.1, 0.5 / Math.max(1, order.length));
       const plateDelay = new Map<string, number>();
       order.forEach((entry, rank) => {
-        const delay = rank * 0.1;
+        const delay = rank * pace;
         plateDelay.set(entry.id, delay);
         const base = this.bases[entry.k];
         if (base) base.delay = delay;
@@ -1096,34 +1092,20 @@ export class SceneController {
         list.push(i);
         members.set(node.region, list);
       });
+      // Pieces land in the direction requests travel: outward from the hub,
+      // or from left to right along the lanes.
+      const along = (i: number) => {
+        const p = nodePosition(layout, i);
+        return layout.mode === 'regions' ? Math.hypot(p[0], p[2]) : p[0];
+      };
       for (const [regionId, list] of members) {
-        // Within a plate, the pieces nearest the hub land first.
-        list.sort((a, b) => {
-          const pa = nodePosition(layout, a);
-          const pb = nodePosition(layout, b);
-          return Math.hypot(pa[0], pa[2]) - Math.hypot(pb[0], pb[2]) || a - b;
-        });
+        list.sort((a, b) => along(a) - along(b) || a - b);
         const start = (plateDelay.get(regionId) ?? 0) + PLATE_TIME * 0.45;
         const spacing = Math.min(0.03, 0.5 / Math.max(1, list.length));
         list.forEach((i, rank) => {
           this.delay[i] = start + rank * spacing;
           landed = Math.max(landed, this.delay[i]! + DROP_TIME);
         });
-      }
-    } else {
-      // The dependency board fills in the direction requests travel.
-      let left = Infinity;
-      let right = -Infinity;
-      for (let i = 0; i < n; i++) {
-        const x = nodePosition(layout, i)[0];
-        left = Math.min(left, x);
-        right = Math.max(right, x);
-      }
-      const span = Math.max(1, right - left);
-      for (let i = 0; i < n; i++) {
-        this.delay[i] =
-          PLATE_TIME * 0.45 + ((nodePosition(layout, i)[0] - left) / span) * 0.55 + (i % 5) * 0.012;
-        landed = Math.max(landed, this.delay[i]! + DROP_TIME);
       }
     }
 
@@ -1147,9 +1129,9 @@ export class SceneController {
     for (const base of this.bases) {
       const open = this.assembling ? easeOutCubic(clamp01((elapsed - base.delay) / PLATE_TIME)) : 1;
       const size = Math.max(open, 0.0001);
-      // A plate opens from its axis and rises the last little way; the
-      // board unrolls along the direction requests travel.
-      if (base.board) base.group.scale.set(size, 1, 1);
+      // A plate opens from its axis and rises the last little way; a lane
+      // unrolls along the direction requests travel.
+      if (base.slab) base.group.scale.set(size, 1, 1);
       else base.group.scale.set(size, 1, size);
       base.group.position.y = (open - 1) * 1.2;
       if (labelFx && base.label >= 0) labelFx.setX(this.n + base.label, open > 0.98 ? 1 : 0);
@@ -1215,21 +1197,25 @@ export class SceneController {
    * The shot that shows the whole model, as large as the free part of the
    * canvas allows.
    *
-   * With a lens this long the picture is very nearly a parallel projection,
-   * so the model's extent on screen can be measured directly: everything that
-   * has to be in the picture is projected onto the camera's own right and up
-   * axes, and the shot is centred on, and sized to, that rectangle. Fitting a
-   * bounding sphere instead leaves the model small and off to one side
-   * whenever it is not round, which a ring of plates seen at an angle is not.
+   * Everything that has to be in the picture (the rim of every plate, every
+   * piece from foot to top, the plates' names) is projected through a camera
+   * standing at the layout's own attitude, and the camera is moved until the
+   * rectangle those points cover is centred in the free area and just fits
+   * it. Fitting a bounding sphere instead leaves the model small and off to
+   * one side whenever it is not round, which plates seen at an angle are not.
+   *
+   * The lens is long, so the picture is nearly a parallel projection and the
+   * fit is nearly linear: a few rounds of measuring and correcting settle it,
+   * and the number of rounds is fixed so the shot is always the same one.
    */
   private framing(): { position: Vec3; target: Vec3 } {
     const layout = this.layout;
     const width = this.dom.clientWidth || 1600;
     const height = this.dom.clientHeight || 900;
-    // The classic axonometric attitude: a little over 35° above the horizon,
-    // turned so that three faces of every piece show.
-    const elevation = this.layoutMode === 'regions' ? 0.62 : 0.74;
-    const azimuth = this.layoutMode === 'regions' ? -0.42 : -0.3;
+    // The classic axonometric attitude: a little under 40° above the horizon,
+    // turned so that three faces of every piece show. The layout is drawn
+    // for this view (see `VIEW`).
+    const { azimuth, elevation } = VIEW[this.layoutMode];
     const toCamera: Vec3 = [
       Math.sin(azimuth) * Math.cos(elevation),
       Math.sin(elevation),
@@ -1241,54 +1227,47 @@ export class SceneController {
       toCamera[2] * right[0] - toCamera[0] * right[2],
       toCamera[0] * right[1] - toCamera[1] * right[0],
     ];
+    const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-    let minR = Infinity;
-    let maxR = -Infinity;
-    let minU = Infinity;
-    let maxU = -Infinity;
-    const include = (x: number, y: number, z: number) => {
-      const r = x * right[0] + y * right[1] + z * right[2];
-      const u = x * up[0] + y * up[1] + z * up[2];
-      if (r < minR) minR = r;
-      if (r > maxR) maxR = r;
-      if (u < minU) minU = u;
-      if (u > maxU) maxU = u;
-    };
+    // What has to be in the picture: points of the model, and names, which
+    // are boxes of a fixed size on screen hung from a point of the model.
+    const points: Vec3[] = [];
+    const names: { anchor: Vec3; width: number; height: number; hang: [number, number] }[] = [];
     if (layout) {
       for (const region of layout.regions) {
-        // The rim of the plate, top and bottom, and room for its name.
-        const reach = region.radius + 1.6;
-        for (let k = 0; k < 24; k++) {
-          const angle = (k / 24) * Math.PI * 2;
-          const x = region.center[0] + Math.cos(angle) * reach;
-          const z = region.center[2] + Math.sin(angle) * reach;
-          include(x, region.center[1], z);
-          include(x, region.center[1] - PLATE_THICKNESS, z);
-        }
-      }
-      if (layout.board) {
-        const { center, halfWidth, halfDepth } = layout.board;
-        for (const sx of [-1, 1]) {
-          for (const sz of [-1, 1]) {
-            include(center[0] + sx * halfWidth, center[1], center[2] + sz * halfDepth);
-            include(
-              center[0] + sx * halfWidth,
-              center[1] - PLATE_THICKNESS,
-              center[2] + sz * halfDepth,
-            );
+        const [cx, top, cz] = region.center;
+        const rim: [number, number][] = [];
+        if (region.shape === 'disc') {
+          for (let k = 0; k < 24; k++) {
+            const angle = (k / 24) * Math.PI * 2;
+            rim.push([Math.cos(angle) * region.radius, Math.sin(angle) * region.radius]);
           }
+        } else {
+          for (const sx of [-1, 1]) {
+            for (const sz of [-1, 1]) rim.push([sx * region.halfWidth, sz * region.halfDepth]);
+          }
+        }
+        // The rim of the plate, and the table under it.
+        for (const [x, z] of rim) {
+          points.push([cx + x, top, cz + z], [cx + x, -PLATE_THICKNESS, cz + z]);
+        }
+        if (this.options.labels) {
+          const outward: Vec3 = [region.outward[0], 0, region.outward[1]];
+          const w = nameWidth(region.name);
+          names.push({
+            anchor: nameAnchor(region),
+            width: w,
+            height: REGION_LABEL_PX,
+            hang: hang(dot(outward, right), dot(outward, up), w, REGION_LABEL_PX),
+          });
         }
       }
       for (let i = 0; i < this.n; i++) {
         const p = nodePosition(layout, i);
         const scale = layout.scales[i] ?? 1;
-        include(p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * scale + 0.6, p[2]);
-        include(p[0], p[1] - scale, p[2]);
+        const top = (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * scale;
+        points.push([p[0], p[1] + top + 0.6, p[2]], [p[0], p[1] - scale, p[2]]);
       }
-    }
-    if (minR > maxR) {
-      minR = minU = -30;
-      maxR = maxU = 30;
     }
 
     // Only the area not covered by interface panels counts as visible, less
@@ -1299,26 +1278,51 @@ export class SceneController {
       height * 0.3,
       height - this.insets.top - this.insets.bottom - margin * 2,
     );
-    const tanHalf = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    // World units the full canvas height covers at distance 1.
-    const unit = 2 * tanHalf;
-    const distance =
-      Math.max(
-        (maxU - minU) / (unit * (freeH / height)),
-        (maxR - minR) / (unit * (freeW / height)),
-      ) *
-      // What stands nearer than the centre of the shot is drawn a little
-      // larger than a parallel projection would have it.
-      1.04;
-    const centre: Vec3 = layout ? layout.center : [0, 0, 0];
-    const depth = centre[0] * toCamera[0] + centre[1] * toCamera[1] + centre[2] * toCamera[2];
-    const cr = (minR + maxR) / 2;
-    const cu = (minU + maxU) / 2;
-    const target: Vec3 = [
-      right[0] * cr + up[0] * cu + toCamera[0] * depth,
-      right[1] * cr + up[1] * cu + toCamera[1] * depth,
-      right[2] * cr + up[2] * cu + toCamera[2] * depth,
-    ];
+    // Pixels a length of one covers at distance one.
+    const lens = height / (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+
+    const target: Vec3 = layout ? [...layout.center] : [0, 0, 0];
+    let distance = (layout ? layout.radius : 30) * 2 * LENS;
+    for (let round = 0; round < 6 && points.length > 0; round++) {
+      const camera: Vec3 = [
+        target[0] + toCamera[0] * distance,
+        target[1] + toCamera[1] * distance,
+        target[2] + toCamera[2] * distance,
+      ];
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      /** Where a point of the model lands, in pixels from the middle of the shot. */
+      const project = (p: Vec3): [number, number] => {
+        const v: Vec3 = [p[0] - camera[0], p[1] - camera[1], p[2] - camera[2]];
+        const scale = lens / Math.max(1e-3, -dot(v, toCamera));
+        return [dot(v, right) * scale, dot(v, up) * scale];
+      };
+      for (const p of points) {
+        const [x, y] = project(p);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+      for (const name of names) {
+        const [x, y] = project(name.anchor);
+        const cx = x + name.hang[0] * name.width;
+        const cy = y + name.hang[1] * name.height;
+        minX = Math.min(minX, cx - name.width / 2);
+        maxX = Math.max(maxX, cx + name.width / 2);
+        minY = Math.min(minY, cy - name.height / 2);
+        maxY = Math.max(maxY, cy + name.height / 2);
+      }
+      // Move the middle of what was measured to the middle of the shot, then
+      // stand as far back as it takes for it to fit.
+      const perPixel = distance / lens;
+      const shiftX = ((minX + maxX) / 2) * perPixel;
+      const shiftY = ((minY + maxY) / 2) * perPixel;
+      for (let k = 0; k < 3; k++) target[k] = target[k]! + right[k]! * shiftX + up[k]! * shiftY;
+      distance *= Math.max((maxX - minX) / freeW, (maxY - minY) / freeH);
+    }
     return {
       target,
       position: [
@@ -1523,7 +1527,11 @@ export class SceneController {
       if (along <= 0 || along >= bestDepth) continue;
       const x = this.ray.origin.x + this.ray.direction.x * along - region.center[0];
       const z = this.ray.origin.z + this.ray.direction.z * along - region.center[2];
-      if (x * x + z * z <= region.radius * region.radius) {
+      const inside =
+        region.shape === 'disc'
+          ? x * x + z * z <= region.radius * region.radius
+          : Math.abs(x) <= region.halfWidth && Math.abs(z) <= region.halfDepth;
+      if (inside) {
         best = region.id;
         bestDepth = along;
       }
@@ -1669,6 +1677,7 @@ export class SceneController {
     this.updatePlates(ease);
     this.updateNodes(ease, 1 - Math.exp(-step * 16), motion);
     this.updateEdges(ease, 1 - Math.exp(-step * 12));
+    this.hangNames();
     this.updateOverlays(step);
 
     this.applyViewOffset(step);
@@ -1795,6 +1804,31 @@ export class SceneController {
     ring.ring.needsUpdate = true;
     if (labelFx) labelFx.needsUpdate = true;
     this.updateStems();
+  }
+
+  /**
+   * Hangs each plate's name off its rim, on whichever side is outward as the
+   * camera now sees it, so the text never lies across the plate it names.
+   */
+  private hangNames(): void {
+    const labels = this.labelAttr;
+    const layout = this.layout;
+    if (!labels || !layout) return;
+    this.camera.updateMatrixWorld();
+    // The camera's own right and up, in world space.
+    const m = this.camera.matrixWorld.elements;
+    layout.regions.forEach((region, k) => {
+      const i = this.n + k;
+      const [ox, oz] = region.outward;
+      const [ax, ay] = hang(
+        ox * m[0]! + oz * m[2]!,
+        ox * m[4]! + oz * m[6]!,
+        labels.size.getX(i),
+        labels.size.getY(i),
+      );
+      labels.align.setXY(i, ax, ay);
+    });
+    labels.align.needsUpdate = true;
   }
 
   /** The supports under raised pieces follow them. */

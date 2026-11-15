@@ -248,8 +248,7 @@ commands) → events`. No clock, no global counters, randomness only from a
    always holds and nothing is sampled or invented.
 3. **Draw calls follow object classes, not object counts.** One instanced
    mesh per service type, one for connections, one for beads, one for labels,
-   one for everything that lies on the plates: 29 draw calls for 51
-   services, 35 for 178.
+   one for everything that lies on the plates: 29 draw calls for 51 services, 35 for 178.
 
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -283,25 +282,25 @@ it). Neither is faked.
 ## Performance
 
 Measured on an RTX 3050 / Ryzen 5 5600G in Chrome 157.0.8103.78 (headless, offscreen) at 1920 × 1080,
-quality ultra, light theme, production build of 2026-11-15 03:45 UTC, interface
-visible.
+quality ultra, light theme, production build, interface in its default state.
 
 | Scene                    | Services / connections | WebGPU | WebGL 2 | Draw calls |
 | ------------------------ | ---------------------: | -----: | ------: | ---------: |
-| Helios · steady state    |                51 / 75 | 1.9 ms |  7.0 ms |         29 |
-| Helios · DDoS surge      |                51 / 75 | 1.9 ms |  7.0 ms |         29 |
-| Stress · steady state    |              178 / 648 | 1.9 ms |  7.2 ms |         35 |
-| Stress · regional outage |              178 / 648 | 2.1 ms |  7.4 ms |         35 |
+| Helios · steady state    |                51 / 75 | 1.7 ms |  7.0 ms |         29 |
+| Helios · DDoS surge      |                51 / 75 | 1.9 ms |  7.3 ms |         29 |
+| Stress · steady state    |              178 / 648 | 1.9 ms |  7.5 ms |         35 |
+| Stress · regional outage |              178 / 648 | 1.9 ms |  8.1 ms |         35 |
 
 <sub>Mean time to produce one frame with the frame-rate limit off.</sub>
 
 - Both backends produce a 1080p frame well inside the 16.7 ms a 60 Hz display
   allows; 3.5× the services and 8.6× the connections add 6 draw calls and no
   measurable frame time.
-- With Chrome's default 60 Hz pacing, 7 of 8 cases held 60.0–60.1 frames/s
-  (the one dip is reported in the performance document).
+- With Chrome's default 60 Hz pacing, the whole page held
+  60.0–60.1 frames/s in every scene on both backends.
 - GPU geometry and texture counts are identical after 12 full scene
-  rebuilds; the JS heap stays between 15.3 and 20.2 MB.
+  rebuilds. The JS heap stayed between 15.0 and 16.6 MB, rising about 0.1 MB
+  per rebuild; a run this short cannot rule out a slow leak.
 - One engine tick costs 26 µs for 51 services and 41 µs for 178.
 - The benchmark earned its keep: on an earlier design it showed that
   `backdrop-filter` blur on the panels cost several times more than the 3D
@@ -341,10 +340,10 @@ pnpm e2e                    # Playwright against the real stack
 | ---------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Rust       |   115 | Flow model, determinism and replay, scenarios, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters                                                   |
 | Contracts  |    28 | Every zod schema against samples exported by the server binary                                                                                                               |
-| Web        |   122 | Layout, palette rules, quality tiers, stores, stream client, event folding, command search, interface                                                                        |
+| Web        |   155 | Layout, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface                                                        |
 | End to end |    11 | Load, render, select, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, no-GPU fallback |
 
-All 276 pass locally. The end-to-end suite runs the real server and a production
+All 309 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy, hue once
 an incident is under way. The same suite passes on a real GPU through WebGPU (10

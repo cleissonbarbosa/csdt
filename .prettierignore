@@ -7,3 +7,5 @@ apps/web/playwright-report
 packages/contracts/samples
 fixtures
 docs/assets
+.mypy_cache
+__pycache__

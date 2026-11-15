@@ -15,6 +15,8 @@ import {
   abs,
   attribute,
   cameraPosition,
+  cameraViewMatrix,
+  cameraWorldMatrix,
   cross,
   dot,
   float,
@@ -24,7 +26,9 @@ import {
   ivec2,
   length,
   max,
+  min,
   mix,
+  modelWorldMatrix,
   normalLocal,
   normalWorld,
   normalize,
@@ -43,6 +47,7 @@ import {
   varying,
   vec2,
   vec3,
+  vec4,
 } from 'three/tsl';
 import * as THREE from 'three/webgpu';
 
@@ -424,8 +429,13 @@ export interface LabelUniforms {
  * on a map: text is for reading and should not grow into the picture. Which
  * labels are shown at all is decided by distance.
  *
+ * A label is hung from its anchor: `aAlign` says where the middle of the
+ * text goes, in units of its own width and height. A service's name stands
+ * on its anchor, `(0, 0.5)`; a plate's name is pushed off the rim to whichever
+ * side is outward on screen, so it never lies across what it names.
+ *
  * Instance: `aPos`, `aSize` (width, height in pixels), `aRect` (u, v, w, h),
- *           `aLabelFx` = (visibility, always shown, alarm, _).
+ *           `aAlign`, `aLabelFx` = (visibility, always shown, alarm, _).
  */
 export function createLabelMaterial(
   atlas: THREE.Texture,
@@ -446,8 +456,13 @@ export function createLabelMaterial(
   const position = attribute('aPos', 'vec3');
   const rect = attribute('aRect', 'vec4');
   const fx = attribute('aLabelFx', 'vec4');
-  material.positionNode = position;
-  material.scaleNode = attribute('aSize', 'vec2').mul(pixelScale);
+  const size = attribute('aSize', 'vec2').mul(pixelScale);
+  // Pixels become world units at the anchor's depth, along the camera's own
+  // right and up, which is the plane the label is drawn in.
+  const depth = cameraViewMatrix.mul(vec4(position, 1)).z.negate();
+  const hang = attribute('aAlign', 'vec2').mul(size).mul(depth);
+  material.positionNode = position.add(cameraWorldMatrix.mul(vec4(hang, 0, 0)).xyz);
+  material.scaleNode = size;
 
   const texel = texture(atlas, rect.xy.add(uv().mul(rect.zw)));
   const distance = length(cameraPosition.sub(position));
@@ -522,10 +537,12 @@ export interface PlateUniforms {
 }
 
 /**
- * A region plate or the dependency board: a low solid with a top face.
+ * A region's plate: a low solid with a top face, round in the regions
+ * arrangement and rectangular in the swimlanes.
  *
- * Geometry: a unit cylinder (round plates) or a unit box (the board), scaled
- * by the mesh. `round` selects how the outline on the top face is measured.
+ * Geometry: a unit cylinder or a unit box, scaled by the mesh to the size of
+ * the plate. The outline on the top face is measured in world units from
+ * that scale, so it is the same hairline on a plate of any size.
  */
 export function createPlateMaterial(
   theme: SceneTheme,
@@ -540,13 +557,19 @@ export function createPlateMaterial(
   const off = uniform(0);
 
   const top = step(0.5, normalLocal.y);
-  const d = round
-    ? length(positionGeometry.xz)
-    : max(abs(positionGeometry.x), abs(positionGeometry.z)).mul(2);
+  const matrix: ShaderNode = modelWorldMatrix;
+  const across = length(matrix[0].xyz);
+  const deep = length(matrix[2].xyz);
+  // Distance from the rim, inward.
+  const inset = round
+    ? oneMinus(length(positionGeometry.xz)).mul(across)
+    : min(
+        float(0.5).sub(abs(positionGeometry.x)).mul(across),
+        float(0.5).sub(abs(positionGeometry.z)).mul(deep),
+      );
   // The outline is a hairline normally and a firm band in an abnormal state.
-  const outline = round
-    ? smoothstep(mix(float(0.988), float(0.955), alarm), mix(float(0.992), float(0.96), alarm), d)
-    : float(0);
+  const band = mix(float(0.14), float(0.5), alarm);
+  const outline = oneMinus(smoothstep(band.sub(0.05), band, inset));
   const lineColor = mix(mix(theme.plateLine, tone, alarm), theme.ink, off);
   const fill = mix(mix(theme.plate, tone, alarm.mul(0.055)), theme.table, off.mul(0.7));
   const face = mix(fill, lineColor, outline);
@@ -562,9 +585,15 @@ export function createSupportMaterial(theme: SceneTheme): THREE.MeshBasicNodeMat
   return material;
 }
 
+/** How far past a plate's rim its shadow reaches on the table. */
+export const SHADOW_REACH = 2;
+
 /**
- * The soft shadow a plate casts on whatever is below it.
- * Geometry: unit disc or unit square lying in XZ, larger than the plate.
+ * The soft shadow a plate casts on the table.
+ *
+ * Geometry: a square lying in XZ, scaled to the plate's half extents plus
+ * `SHADOW_REACH`. The softness is measured in world units from that scale,
+ * so plates of every size and shape throw the same shadow.
  */
 export function createCastShadowMaterial(
   theme: SceneTheme,
@@ -572,9 +601,16 @@ export function createCastShadowMaterial(
   strength: number,
 ): THREE.MeshBasicNodeMaterial {
   const material = blended(new THREE.MeshBasicNodeMaterial());
-  const centered = uv().sub(0.5).mul(2);
-  const d = round ? length(centered) : max(abs(centered.x), abs(centered.y));
-  const falloff = oneMinus(smoothstep(round ? 0.8 : 0.88, 1, d));
+  const matrix: ShaderNode = modelWorldMatrix;
+  const half = vec2(length(matrix[0].xyz), length(matrix[2].xyz));
+  const p = uv().sub(0.5).mul(2).mul(half);
+  const plate = max(half.sub(SHADOW_REACH), vec2(0, 0));
+  const beyond = abs(p).sub(plate);
+  // Distance from the plate's rim, negative under the plate.
+  const d = round
+    ? length(p).sub(plate.x)
+    : length(max(beyond, vec2(0, 0))).add(min(max(beyond.x, beyond.y), float(0)));
+  const falloff = oneMinus(smoothstep(-0.7, SHADOW_REACH, d));
   material.colorNode = theme.shadow;
   material.opacityNode = falloff.mul(theme.shadowOpacity).mul(strength);
   return material;

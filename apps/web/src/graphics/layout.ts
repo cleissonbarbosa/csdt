@@ -1,8 +1,8 @@
 /**
  * Deterministic spatial layout of a topology.
  *
- * Pure functions of the topology: no randomness, no iteration to convergence,
- * no dependence on insertion order beyond explicit sorting. The same topology
+ * Pure functions of the topology: no randomness, no simulation, no
+ * dependence on insertion order beyond explicit sorting. The same topology
  * always produces the same picture, which keeps the scene stable across
  * reloads and makes the layout testable.
  *
@@ -11,13 +11,25 @@
  * `ground + s` therefore rests exactly on the surface below it. `ground` is
  * kept per node so the scene can draw contact shadows and support stems.
  *
- * `regions` mode — a hub-and-spoke archipelago. The global edge is a raised
- * plate at the centre (clients on its rim, the edge router in the middle, the
- * security monitor on a mast above it). Cloud regions are plates on a ring
- * around it, one step lower. Inside a region, tiers run outward from the hub.
+ * Both arrangements are built from the same three decisions:
  *
- * `dependencies` mode — a layered left-to-right dependency graph on a single
- * board: one column per tier, ignoring region placement.
+ * - A tier is a line of pieces, and the space between two tiers is wider
+ *   than the space between two pieces of one tier, so the lines can be read
+ *   without anything being drawn to mark them.
+ * - Within a line, pieces of one kind stand together, and among those each
+ *   stands as near as it can to what it is connected to in the lines before
+ *   it, which keeps connections from crossing more than they have to.
+ * - A plate is as large as what stands on it, and no larger.
+ *
+ * `regions` mode — a hub and its spokes. The global edge is a low plinth at
+ * the centre (the edge router in the middle, clients around it, the security
+ * monitor on a mast above). Each cloud region is a round plate beside it,
+ * with its gateway at the hub's side and its tiers running outward. Nothing
+ * stands over anything else, so no piece is hidden behind a plate.
+ *
+ * `dependencies` mode — swimlanes. Tiers are columns that run left to right
+ * in the direction requests travel, and each region is a lane of its own
+ * across them, so a tier can be compared between regions along one line.
  */
 import type { InfrastructureNode, ServiceType, Topology } from '@aegis/contracts';
 
@@ -25,19 +37,35 @@ export type LayoutMode = 'regions' | 'dependencies';
 
 export type Vec3 = [number, number, number];
 
+/**
+ * The attitude each arrangement is drawn for: where the default camera
+ * stands, as an angle around the model and an angle above the horizon. The
+ * layout faces it, and the scene frames its opening shot from it.
+ */
+export const VIEW: Record<LayoutMode, { azimuth: number; elevation: number }> = {
+  regions: { azimuth: -0.42, elevation: 0.68 },
+  dependencies: { azimuth: -0.3, elevation: 0.74 },
+};
+
+/** A plate: the surface a region's services stand on. */
 export interface RegionLayout {
   id: string;
   name: string;
   kind: 'edge' | 'cloud';
+  /** Round in the regions arrangement, rectangular in the swimlanes. */
+  shape: 'disc' | 'slab';
+  /** Middle of the plate's top face. */
   center: Vec3;
+  /** Radius of a disc; for a slab, of the circle around its corners. */
   radius: number;
-}
-
-/** The rectangular base the dependency layout stands on. */
-export interface BoardLayout {
-  center: Vec3;
+  /** Half extents along x and z (both equal to `radius` for a disc). */
   halfWidth: number;
   halfDepth: number;
+  /**
+   * Unit direction on the ground, `[x, z]`, that points away from the rest
+   * of the model. The plate's name stands off the rim on this side.
+   */
+  outward: [number, number];
 }
 
 export interface SceneLayout {
@@ -48,26 +76,32 @@ export interface SceneLayout {
   scales: Float32Array;
   /** Height of the surface under each node. */
   ground: Float32Array;
-  /** Region plates; `center` is the middle of the plate's top face. */
+  /** Plates; `center` is the middle of the plate's top face. */
   regions: RegionLayout[];
-  board: BoardLayout | null;
   /** Centre and radius of a sphere enclosing everything. */
   center: Vec3;
   radius: number;
 }
 
-const ROW_GAP = 3.3;
-const COL_GAP = 3.1;
-const MAX_PER_ROW = 6;
-const PLATFORM_MARGIN = 2.7;
-const REGION_GAP = 2.4;
-const HUB_RING = 7.6;
-/** How far a region platform keeps from the central pillar. */
-const HUB_CLEARANCE = 5.2;
-/** Height of the raised plate that carries the global edge. */
-const HUB_HEIGHT = 5.4;
+/** Clear space between two neighbours in a line, and two lines of one tier. */
+const PIECE_CLEAR = 0.9;
+/** Clear space between two tiers: about twice the above, so tiers read apart. */
+const TIER_CLEAR = 1.9;
+/** From the centre of the outermost piece to the rim of its plate. */
+const PLATE_MARGIN = 2.5;
+const MIN_PLATE = 6;
+/** Table left showing between two plates. */
+const PLATE_GAP = 1.8;
+/** Height of the plinth that carries the global edge. */
+const HUB_HEIGHT = 1.8;
 /** Gap between the edge router and the monitor on its mast. */
 const MAST_GAP = 1.4;
+/** Each further line of a tier costs this much plate, when weighing plates. */
+const LINE_COST = 0.3;
+/** Clear space between two tiers of the swimlanes, where connections run. */
+const COLUMN_CLEAR = 5;
+/** The picture the swimlanes are proportioned for. */
+const PICTURE_ASPECT = 16 / 9;
 
 const TYPE_ORDER: Record<ServiceType, number> = {
   'external-client': 0,
@@ -99,34 +133,175 @@ const TYPE_SCALE: Record<ServiceType, number> = {
   storage: 1.14,
 };
 
-function byTypeThenId(a: { node: InfrastructureNode }, b: { node: InfrastructureNode }): number {
-  return (
-    TYPE_ORDER[a.node.serviceType] - TYPE_ORDER[b.node.serviceType] ||
-    (a.node.id < b.node.id ? -1 : a.node.id > b.node.id ? 1 : 0)
-  );
-}
-
 interface Indexed {
   node: InfrastructureNode;
   index: number;
 }
 
-/** Splits a region's nodes into rows: one or more per tier, inner tier first. */
-function rowsOf(nodes: Indexed[]): Indexed[][] {
+const byId = (a: Indexed, b: Indexed) =>
+  a.node.id < b.node.id ? -1 : a.node.id > b.node.id ? 1 : 0;
+
+function byTypeThenId(a: Indexed, b: Indexed): number {
+  return TYPE_ORDER[a.node.serviceType] - TYPE_ORDER[b.node.serviceType] || byId(a, b);
+}
+
+/** The members of each tier, lowest tier first, each sorted by kind. */
+function tiersOf(nodes: Indexed[]): Indexed[][] {
   const tiers = new Map<number, Indexed[]>();
   for (const entry of nodes) {
     const list = tiers.get(entry.node.tier) ?? [];
     list.push(entry);
     tiers.set(entry.node.tier, list);
   }
-  const rows: Indexed[][] = [];
-  for (const tier of [...tiers.keys()].sort((a, b) => a - b)) {
-    const members = tiers.get(tier)!.sort(byTypeThenId);
-    const rowCount = Math.ceil(members.length / MAX_PER_ROW);
-    const perRow = Math.ceil(members.length / rowCount);
-    for (let r = 0; r < rowCount; r++) rows.push(members.slice(r * perRow, (r + 1) * perRow));
+  return [...tiers.keys()].sort((a, b) => a - b).map((tier) => tiers.get(tier)!.sort(byTypeThenId));
+}
+
+/** Splits a tier into lines of at most `cap`, as equal in length as they can be. */
+function split(members: Indexed[], cap: number): Indexed[][] {
+  const count = Math.ceil(members.length / Math.max(1, cap));
+  const base = Math.floor(members.length / count);
+  const longer = members.length % count;
+  const lines: Indexed[][] = [];
+  let from = 0;
+  for (let k = 0; k < count; k++) {
+    const length = base + (k < longer ? 1 : 0);
+    lines.push(members.slice(from, from + length));
+    from += length;
   }
-  return rows;
+  return lines;
+}
+
+/** For every node, the nodes it shares a connection with. */
+function neighboursOf(topology: Topology): number[][] {
+  const index = new Map(topology.nodes.map((node, i) => [node.id, i]));
+  const lists: number[][] = topology.nodes.map(() => []);
+  for (const edge of topology.edges) {
+    const a = index.get(edge.source);
+    const b = index.get(edge.target);
+    if (a === undefined || b === undefined || a === b) continue;
+    lists[a]!.push(b);
+    lists[b]!.push(a);
+  }
+  return lists;
+}
+
+/**
+ * Orders one line. Pieces of a kind stay together; among them, each goes
+ * toward the pieces it is connected to in the lines already placed, whose
+ * positions along the line are in `placed`.
+ */
+function arrange(line: Indexed[], links: number[][], placed: Map<number, number>): Indexed[] {
+  const pull = new Map<number, number>();
+  for (const entry of line) {
+    let sum = 0;
+    let count = 0;
+    for (const other of links[entry.index] ?? []) {
+      const at = placed.get(other);
+      if (at === undefined) continue;
+      sum += at;
+      count++;
+    }
+    pull.set(entry.index, count > 0 ? sum / count : 0);
+  }
+  return [...line].sort(
+    (a, b) =>
+      TYPE_ORDER[a.node.serviceType] - TYPE_ORDER[b.node.serviceType] ||
+      pull.get(a.index)! - pull.get(b.index)! ||
+      byId(a, b),
+  );
+}
+
+/** One line of pieces, measured along the axis its tiers run on. */
+interface Line {
+  members: Indexed[];
+  /** Distance from the first line. */
+  depth: number;
+  /** Distance between neighbours, and from the middle to the last of them. */
+  pitch: number;
+  half: number;
+}
+
+function linesOf(tiers: Indexed[][], cap: number, scales: Float32Array, tierClear: number): Line[] {
+  const lines: Line[] = [];
+  let depth = 0;
+  let previous = 0;
+  for (const members of tiers) {
+    split(members, cap).forEach((run, r) => {
+      const size = Math.max(...run.map((entry) => scales[entry.index]!));
+      if (lines.length > 0) depth += previous + size + (r === 0 ? tierClear : PIECE_CLEAR);
+      const pitch = 2 * size + PIECE_CLEAR;
+      lines.push({ members: run, depth, pitch, half: ((run.length - 1) * pitch) / 2 });
+      previous = size;
+    });
+  }
+  return lines;
+}
+
+/**
+ * The smallest circle, centred on the axis, around the ends of every line.
+ * Its centre is either level with one line or where two lines are equally
+ * far away, so the candidates can simply be listed.
+ */
+function circleAround(lines: Line[]): { centre: number; radius: number } {
+  const reach = (t: number) => {
+    let farthest = 0;
+    for (const line of lines) farthest = Math.max(farthest, line.half ** 2 + (line.depth - t) ** 2);
+    return farthest;
+  };
+  let centre = 0;
+  let best = Infinity;
+  const consider = (t: number) => {
+    const squared = reach(t);
+    if (squared < best - 1e-9) {
+      best = squared;
+      centre = t;
+    }
+  };
+  for (const line of lines) consider(line.depth);
+  for (let i = 0; i < lines.length; i++) {
+    for (let j = i + 1; j < lines.length; j++) {
+      const a = lines[i]!;
+      const b = lines[j]!;
+      if (a.depth === b.depth) continue;
+      consider(
+        (a.half ** 2 - b.half ** 2 + a.depth ** 2 - b.depth ** 2) / (2 * (a.depth - b.depth)),
+      );
+    }
+  }
+  return { centre, radius: Number.isFinite(best) ? Math.sqrt(best) : 0 };
+}
+
+interface Plate {
+  lines: Line[];
+  /** Where the middle of the plate is, measured from the first line. */
+  centre: number;
+  radius: number;
+}
+
+/**
+ * Fits a region onto a round plate: tiers as straight lines across it, the
+ * first at the rim. A long tier may be broken into several lines; of the
+ * ways of doing that, the one that needs the smallest plate is taken.
+ */
+function plateFor(nodes: Indexed[], scales: Float32Array): Plate {
+  const tiers = tiersOf(nodes);
+  const longest = Math.max(1, ...tiers.map((tier) => tier.length));
+  let chosen: Plate | null = null;
+  let lowest = Infinity;
+  for (let cap = longest; cap >= 2; cap--) {
+    const lines = linesOf(tiers, cap, scales, TIER_CLEAR);
+    const { centre, radius } = circleAround(lines);
+    const cost = radius + LINE_COST * (lines.length - tiers.length);
+    if (cost < lowest - 1e-9) {
+      lowest = cost;
+      chosen = { lines, centre, radius };
+    }
+  }
+  if (!chosen) {
+    const lines = linesOf(tiers, longest, scales, TIER_CLEAR);
+    chosen = { lines, ...circleAround(lines) };
+  }
+  return { ...chosen, radius: Math.max(MIN_PLATE, chosen.radius + PLATE_MARGIN) };
 }
 
 function enclose(positions: Float32Array, extra: number): { center: Vec3; radius: number } {
@@ -152,7 +327,8 @@ function enclose(positions: Float32Array, extra: number): { center: Vec3; radius
   return { center, radius: radius + extra };
 }
 
-function layoutRegions(topology: Topology): SceneLayout {
+/** The nodes of each region, and a way to stand one of them on a surface. */
+function stage(topology: Topology) {
   const n = topology.nodes.length;
   const positions = new Float32Array(n * 3);
   const scales = new Float32Array(n);
@@ -165,97 +341,143 @@ function layoutRegions(topology: Topology): SceneLayout {
     positions[index * 3 + 2] = z;
     ground[index] = floor;
   };
-
   const byRegion = new Map<string, Indexed[]>();
   topology.nodes.forEach((node, index) => {
     const list = byRegion.get(node.region) ?? [];
     list.push({ node, index });
     byRegion.set(node.region, list);
   });
+  return { positions, scales, ground, put, byRegion };
+}
+
+/** What stands at the global edge, sorted into the roles the hub gives them. */
+function edgeCast(members: Indexed[]) {
+  const sorted = [...members].sort(byTypeThenId);
+  const routers = sorted.filter((m) => m.node.serviceType === 'network-gateway');
+  const core = routers.shift();
+  // Monitors watch from a mast above the router. Without one they are
+  // ordinary pieces.
+  const monitors = core ? sorted.filter((m) => m.node.serviceType === 'security-monitor') : [];
+  const rest = sorted.filter((m) => m !== core && !monitors.includes(m));
+  return { core, monitors, rest };
+}
+
+function layoutRegions(topology: Topology): SceneLayout {
+  const { positions, scales, ground, put, byRegion } = stage(topology);
+  const links = neighboursOf(topology);
 
   const cloud = topology.regions.filter((r) => r.kind === 'cloud' && byRegion.has(r.id));
   const edge = topology.regions.filter((r) => r.kind !== 'cloud' && byRegion.has(r.id));
-
-  // Measure every cloud region first: the ring must fit the largest one.
-  const measured = cloud.map((region) => {
-    const rows = rowsOf(byRegion.get(region.id)!);
-    const columns = Math.max(1, ...rows.map((row) => row.length));
-    const halfDepth = ((rows.length - 1) * ROW_GAP) / 2;
-    const halfWidth = ((columns - 1) * COL_GAP) / 2;
-    return { region, rows, halfDepth, radius: Math.hypot(halfDepth, halfWidth) + PLATFORM_MARGIN };
-  });
-  const platform = Math.max(8, ...measured.map((m) => m.radius));
-  const count = measured.length;
-  // Platforms tuck in under the elevated hub, so the pillar only needs a
-  // little clearance; beyond that the ring is as tight as the platforms allow.
-  const hub = edge.length > 0 ? HUB_CLEARANCE : 0;
-  const ring =
-    count <= 1
-      ? count * (platform + hub)
-      : Math.max((platform + REGION_GAP / 2) / Math.sin(Math.PI / count), platform + hub);
-
+  const count = cloud.length;
+  // The first region faces the default camera, so its tiers run straight
+  // across the picture; the rest follow round the hub.
+  const front = Math.PI / 2 - VIEW.regions.azimuth;
   const regions: RegionLayout[] = [];
-  measured.forEach(({ region, rows, halfDepth }, i) => {
-    // Region 0 faces the default camera (+z); the rest follow clockwise.
-    const angle = Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, count);
-    const ux = Math.cos(angle);
-    const uz = Math.sin(angle);
-    const cx = ring * ux;
-    const cz = ring * uz;
-    rows.forEach((row, r) => {
-      const radial = -halfDepth + r * ROW_GAP;
-      row.forEach((entry, c) => {
-        const tangent = (c - (row.length - 1) / 2) * COL_GAP;
-        // Tangent axis is the radial axis rotated a quarter turn.
-        put(entry.index, cx + ux * radial - uz * tangent, 0, cz + uz * radial + ux * tangent);
-      });
-    });
-    regions.push({
-      id: region.id,
-      name: region.name,
-      kind: 'cloud',
-      center: [cx, 0, cz],
-      radius: platform,
-    });
-  });
 
-  // The global edge: a raised plate at the centre of the ring.
+  // The global edge: a plinth at the centre. Clients stand in a ring round
+  // the router, far enough apart to be told from one another.
+  let hubRadius = 0;
   for (const region of edge) {
-    const members = byRegion.get(region.id)!.sort(byTypeThenId);
-    const clients = members.filter((m) => m.node.serviceType === 'external-client');
-    const routers = members.filter((m) => m.node.serviceType === 'network-gateway');
-    const monitors = members.filter((m) => m.node.serviceType === 'security-monitor');
-    const others = members.filter(
-      (m) => !clients.includes(m) && !routers.includes(m) && !monitors.includes(m),
-    );
-    const core = routers.shift();
+    const { core, monitors, rest } = edgeCast(byRegion.get(region.id)!);
     if (core) put(core.index, 0, HUB_HEIGHT, 0);
-    // Monitors watch from a mast above the router, one over the other.
     let mast = core ? scales[core.index]! * 2 + MAST_GAP : 0;
     for (const m of monitors) {
       put(m.index, 0, HUB_HEIGHT, 0, mast);
       mast += scales[m.index]! * 2 + MAST_GAP;
     }
-    clients.forEach((m, i) => {
-      const angle =
-        Math.PI / 2 + Math.PI / Math.max(1, clients.length) + (i * 2 * Math.PI) / clients.length;
-      put(m.index, HUB_RING * Math.cos(angle), HUB_HEIGHT, HUB_RING * Math.sin(angle));
+    const clients = rest.filter((m) => m.node.serviceType === 'external-client');
+    const others = rest.filter((m) => m.node.serviceType !== 'external-client');
+    let reach = core ? scales[core.index]! : 0;
+    for (const ring of [others, clients]) {
+      if (ring.length === 0) continue;
+      const size = Math.max(...ring.map((m) => scales[m.index]!));
+      const pitch = 2 * size + PIECE_CLEAR;
+      const radius = Math.max(
+        reach > 0 || ring.length > 1 ? reach + TIER_CLEAR + size : 0,
+        ring.length > 1 ? pitch / 2 / Math.sin(Math.PI / ring.length) : 0,
+      );
+      // Nobody stands on the line from the camera through the router, where a
+      // piece would hide behind it or lie under the route to the first
+      // region: half a step off that line, or a quarter when the count is
+      // odd and half a step would put one straight behind.
+      const turn = (2 * Math.PI) / ring.length;
+      const phase = front + turn * (ring.length % 2 === 0 ? 0.5 : 0.25);
+      ring.forEach((m, i) => {
+        const angle = phase + i * turn;
+        put(m.index, radius * Math.cos(angle), HUB_HEIGHT, radius * Math.sin(angle));
+      });
+      reach = radius + size;
+    }
+    hubRadius = Math.max(hubRadius, reach + PLATE_MARGIN - 1.2, 4);
+  }
+
+  // Every region gets the plate it needs. The plates stand round the hub at
+  // equal angles, each as close to it as its neighbours allow.
+  const plates = cloud.map((region) => plateFor(byRegion.get(region.id)!, scales));
+  const step = count > 0 ? (2 * Math.PI) / count : 0;
+  let inner = hubRadius > 0 ? hubRadius + PLATE_GAP : 0;
+  for (let i = 0; i < count && count > 1; i++) {
+    const a = plates[i]!.radius;
+    const b = plates[(i + 1) % count]!.radius;
+    // Two neighbours at distances `inner + a` and `inner + b` from the hub,
+    // `step` apart, must be `a + b + gap` from each other: a quadratic in
+    // `inner`, of which the larger root is the one that separates them.
+    const cos = Math.cos(step);
+    const qa = 2 * (1 - cos);
+    const qb = qa * (a + b);
+    const qc = a * a + b * b - 2 * a * b * cos - (a + b + PLATE_GAP) ** 2;
+    inner = Math.max(inner, (-qb + Math.sqrt(Math.max(0, qb * qb - 4 * qa * qc))) / (2 * qa));
+  }
+
+  plates.forEach((plate, i) => {
+    const region = cloud[i]!;
+    const angle = front + i * step;
+    const ux = Math.cos(angle);
+    const uz = Math.sin(angle);
+    // A region with neither hub nor neighbour is simply the middle of things.
+    const distance = count === 1 && hubRadius === 0 ? 0 : inner + plate.radius;
+    const cx = distance * ux;
+    const cz = distance * uz;
+    const placed = new Map<number, number>();
+    for (const line of plate.lines) {
+      const radial = line.depth - plate.centre;
+      arrange(line.members, links, placed).forEach((entry, c) => {
+        const tangent = (c - (line.members.length - 1) / 2) * line.pitch;
+        placed.set(entry.index, tangent);
+        // The tangent axis is the radial axis turned a quarter of the way round.
+        put(entry.index, cx + ux * radial - uz * tangent, 0, cz + uz * radial + ux * tangent);
+      });
+    }
+    regions.push({
+      id: region.id,
+      name: region.name,
+      kind: 'cloud',
+      shape: 'disc',
+      center: [cx, 0, cz],
+      radius: plate.radius,
+      halfWidth: plate.radius,
+      halfDepth: plate.radius,
+      outward: [ux, uz],
     });
-    const inner = [...routers, ...others];
-    inner.forEach((m, i) => {
-      const angle = (i * 2 * Math.PI) / inner.length;
-      put(m.index, 4.6 * Math.cos(angle), HUB_HEIGHT, 4.6 * Math.sin(angle));
-    });
+  });
+
+  // The hub's own name goes where no region is: in the gap after the first
+  // one, which faces the default camera.
+  const gap = front + (count > 0 ? step / 2 : 0);
+  for (const region of edge) {
     regions.push({
       id: region.id,
       name: region.name,
       kind: 'edge',
+      shape: 'disc',
       center: [0, HUB_HEIGHT, 0],
-      radius: HUB_RING + 2.2,
+      radius: hubRadius,
+      halfWidth: hubRadius,
+      halfDepth: hubRadius,
+      outward: [Math.cos(gap), Math.sin(gap)],
     });
   }
 
-  // Frame the platforms and their titles, not just the nodes standing on them.
   const bounds = enclose(positions, 3);
   let reach = bounds.radius;
   for (const region of regions) {
@@ -267,75 +489,263 @@ function layoutRegions(topology: Topology): SceneLayout {
     scales,
     ground,
     regions,
-    board: null,
     center: [0, bounds.center[1], 0],
     radius: reach,
   };
 }
 
-const COLUMN_GAP = 9.5;
-const LANE_GAP = 3.3;
-const MAX_PER_COLUMN = 14;
+/** One tier of the swimlanes: how many lines it takes, and where it starts. */
+interface Column {
+  tier: number;
+  /** Scale of the largest piece that stands in it, in any lane. */
+  size: number;
+  lines: number;
+  /** Position of its first line along x, measured from the first tier. */
+  at: number;
+}
+
+interface LanePlan {
+  /** The most pieces a line may hold. */
+  cap: number;
+  columns: Column[];
+  /** Half the depth of each lane, margin included. */
+  halves: number[];
+  /** Extent of the lanes along x and z, margins included. */
+  width: number;
+  depth: number;
+}
 
 function layoutDependencies(topology: Topology): SceneLayout {
+  const { positions, scales, ground, put, byRegion } = stage(topology);
+  const links = neighboursOf(topology);
   const n = topology.nodes.length;
-  const positions = new Float32Array(n * 3);
-  const scales = new Float32Array(n);
-  const regionOrder = new Map(topology.regions.map((region, i) => [region.id, i]));
-  const tiers = new Map<number, Indexed[]>();
-  topology.nodes.forEach((node, index) => {
-    scales[index] = TYPE_SCALE[node.serviceType] * 0.9;
-    const list = tiers.get(node.tier) ?? [];
-    list.push({ node, index });
-    tiers.set(node.tier, list);
-  });
 
-  let x = 0;
-  for (const tier of [...tiers.keys()].sort((a, b) => a - b)) {
-    const members = tiers
-      .get(tier)!
-      .sort(
-        (a, b) =>
-          (regionOrder.get(a.node.region) ?? 0) - (regionOrder.get(b.node.region) ?? 0) ||
-          byTypeThenId(a, b),
-      );
-    const columns = Math.ceil(members.length / MAX_PER_COLUMN);
-    const perColumn = Math.ceil(members.length / columns);
-    for (let c = 0; c < columns; c++) {
-      const column = members.slice(c * perColumn, (c + 1) * perColumn);
-      column.forEach((entry, r) => {
-        positions[entry.index * 3] = x + c * 3.6;
-        // Standing on the board, which is at height zero.
-        positions[entry.index * 3 + 1] = scales[entry.index]!;
-        positions[entry.index * 3 + 2] = (r - (column.length - 1) / 2) * LANE_GAP;
+  const lanes = topology.regions.filter((r) => r.kind === 'cloud' && byRegion.has(r.id));
+  const inLane = new Set(lanes.map((region) => region.id));
+  const edgeRegion = topology.regions.find((r) => !inLane.has(r.id) && byRegion.has(r.id));
+  const outside: Indexed[] = [];
+  topology.nodes.forEach((node, index) => {
+    if (!inLane.has(node.region)) outside.push({ node, index });
+  });
+  const { core, monitors, rest } = edgeCast(outside);
+  const edgeTiers = tiersOf(core ? [core, ...rest] : rest);
+  const laneTiers = lanes.map((region) => tiersOf(byRegion.get(region.id)!));
+  const tierIds = [...new Set(laneTiers.flat().map((tier) => tier[0]!.node.tier))].sort(
+    (a, b) => a - b,
+  );
+  const sizeOf = (members: Indexed[]) => Math.max(...members.map((m) => scales[m.index]!));
+  const pitchOf = (size: number) => 2 * size + PIECE_CLEAR;
+
+  /** Lays the lanes out with at most `cap` pieces to a line. */
+  const plan = (cap: number): LanePlan => {
+    const columns: Column[] = tierIds.map((tier) => ({ tier, size: 0, lines: 0, at: 0 }));
+    const halves = laneTiers.map((tiers) => {
+      let half = 0;
+      for (const members of tiers) {
+        const column = columns.find((c) => c.tier === members[0]!.node.tier)!;
+        const runs = split(members, cap);
+        const size = sizeOf(members);
+        column.size = Math.max(column.size, size);
+        column.lines = Math.max(column.lines, runs.length);
+        // The first run is the longest.
+        half = Math.max(half, ((runs[0]!.length - 1) * pitchOf(size)) / 2);
+      }
+      return half + PLATE_MARGIN;
+    });
+    let x = 0;
+    columns.forEach((column, k) => {
+      const before = columns[k - 1];
+      if (before) x += before.size + column.size + COLUMN_CLEAR;
+      column.at = x;
+      x += (column.lines - 1) * pitchOf(column.size);
+    });
+    const depth = halves.reduce((sum, half) => sum + 2 * half, 0) + (lanes.length - 1) * PLATE_GAP;
+    return { cap, columns, halves, width: x + 2 * PLATE_MARGIN, depth: Math.max(0, depth) };
+  };
+
+  /**
+   * The edge stands to the left of the lanes, its own tiers as columns, and
+   * is no deeper than the lanes are.
+   */
+  const edgePlan = (lanesDepth: number) => {
+    const crowd = edgeTiers.filter((tier) => tier.length > 1);
+    const pitch = pitchOf(crowd.length > 0 ? Math.max(...crowd.map(sizeOf)) : 1);
+    const room = Math.floor((lanesDepth - 2 * PLATE_MARGIN) / pitch) + 1;
+    const lines = linesOf(
+      edgeTiers,
+      lanes.length > 0 ? Math.max(2, room) : 8,
+      scales,
+      COLUMN_CLEAR,
+    );
+    const last = lines[lines.length - 1];
+    return {
+      lines,
+      half: Math.max(0, ...lines.map((line) => line.half)) + PLATE_MARGIN,
+      // From its first column to its last.
+      span: last ? last.depth : 0,
+      // From its last column to the first tier of the lanes.
+      lead: last && tierIds.length > 0 ? sizeOf(last.members) + COLUMN_CLEAR : 0,
+    };
+  };
+
+  // How long a line may be decides the shape of the whole board: short lines
+  // make it wide, long ones deep. The one that fills the picture best, seen
+  // from where the camera first stands, is taken.
+  const { azimuth, elevation } = VIEW.dependencies;
+  let chosen = plan(4);
+  let lowest = Infinity;
+  for (let cap = 2; cap <= 8 && lanes.length > 0; cap++) {
+    const candidate = plan(cap);
+    const side = edgePlan(candidate.depth);
+    const first = candidate.columns[0]!;
+    const width =
+      candidate.width +
+      (side.lines.length > 0 ? side.span + side.lead + first.size + PLATE_MARGIN : 0);
+    const depth = Math.max(candidate.depth, 2 * side.half);
+    const across = width * Math.cos(azimuth) + depth * Math.abs(Math.sin(azimuth));
+    const up =
+      (width * Math.abs(Math.sin(azimuth)) + depth * Math.cos(azimuth)) * Math.sin(elevation);
+    const cost = Math.max(across / PICTURE_ASPECT, up);
+    if (cost < lowest - 1e-9) {
+      lowest = cost;
+      chosen = candidate;
+    }
+  }
+  const { columns, halves } = chosen;
+  const edgeSide = edgePlan(chosen.depth);
+  const regions: RegionLayout[] = [];
+
+  // The edge, each of its columns centred on the middle of the board.
+  if (edgeSide.lines.length > 0) {
+    const first = columns[0];
+    const left = -(edgeSide.span + edgeSide.lead + (first ? first.size : 0));
+    const placed = new Map<number, number>();
+    for (const line of edgeSide.lines) {
+      arrange(line.members, links, placed).forEach((entry, r) => {
+        const z = (r - (line.members.length - 1) / 2) * line.pitch;
+        placed.set(entry.index, z);
+        put(entry.index, left + line.depth, 0, z);
       });
     }
-    x += COLUMN_GAP + (columns - 1) * 3.6;
+    if (core) {
+      // The monitor keeps its place on the mast above the router.
+      let mast = scales[core.index]! * 2 + MAST_GAP;
+      const x = positions[core.index * 3]!;
+      const z = positions[core.index * 3 + 2]!;
+      for (const m of monitors) {
+        put(m.index, x, 0, z, mast);
+        mast += scales[m.index]! * 2 + MAST_GAP;
+      }
+    }
+    const halfWidth = edgeSide.span / 2 + PLATE_MARGIN;
+    regions.push({
+      id: edgeRegion?.id ?? 'edge',
+      name: edgeRegion?.name ?? 'Edge',
+      kind: 'edge',
+      shape: 'slab',
+      center: [left + edgeSide.span / 2, 0, 0],
+      radius: Math.hypot(halfWidth, edgeSide.half),
+      halfWidth,
+      halfDepth: edgeSide.half,
+      // Toward the camera: the lanes are deeper than the edge, so there is
+      // table in front of it.
+      outward: [0, 1],
+    });
   }
-  // Centre the graph on the origin.
-  const shift = (x - COLUMN_GAP) / 2;
-  for (let i = 0; i < n; i++) positions[i * 3] = positions[i * 3]! - shift;
 
-  let halfWidth = 0;
-  let halfDepth = 0;
-  for (let i = 0; i < n; i++) {
-    halfWidth = Math.max(halfWidth, Math.abs(positions[i * 3]!));
-    halfDepth = Math.max(halfDepth, Math.abs(positions[i * 3 + 2]!));
+  // The lanes, the first region farthest from the camera.
+  const halfWidth = chosen.width / 2;
+  let z = -chosen.depth / 2;
+  lanes.forEach((region, b) => {
+    const half = halves[b]!;
+    const middle = z + half;
+    const placed = new Map<number, number>();
+    for (const members of laneTiers[b]!) {
+      const column = columns.find((c) => c.tier === members[0]!.node.tier)!;
+      const pitch = pitchOf(sizeOf(members));
+      split(members, chosen.cap).forEach((run, s) => {
+        const x = column.at + s * pitchOf(column.size);
+        arrange(run, links, placed).forEach((entry, r) => {
+          const offset = (r - (run.length - 1) / 2) * pitch;
+          placed.set(entry.index, offset);
+          put(entry.index, x, 0, middle + offset);
+        });
+      });
+    }
+    regions.push({
+      id: region.id,
+      name: region.name,
+      kind: 'cloud',
+      shape: 'slab',
+      center: [halfWidth - PLATE_MARGIN, 0, middle],
+      radius: Math.hypot(halfWidth, half),
+      halfWidth,
+      halfDepth: half,
+      // Off the far end of the lane, past its last tier.
+      outward: [1, 0],
+    });
+    z += 2 * half + PLATE_GAP;
+  });
+
+  // Centre the board on the origin.
+  let low = Infinity;
+  let high = -Infinity;
+  for (const region of regions) {
+    low = Math.min(low, region.center[0] - region.halfWidth);
+    high = Math.max(high, region.center[0] + region.halfWidth);
   }
+  const shift = regions.length > 0 ? (low + high) / 2 : 0;
+  for (let i = 0; i < n; i++) positions[i * 3] = positions[i * 3]! - shift;
+  for (const region of regions) region.center[0] -= shift;
+
   return {
     mode: 'dependencies',
     positions,
     scales,
-    ground: new Float32Array(n),
-    regions: [],
-    board:
-      n === 0 ? null : { center: [0, 0, 0], halfWidth: halfWidth + 4, halfDepth: halfDepth + 4 },
+    ground,
+    regions,
     ...enclose(positions, 6),
   };
 }
 
 export function computeLayout(topology: Topology, mode: LayoutMode): SceneLayout {
   return mode === 'regions' ? layoutRegions(topology) : layoutDependencies(topology);
+}
+
+/** Table left between a plate's rim and its name. */
+const NAME_GAP = 0.9;
+
+/** The point beside a plate, off its rim on the outward side, where its name is anchored. */
+export function nameAnchor(region: RegionLayout): Vec3 {
+  const [ox, oz] = region.outward;
+  const reach =
+    region.shape === 'disc'
+      ? region.radius
+      : Math.abs(ox) * region.halfWidth + Math.abs(oz) * region.halfDepth;
+  return [
+    region.center[0] + ox * (reach + NAME_GAP),
+    region.center[1],
+    region.center[2] + oz * (reach + NAME_GAP),
+  ];
+}
+
+/**
+ * Where the middle of a `width × height` box goes, in units of its own size,
+ * so that it touches its anchor and lies wholly on the side `(x, y)` points
+ * to. The scene uses it to hang a plate's name off the rim, whichever way
+ * "outward" happens to point on screen, so a name never lies across the
+ * plate it names.
+ */
+export function hang(x: number, y: number, width: number, height: number): [number, number] {
+  const length = Math.hypot(x, y);
+  if (length < 1e-4) return [0, 0.5];
+  const ux = x / length;
+  const uy = y / length;
+  const reach = Math.min(
+    Math.abs(ux) > 1e-6 ? width / (2 * Math.abs(ux)) : Infinity,
+    Math.abs(uy) > 1e-6 ? height / (2 * Math.abs(uy)) : Infinity,
+  );
+  return [(ux * reach) / width, (uy * reach) / height];
 }
 
 /** Control point of the quadratic curve an edge is drawn along. */
