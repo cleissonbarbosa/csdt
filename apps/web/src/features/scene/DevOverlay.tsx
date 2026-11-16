@@ -27,6 +27,7 @@ export function DevOverlay() {
     ['Draw calls', String(stats.drawCalls)],
     ['Triangles', formatCount(stats.triangles)],
     ['Beads', `${formatCount(stats.particles)} of ${formatCount(stats.particleCapacity)}`],
+    ['Names', `${stats.names}, ${stats.namesMs.toFixed(2)} ms`],
     ['Objects', `${stats.nodes} services, ${stats.edges} connections`],
     ['Backend', stats.backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'],
     ['Quality', `${stats.quality} at ${stats.pixelRatio.toFixed(2)}×`],

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "recording": {
+    "id": "session",
+    "name": "Session",
+    "description": "",
+    "topologyId": "helios-commerce",
+    "seed": 42,
+    "durationMs": 32000,
+    "commands": [
+      {
+        "atMs": 8000,
+        "command": {
+          "type": "startScenario",
+          "scenarioId": "credential-stuffing"
+        }
+      },
+      {
+        "atMs": 30000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "latency",
+            "nodes": "node:use-search",
+            "factor": 3.0
+          },
+          "rampMs": 1000
+        }
+      }
+    ]
+  },
+  "cursorMs": 32000,
+  "omitted": {
+    "decisions": 2,
+    "importedEvents": 2
+  },
+  "reproducible": true,
+  "note": null,
+  "workspaceOrigin": "bundled"
+}

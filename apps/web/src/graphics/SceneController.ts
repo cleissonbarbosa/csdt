@@ -12,8 +12,11 @@
  * not the number of objects:
  *
  *   pieces        one instanced mesh per service type (≤ 12)
- *   ground marks  1      connections  1      beads  1      labels  1
+ *   ground marks  1      connections  1      beads  1
  *   plates        one per region, its shadow, and the plinth under the hub
+ *
+ * Names are not part of that picture: they are placed here and drawn by
+ * `labelLayer.ts` on a canvas of their own, at the display's full resolution.
  *
  * Snapshots set targets; the controller eases displayed values toward them
  * every frame, so the scene moves continuously between 5 Hz updates.
@@ -42,7 +45,7 @@ import * as THREE from 'three/webgpu';
 
 import { SCENE_PALETTE, type ScenePalette, type ThemeName } from '@/lib/palette';
 
-import { buildLabelAtlas, loadLabelFonts, type LabelAtlas } from './labels';
+import { LabelLayer, loadLabelFonts, type LabelColours, type LabelTone } from './labelLayer';
 import {
   bezierPoint,
   computeLayout,
@@ -61,7 +64,6 @@ import {
   createCastShadowMaterial,
   createEdgeMaterial,
   createGroundMaterial,
-  createLabelMaterial,
   createParticleMaterial,
   createPieceMaterial,
   createPlateMaterial,
@@ -72,7 +74,6 @@ import {
   EDGE_ROWS,
   SHADOW_REACH,
   type EdgeUniforms,
-  type LabelUniforms,
   type ParticleUniforms,
   type PlateUniforms,
   type SceneTheme,
@@ -130,9 +131,19 @@ export interface SceneStats {
   /** GPU resources currently alive, as tracked by the renderer. */
   geometries: number;
   textures: number;
+  /** Names on screen, and what placing and drawing them costs a frame (smoothed). */
+  names: number;
+  namesMs: number;
 }
 
 const EDGE_SEGMENTS = 20;
+/**
+ * How far a name in the overview steps out for the selection's ring, in
+ * units of its piece's size. The name's anchor is 1.3 from the piece and the
+ * ring's outer edge 1.72 (`createGroundMaterial`: 0.774 of a quad 2.2 times
+ * 0.95 times 1.06 of the size), so this leaves a little of the plate between.
+ */
+const RING_CLEARANCE = 0.5;
 /**
  * Beads are ink on a light plate: past a certain density a stream turns into
  * a solid rope and stops saying anything. The budget keeps single beads
@@ -152,9 +163,8 @@ const TRAIL = 12;
 export const FOV = 14;
 /** How much farther this lens stands than a 40° one for the same framing. */
 const LENS = Math.tan(THREE.MathUtils.degToRad(20)) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-/** Height of a label's atlas cell on screen, in CSS pixels. */
-const NODE_LABEL_PX = 19;
-const REGION_LABEL_PX = 27;
+/** About how tall a plate's name is on screen, in CSS pixels, for framing. */
+const REGION_LABEL_PX = 24;
 /** Thickness of a region plate, and so the height of the table below it. */
 const PLATE_THICKNESS = 0.6;
 /** A layer of the overview is a lower step: it marks a stage, not a place. */
@@ -201,6 +211,16 @@ const easeOutBack = (x: number) => 1 + 2.4 * (x - 1) ** 3 + 1.4 * (x - 1) ** 2;
 
 /** A plate's name is drawn at a fixed size; this is about how wide it comes out. */
 const nameWidth = (name: string) => 12 * name.length + 8;
+
+/** The colours names are drawn in, for the canvas they are drawn on. */
+function labelColoursOf(palette: ScenePalette): LabelColours {
+  return {
+    ink: palette.ink,
+    inkDim: palette.inkDim,
+    critical: palette.critical,
+    halo: palette.plate,
+  };
+}
 
 function hex(color: string): Vec3 {
   const c = new THREE.Color(color);
@@ -435,13 +455,26 @@ export class SceneController {
   private particleData: THREE.DataTexture | null = null;
   private particleUniforms: ParticleUniforms | null = null;
   private particleCapacity = 0;
-  private labelAttr: {
-    fx: THREE.InstancedBufferAttribute;
-    align: THREE.InstancedBufferAttribute;
-    size: THREE.InstancedBufferAttribute;
-  } | null = null;
-  private labelUniforms: LabelUniforms | null = null;
-  private labelMesh: THREE.Mesh | null = null;
+  /** The names, drawn on a canvas of their own over the scene. */
+  private readonly labelLayer: LabelLayer;
+  /** World anchors of every name: the nodes', then the regions'. */
+  private labelAnchors = new Float32Array(0);
+  /** Where a node's name hangs from its anchor, in units of its own size. */
+  private labelAlign: [number, number] = [0, 0.5];
+  /** Per node: how present its name is, whether it is always shown, its alarm. */
+  private labelNamed = new Float32Array(0);
+  private labelEmphasis = new Uint8Array(0);
+  private labelAlarm = new Uint8Array(0);
+  /** How much of the selection's ring is drawn round each piece, 0 to 1. */
+  private labelRing = new Float32Array(0);
+  /** Per region: whether its plate has opened far enough to be named. */
+  private regionNamed = new Float32Array(0);
+  private labelFadeNear = 40;
+  private labelFadeFar = 80;
+  private labelsReady = false;
+  /** What a frame spends on names, smoothed over the last few dozen. */
+  private namesMs = 0;
+  private labelColours: LabelColours;
   private plates: {
     uniforms: PlateUniforms;
     regionId: string;
@@ -498,6 +531,8 @@ export class SceneController {
     const palette = SCENE_PALETTE[options.theme];
     this.theme = createSceneTheme(palette);
     this.tones = tonesOf(palette);
+    this.labelColours = labelColoursOf(palette);
+    this.labelLayer = new LabelLayer(dom);
     renderer.info.autoReset = false;
     scene.background = new THREE.Color(palette.table);
     camera.fov = FOV;
@@ -675,8 +710,8 @@ export class SceneController {
     this.ringAttr = null;
     this.edgeAttr = null;
     this.particleData = null;
-    this.labelAttr = null;
-    this.labelMesh = null;
+    this.labelsReady = false;
+    this.labelLayer.clear();
   }
 
   /** The plates, the shadows they cast on the table and the plinth under the hub. */
@@ -937,56 +972,50 @@ export class SceneController {
     // The topology may have been replaced while fonts were loading.
     if (this.disposed || this.layout !== layout) return;
     const names = topology.nodes.map((node, i) => this.labels?.[i] ?? node.name);
-    const labels = [
+    this.labelLayer.setLabels([
       ...names.map((text) => ({ text, style: 'node' as const })),
-      ...layout.regions.map((region) => ({ text: region.name, style: 'region' as const })),
-    ];
-    const atlas: LabelAtlas = this.track(buildLabelAtlas(labels));
+      // A layer's heading is "02 Identity": where the headings would touch
+      // they are all cut to their number, which is what orders them.
+      ...layout.regions.map((region) => ({
+        text: region.name,
+        style: 'region' as const,
+        short: region.heading ? region.name.split(' ')[0] : undefined,
+      })),
+    ]);
     const count = this.n + layout.regions.length;
-    const geometry = this.track(instancedQuad(count));
-    const pos = instanced(geometry, 'aPos', 3, count, false);
-    const size = instanced(geometry, 'aSize', 2, count, false);
-    const rect = instanced(geometry, 'aRect', 4, count, false);
-    const align = instanced(geometry, 'aAlign', 2, count);
-    const fx = instanced(geometry, 'aLabelFx', 4, count);
+    this.labelAnchors = new Float32Array(count * 3);
+    this.labelNamed = new Float32Array(this.n);
+    this.labelEmphasis = new Uint8Array(this.n);
+    this.labelRing = new Float32Array(this.n);
+    this.labelAlarm = new Uint8Array(this.n);
+    // A plate is named unless an assembly under way says it has not opened
+    // yet. The names may be ready after the plates have all opened (fonts
+    // take a moment, and with reduced motion the assembly takes none).
+    this.regionNamed = new Float32Array(layout.regions.length).fill(1);
+    if (this.assembling) this.applyBases(this.time - this.assembleAt);
     topology.nodes.forEach((_, i) => {
-      const r = atlas.rect(names[i]!, 'node');
       const p = nodePosition(layout, i);
       const s = layout.scales[i] ?? 1;
       if (layout.mode === 'layers') {
         // In the overview a name lies on the plate at the foot of its piece,
         // toward the viewer, where it covers nothing that stands behind.
-        pos.setXYZ(i, p[0], layout.ground[i] ?? 0, p[2] + s * 1.3);
-        align.setXY(i, 0, -0.5);
+        this.labelAnchors.set([p[0], layout.ground[i] ?? 0, p[2] + s * 1.3], i * 3);
       } else {
         // A service's name stands above its piece, clear of the silhouette.
-        pos.setXYZ(i, p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * s + 0.25, p[2]);
-        align.setXY(i, 0, 0.5);
+        this.labelAnchors.set(
+          [p[0], p[1] + (this.typeTop[this.nodeTypeIndex[i]!] ?? 1) * s + 0.25, p[2]],
+          i * 3,
+        );
       }
-      if (r) {
-        size.setXY(i, NODE_LABEL_PX * r.aspect, NODE_LABEL_PX);
-        rect.setXYZW(i, r.u, r.v, r.w, r.h);
-      }
-      fx.setXYZW(i, 1, 0, 0, 0);
     });
+    this.labelAlign = layout.mode === 'layers' ? [0, -0.5] : [0, 0.5];
     // A plate's name stands on the table just off its rim, on the side that
     // faces away from the rest of the model. Which way that is on screen
     // depends on the camera, so the text is hung from the anchor every frame.
     layout.regions.forEach((region, k) => {
-      const i = this.n + k;
-      const r = atlas.rect(region.name, 'region');
-      pos.setXYZ(i, ...nameAnchor(region));
-      size.setXY(i, REGION_LABEL_PX * (r?.aspect ?? 1), REGION_LABEL_PX);
-      if (r) rect.setXYZW(i, r.u, r.v, r.w, r.h);
-      fx.setXYZW(i, 1, 1, 0, 0);
+      this.labelAnchors.set(nameAnchor(region), (this.n + k) * 3);
     });
-    this.labelAttr = { fx, align, size };
-    const { material, uniforms } = createLabelMaterial(atlas.texture, this.theme);
-    this.labelUniforms = uniforms;
-    this.labelMesh = new THREE.Mesh(geometry, this.track(material));
-    this.labelMesh.frustumCulled = false;
-    this.labelMesh.renderOrder = 6;
-    this.world.add(this.labelMesh);
+    this.labelsReady = true;
     this.applyQuality(this.quality);
   }
 
@@ -1041,6 +1070,7 @@ export class SceneController {
       const palette = SCENE_PALETTE[options.theme];
       applyPalette(this.theme, palette);
       this.tones = tonesOf(palette);
+      this.labelColours = labelColoursOf(palette);
       (this.scene.background as THREE.Color).set(palette.table);
       this.options = options;
       this.applyPlateStates();
@@ -1291,7 +1321,6 @@ export class SceneController {
 
   /** Opens every plate to where it stands `elapsed` seconds into an assembly. */
   private applyBases(elapsed: number): void {
-    const labelFx = this.labelAttr?.fx;
     for (const base of this.bases) {
       const open = this.assembling ? easeOutCubic(clamp01((elapsed - base.delay) / PLATE_TIME)) : 1;
       const size = Math.max(open, 0.0001);
@@ -1300,7 +1329,9 @@ export class SceneController {
       if (base.slab) base.group.scale.set(size, 1, 1);
       else base.group.scale.set(size, 1, size);
       base.group.position.y = (open - 1) * 1.2;
-      if (labelFx && base.label >= 0) labelFx.setX(this.n + base.label, open > 0.98 ? 1 : 0);
+      if (base.label >= 0 && base.label < this.regionNamed.length) {
+        this.regionNamed[base.label] = open > 0.98 ? 1 : 0;
+      }
     }
   }
 
@@ -1888,16 +1919,17 @@ export class SceneController {
     this.quality = level;
     const profile = QUALITY[level];
     if (this.particleUniforms) this.particleUniforms.density.value = profile.particles;
-    if (this.labelMesh) this.labelMesh.visible = this.options.labels;
-    if (this.labelUniforms && this.layout) {
-      // The overview has a dozen pieces: every one of them is named, at any
-      // distance. Elsewhere names come as the camera gets close enough.
+    if (this.layout) {
+      // The overview has a dozen pieces: every one of them may be named, at
+      // any distance. Elsewhere names come as the camera gets close enough.
+      // How sharp they are does not depend on the tier: they are not drawn
+      // in the scene's own picture (`labelLayer.ts`).
       const range =
         this.layoutMode === 'layers'
           ? 1e6
           : Math.max(34, this.layout.radius * 1.15) * profile.labelRange * LENS;
-      this.labelUniforms.fadeNear.value = range * 0.62;
-      this.labelUniforms.fadeFar.value = range;
+      this.labelFadeNear = range * 0.62;
+      this.labelFadeFar = range;
     }
     if (changed) this.hooks.onQuality(level);
   }
@@ -1946,14 +1978,16 @@ export class SceneController {
     this.updatePlates(ease);
     this.updateNodes(step, ease, 1 - Math.exp(-step * 16), motion);
     this.updateEdges(ease, 1 - Math.exp(-step * 12));
-    this.hangNames();
     this.updateOverlays(step);
 
     this.applyViewOffset(step);
     const pixelScale =
       (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2))) / (this.dom.clientHeight || 1);
     if (this.edgeUniforms) this.edgeUniforms.pixelScale.value = pixelScale;
-    if (this.labelUniforms) this.labelUniforms.pixelScale.value = pixelScale;
+    // After the view offset: names are placed where the picture now is.
+    const before = performance.now();
+    this.drawLabels(step, motion);
+    this.namesMs += (performance.now() - before - this.namesMs) * 0.05;
   }
 
   private updatePlates(ease: number): void {
@@ -1968,7 +2002,7 @@ export class SceneController {
     const layout = this.layout;
     const ring = this.ringAttr;
     if (!layout || !ring) return;
-    const labelFx = this.labelAttr?.fx;
+    const named = this.labelNamed;
     const tones = this.tones;
     const elapsed = this.time - this.assembleAt;
     const walkFrom = this.assembling ? this.walkFrom : null;
@@ -2069,18 +2103,25 @@ export class SceneController {
       const lamp = code > 0 ? tones.lamp[code]! : impacted ? tones.warning : tones.ink;
       ring.pos.setXYZ(i, x, floor + 0.035, z);
       ring.color.setXYZ(i, lamp[0], lamp[1], lamp[2]);
+      const ringed = selected || hovered ? Math.min(1, emphasis * 2) : 0;
       ring.ring.setXYZW(
         i,
         // The contact shadow tightens as the piece leaves the plate.
         base * 0.95 * clamp01(arrived) * (1 - 0.45 * clamp01(airborne) + emphasis * 0.06),
         (code > 0 ? 1 : impacted ? 0.7 : 0) * present,
         motion ? this.shockAt[i]! : -100,
-        (selected ? 1 : hovered ? 0.45 : 0) * Math.min(1, emphasis * 2),
+        (selected ? 1 : 0.45) * ringed,
       );
       // The selected and the pointed-at piece are always named; the rest
       // get their names when the camera is close enough to read them.
-      const named = this.assembling && (walkFrom !== null || arrived < 0.99) ? 0 : present;
-      labelFx?.setXYZW(i, named, selected || hovered ? 1 : 0, code === 2 ? 1 : 0, 0);
+      if (i < named.length) {
+        named[i] = this.assembling && (walkFrom !== null || arrived < 0.99) ? 0 : present;
+        this.labelEmphasis[i] = selected || hovered ? 1 : 0;
+        this.labelRing[i] = ringed;
+        // What matters more is named first: a failing service, then one an
+        // incident has reached, then the rest.
+        this.labelAlarm[i] = code === 2 ? 3 : code > 0 ? 2 : impacted ? 1 : 0;
+      }
     }
     for (const batch of this.batches) {
       if (!batch) continue;
@@ -2091,36 +2132,90 @@ export class SceneController {
     ring.pos.needsUpdate = true;
     ring.color.needsUpdate = true;
     ring.ring.needsUpdate = true;
-    if (labelFx) labelFx.needsUpdate = true;
     this.updateStems();
   }
 
   /**
-   * Hangs each plate's name off its rim, on whichever side is outward as the
+   * Hands every name to the label layer for this frame: where its anchor is
+   * on the screen, how present it is and how much it matters. The layer
+   * decides which of them there is room for and draws those.
+   *
+   * A plate's name is hung off its rim on whichever side is outward as the
    * camera now sees it, so the text never lies across the plate it names.
    */
-  private hangNames(): void {
-    const labels = this.labelAttr;
+  private drawLabels(step: number, motion: boolean): void {
+    const layer = this.labelLayer;
     const layout = this.layout;
-    if (!labels || !layout) return;
+    const width = this.dom.clientWidth;
+    const height = this.dom.clientHeight;
+    if (!layout || !this.labelsReady || !this.options.labels || width === 0 || height === 0) {
+      layer.draw(width, height, step, true, null);
+      return;
+    }
     this.camera.updateMatrixWorld();
+    const anchors = this.labelAnchors;
+    const eye = this.camera.position;
+    const [alignX, alignY] = this.labelAlign;
+    const span = Math.max(1e-6, this.labelFadeFar - this.labelFadeNear);
+    // In the overview a name lies at the foot of its piece, which is where
+    // the ring of a selection is drawn: the name steps out as the ring
+    // comes, so the ring never runs through the words.
+    const clearance = layout.mode === 'layers' ? RING_CLEARANCE : 0;
+    for (let i = 0; i < this.n; i++) {
+      const present = this.labelNamed[i]!;
+      const emphasis = this.labelEmphasis[i] === 1;
+      this.scratch.set(
+        anchors[i * 3]!,
+        anchors[i * 3 + 1]!,
+        anchors[i * 3 + 2]! + clearance * this.labelRing[i]! * (layout.scales[i] ?? 1),
+      );
+      const distance = this.scratch.distanceTo(eye);
+      // Away from the camera a name fades out, unless it is the one in hand.
+      const near = clamp01((distance - this.labelFadeNear) / span);
+      const fade = emphasis ? 1 : 1 - near * near * (3 - 2 * near);
+      this.scratch.project(this.camera);
+      const behind = this.scratch.z < -1 || this.scratch.z > 1;
+      const alarm = this.labelAlarm[i]!;
+      layer.set(
+        i,
+        (this.scratch.x * 0.5 + 0.5) * width,
+        (-this.scratch.y * 0.5 + 0.5) * height,
+        alignX,
+        alignY,
+        behind ? 0 : present * fade,
+        // Among names of the same standing, the nearer one first.
+        alarm * 100 + 10 - Math.min(9.99, distance / Math.max(1, this.labelFadeFar)),
+        (alarm === 3 ? 2 : emphasis ? 1 : 0) as LabelTone,
+        emphasis,
+      );
+    }
     // The camera's own right and up, in world space.
     const m = this.camera.matrixWorld.elements;
     layout.regions.forEach((region, k) => {
       const i = this.n + k;
+      this.scratch.set(anchors[i * 3]!, anchors[i * 3 + 1]!, anchors[i * 3 + 2]!);
+      this.scratch.project(this.camera);
+      const behind = this.scratch.z < -1 || this.scratch.z > 1;
       const [ox, oz] = region.outward;
+      const [w, h] = layer.sizeOf(i);
       // A heading keeps the place it was given; a name is hung off the rim.
       const [ax, ay] =
-        region.heading?.align ??
-        hang(
-          ox * m[0]! + oz * m[2]!,
-          ox * m[4]! + oz * m[6]!,
-          labels.size.getX(i),
-          labels.size.getY(i),
-        );
-      labels.align.setXY(i, ax, ay);
+        region.heading?.align ?? hang(ox * m[0]! + oz * m[2]!, ox * m[4]! + oz * m[6]!, w, h);
+      layer.set(
+        i,
+        (this.scratch.x * 0.5 + 0.5) * width,
+        (-this.scratch.y * 0.5 + 0.5) * height,
+        ax,
+        ay,
+        behind ? 0 : (this.regionNamed[k] ?? 0),
+        // Places come before the services that stand on them, and after a
+        // service that is failing.
+        250,
+        1,
+        false,
+      );
     });
-    labels.align.needsUpdate = true;
+    layer.draw(width, height, step, !motion, this.labelColours);
   }
 
   /** The supports under raised pieces follow them. */
@@ -2381,6 +2476,23 @@ export class SceneController {
     flipY: boolean;
   }> {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2()).floor();
+    if (this.backend === 'webgl2') {
+      // The canvas's own drawing buffer can be read back for as long as the
+      // task that drew it lasts, so the frame is drawn to the canvas as any
+      // other and read from there. The output-target path below was found
+      // to leave this backend presenting nothing once the world is rebuilt
+      // after a capture (the arrangement is switched), and to never answer
+      // the next read; it is kept for the backend that has no other way.
+      const gl = (this.dom as HTMLCanvasElement).getContext('webgl2');
+      if (gl) {
+        this.renderer.render(this.scene, this.camera);
+        const pixels = new Uint8Array(size.x * size.y * 4);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.readPixels(0, 0, size.x, size.y, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        // Rows come bottom-up.
+        return { width: size.x, height: size.y, pixels, flipY: true };
+      }
+    }
     // One target for the life of the scene: the renderer keeps state for its
     // output target, and a fresh target per capture is not picked up again
     // after the first.
@@ -2403,9 +2515,14 @@ export class SceneController {
       width: size.x,
       height: size.y,
       pixels: new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength),
-      // WebGL reads rows bottom-up; WebGPU top-down.
+      // WebGPU hands rows back top-down.
       flipY: this.backend === 'webgl2',
     };
+  }
+
+  /** The names on screen right now, each with the box it is drawn in (CSS pixels). */
+  labelBoxes(): { text: string; left: number; top: number; right: number; bottom: number }[] {
+    return this.labelLayer.boxes();
   }
 
   getStats(): SceneStats {
@@ -2429,6 +2546,8 @@ export class SceneController {
       pixelRatio: this.renderer.getPixelRatio(),
       geometries: this.renderer.info.memory.geometries,
       textures: this.renderer.info.memory.textures,
+      names: this.labelLayer.drawn,
+      namesMs: this.namesMs,
     };
   }
 
@@ -2444,6 +2563,7 @@ export class SceneController {
     this.controls.removeEventListener('control', this.onControl);
     this.controls.dispose();
     this.clearWorld();
+    this.labelLayer.dispose();
     for (const resource of this.disposables) resource.dispose();
     this.scene.remove(this.root);
   }

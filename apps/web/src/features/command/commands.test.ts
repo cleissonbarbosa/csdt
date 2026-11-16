@@ -21,6 +21,7 @@ function context(overrides: Partial<CommandContext> = {}): CommandContext {
       setLayoutMode: vi.fn(),
       setTheme: vi.fn(),
       openPanel: vi.fn(),
+      openGuide: vi.fn(),
       toggleOverlay: vi.fn(),
     },
     ...overrides,

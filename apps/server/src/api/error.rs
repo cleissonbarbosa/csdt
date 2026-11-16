@@ -91,7 +91,18 @@ impl From<ServiceError> for ApiError {
         match error {
             ServiceError::UnknownScenario(_)
             | ServiceError::UnknownTopology(_)
-            | ServiceError::UnknownRecording(_) => Self::not_found(error.to_string()),
+            | ServiceError::UnknownRecording(_)
+            | ServiceError::UnknownIncident(_) => Self::not_found(error.to_string()),
+            ServiceError::InvalidSession(_) => Self::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_session",
+                error.to_string(),
+            ),
+            ServiceError::InvalidExperiment(_) => Self::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_experiment",
+                error.to_string(),
+            ),
             ServiceError::ScenarioUnavailable(_)
             | ServiceError::NoActiveScenario
             | ServiceError::WorkspaceChanged => {

@@ -73,8 +73,8 @@ the regions, and anything that needs attention.
 
 ## 3 · Follow a request (60 s)
 
-Go back to the **Overview**, open **⋯** and choose **Trace a request through
-Cedar**.
+Go back to the **Overview** and press **Test an authorization** in the top
+bar (it is also in **⋯**, as **Trace a request through Cedar**).
 
 1. Principal **Mallory**, action **Export ledger**, resource **Acme ledger
    2026**. Press **Evaluate with Cedar**.
@@ -90,7 +90,15 @@ Cedar**.
 4. Choose **Export ledger** for Alice with _Fresh MFA assertion_ **Absent**.
    **Deny**, and Cedar's own diagnostic explains that the policy errored on a
    missing attribute. Set it to **True**: **Allow**.
-5. Switch off `forbid-destructive-outside-change-window` and try **Carol**
+5. With that **Allow** on screen, set _Fresh MFA assertion_ back to
+   **False** and do not evaluate. The card says **Configuration changed.
+   Evaluate again.**, shows the result as _Was Allow_ and lists what
+   changed: a result is never shown as the answer to a form it was not
+   asked.
+6. Set it to **True** again, press **Keep to compare**, set it to **False**
+   and evaluate. The two results stand side by side: Allow and Deny, the
+   policy that decides each, and the one thing that differs.
+7. Switch off `forbid-destructive-outside-change-window` and try **Carol**
    deleting a customer.
 
 These decisions come from the `cedar-policy` engine evaluating the policies
@@ -125,6 +133,14 @@ visible; press one to unfold it. Switch to **Regions** to see the same
 incident by place: the camera moves in on the route, and the plate of the
 region under attack takes a red outline.
 
+Phases are timed from the start of the incident. Press one that has been
+reached to see why: what the scenario _prescribed_ in it, what followed in
+the _model_ (each service with the dependency it was traced along) and what
+was _observed_. **Summary so far**, and afterwards the incident's entry
+under **On this timeline**, give the whole of it: origin, propagation, peak
+impact, recovery, and the moments to go back to. **Copy** takes it away as
+text.
+
 ## 5 · Travel in time (60 s)
 
 - Press **Pause**. Virtual time stops.
@@ -132,13 +148,35 @@ region under attack takes a red outline.
   errors with the incident marked. Drag the playhead back to before the red
   band. The model, the signals and every card return to exactly that moment.
 - Press **Play**: you are replaying recorded history, re-simulated bit for
-  bit. The bar says _Replay_.
+  bit. The bar says _History_, and where the simulation's now is.
 - **Replay the incident** goes back to where the latest one began.
-- Press **Live** to jump back to the head.
+- Press **Now** to jump back to the simulation's now.
 - Click any event in the console, then **Jump to this moment**.
 
 Start a different scenario while in the past and the timeline _branches_: the
 old future is discarded and a new one is made from there.
+
+## 5b · Change one thing (60 s)
+
+Under **Cascading Service Failure**, press **Compare an intervention**. The
+form starts on the service the scenario is about. Set the factor to **6**
+and press **Run both**: the engine runs the incident twice from the same
+seed, once as it is and once with six times the database's capacity placed
+21 seconds in. The dialog says exactly what changed, lays errors, latency,
+services affected and recovery side by side, and draws both runs. **Watch
+run B on the timeline** puts it there to scrub.
+
+## 5c · Take it with you
+
+Open **⋯ → Save or share this session**. It lists what reproduces what is on
+screen: the platform, the seed, each command with its time, the moment and
+the view. **Copy a link** carries it in the address; **Save as a file**
+carries the platform's files too when they are not the bundled ones. Opening
+either shows the session first and simulates it again only when asked.
+
+**⋯ → Guided challenges** asks three questions and checks the answers
+against the model: where a cascade begins, where a flood is stopped, how to
+make Cedar allow an export it denied.
 
 ## 6 · The other four incidents
 
@@ -215,6 +253,11 @@ Helios back. From a terminal,
 start from, `check-workspace` validates a directory without starting
 anything, and `diff-workspace` lists what Cedar decides differently between
 two of them. The format is in [WORKSPACE.md](WORKSPACE.md).
+
+To write an incident of your own without leaving the page, press **Write a
+scenario of your own** under the scenarios: name it, give each phase its
+effects (by role, region or service) and the events it announces, and the
+engine says whether it accepts the file and where it can run.
 
 ## Reproducing the screenshots
 

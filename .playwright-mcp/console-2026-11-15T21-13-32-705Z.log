@@ -1,0 +1,13 @@
+[    1152ms] [WARNING] No available adapters. @ https://cleissonbarbosa.github.io/csdt/:1
+[    1229ms] [WARNING] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1
+[    1233ms] [WARNING] No available adapters. @ https://cleissonbarbosa.github.io/csdt/:1
+[    1233ms] [WARNING] THREE.WebGPURenderer: WebGPU is not available, running under WebGL2 backend. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1
+[    1250ms] [WARNING] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1
+[    1399ms] [WARNING] [.WebGL-0x2954000ff200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ https://cleissonbarbosa.github.io/csdt/:1
+[    1429ms] [WARNING] [.WebGL-0x2954000ff200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ https://cleissonbarbosa.github.io/csdt/:1
+[    1457ms] [WARNING] [.WebGL-0x2954000ff200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ https://cleissonbarbosa.github.io/csdt/:1
+[    1500ms] [WARNING] [.WebGL-0x2954000ff200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ https://cleissonbarbosa.github.io/csdt/:1
+[  221000ms] [WARNING] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1
+[  221001ms] [WARNING] No available adapters. @ https://cleissonbarbosa.github.io/csdt/:1
+[  221002ms] [WARNING] THREE.WebGPURenderer: WebGPU is not available, running under WebGL2 backend. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1
+[  221016ms] [WARNING] THREE.WebGPURenderer: PCFSoftShadowMap has been removed. Using PCFShadowMap instead. @ https://cleissonbarbosa.github.io/csdt/assets/three-DmHSerBQ.js:1

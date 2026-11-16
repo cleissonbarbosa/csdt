@@ -8,15 +8,19 @@ use crate::authorization::validate_request;
 use crate::clock::Instant;
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, Decision, EngineInfo,
-    ImportedEvent, Incident, MetricsReport, PathStage, PathStageKind, PlaybackState,
-    PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario, SecurityEvent,
-    Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS, SCHEMA_VERSION,
+    ImportedEvent, Incident, IncidentReport, MetricsReport, PathStage, PathStageKind,
+    PlaybackState, PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario,
+    SecurityEvent, Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS,
+    SCHEMA_VERSION,
 };
+use crate::incidents::recordings::Recording;
 use crate::incidents::{resolve_fault, Effect};
 use crate::simulation::engine::{fault_fits, MAX_FAULT_RAMP_MS};
 use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
+use super::experiment::{self, Experiment};
+use super::session::{self, SessionExport};
 use super::{Assets, Loaded};
 
 /// Version of the WebSocket message protocol.
@@ -52,6 +56,12 @@ pub enum ServiceError {
     InvalidFault(String),
     #[error("too many faults are in force; lift some first")]
     TooManyFaults,
+    #[error("unknown incident `{0}`, or one older than the history that is kept")]
+    UnknownIncident(String),
+    #[error("the session cannot be loaded: {0}")]
+    InvalidSession(String),
+    #[error("the comparison cannot be run: {0}")]
+    InvalidExperiment(String),
     #[error("the platform's files were replaced while this was being prepared; try again")]
     WorkspaceChanged,
     #[error(transparent)]
@@ -515,6 +525,112 @@ impl SimulationService {
         Ok(rt.timeline.playback(rt.status, rt.speed))
     }
 
+    /// The timeline in use as a session: what reproduces it.
+    pub fn session(&self) -> SessionExport {
+        let rt = self.lock();
+        session::export(&rt.timeline, rt.loaded.origin)
+    }
+
+    /// Replaces the timeline with the one a session describes, re-simulated
+    /// from its seed and commands, and puts the cursor where it was saved.
+    /// With a cursor the timeline waits there, paused; without one it plays
+    /// from the start.
+    pub fn load_session(
+        &self,
+        recording: &Recording,
+        cursor_ms: Option<u64>,
+    ) -> Result<PlaybackState, ServiceError> {
+        recording
+            .validate_session()
+            .map_err(ServiceError::InvalidSession)?;
+        let assets = self.assets();
+        let world = assets
+            .world(&recording.topology_id)
+            .ok_or_else(|| ServiceError::UnknownTopology(recording.topology_id.clone()))?;
+        // The same questions start-up asks of a recording file.
+        for id in recording.scenario_ids() {
+            let scenario = world
+                .scenarios
+                .iter()
+                .find(|scenario| scenario.info.id == id)
+                .ok_or_else(|| ServiceError::UnknownScenario(id.clone()))?;
+            if !scenario.info.available {
+                return Err(ServiceError::ScenarioUnavailable(id));
+            }
+        }
+        for effect in recording.faults() {
+            resolve_fault(&world.topo, effect).map_err(ServiceError::InvalidSession)?;
+        }
+        let mut timeline = Timeline::from_recording(
+            Arc::clone(&world.topo),
+            Arc::clone(&world.scenarios),
+            Arc::clone(&assets.decisions),
+            recording,
+        );
+        if let Some(cursor_ms) = cursor_ms {
+            timeline.seek(cursor_ms / TICK_MS);
+        }
+        let mut rt = self.lock();
+        if !Arc::ptr_eq(&rt.loaded.assets, &assets) {
+            return Err(ServiceError::WorkspaceChanged);
+        }
+        rt.timeline = timeline;
+        rt.status = if cursor_ms.is_some() {
+            PlaybackStatus::Paused
+        } else {
+            PlaybackStatus::Playing
+        };
+        rt.accumulator_ms = 0.0;
+        self.broadcast_timeline(&mut rt, TimelineReason::Recording);
+        Ok(rt.timeline.playback(rt.status, rt.speed))
+    }
+
+    /// Runs a scenario twice on timelines of its own, on the topology in
+    /// use and with the server's seed: as it is, and with one fault placed
+    /// `at_ms` after it starts. The timeline in use is not touched.
+    pub fn compare_intervention(
+        &self,
+        scenario_id: &str,
+        effect: Effect,
+        at_ms: u64,
+        ramp_ms: u64,
+    ) -> Result<Experiment, ServiceError> {
+        effect.validate().map_err(ServiceError::InvalidFault)?;
+        if ramp_ms > MAX_FAULT_RAMP_MS {
+            return Err(ServiceError::InvalidFault(format!(
+                "rampMs must be at most {MAX_FAULT_RAMP_MS}, got {ramp_ms}"
+            )));
+        }
+        let (assets, topology_id) = {
+            let rt = self.lock();
+            (
+                Arc::clone(&rt.loaded.assets),
+                rt.timeline.topology().spec.id.clone(),
+            )
+        };
+        let world = assets
+            .world(&topology_id)
+            .ok_or(ServiceError::UnknownTopology(topology_id))?;
+        let scenario = world
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.info.id == scenario_id)
+            .ok_or_else(|| ServiceError::UnknownScenario(scenario_id.to_string()))?;
+        if !scenario.info.available {
+            return Err(ServiceError::ScenarioUnavailable(scenario_id.to_string()));
+        }
+        experiment::run(
+            world,
+            &assets.decisions,
+            self.seed,
+            scenario,
+            effect,
+            at_ms,
+            ramp_ms,
+        )
+        .map_err(ServiceError::InvalidExperiment)
+    }
+
     /// Places fixture-derived events on the timeline at the cursor.
     pub fn import_events(&self, provider_id: &str, events: Vec<ImportedEvent>) {
         if events.is_empty() {
@@ -670,6 +786,14 @@ impl SimulationService {
 
     pub fn incidents(&self) -> Vec<Incident> {
         self.lock().timeline.incidents().to_vec()
+    }
+
+    /// An incident of the timeline in use, read back from its record.
+    pub fn incident_report(&self, incident_id: &str) -> Result<IncidentReport, ServiceError> {
+        self.lock()
+            .timeline
+            .incident_report(incident_id)
+            .ok_or_else(|| ServiceError::UnknownIncident(incident_id.to_string()))
     }
 
     pub fn scenarios(&self) -> Vec<Scenario> {

@@ -3,7 +3,7 @@
 //   node scripts/capture.mjs --out shot.png [--url http://localhost:5173]
 //        [--width 1920 --height 1080] [--wait 6] [--webgl2] [--readback]
 //        [--arrangement regions|dependencies]  (the default is the overview)
-//        [--settings '{"quality":"ultra"}'] [--reset]
+//        [--settings '{"quality":"ultra"}'] [--reset] [--first-visit]
 //        [--scenario ddos-surge --after 24] [--speed 2]
 //        [--click tab-incidents,scenario-start-ddos-surge]
 //        [--select authz-principal=User::"mallory"] [--then authz-evaluate]
@@ -74,6 +74,16 @@ if (args.webgl2 || args.settings) {
     window.localStorage.setItem('aegis.settings.v1', JSON.stringify({ state: value, version: 1 }));
   }, settings);
 }
+if (!args['first-visit']) {
+  // A capture shows the application as a returning visitor sees it: without
+  // the orientation card that is laid over the model on a first visit.
+  await context.addInitScript(() => {
+    window.localStorage.setItem(
+      'aegis.guide.v1',
+      JSON.stringify({ state: { oriented: true, completed: [] }, version: 1 }),
+    );
+  });
+}
 await page.goto(args.arrangement ? `${url}/?arrangement=${args.arrangement}` : url);
 await page.waitForTimeout(Number(args.wait ?? 6) * 1000);
 if (args.scenario) {
@@ -101,9 +111,11 @@ for (const id of typeof args.then === 'string' ? args.then.split(',') : []) {
   await page.getByTestId(id).first().click();
   await page.waitForTimeout(450);
 }
+// The scene's own canvas: the names are drawn on a second one laid over it.
+const scene = page.locator('canvas:not([data-aegis-labels])').first();
 if (typeof args.node === 'string') {
   const at = await page.evaluate((id) => window.__aegis?.projectNode(id) ?? null, args.node);
-  const box = await page.locator('canvas').boundingBox();
+  const box = await scene.boundingBox();
   if (at && box) await page.mouse.click(box.x + at.x, box.y + at.y);
   // Park the pointer so no hover card covers the subject.
   await page.mouse.move(4, 4);
@@ -112,7 +124,7 @@ if (typeof args.node === 'string') {
 if (typeof args.focus === 'string') {
   // Double-click a service: the camera moves in on it.
   const at = await page.evaluate((id) => window.__aegis?.projectNode(id) ?? null, args.focus);
-  const box = await page.locator('canvas').boundingBox();
+  const box = await scene.boundingBox();
   if (at && box) await page.mouse.dblclick(box.x + at.x, box.y + at.y);
   await page.mouse.move(4, 4);
   await page.waitForTimeout(1500);
@@ -151,6 +163,9 @@ if (args.readback) {
     // The render target has no alpha to speak of; make the image opaque.
     for (let i = 3; i < image.data.length; i += 4) image.data[i] = 255;
     ctx.putImageData(image, 0, 0);
+    // Names are drawn on a canvas of their own over the scene; lay it on.
+    const names = document.querySelector('canvas[data-aegis-labels]');
+    if (names) ctx.drawImage(names, 0, 0, frame.width, frame.height);
     return canvas.toDataURL('image/png');
   });
   await writeFile(args.out ?? 'capture.png', Buffer.from(dataUrl.split(',')[1], 'base64'));

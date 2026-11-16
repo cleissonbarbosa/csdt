@@ -1,5 +1,5 @@
 /** Interface state: selection, filters, panels and persisted settings. */
-import type { AuthorizationDecision, Health, ServiceType } from '@aegis/contracts';
+import type { AuthorizationDecision, EvaluateRequest, Health, ServiceType } from '@aegis/contracts';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -34,7 +34,18 @@ function initialLayout(): LayoutMode {
   return LAYOUT_MODES.find((mode) => mode === asked) ?? 'layers';
 }
 export type ViewMode = 'scene' | 'table';
-export type PanelId = 'authorization' | 'integrations' | 'settings' | 'help' | 'workspace';
+export type PanelId =
+  | 'authorization'
+  | 'integrations'
+  | 'settings'
+  | 'help'
+  | 'workspace'
+  /** The same incident twice, with one thing changed. */
+  | 'experiment'
+  /** Saving, sharing and opening a session. */
+  | 'session'
+  /** Writing a scenario by hand. */
+  | 'scenario-editor';
 export type LeftTab = 'explorer' | 'incidents';
 
 export interface Filters {
@@ -92,6 +103,14 @@ export interface UiState {
   timelineOpen: boolean;
   /** Event whose details are shown in the event inspector. */
   inspectedEventSeq: number | null;
+  /** Incident whose summary is shown in the incidents tab. */
+  inspectedIncidentId: string | null;
+  /** A request for the tracer's form to take up, from a challenge or a link. */
+  authorizationPreset: EvaluateRequest | null;
+  /** The latest decision Cedar gave in this page, whatever is being traced. */
+  lastDecision: AuthorizationDecision | null;
+  /** The scenario a comparison is opened on. */
+  experimentScenarioId: string | null;
   /** The incident the viewer has already looked at; newer ones ask for attention. */
   acknowledgedIncidentId: string | null;
   commandOpen: boolean;
@@ -116,6 +135,11 @@ export interface UiState {
   setTracing: (tracing: boolean) => void;
   setTimelineOpen: (open: boolean) => void;
   inspectEvent: (seq: number | null) => void;
+  inspectIncident: (id: string | null) => void;
+  presetAuthorization: (request: EvaluateRequest | null) => void;
+  setLastDecision: (decision: AuthorizationDecision | null) => void;
+  /** Opens the comparison of an intervention, on a scenario if one is named. */
+  openExperiment: (scenarioId?: string) => void;
   acknowledgeIncident: (id: string | null) => void;
   setCommandOpen: (open: boolean) => void;
   /** Clears state tied to a topology that is being replaced. */
@@ -141,6 +165,10 @@ export const useUi = create<UiState>((set) => ({
   tracing: false,
   timelineOpen: false,
   inspectedEventSeq: null,
+  inspectedIncidentId: null,
+  authorizationPreset: null,
+  lastDecision: null,
+  experimentScenarioId: null,
   acknowledgedIncidentId: null,
   commandOpen: false,
 
@@ -194,7 +222,12 @@ export const useUi = create<UiState>((set) => ({
       };
     }),
   setViewMode: (viewMode) => set({ viewMode }),
-  setPanel: (openPanel) => set({ openPanel }),
+  // The tracer lives in the right sidebar: asking for it brings that forward.
+  setPanel: (openPanel) =>
+    set((s) => ({
+      openPanel,
+      inspectorOpen: openPanel === 'authorization' ? true : s.inspectorOpen,
+    })),
   togglePanel: (panel) =>
     set((s) => ({
       openPanel: s.openPanel === panel ? null : panel,
@@ -219,6 +252,33 @@ export const useUi = create<UiState>((set) => ({
         ? { inspectedEventSeq }
         : { inspectedEventSeq, leftTab: 'incidents', explorerOpen: true },
     ),
+  // An incident's summary lives there too, and takes the place of an event.
+  inspectIncident: (inspectedIncidentId) =>
+    set(
+      inspectedIncidentId === null
+        ? { inspectedIncidentId }
+        : {
+            inspectedIncidentId,
+            inspectedEventSeq: null,
+            leftTab: 'incidents',
+            explorerOpen: true,
+          },
+    ),
+  // The tracer shares the right sidebar: handing it a request brings it forward.
+  presetAuthorization: (authorizationPreset) =>
+    set(
+      authorizationPreset === null
+        ? { authorizationPreset }
+        : {
+            authorizationPreset,
+            openPanel: 'authorization',
+            inspectorOpen: true,
+            selection: null,
+          },
+    ),
+  setLastDecision: (lastDecision) => set({ lastDecision }),
+  openExperiment: (scenarioId) =>
+    set({ openPanel: 'experiment', experimentScenarioId: scenarioId ?? null }),
   acknowledgeIncident: (acknowledgedIncidentId) => set({ acknowledgedIncidentId }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),
   resetForTopology: () =>
@@ -229,6 +289,8 @@ export const useUi = create<UiState>((set) => ({
       tracedDecision: null,
       tracing: false,
       inspectedEventSeq: null,
+      inspectedIncidentId: null,
+      lastDecision: null,
     }),
 }));
 

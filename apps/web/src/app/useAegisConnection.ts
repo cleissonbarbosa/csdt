@@ -1,11 +1,12 @@
 /**
  * Connects the telemetry provider to the stores for the lifetime of the app.
  */
-import type { TimelineReason } from '@aegis/contracts';
+import type { SecurityEvent, TimelineReason } from '@aegis/contracts';
 import { useEffect } from 'react';
 
 import { api, ApiError } from '@/providers/api';
 import { DemoSimulationProvider } from '@/providers/demoProvider';
+import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
@@ -58,6 +59,30 @@ function invalidateTimelineQueries(): void {
   }
 }
 
+/**
+ * Whether an event adds a line to an incident's report: the incident's own
+ * events (its start, a phase, its end) and every change of a service's
+ * state, which the report lists and explains. A report read before such an
+ * event does not have it: asked why a service that has just changed did,
+ * it would have nothing to say.
+ */
+export function growsReport(event: SecurityEvent): boolean {
+  return event.kind.startsWith('incident-') || event.kind === 'health-transition';
+}
+
+/**
+ * Offers the summary of an incident as it ends. The event is the engine's;
+ * the summary it leads to is read from the same timeline.
+ */
+export function announceResolved(event: SecurityEvent): void {
+  const incidentId = event.incidentId;
+  if (event.kind !== 'incident-resolved' || incidentId === null) return;
+  useNotices.getState().push('info', `${event.title}. Its summary is ready.`, {
+    label: 'Open the summary',
+    run: () => useUi.getState().inspectIncident(incidentId),
+  });
+}
+
 export function useAegisConnection(): void {
   useEffect(() => {
     const source = getProvider();
@@ -83,11 +108,25 @@ export function useAegisConnection(): void {
         if (state.topology && snapshot.topologyId !== state.topology.id) {
           void loadTopology().catch(() => undefined);
         }
+        // While history is replayed no event is announced again, so the list
+        // of incidents would stay as it was when the cursor was put there.
+        // The snapshot says which incident is under way at its moment: when
+        // that changes, so has the list.
+        const before = state.snapshot?.incident;
+        const now = snapshot.incident;
+        if (before?.id !== now?.id || before?.status !== now?.status) invalidateTimelineQueries();
         state.applySnapshot(snapshot);
       }),
       source.subscribeEvents((event) => {
         useTelemetry.getState().appendEvents([event]);
         if (event.kind.startsWith('incident-')) invalidateTimelineQueries();
+        // What is known of the incident has grown; so has its report.
+        if (growsReport(event)) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.reports });
+        }
+        // An incident that has just ended can be read back in full: say so,
+        // once, where it can be taken up or left.
+        announceResolved(event);
         if (event.kind === 'authz-decision') {
           void queryClient.invalidateQueries({ queryKey: queryKeys.decisions });
         }
@@ -102,6 +141,16 @@ export function useAegisConnection(): void {
         if (replaced) useUi.getState().resetForTopology();
         if (reason === 'reset' || reason === 'topology' || reason === 'recording' || replaced) {
           state.clearTimeline();
+        }
+        if (reason !== 'seek') {
+          // History changed shape: an incident that was on it may be gone,
+          // and its report with it. Nothing is asked about it until the
+          // snapshot that follows says what is running now.
+          state.forgetIncident();
+          queryClient.removeQueries({ queryKey: queryKeys.reports });
+          // A branch keeps what came before it; anything else starts over,
+          // and a summary that was being read is of a timeline that is gone.
+          if (reason !== 'branch') useUi.getState().inspectIncident(null);
         }
         const reload =
           reason === 'topology' || reason === 'recording' || replaced

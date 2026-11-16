@@ -8,7 +8,7 @@
 import type { Scenario, Topology } from '@aegis/contracts';
 
 import { SERVICE_TYPE } from '@/lib/palette';
-import type { LayoutMode } from '@/stores/ui';
+import type { LayoutMode, PanelId } from '@/stores/ui';
 
 export type CommandGroup = 'Services' | 'Scenarios' | 'Regions' | 'Actions';
 
@@ -37,9 +37,8 @@ export interface CommandContext {
     setViewMode: (mode: 'scene' | 'table') => void;
     setLayoutMode: (mode: LayoutMode) => void;
     setTheme: (theme: 'system' | 'light' | 'night') => void;
-    openPanel: (
-      panel: 'authorization' | 'integrations' | 'settings' | 'help' | 'workspace',
-    ) => void;
+    openPanel: (panel: PanelId) => void;
+    openGuide: () => void;
     toggleOverlay: () => void;
   };
 }
@@ -104,6 +103,34 @@ export function buildCommands(context: CommandContext): Command[] {
       title: 'Open the authorization explorer',
       hint: 'Cedar',
       run: () => act.openPanel('authorization'),
+    },
+    {
+      id: 'experiment',
+      group: 'Actions',
+      title: 'Compare an intervention',
+      hint: 'the same incident twice, A/B',
+      run: () => act.openPanel('experiment'),
+    },
+    {
+      id: 'guide',
+      group: 'Actions',
+      title: 'Take a guided challenge',
+      hint: 'objectives, training',
+      run: act.openGuide,
+    },
+    {
+      id: 'session',
+      group: 'Actions',
+      title: 'Save or share this session',
+      hint: 'link, file, reproduce',
+      run: () => act.openPanel('session'),
+    },
+    {
+      id: 'scenario-editor',
+      group: 'Actions',
+      title: 'Write a scenario',
+      hint: 'editor, phases, effects',
+      run: () => act.openPanel('scenario-editor'),
     },
     {
       id: 'integrations',

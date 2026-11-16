@@ -12,6 +12,10 @@ use crate::simulation::engine::{Command, MAX_FAULT_RAMP_MS};
 
 use super::spec::{Effect, MAX_DURATION_MS, MAX_LIST};
 
+/// Most commands a session saved from the interface may hold. A recording
+/// file is held to the smaller [`MAX_LIST`].
+pub const MAX_SESSION_COMMANDS: usize = 512;
+
 /// A fault in a recording is held to what one placed through the interface
 /// is: figures in range, and an effect that means something outside a
 /// scenario.
@@ -50,6 +54,17 @@ impl Recording {
     /// decision or an imported event on the timeline, and those have to come
     /// from an engine or an importer, never from a file that merely says so.
     pub fn validate(&self) -> Result<(), String> {
+        self.check(1, MAX_LIST)
+    }
+
+    /// Checks a session: a timeline written out by the server and handed
+    /// back. It is held to what a recording file is, except that it may
+    /// hold no command at all (time simply passed) and more of them.
+    pub fn validate_session(&self) -> Result<(), String> {
+        self.check(0, MAX_SESSION_COMMANDS)
+    }
+
+    fn check(&self, fewest: usize, most: usize) -> Result<(), String> {
         if !is_valid_id(&self.id) {
             return Err(format!("id `{}` is not a valid identifier", self.id));
         }
@@ -62,9 +77,9 @@ impl Recording {
                 self.duration_ms
             ));
         }
-        if self.commands.is_empty() || self.commands.len() > MAX_LIST {
+        if self.commands.len() < fewest || self.commands.len() > most {
             return Err(format!(
-                "a recording holds 1 to {MAX_LIST} commands, found {}",
+                "a recording holds {fewest} to {most} commands, found {}",
                 self.commands.len()
             ));
         }

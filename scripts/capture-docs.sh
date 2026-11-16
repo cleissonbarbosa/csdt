@@ -48,6 +48,13 @@ shot --webgl2 --settings "$LIGHT" --wait 10 --click open-menu,menu-trace \
   --select 'authz-principal=User::"mallory",authz-action=Action::"exportLedger"' --then authz-evaluate \
   --settle 5 --out "$OUT/cedar-denial.png"
 shot --webgl2 --settings "$LIGHT" --arrangement regions --wait 10 --focus use-gateway --settle 2 --out "$OUT/closeup.png"
+# An incident read back from its own record while it runs: what the scenario
+# prescribed, what followed in the model, and the moments to go back to.
+shot --webgl2 --settings "$LIGHT" --wait 8 --scenario cascading-failure --after 46 \
+  --click explore-incident,incident-summary-open --settle 2 --out "$OUT/incident-explained.png"
+# The same incident twice, the second time with one change.
+shot --webgl2 --settings "$LIGHT" --wait 8 --click explore-incident,scenario-compare-cascading-failure,experiment-run \
+  --settle 8 --out "$OUT/comparison.png"
 shot hyperscale-stress --webgl2 --settings "$LIGHT" --wait 10 --out "$OUT/stress-overview.png"
 shot hyperscale-stress --webgl2 --settings "$LIGHT" --arrangement regions --wait 12 --out "$OUT/stress-regions.png"
 shot hyperscale-stress --webgl2 --settings "$LIGHT" --arrangement dependencies --wait 12 --out "$OUT/stress-dependencies.png"

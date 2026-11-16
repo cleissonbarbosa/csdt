@@ -5,13 +5,16 @@ import {
   Box,
   CircleHelp,
   Ellipsis,
+  Flag,
   FolderOpen,
+  GitCompareArrows,
   History,
   KeyRound,
   List,
   Play,
   Search,
   Settings,
+  Share2,
   Table2,
 } from 'lucide-react';
 
@@ -26,6 +29,7 @@ import { Deviations } from '@/features/hud/Hud';
 import { cn } from '@/lib/cn';
 import { COLOR, DATA_SOURCE_HINT, DATA_SOURCE_LABEL, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
+import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
@@ -133,7 +137,7 @@ function PlatformStatus() {
 function ConnectionHealth() {
   const connection = useTelemetry((state) => state.connection);
   const view = {
-    open: { label: 'Stream live', tone: undefined },
+    open: { label: 'Stream connected', tone: undefined },
     connecting: { label: HOST.connecting, tone: COLOR.warning },
     reconnecting: { label: HOST.reconnecting, tone: COLOR.warning },
     idle: { label: 'Offline', tone: COLOR.warning },
@@ -220,14 +224,16 @@ function TopologyPicker() {
 }
 
 /**
- * The bar: what this is, how it is, and the two things to do first. The rest
- * of the application is one step away, in the menu at its end and in the
- * model itself.
+ * The bar: what this is, how it is, and the things to do first: find
+ * something, ask Cedar, follow an incident. The rest of the application is
+ * one step away, in the menu at its end and in the model itself.
  */
 export function TopNav() {
   const viewMode = useUi((state) => state.viewMode);
   const incidentsOpen = useUi((state) => state.explorerOpen && state.leftTab === 'incidents');
   const timelineOpen = useUi((state) => state.timelineOpen);
+  const tracerOpen = useUi((state) => state.inspectorOpen && state.openPanel === 'authorization');
+  const guideOpen = useGuide((state) => state.open);
   const incidentActive = useTelemetry((state) => {
     const incident = state.snapshot?.incident;
     return incident != null && incident.status !== 'resolved';
@@ -268,6 +274,20 @@ export function TopNav() {
           <span className="max-lg:hidden">Search</span>
           <kbd className="code text-[10px] text-ink-faint max-xl:hidden">Ctrl K</kbd>
         </button>
+        {/* What makes this a security model, not only an operations one:
+            on the bar itself, a step from anywhere. On a phone too, where
+            it is its icon: the menu at the end is where it was overlooked. */}
+        <Button
+          icon={<KeyRound size={13} aria-hidden />}
+          aria-expanded={tracerOpen}
+          aria-label="Test an authorization with Cedar"
+          title="Ask Cedar who may do what, and follow the request across the model"
+          onClick={() => useUi.getState().togglePanel('authorization')}
+          data-testid="open-tracer"
+          className="max-lg:w-8 max-lg:px-0"
+        >
+          <span className="max-lg:hidden">Test an authorization</span>
+        </Button>
         <Button
           variant="primary"
           icon={<Play size={13} aria-hidden />}
@@ -279,7 +299,12 @@ export function TopNav() {
           }}
           data-testid="explore-incident"
         >
-          {incidentActive ? 'Follow the incident' : 'Explore an incident'}
+          {/* A phone's bar has room for the last word, which is the one
+              that says what the button is about. */}
+          <span>
+            <span className="max-sm:hidden">{incidentActive ? 'Follow the ' : 'Explore an '}</span>
+            <span className="max-sm:capitalize">incident</span>
+          </span>
         </Button>
         <Menu
           label="More"
@@ -291,6 +316,19 @@ export function TopNav() {
               label: 'Trace a request through Cedar',
               icon: <KeyRound size={14} />,
               onSelect: () => useUi.getState().togglePanel('authorization'),
+            },
+            {
+              id: 'experiment',
+              label: 'Compare an intervention',
+              icon: <GitCompareArrows size={14} />,
+              onSelect: () => useUi.getState().openExperiment(),
+            },
+            {
+              id: 'guide',
+              label: 'Guided challenges',
+              icon: <Flag size={14} />,
+              checked: guideOpen,
+              onSelect: () => useGuide.getState().setOpen(!guideOpen),
             },
             {
               id: 'services',
@@ -324,6 +362,12 @@ export function TopNav() {
               icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
               onSelect: () =>
                 useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+            },
+            {
+              id: 'session',
+              label: 'Save or share this session',
+              icon: <Share2 size={14} />,
+              onSelect: () => useUi.getState().setPanel('session'),
             },
             {
               id: 'workspace',

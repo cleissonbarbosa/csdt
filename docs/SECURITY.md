@@ -76,7 +76,8 @@ Whichever way it arrives, a workspace is held to this:
 - **Provenance cannot be forged.** A topology must be labelled `synthetic`,
   because its figures are computed whatever platform it describes. A scenario
   may only announce alerts, authentication failures, mitigations and reroutes;
-  a recording may only start and stop scenarios. An authorization decision, an
+  a recording, and a session, may only start and stop scenarios and place
+  and lift faults. An authorization decision, an
   advisory or a scan finding cannot be written into a file: they come from
   Cedar or from an importer.
 - **Cedar still decides.** Policies from a workspace are parsed and evaluated
@@ -95,14 +96,52 @@ Files in a workspace may describe a real system, and two things follow.
   connected cedar-agent started with `AEGIS_CEDAR_AGENT_SYNC=true` receives the
   policies and entities the embedded engine holds.
 
+## Sessions, comparisons and reports
+
+A few routes take or produce a timeline as data. None reads a file, none
+takes an outcome, and what each can make the server do is bounded.
+
+- **A session is a recording.** `GET /session` writes the timeline in use
+  out as a topology id, a seed and the commands that were issued.
+  `POST /demo/session/load` takes one and has the engine simulate it again.
+  It is held to what a recording file is held to: it may start and stop
+  scenarios and place and lift faults, with figures in range, on services
+  and connections the topology has. A decision or an imported event in it is
+  refused; those are left out, and counted, when a session is written, and
+  can only come from Cedar or from an importer. At most 512 commands, 30
+  virtual minutes and 256 KiB, simulated off the async workers. Loading one
+  replaces the timeline for everyone connected, as loading a bundled
+  recording does.
+- **A comparison touches nothing.** `POST /demo/experiments/compare`
+  simulates one scenario twice on timelines of its own, bounded the same
+  way, and answers with both. The timeline in use is not changed.
+- **A policy comparison applies nothing.** `POST /demo/workspace/diff`
+  builds the uploaded files as a check does and has Cedar evaluate the
+  catalogued requests, and every request the tracer can build (at most
+  20 000), under both sets of policies. It is one of the import routes: the
+  same 8 MiB, and 403 with `AEGIS_IMPORT=off`.
+- **A report invents nothing.** `GET /incidents/{id}/report` is read from
+  the events and samples already on the timeline. A relation it cannot find
+  is reported as `unattributed`.
+- **A link carries a session in its fragment.** The part of an address after
+  `#` is not sent to a server. The page that opens such a link shows what
+  the session holds and loads it only when asked: following a link never
+  changes what is running. A session file that carries a platform's files is
+  an import, with everything said above about imports.
+- **The view is in the query string.** The arrangement and the selection are
+  written into the address as they change
+  (`?arrangement=regions&select=node:use-auth`). They are identifiers of the
+  platform on show, which the API serves to anyone who can reach it, and
+  opening such an address changes nothing on the server.
+
 ## Server
 
 **Input validation.** Request bodies are deserialised into typed structures
 that reject unknown fields. Identifiers are restricted to a conservative
 character set and length; Cedar entity references and contexts are
 length-bounded and parsed before use; bodies are capped at 16 KiB, except
-those of a workspace check or import, which carry files and are capped at
-8 MiB.
+those of a workspace check, comparison or import, which carry files and are
+capped at 8 MiB, and that of a session, capped at 256 KiB.
 
 **Rate limiting.** A per-client token bucket in front of every route, with a
 small burst for mutations (40, refilling at 8/s) and a larger one for reads.

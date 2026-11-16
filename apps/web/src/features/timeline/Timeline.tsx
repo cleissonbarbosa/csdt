@@ -1,9 +1,10 @@
 import { PLAYBACK_SPEEDS, type Incident, type PlaybackSpeed } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { History, Pause, Play, Radio, SkipForward, X } from 'lucide-react';
+import { ChevronLast, History, Pause, Play, SkipForward, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { useMinWidth } from '@/app/hooks';
 import { queryKeys } from '@/app/queryClient';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Field';
@@ -128,7 +129,9 @@ function Track({ incidents }: TrackProps) {
     return start + ratio * span;
   };
 
-  if (!playback) return <div ref={ref} className="h-[18px] flex-1" />;
+  if (!playback) {
+    return <div ref={ref} className="h-[18px] flex-1 max-sm:order-last max-sm:basis-full" />;
+  }
   const cursor = preview ?? playback.virtualTimeMs;
   const step = (delta: number) =>
     seek(Math.min(head, Math.max(start, playback.virtualTimeMs + delta)), true);
@@ -136,7 +139,10 @@ function Track({ incidents }: TrackProps) {
   return (
     // The slot keeps the strip's place in the bar; the track is anchored to
     // its bottom edge and grows out of it.
-    <div ref={ref} className="timeline-slot relative h-[18px] min-w-24 flex-1 py-0">
+    <div
+      ref={ref}
+      className="timeline-slot relative h-[18px] min-w-24 flex-1 py-0 max-sm:order-last max-sm:h-7 max-sm:basis-full"
+    >
       <div
         role="slider"
         tabIndex={0}
@@ -180,6 +186,7 @@ function Track({ incidents }: TrackProps) {
           if (event.key === 'ArrowLeft') step(-big);
           else if (event.key === 'ArrowRight') step(big);
           else if (event.key === 'Home') seek(start, true);
+          // The end of the track is the simulation's now.
           else if (event.key === 'End') void actions.control({ action: 'live' });
           else return;
           event.preventDefault();
@@ -274,6 +281,51 @@ function Track({ incidents }: TrackProps) {
 
 /** Height of the bar, for whoever has to make room for it. */
 export const TIMELINE_HEIGHT = 48;
+/**
+ * On a narrow screen the strip of history takes a row of its own under the
+ * controls, so neither is squeezed out of reach by the other.
+ */
+export const TIMELINE_HEIGHT_NARROW = 86;
+/** The width from which the bar is one row. */
+const ONE_ROW_FROM = 640;
+
+/** How tall the bar is on this screen. */
+export function useTimelineHeight(): number {
+  return useMinWidth(ONE_ROW_FROM) ? TIMELINE_HEIGHT : TIMELINE_HEIGHT_NARROW;
+}
+
+/**
+ * Where the cursor is, in the interface's own words. The contract calls the
+ * head of the timeline `live`; on a page where everything is simulated that
+ * word claims too much, and "live, paused" contradicts itself. Time is
+ * either at the simulation's now or in its history, and either runs or is
+ * paused.
+ */
+export function describePlayback(
+  mode: 'live' | 'replay',
+  status: 'playing' | 'paused',
+): { label: string; hint: string } {
+  if (mode === 'live') {
+    return status === 'playing'
+      ? {
+          label: 'Simulation now',
+          hint: "At the simulation's now: new history is being made.",
+        }
+      : {
+          label: 'Paused',
+          hint: "Paused at the simulation's now: nothing advances until it is played.",
+        };
+  }
+  return status === 'playing'
+    ? {
+        label: 'History',
+        hint: 'Inside recorded history: the past is being re-simulated exactly.',
+      }
+    : {
+        label: 'Paused in history',
+        hint: 'Paused inside recorded history, at a moment that was re-simulated exactly.',
+      };
+}
 
 /**
  * Whether there is anything on the timeline to reach for: an incident under
@@ -308,15 +360,17 @@ export function useTimelineVisible(): boolean {
 }
 
 /**
- * The transport: one row, floating at the foot of the stage. Play and the
- * clock, the strip of history, then the few controls that change how time
- * runs. Recorded incidents are loaded from the incidents panel, where the
- * scenarios are.
+ * The transport, floating at the foot of the stage: play and the clock, the
+ * strip of history, then the few controls that change how time runs. One
+ * row where there is room for it; on a narrow screen the strip drops to a
+ * row of its own. Recorded incidents are loaded from the incidents panel,
+ * where the scenarios are.
  */
 export function Timeline() {
   const playback = useTelemetry((state) => state.playback);
   const visible = useTimelineVisible();
   const needed = useTimelineNeeded();
+  const height = useTimelineHeight();
   const { data: incidents } = useQuery({
     queryKey: queryKeys.incidents,
     queryFn: api.incidents,
@@ -329,19 +383,20 @@ export function Timeline() {
 
   if (!playback || !visible) return null;
   const playing = playback.status === 'playing';
-  const live = playback.mode === 'live';
+  const atNow = playback.mode === 'live';
   const recording = recordings?.find((r) => r.id === playback.recordingId);
+  const where = describePlayback(playback.mode, playback.status);
 
   return (
     <section
-      className="panel floating absolute inset-x-3 bottom-3 z-20 flex animate-rise items-center gap-3 px-2"
-      style={{ height: TIMELINE_HEIGHT }}
+      className="panel floating absolute inset-x-3 bottom-3 z-20 flex animate-rise flex-wrap items-center gap-x-3 gap-y-2 px-2 max-sm:content-center max-sm:gap-x-2"
+      style={{ height }}
       aria-label="Timeline and playback"
       data-testid="timeline"
       data-status={playback.status}
       data-mode={playback.mode}
     >
-      <div className="flex items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-0.5">
         <Button
           variant="primary"
           size="sm"
@@ -363,26 +418,28 @@ export function Timeline() {
         </IconButton>
       </div>
 
-      <div className="flex shrink-0 items-baseline gap-2" aria-live="off">
-        <span className="numeric text-sm text-ink" data-testid="playback-clock">
+      {/* The words give way before a control does: they shorten, then clip. */}
+      <div className="flex min-w-0 items-baseline gap-2 max-sm:flex-1" aria-live="off">
+        <span className="numeric shrink-0 text-sm text-ink" data-testid="playback-clock">
           {formatClock(playback.virtualTimeMs)}
         </span>
         <p
           className={cn(
-            'whitespace-nowrap text-[11px]',
-            live ? 'text-ink-faint' : 'font-bold text-ink',
+            'min-w-0 truncate whitespace-nowrap text-[11px]',
+            atNow && playing ? 'text-ink-faint' : 'font-bold text-ink',
           )}
           title={
-            live
-              ? 'At the head of the timeline: new history is being made.'
-              : `Inside recorded history, which ends at ${formatClock(playback.headTimeMs)}: the past is being re-simulated exactly.`
+            atNow
+              ? where.hint
+              : `${where.hint} The simulation's now is at ${formatClock(playback.headTimeMs)}.`
           }
         >
-          <span data-testid="playback-mode">{live ? 'Live' : 'Replay'}</span>
-          {!live && (
-            <span className="numeric font-normal"> of {formatClock(playback.headTimeMs)}</span>
+          <span data-testid="playback-mode">{where.label}</span>
+          {!atNow && (
+            <span className="numeric font-normal max-sm:hidden" data-testid="playback-head">
+              , now is {formatClock(playback.headTimeMs)}
+            </span>
           )}
-          {!playing && ', paused'}
           {recording && (
             <span className="hidden font-normal lg:inline" title={recording.description}>
               , recording {recording.name}
@@ -401,21 +458,23 @@ export function Timeline() {
           disabled={(incidents ?? []).length === 0}
           onClick={() => void actions.control({ action: 'replay' })}
           title="Go back to where the latest incident began and watch it again"
+          aria-label="Replay the incident"
           data-testid="playback-replay"
         >
           <span className="max-lg:hidden">Replay the incident</span>
-          <span className="lg:hidden">Replay</span>
+          <span className="max-sm:hidden lg:hidden">Replay</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          icon={<Radio size={13} aria-hidden />}
-          pressed={live}
+          icon={<ChevronLast size={13} aria-hidden />}
+          pressed={atNow}
           onClick={() => void actions.control({ action: 'live' })}
-          title="Jump to the head of the timeline"
+          title="Jump to the simulation's now, the end of recorded history"
+          aria-label="Go to the simulation's now"
           data-testid="playback-live"
         >
-          Live
+          Now
         </Button>
         {/* On a narrow screen the strip of history matters more than the
             speed, which the incident panel still sets while a scenario runs. */}

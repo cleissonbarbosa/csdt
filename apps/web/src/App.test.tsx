@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryClient } from '@/app/queryClient';
+import { useGuide } from '@/stores/guide';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useSettings, useUi } from '@/stores/ui';
@@ -21,6 +22,11 @@ const api = vi.hoisted(() => ({
   metrics: vi.fn(),
   events: vi.fn(),
   incidents: vi.fn(),
+  incidentReport: vi.fn(),
+  session: vi.fn(),
+  loadSession: vi.fn(),
+  compareIntervention: vi.fn(),
+  diffWorkspace: vi.fn(),
   scenarios: vi.fn(),
   recordings: vi.fn(),
   providers: vi.fn(),
@@ -88,7 +94,11 @@ async function fromMenu(user: ReturnType<typeof userEvent.setup>, name: string |
 beforeEach(() => {
   window.innerWidth = 1600;
   localStorage.clear();
+  // The address carries the view; one test's selection is not the next one's.
+  window.history.replaceState(null, '', '/');
   queryClient.clear();
+  // A first visit is its own subject; everywhere else it has been dealt with.
+  useGuide.setState({ ...useGuide.getInitialState(), oriented: true }, true);
   useTelemetry.setState(useTelemetry.getInitialState(), true);
   useUi.setState(useUi.getInitialState(), true);
   useNotices.setState({ notices: [] });
@@ -98,6 +108,10 @@ beforeEach(() => {
   api.topologies.mockResolvedValue(fixtures.topologies());
   api.scenarios.mockResolvedValue(fixtures.scenarios());
   api.incidents.mockResolvedValue(fixtures.incidents());
+  api.incidentReport.mockResolvedValue(fixtures.incidentReport());
+  api.session.mockResolvedValue(fixtures.session());
+  api.compareIntervention.mockResolvedValue(fixtures.experiment());
+  api.diffWorkspace.mockResolvedValue(fixtures.workspaceDiff());
   api.recordings.mockResolvedValue(fixtures.recordings());
   api.providers.mockResolvedValue(fixtures.providers());
   api.authorizationCatalog.mockResolvedValue(fixtures.catalog());
@@ -119,6 +133,7 @@ beforeEach(() => {
     api.reset,
     api.selectTopology,
     api.loadRecording,
+    api.loadSession,
   ]) {
     command.mockResolvedValue(control);
   }
@@ -141,7 +156,7 @@ describe('loading and fallback rendering', () => {
 
   it('labels where the data comes from and how the stream is doing', async () => {
     renderApp();
-    expect(screen.getByTestId('connection-health')).toHaveTextContent('Stream live');
+    expect(screen.getByTestId('connection-health')).toHaveTextContent('Stream connected');
     // Provenance is a plain sentence, not a cluster of badges.
     expect(screen.getByText('Simulated, synthetic data')).toBeInTheDocument();
     expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'demo');
@@ -468,7 +483,9 @@ describe('inspector', () => {
     renderOpen();
     await user.click(screen.getByTestId('service-use-gateway'));
     await user.click(
-      screen.getByRole('button', { name: 'Inspect connection to Identity Service' }),
+      screen.getByRole('button', {
+        name: 'Inspect connection to Identity Service, US East · Primary',
+      }),
     );
     const edge = screen.getByTestId('edge-inspector');
     expect(edge).toHaveTextContent('Authenticates with');
@@ -501,7 +518,9 @@ describe('incident console', () => {
     const user = userEvent.setup();
     renderOpen();
     const console_ = await openConsole(user);
-    const cards = await within(console_).findAllByTestId(/^scenario-(?!start|console)/);
+    const cards = await within(console_).findAllByTestId(
+      /^scenario-(?!start|console|compare|editor)/,
+    );
     expect(cards).toHaveLength(5);
     await user.click(screen.getByTestId('scenario-start-ddos-surge'));
     expect(api.startScenario).toHaveBeenCalledWith('ddos-surge');
@@ -539,7 +558,10 @@ describe('incident console', () => {
     expect(within(active).getByRole('progressbar')).toHaveAttribute('aria-valuenow');
     expect(within(active).getByTestId('incident-phase')).not.toBeEmptyDOMElement();
     const impacted = within(active).getByTestId('impacted-services');
-    expect(within(impacted).getByRole('button', { name: 'Identity Service' })).toBeInTheDocument();
+    // Three regions run an identity service; the list says which one this is.
+    expect(
+      within(impacted).getByRole('button', { name: 'Identity Service, US East · Primary' }),
+    ).toBeInTheDocument();
 
     // The running scenario offers a restart, the others a start.
     expect(screen.getByTestId('scenario-start-credential-stuffing')).toHaveTextContent('Restart');
@@ -636,7 +658,7 @@ describe('playback', () => {
     useTelemetry.getState().setPlayback(paused);
     renderApp();
     expect(screen.getByTestId('playback-toggle')).toHaveTextContent('Play');
-    expect(screen.getByTestId('playback-mode')).toHaveTextContent('Replay');
+    expect(screen.getByTestId('playback-mode')).toHaveTextContent('Paused in history');
     expect(screen.getByRole('button', { name: 'Step one tick forward' })).toBeEnabled();
   });
 
@@ -1104,5 +1126,845 @@ describe('faults placed by hand', () => {
     await user.click(within(faults).getByText('Faults'));
     await user.click(within(faults).getByRole('button', { name: 'Capacity ×0.5' }));
     expect(await screen.findByText(/The fault could not be placed. too many faults/)).toBeVisible();
+  });
+});
+
+describe('a Cedar result and the form it answers', () => {
+  /** Alice asking to export her tenant's ledger with fresh MFA: what `decision-allow` answers. */
+  async function evaluateExport(user: ReturnType<typeof userEvent.setup>) {
+    await fromMenu(user, 'Trace a request through Cedar');
+    const form = await screen.findByTestId('authz-form');
+    await user.selectOptions(within(form).getByTestId('authz-action'), 'Action::"exportLedger"');
+    const mfa = within(form).getByRole('radiogroup', { name: 'Fresh MFA assertion' });
+    await user.click(within(mfa).getByRole('radio', { name: 'True' }));
+    await user.click(screen.getByTestId('authz-evaluate'));
+    return { mfa, card: await screen.findByTestId('decision-card') };
+  }
+
+  beforeEach(() => api.evaluate.mockResolvedValue(fixtures.decisionAllow()));
+
+  it('records what it was evaluated with', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const { card } = await evaluateExport(user);
+    expect(card).toHaveAttribute('data-stale', 'false');
+    const inputs = within(card).getByTestId('decision-inputs');
+    expect(within(inputs).getByTestId('decision-context-mfa')).toHaveTextContent('true');
+    expect(within(inputs).getByTestId('decision-context-changeWindow')).toHaveTextContent('absent');
+    expect(within(inputs).getByTestId('decision-policies-used')).toHaveTextContent('9 of 9 active');
+  });
+
+  it('is marked out of date the moment the context changes, and says what changed', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const { mfa, card } = await evaluateExport(user);
+    expect(within(card).getByTestId('decision-result')).toHaveTextContent(/^Allow$/);
+
+    await user.click(within(mfa).getByRole('radio', { name: 'False' }));
+    expect(card).toHaveAttribute('data-stale', 'true');
+    const stale = within(card).getByTestId('decision-stale');
+    expect(stale).toHaveTextContent('Configuration changed. Evaluate again.');
+    expect(within(stale).getByTestId('decision-changes')).toHaveTextContent(
+      'Fresh MFA assertion was true, now false.',
+    );
+    // The old answer is still there, as an old answer.
+    expect(within(card).getByTestId('decision-result')).toHaveTextContent('Was Allow');
+    expect(within(card).getByTestId('decision-context-mfa')).toHaveTextContent('true');
+    expect(screen.getByTestId('authz-evaluate')).toHaveTextContent('Evaluate again');
+    // Nothing was asked of Cedar in the meantime.
+    expect(api.evaluate).toHaveBeenCalledTimes(1);
+
+    // Back to what was evaluated, it is the answer again.
+    await user.click(within(mfa).getByRole('radio', { name: 'True' }));
+    expect(card).toHaveAttribute('data-stale', 'false');
+    expect(within(card).queryByTestId('decision-stale')).not.toBeInTheDocument();
+  });
+
+  it('is marked out of date when a policy is switched or the policies are replaced', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const { card } = await evaluateExport(user);
+    const policies = screen.getByTestId('policy-list');
+    await user.click(within(policies).getByRole('switch', { name: /Hard tenant isolation/ }));
+    expect(within(card).getByTestId('decision-changes')).toHaveTextContent(
+      'Policy forbid-cross-tenant switched off.',
+    );
+    await user.click(within(policies).getByRole('switch', { name: /Hard tenant isolation/ }));
+    expect(card).toHaveAttribute('data-stale', 'false');
+
+    // An import replaced the policies while the result was on screen.
+    const catalog = fixtures.catalog();
+    act(() => {
+      queryClient.setQueryData(['authorization', 'catalog'], {
+        ...catalog,
+        policies: catalog.policies.map((policy, i) =>
+          i === 0 ? { ...policy, content: 'permit(principal, action, resource);' } : policy,
+        ),
+      });
+    });
+    await waitFor(() => expect(card).toHaveAttribute('data-stale', 'true'));
+    expect(within(card).getByTestId('decision-changes')).toHaveTextContent(
+      'The policies in use were replaced.',
+    );
+  });
+
+  it('keeps a result aside and sets the next one beside it', async () => {
+    const allow = fixtures.decisionAllow();
+    const user = userEvent.setup();
+    renderApp();
+    const { mfa } = await evaluateExport(user);
+    await user.click(screen.getByTestId('decision-keep'));
+    expect(screen.getByTestId('comparison-verdict')).toHaveTextContent(/^A is kept\./);
+    expect(screen.getByTestId('comparison-b')).toHaveTextContent('not evaluated yet');
+
+    // The same request without MFA: no permit applies, and Cedar denies.
+    api.evaluate.mockResolvedValue({
+      ...allow,
+      id: 'dec-2',
+      decision: 'deny',
+      determiningPolicies: [],
+      request: { ...allow.request, context: { mfa: false } },
+    });
+    await user.click(within(mfa).getByRole('radio', { name: 'False' }));
+    // A result that is out of date is not what B is.
+    expect(screen.getByTestId('comparison-b')).toHaveTextContent('not evaluated yet');
+    await user.click(screen.getByTestId('authz-evaluate'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('comparison-verdict')).toHaveTextContent(
+        'The decision changed from Allow to Deny.',
+      ),
+    );
+    expect(screen.getByTestId('comparison-a')).toHaveTextContent('Allow');
+    expect(screen.getByTestId('comparison-b')).toHaveTextContent('Deny');
+    // The context is named in the form's words, not by a key cut short.
+    const fresh = within(screen.getByTestId('comparison')).getByRole('rowheader', {
+      name: 'Fresh MFA assertion',
+    });
+    expect(fresh.closest('tr')).toHaveTextContent('Fresh MFA assertiontruefalse');
+    expect(screen.getByTestId('comparison-differences')).toHaveTextContent(
+      'Fresh MFA assertion was true, now false.',
+    );
+    expect(screen.getByTestId('comparison-attribution')).toHaveTextContent(
+      'Only A is decided by finance-export-ledger-mfa.',
+    );
+    await user.click(screen.getByTestId('comparison-clear'));
+    expect(screen.queryByTestId('comparison')).not.toBeInTheDocument();
+  });
+
+  it('is one step away on the bar', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId('open-tracer'));
+    expect(await screen.findByTestId('authz-form')).toBeInTheDocument();
+    expect(screen.getByTestId('open-tracer')).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('where the cursor is, in words', () => {
+  const playback = (over: Partial<ReturnType<typeof fixtures.snapshot>['playback']>) =>
+    useTelemetry.getState().setPlayback({ ...fixtures.snapshot().playback, ...over });
+
+  it('is the simulation’s now, or its history, and either may be paused', () => {
+    renderApp();
+    const mode = () => screen.getByTestId('playback-mode');
+    act(() => playback({ mode: 'live', status: 'playing' }));
+    expect(mode()).toHaveTextContent(/^Simulation now$/);
+    act(() => playback({ mode: 'live', status: 'paused' }));
+    expect(mode()).toHaveTextContent(/^Paused$/);
+    act(() => playback({ mode: 'replay', status: 'playing', headTimeMs: 130_000 }));
+    expect(mode()).toHaveTextContent(/^History$/);
+    // In history, where the simulation's now is is said too.
+    expect(screen.getByTestId('playback-head')).toHaveTextContent('now is 2:10');
+    act(() => playback({ mode: 'replay', status: 'paused' }));
+    expect(mode()).toHaveTextContent(/^Paused in history$/);
+    // Nothing on the bar calls simulated time "live".
+    expect(screen.getByTestId('timeline')).not.toHaveTextContent(/live/i);
+  });
+
+  it('goes to the simulation’s now', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: /^Go to the simulation.s now$/ }));
+    expect(api.control).toHaveBeenCalledWith({ action: 'live' });
+  });
+});
+
+describe('a first visit', () => {
+  beforeEach(() => useGuide.setState({ oriented: false }));
+
+  it('says what this is for and offers three ways in', () => {
+    renderApp();
+    const card = screen.getByTestId('orientation');
+    for (const name of [
+      /Understand the platform/,
+      /Investigate a failure/,
+      /Test an authorization/,
+    ]) {
+      expect(within(card).getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(card).toHaveTextContent('12 kinds of service');
+  });
+
+  it.each([
+    ['orientation-platform', 'overview'],
+    ['orientation-incident', 'scenario-console'],
+    ['orientation-authorization', 'authz-form'],
+  ])('%s leads there and the card is gone for good', async (path, destination) => {
+    const user = userEvent.setup();
+    const { unmount } = renderApp();
+    await user.click(screen.getByTestId(path));
+    expect(await screen.findByTestId(destination)).toBeInTheDocument();
+    expect(screen.queryByTestId('orientation')).not.toBeInTheDocument();
+    // Remembered beyond this page.
+    expect(localStorage.getItem('aegis.guide.v1')).toContain('"oriented":true');
+    unmount();
+    renderApp();
+    expect(screen.queryByTestId('orientation')).not.toBeInTheDocument();
+  });
+
+  it('can be dismissed, and leaves the model alone on the stage', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByTestId('orientation-dismiss'));
+    expect(screen.queryByTestId('orientation')).not.toBeInTheDocument();
+    expect(useUi.getState().explorerOpen).toBe(false);
+    expect(useUi.getState().inspectorOpen).toBe(false);
+    expect(useGuide.getState().oriented).toBe(true);
+  });
+
+  it('is not shown before there is a platform to be oriented in', () => {
+    useTelemetry.setState(useTelemetry.getInitialState(), true);
+    renderApp();
+    expect(screen.queryByTestId('orientation')).not.toBeInTheDocument();
+  });
+});
+
+describe('an incident read back from its record', () => {
+  async function openIncidents(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    return screen.findByTestId('active-incident');
+  }
+
+  it('times phases from the start of the incident and explains one on request', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    const active = await openIncidents(user);
+    // The incident began at 0:08 on the simulation clock; phases count from there.
+    await waitFor(() =>
+      expect(within(active).getByTestId('phase-times')).toHaveTextContent(
+        'timed from the start of the incident (0:08 on the simulation clock)',
+      ),
+    );
+    expect(within(active).getByTestId('phase-1')).toHaveTextContent('Stuffing burst+0:10');
+    // Nothing is explained until it is asked for.
+    expect(within(active).queryByTestId('phase-explanation')).not.toBeInTheDocument();
+    // A phase the incident has not reached has nothing to explain yet.
+    expect(within(active).getByTestId('phase-2')).toBeDisabled();
+
+    await user.click(within(active).getByTestId('phase-1'));
+    const explained = await within(active).findByTestId('phase-explanation');
+    expect(within(explained).getByTestId('phase-prescribed')).toHaveTextContent(
+      /injected traffic “Replayed credentials” at 1320 req\/s on Global Edge Router/,
+    );
+    const followed = within(explained).getAllByTestId('report-transition');
+    expect(followed[0]).toHaveTextContent('Identity Service, US East · Primary');
+    expect(within(followed[0]!).getByTestId('report-cause')).toHaveTextContent(
+      /^Degraded because the scenario acts on it/,
+    );
+    expect(followed[0]!.querySelector('[data-basis]')).toHaveAttribute('data-basis', 'prescribed');
+    // What a detection rule raised is observed, not prescribed.
+    expect(within(explained).getByTestId('phase-observed')).toHaveTextContent(
+      'A detection rule raised “Error budget burning”',
+    );
+    expect(api.incidentReport).toHaveBeenCalledWith('inc-001');
+  });
+
+  it('is summarised with its origin, its spread, its peak and the moments to go back to', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await openIncidents(user);
+    await user.click(await screen.findByTestId('incident-inc-001'));
+    const summary = await screen.findByTestId('incident-summary');
+    await waitFor(() => expect(summary).toHaveAttribute('data-incident', 'inc-001'));
+    expect(within(summary).getByTestId('summary-outcome')).toHaveTextContent(
+      'Still running: +0:23 recorded so far.',
+    );
+    expect(within(summary).getByTestId('summary-origin')).toHaveTextContent(
+      'Identity Service, US East · Primary: the scenario names it as the root cause.',
+    );
+    expect(within(summary).getByTestId('summary-propagation')).toHaveTextContent('API Gateway');
+    expect(within(summary).getByTestId('summary-peaks')).toHaveTextContent('7.39%');
+    expect(within(summary).getByTestId('summary-decisions')).toHaveTextContent(
+      'bob → exportLedger',
+    );
+
+    // A moment is a link into the history: a second of lead-in before it.
+    await user.click(within(summary).getByTestId('moment-start'));
+    expect(api.control).toHaveBeenCalledWith({ action: 'seek', toMs: 7200 });
+
+    await user.click(within(summary).getByTestId('summary-copy'));
+    const copied = await navigator.clipboard.readText();
+    expect(copied).toContain('Credential Stuffing: incident inc-001');
+    expect(copied).toContain('none is measured from a real system');
+    expect(await screen.findByText('Summary copied as text.')).toBeInTheDocument();
+
+    await user.click(within(summary).getByRole('button', { name: /Incidents and scenarios/ }));
+    expect(screen.getByTestId('scenario-console')).toBeInTheDocument();
+  });
+
+  it('is offered as a summary the moment the incident ends', async () => {
+    // The connection hook is replaced in these tests; this is the part of it
+    // that speaks when the engine says an incident is over.
+    const { announceResolved } = await vi.importActual<typeof import('@/app/useAegisConnection')>(
+      '@/app/useAegisConnection',
+    );
+    const user = userEvent.setup();
+    renderApp();
+    const started = fixtures.events().events.find((event) => event.kind === 'incident-started')!;
+    act(() => {
+      // Only the end of an incident is announced.
+      announceResolved(started);
+      announceResolved({
+        ...started,
+        kind: 'incident-resolved',
+        title: 'Credential Stuffing resolved',
+      });
+    });
+    expect(
+      screen.getByText('Credential Stuffing resolved. Its summary is ready.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId('notice-action')).toHaveLength(1);
+    await user.click(screen.getByTestId('notice-action'));
+    expect(await screen.findByTestId('incident-summary')).toBeInTheDocument();
+    expect(screen.queryByTestId('notice-action')).not.toBeInTheDocument();
+  });
+
+  it('is read again when a service changes state, not only when the incident does', async () => {
+    const { growsReport } = await vi.importActual<typeof import('@/app/useAegisConnection')>(
+      '@/app/useAegisConnection',
+    );
+    const events = fixtures.events().events;
+    const started = events.find((event) => event.kind === 'incident-started')!;
+    expect(growsReport(started)).toBe(true);
+    // A service that has just changed is a line of the report: one read
+    // before it could not say why.
+    expect(growsReport({ ...started, kind: 'health-transition' })).toBe(true);
+    // A decision or an alert adds no transition to explain.
+    expect(growsReport({ ...started, kind: 'authz-decision' })).toBe(false);
+    expect(growsReport({ ...started, kind: 'alert' })).toBe(false);
+  });
+
+  it('says so when the incident is no longer on the timeline', async () => {
+    const { ApiError } = await import('@/providers/api');
+    api.incidentReport.mockRejectedValue(new ApiError(404, 'not_found', 'unknown incident'));
+    const user = userEvent.setup();
+    renderOpen();
+    await openIncidents(user);
+    act(() => useUi.getState().inspectIncident('inc-009'));
+    expect(await screen.findByText('No summary')).toBeInTheDocument();
+  });
+
+  it('shows an event on both clocks, and why a service changed', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await openIncidents(user);
+    const transition = fixtures.incidentReport().propagation[0]!;
+    act(() => useUi.getState().inspectEvent(transition.seq));
+    const detail = await screen.findByTestId('event-detail');
+    expect(within(detail).getByTestId('event-clock')).toHaveTextContent('0:21');
+    await waitFor(() =>
+      expect(within(detail).getByTestId('event-since-incident')).toHaveTextContent(
+        '+0:13 (it began at 0:08)',
+      ),
+    );
+    expect(await within(detail).findByTestId('event-why')).toHaveTextContent(
+      'Because the scenario acts on it',
+    );
+  });
+});
+
+describe('comparing an intervention', () => {
+  it('runs a scenario twice, says exactly what changed and lays the runs side by side', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    await user.click(await screen.findByTestId('scenario-compare-credential-stuffing'));
+    const dialog = await screen.findByRole('dialog', { name: 'Compare an intervention' });
+    const form = within(dialog).getByTestId('experiment-form');
+    expect(within(form).getByTestId('experiment-scenario')).toHaveValue('credential-stuffing');
+    // It starts from the service the scenario is about, not a crowd of clients.
+    expect(within(form).getByTestId('experiment-node')).toHaveValue('use-auth');
+    expect(api.compareIntervention).not.toHaveBeenCalled();
+
+    await user.click(within(form).getByTestId('experiment-run'));
+    expect(api.compareIntervention).toHaveBeenCalledWith({
+      scenarioId: 'credential-stuffing',
+      intervention: {
+        effect: { type: 'capacity', nodes: 'node:use-auth', factor: 2 },
+        atMs: 17_000,
+        rampMs: 2000,
+      },
+    });
+
+    const results = await within(dialog).findByTestId('experiment-results');
+    // What the server says it changed, in full.
+    expect(within(results).getByTestId('experiment-change')).toHaveTextContent(
+      'In run B, capacity ×3 on Identity Service, US East · Primary, placed +0:12 into the incident',
+    );
+    expect(results).toHaveTextContent('with seed 42');
+    expect(results).toHaveTextContent('identical, sample for sample');
+    const experiment = fixtures.experiment();
+    const affected = within(results).getByTestId('experiment-row-affected');
+    expect(affected).toHaveTextContent(String(experiment.baseline.report.impactedNodeIds.length));
+    expect(within(results).getByTestId('experiment-row-peak-error')).toHaveTextContent('pts');
+    expect(within(results).getAllByRole('img')).toHaveLength(2);
+
+    // Watching a run puts it on the timeline, as the recording it is.
+    await user.click(within(results).getByTestId('experiment-watch-b'));
+    expect(api.loadSession).toHaveBeenCalledWith(experiment.variant.recording, undefined);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Compare an intervention' }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('lets another scenario be chosen after it was opened on one', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    await user.click(await screen.findByTestId('scenario-compare-credential-stuffing'));
+    const dialog = await screen.findByRole('dialog', { name: 'Compare an intervention' });
+    const scenario = within(dialog).getByTestId('experiment-scenario');
+    expect(scenario).toHaveValue('credential-stuffing');
+
+    // The scenario it was opened on does not take the choice back.
+    await user.selectOptions(scenario, 'cascading-failure');
+    expect(scenario).toHaveValue('cascading-failure');
+    // The new scenario brings the service it is about with it.
+    expect(within(dialog).getByTestId('experiment-node')).toHaveValue('use-orders-db');
+    await user.click(within(dialog).getByTestId('experiment-run'));
+    expect(api.compareIntervention).toHaveBeenCalledWith(
+      expect.objectContaining({ scenarioId: 'cascading-failure' }),
+    );
+  });
+
+  it('does not show the answer to a question the form no longer asks', async () => {
+    // The comparison takes a moment; the form is changed while it runs.
+    let answer: (value: ReturnType<typeof fixtures.experiment>) => void = () => {};
+    api.compareIntervention.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp();
+    await fromMenu(user, 'Compare an intervention');
+    const dialog = await screen.findByRole('dialog', { name: 'Compare an intervention' });
+    await user.click(await within(dialog).findByTestId('experiment-run'));
+    await user.clear(within(dialog).getByTestId('experiment-value'));
+    await user.type(within(dialog).getByTestId('experiment-value'), '5');
+    await act(async () => {
+      answer(fixtures.experiment());
+      await Promise.resolve();
+    });
+    // What came back answers the earlier form, so it is not put beside this one.
+    expect(within(dialog).queryByTestId('experiment-results')).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId('experiment-run')).toBeEnabled();
+  });
+
+  it('says why when the comparison cannot be run', async () => {
+    const { ApiError } = await import('@/providers/api');
+    api.compareIntervention.mockRejectedValue(
+      new ApiError(422, 'invalid_experiment', 'the comparison cannot be run: nothing to touch'),
+    );
+    const user = userEvent.setup();
+    renderApp();
+    await fromMenu(user, 'Compare an intervention');
+    const dialog = await screen.findByRole('dialog', { name: 'Compare an intervention' });
+    await user.click(await within(dialog).findByTestId('experiment-run'));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('nothing to touch');
+    expect(within(dialog).queryByTestId('experiment-results')).not.toBeInTheDocument();
+  });
+});
+
+describe('sessions', () => {
+  async function openSessions(user: ReturnType<typeof userEvent.setup>) {
+    await fromMenu(user, 'Save or share this session');
+    return screen.findByRole('dialog', { name: 'Session' });
+  }
+
+  it('says what reproduces the timeline, and what a session does not carry', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openSessions(user);
+    const contents = await within(dialog).findByTestId('session-contents');
+    expect(contents).toHaveTextContent('helios-commerce, as bundled with AEGIS');
+    expect(contents).toHaveTextContent('42');
+    expect(contents).toHaveTextContent('0:08 starts Credential Stuffing');
+    expect(contents).toHaveTextContent('0:30 places a fault by hand (latency)');
+    expect(within(dialog).getByTestId('session-omitted')).toHaveTextContent(
+      '2 authorization decisions evaluated by hand and 2 imports from an integration',
+    );
+  });
+
+  it('copies a link that carries the session and the view', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().selectNode('use-auth'));
+    const dialog = await openSessions(user);
+    await user.click(await within(dialog).findByTestId('session-copy-link'));
+    await screen.findByText('Link to this session copied.');
+    const link = new URL(await navigator.clipboard.readText());
+    const { sessionFromHash } = await import('@/app/session');
+    expect(sessionFromHash(link.hash)).toEqual({
+      session: {
+        format: 'aegis-session',
+        version: 1,
+        recording: fixtures.session().recording,
+        cursorMs: fixtures.session().cursorMs,
+        view: { arrangement: 'regions', select: 'node:use-auth' },
+      },
+    });
+  });
+
+  it('opens a session from a file only once that is asked for', async () => {
+    const { composeSession } = await import('@/app/session');
+    const session = composeSession(fixtures.session(), { arrangement: 'dependencies' });
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openSessions(user);
+    await user.upload(
+      within(dialog).getByTestId('session-file'),
+      new File([JSON.stringify(session)], 'aegis-session.json', { type: 'application/json' }),
+    );
+    const confirm = await within(dialog).findByTestId('session-open-confirm');
+    expect(api.loadSession).not.toHaveBeenCalled();
+    await user.click(confirm);
+    expect(api.loadSession).toHaveBeenCalledWith(session.recording, session.cursorMs);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Session' })).not.toBeInTheDocument(),
+    );
+    // The view it was saved with comes back with it.
+    expect(useUi.getState().layoutMode).toBe('dependencies');
+    expect(await screen.findByText(/Session opened/)).toBeInTheDocument();
+  });
+
+  it('refuses a file that is not a session, and says so', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await openSessions(user);
+    await user.upload(
+      within(dialog).getByTestId('session-file'),
+      new File(['{"files":[]}'], 'workspace.json', { type: 'application/json' }),
+    );
+    expect(await within(dialog).findByTestId('session-problem')).toHaveTextContent(
+      'This is not a session file',
+    );
+    expect(within(dialog).queryByTestId('session-open-confirm')).not.toBeInTheDocument();
+  });
+
+  it('shows the session a link carries and changes nothing until asked', async () => {
+    const { composeSession, sessionLink } = await import('@/app/session');
+    const link = sessionLink(composeSession(fixtures.session(), {}), 'http://localhost/');
+    window.history.replaceState(null, '', new URL(link as string).hash);
+    const user = userEvent.setup();
+    renderApp();
+    const dialog = await screen.findByRole('dialog', { name: 'Session' });
+    expect(within(dialog).getByTestId('session-offered')).toHaveTextContent(
+      'Nothing has been changed yet.',
+    );
+    expect(api.loadSession).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Not now' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Session' })).not.toBeInTheDocument(),
+    );
+    // Declined, the link is not offered again on a reload.
+    expect(window.location.hash).toBe('');
+    expect(api.loadSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the view in the address as it changes', async () => {
+    renderApp();
+    act(() => useUi.getState().selectNode('use-orders-db'));
+    expect(window.location.search).toBe('?arrangement=regions&select=node%3Ause-orders-db');
+    act(() => useUi.getState().setLayoutMode('layers'));
+    // Back at the overview with nothing selected, the address is plain again.
+    expect(window.location.search).toBe('');
+  });
+
+  it('opens on the view an address asks for', () => {
+    window.history.replaceState(null, '', '/?select=node:use-auth&view=table');
+    renderApp();
+    expect(useUi.getState().selection).toEqual({ kind: 'node', id: 'use-auth' });
+    expect(useUi.getState().viewMode).toBe('table');
+  });
+});
+
+describe('writing a scenario', () => {
+  it('has the engine check the file with everything in use, then runs it', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    await user.click(await screen.findByTestId('open-scenario-editor'));
+    const dialog = await screen.findByRole('dialog', { name: 'Write a scenario' });
+    const editor = await within(dialog).findByTestId('scenario-editor');
+
+    const name = within(editor).getByTestId('editor-name');
+    await user.clear(name);
+    await user.type(name, 'Slow ledger');
+    // The id follows the name until it is set by hand.
+    expect(within(editor).getByTestId('editor-id')).toHaveValue('slow-ledger');
+
+    await within(editor).findByTestId('editor-valid');
+    const inUse = fixtures.workspaceExport().files;
+    const sent = api.checkWorkspace.mock.lastCall![0] as { path: string; text: string }[];
+    // Everything in use goes with it: an import is laid over what the
+    // server started with, and must not take the rest away.
+    expect(sent.slice(0, inUse.length)).toEqual(inUse);
+    expect(sent).toHaveLength(inUse.length + 1);
+    const written = sent.at(-1)!;
+    expect(written.path).toBe('scenarios/zz-slow-ledger.json');
+    expect(JSON.parse(written.text)).toMatchObject({
+      id: 'slow-ledger',
+      name: 'Slow ledger',
+      durationMs: 60_000,
+      phases: [
+        { name: 'Degradation', atMs: 0, status: 'active', effects: [{ type: 'latency' }] },
+        { name: 'Recovery', atMs: 30_000, status: 'recovering', effects: [] },
+      ],
+    });
+    // The file on show is the one that was checked.
+    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"id": "slow-ledger"');
+    expect(api.importWorkspace).not.toHaveBeenCalled();
+
+    await user.click(within(editor).getByTestId('editor-run'));
+    await waitFor(() => expect(api.startScenario).toHaveBeenCalledWith('slow-ledger'));
+    expect(api.importWorkspace).toHaveBeenCalledWith(sent);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Write a scenario' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('shows what the engine says is wrong and will not run it', async () => {
+    api.checkWorkspace.mockResolvedValue({
+      valid: false,
+      problem: {
+        path: 'scenarios/zz-my-scenario.json',
+        message: 'factor must be between 0 and 1000',
+      },
+    });
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('scenario-editor'));
+    const editor = await screen.findByTestId('scenario-editor');
+    expect(await within(editor).findByTestId('editor-problem')).toHaveTextContent(
+      'factor must be between 0 and 1000',
+    );
+    expect(within(editor).getByTestId('editor-run')).toBeDisabled();
+    // The file can be saved all the same.
+    expect(within(editor).getByTestId('editor-download')).toBeEnabled();
+    await user.click(within(editor).getByTestId('editor-add-phase'));
+    expect(within(editor).getByTestId('phase-draft-2')).toBeInTheDocument();
+  });
+
+  it('takes a figure typed key by key, decimal point included', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('scenario-editor'));
+    const editor = await screen.findByTestId('scenario-editor');
+    const factor = within(editor).getAllByRole('spinbutton', { name: 'Factor' })[0]!;
+    await user.clear(factor);
+    // "1." is not a number yet: the field must not take the point away.
+    await user.type(factor, '1.75');
+    expect(factor).toHaveValue(1.75);
+    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"factor": 1.75');
+    // The same for a time, which the file keeps in milliseconds.
+    const starts = within(editor).getAllByTestId('phase-at')[1]!;
+    await user.clear(starts);
+    await user.type(starts, '12.5');
+    expect(starts).toHaveValue(12.5);
+    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"atMs": 12500');
+    // Left empty, a field goes back to the figure the scenario still holds.
+    await user.clear(starts);
+    await user.tab();
+    expect(starts).toHaveValue(12.5);
+  });
+
+  it('says what is missing before the engine is asked', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('scenario-editor'));
+    const editor = await screen.findByTestId('scenario-editor');
+    await within(editor).findByTestId('editor-valid');
+    api.checkWorkspace.mockClear();
+    await user.clear(within(editor).getByTestId('editor-name'));
+    expect(within(editor).getByTestId('editor-problem')).toHaveTextContent(
+      'The scenario needs a name.',
+    );
+    expect(within(editor).getByTestId('editor-download')).toBeDisabled();
+    expect(api.checkWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('starts from a copy of a scenario in use, keeping what it cannot edit', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('scenario-editor'));
+    const editor = await screen.findByTestId('scenario-editor');
+    const from = within(editor).getByTestId('editor-start-from') as HTMLSelectElement;
+    await waitFor(() => expect(from.options.length).toBeGreaterThan(1));
+    await user.selectOptions(from, from.options[1]!.value);
+    // The tiny workspace of the samples has one scenario: a slow door.
+    expect(within(editor).getByTestId('editor-id')).toHaveValue('slow-door-copy');
+    expect(within(editor).getByTestId('editor-name')).toHaveValue('Slow door (copy)');
+    expect(within(editor).getAllByTestId('effect-row')).toHaveLength(1);
+  });
+});
+
+describe('guided challenges', () => {
+  /** The guide is a card that stays; its menu entry says whether it is there. */
+  async function openGuide(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Guided challenges' }));
+  }
+
+  it('sets an incident going and checks the answer against its report', async () => {
+    // The report on record is of the incident the challenge asks about.
+    const incidents = fixtures.incidents();
+    api.incidents.mockResolvedValue({
+      ...incidents,
+      incidents: incidents.incidents.map((incident) => ({
+        ...incident,
+        scenarioId: 'cascading-failure',
+      })),
+    });
+    const user = userEvent.setup();
+    renderApp();
+    await openGuide(user);
+    const guide = await screen.findByTestId('guide');
+    expect(within(guide).getAllByRole('heading', { level: 4 })).toHaveLength(3);
+    await user.click(within(guide).getByTestId('guide-start-cascade-origin'));
+    await waitFor(() => expect(api.startScenario).toHaveBeenCalledWith('cascading-failure'));
+    expect(api.reset).toHaveBeenCalledWith('simulation');
+    // The answer is a service: the model goes to where services are.
+    expect(useUi.getState().layoutMode).toBe('regions');
+    await within(guide).findByTestId('guide-challenge');
+    expect(within(guide).getByTestId('guide-waiting')).toHaveTextContent('Select a service');
+
+    // A service that followed is told why it followed.
+    act(() => useUi.getState().selectNode('use-gateway'));
+    await user.click(within(guide).getByTestId('guide-answer'));
+    const wrong = await within(guide).findByTestId('guide-feedback');
+    expect(wrong).toHaveAttribute('data-correct', 'false');
+    expect(wrong).toHaveTextContent('it is a consequence');
+    expect(useGuide.getState().completed).toEqual([]);
+
+    act(() => useUi.getState().selectNode('use-auth'));
+    await user.click(within(guide).getByTestId('guide-answer'));
+    await waitFor(() =>
+      expect(within(guide).getByTestId('guide-feedback')).toHaveAttribute('data-correct', 'true'),
+    );
+    expect(within(guide).getByTestId('guide-feedback')).toHaveTextContent(
+      'Yes: it begins at Identity Service, US East · Primary.',
+    );
+    expect(useGuide.getState().completed).toEqual(['cascade-origin']);
+    expect(localStorage.getItem('aegis.guide.v1')).toContain('cascade-origin');
+
+    await user.click(within(guide).getByTestId('guide-close'));
+    expect(screen.queryByTestId('guide')).not.toBeInTheDocument();
+  });
+
+  it('hands the tracer a request and is solved by what Cedar then answers', async () => {
+    const allow = fixtures.decisionAllow();
+    const user = userEvent.setup();
+    renderApp();
+    await openGuide(user);
+    const guide = await screen.findByTestId('guide');
+    await user.click(within(guide).getByTestId('guide-start-export-denied'));
+    const form = await screen.findByTestId('authz-form');
+    // Alice, the export, the Acme ledger, and nothing in the context.
+    expect(within(form).getByTestId('authz-principal')).toHaveValue('User::"alice"');
+    expect(within(form).getByTestId('authz-action')).toHaveValue('Action::"exportLedger"');
+    expect(within(guide).getByTestId('guide-waiting')).toHaveTextContent('Evaluate the request');
+
+    api.evaluate.mockResolvedValue({
+      ...allow,
+      decision: 'deny',
+      determiningPolicies: [],
+      request: { ...allow.request, context: {} },
+    });
+    await user.click(screen.getByTestId('authz-evaluate'));
+    await user.click(await within(guide).findByTestId('guide-answer'));
+    expect(await within(guide).findByTestId('guide-feedback')).toHaveTextContent(
+      /Still denied\..*no policy decided this/,
+    );
+
+    api.evaluate.mockResolvedValue(allow);
+    await user.click(
+      within(within(form).getByRole('radiogroup', { name: 'Fresh MFA assertion' })).getByRole(
+        'radio',
+        { name: 'True' },
+      ),
+    );
+    await user.click(screen.getByTestId('authz-evaluate'));
+    await waitFor(() => expect(useUi.getState().lastDecision?.decision).toBe('allow'));
+    await user.click(within(guide).getByTestId('guide-answer'));
+    await waitFor(() =>
+      expect(within(guide).getByTestId('guide-feedback')).toHaveAttribute('data-correct', 'true'),
+    );
+    expect(within(guide).getByTestId('guide-feedback')).toHaveTextContent(
+      'finance-export-ledger-mfa',
+    );
+  });
+
+  it('does not offer a challenge the platform cannot run', async () => {
+    const scenarios = fixtures.scenarios();
+    api.scenarios.mockResolvedValue({
+      ...scenarios,
+      scenarios: scenarios.scenarios.filter((scenario) => scenario.id !== 'ddos-surge'),
+    });
+    const user = userEvent.setup();
+    renderApp();
+    await openGuide(user);
+    const start = await screen.findByTestId('guide-start-flood-stopped');
+    await waitFor(() => expect(start).toBeDisabled());
+    expect(screen.getByTestId('guide-start-cascade-origin')).toBeEnabled();
+  });
+});
+
+describe('what Cedar would decide differently', () => {
+  it('compares staged files with the ones in use, on request, and applies nothing', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await fromMenu(user, 'Import or export files');
+    const dialog = await screen.findByRole('dialog', { name: 'Platform files' });
+    const policies = new File(['[]'], 'policies.json', { type: 'application/json' });
+    await user.upload(within(dialog).getByTestId('workspace-files'), policies);
+    const diff = await within(dialog).findByTestId('policy-diff');
+    // It evaluates every request twice: asked for, not done unasked.
+    expect(api.diffWorkspace).not.toHaveBeenCalled();
+    await user.click(within(diff).getByTestId('policy-diff-run'));
+    expect(api.diffWorkspace).toHaveBeenCalledWith([{ path: 'policies.json', text: '[]' }]);
+
+    const result = await within(diff).findByTestId('policy-diff-result');
+    expect(result).toHaveAttribute('data-changed', 'true');
+    expect(within(result).getByTestId('diff-policies')).toHaveTextContent(
+      'Removed: finance-view-ledger',
+    );
+    expect(within(result).getByTestId('diff-at-rest')).toHaveTextContent('15.0%');
+    expect(within(result).getByTestId('diff-at-rest')).toHaveTextContent('7.00%');
+    expect(within(result).getByTestId('diff-requests')).toHaveTextContent('alice-view-ledger');
+    expect(within(result).getByTestId('diff-flows')).toHaveTextContent(
+      'would stop at the authorizer',
+    );
+    expect(within(result).getByTestId('diff-matrix')).toHaveTextContent(
+      'Of 756 requests (6 principals, 6 actions, 7 resources, 9 contexts), 9 go from allow to deny and 0 from deny to allow.',
+    );
+    expect(within(result).getByTestId('diff-matrix-changes')).toHaveTextContent(
+      'alice → viewLedger on acme-ledger-2026, in every context; now decided by finance-view-ledger',
+    );
+    expect(api.importWorkspace).not.toHaveBeenCalled();
   });
 });

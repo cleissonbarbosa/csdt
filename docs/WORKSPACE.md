@@ -70,6 +70,12 @@ same without a restart.
   would give (the platforms, the scenarios, the share of ordinary requests
   Cedar would deny, any scenario that could not run and why) or the file a
   mistake is in and what it is. Nothing changes until **Apply**.
+- Once the files are valid, **Compare with what is in use** asks what Cedar
+  would decide differently under them: policies added, removed or changed
+  in meaning, catalogued requests and scenario flows whose outcome changes,
+  and every request the tracer can build that goes from allow to deny or
+  back. It is [`diff-workspace`](#comparing-two-workspaces) with the files
+  in use as the base, and applies nothing.
 - An import is laid over **what the server was started with**, not over an
   earlier import: each kind of file you add replaces that part, and the rest
   stays. One scenario file is the whole list of scenarios. To add to what is
@@ -92,6 +98,7 @@ only saves. The API behind it:
 | `GET /api/v1/workspace`              | where the files in use came from and what they amount to       |
 | `GET /api/v1/workspace/export`       | the files in use, as a bundle                                  |
 | `POST /api/v1/demo/workspace/check`  | what `{ "files": [{ "path", "text" }] }` would give; no change |
+| `POST /api/v1/demo/workspace/diff`   | what Cedar would decide differently under them; no change      |
 | `POST /api/v1/demo/workspace/import` | the same, applied; 422 with the file and reason if invalid     |
 | `POST /api/v1/demo/workspace/reset`  | back to what the server started with                           |
 
@@ -272,6 +279,16 @@ still evaluates requests; the tracer just has no path to draw, and says so.
 A scenario changes numbers inside the model and announces events. It cannot do
 anything else: there is no effect that reaches outside the engine.
 
+A scenario can be written in a text editor, or in the interface: **Write a
+scenario of your own**, under the scenarios in the incidents panel. The form
+there writes this same file. Effects are placed by role first (so the
+scenario runs on any platform that has the role), then by region or by
+service; the engine checks the file as it is written, with everything else
+in use, and says where it can run; **Save the file** hands it over as it is,
+and **Add it and run it** imports it with the files in use and starts it.
+Injected flows, and an effect between two named ends, are not in the form:
+a scenario that has them is opened with those parts kept as written.
+
 ```json
 {
   "id": "ledger-fire",
@@ -438,6 +455,17 @@ the recording's topology.
 
 `clearFaults` lifts every fault, or with an `effect` only what that effect
 touches. `rampMs` is at most 60000.
+
+A **session** saved from the interface (**Save or share this session**) is a
+recording of the timeline in use, with where the cursor was, how the model
+was being looked at and, when the platform is not the bundled one, its files.
+`GET /api/v1/session` writes the recording and `POST
+/api/v1/demo/session/load` takes `{ "recording": …, "cursorMs": … }` back. It
+is held to the rules above, with two differences: it may hold up to 512
+commands, and it may hold none (time simply passed). Decisions asked for by
+hand and imports from an integration are left out, and the answer says how
+many. A comparison of an intervention (`POST
+/api/v1/demo/experiments/compare`) returns its two runs as recordings too.
 
 ## Cedar
 

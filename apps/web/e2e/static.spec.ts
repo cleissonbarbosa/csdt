@@ -207,3 +207,40 @@ test('says so, and shows nothing, when the engine cannot be loaded', async ({ pa
   await expect(page.getByTestId('platform-status')).toHaveCount(0);
   await expect(page.getByTestId('active-incident')).toHaveCount(0);
 });
+
+test('an incident is compared with an intervention, and read back, in the tab', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const requests = collectRequests(page);
+  await openStatic(page);
+  await waitForScene(page);
+
+  // Two runs of the same incident, simulated by the engine in this tab.
+  await page.getByTestId('explore-incident').click();
+  await page.getByTestId('scenario-compare-cascading-failure').click();
+  const dialog = page.getByRole('dialog', { name: 'Compare an intervention' });
+  await dialog.getByTestId('experiment-value').fill('6');
+  await dialog.getByTestId('experiment-run').click();
+  const results = dialog.getByTestId('experiment-results');
+  await expect(results.getByTestId('experiment-change')).toContainText('capacity ×6 on Orders DB', {
+    timeout: 30_000,
+  });
+  await expect(results).toContainText('identical, sample for sample');
+
+  // One of them, put on the timeline and read back from its record.
+  await results.getByTestId('experiment-watch-b').click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByTestId('incident-inc-001').click();
+  const summary = page.getByTestId('incident-summary');
+  await expect(summary.getByTestId('summary-origin')).toContainText('Orders DB');
+  await expect(summary.getByTestId('summary-outcome')).toContainText('The scenario ended at +1:44');
+  await expect(summary.getByTestId('summary-propagation')).toContainText('because it calls');
+
+  // The session that reproduces it is read from the engine too.
+  await page.keyboard.press('Escape');
+  await page.getByTestId('open-menu').click();
+  await page.getByTestId('menu-session').click();
+  await expect(page.getByTestId('session-contents')).toContainText('places a fault by hand');
+  expect(requests.filter((url) => new URL(url).pathname.includes('/api/'))).toEqual([]);
+});

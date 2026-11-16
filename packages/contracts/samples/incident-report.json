@@ -1,0 +1,393 @@
+{
+  "schemaVersion": "1.0",
+  "dataSource": "synthetic",
+  "incidentId": "inc-001",
+  "scenarioId": "credential-stuffing",
+  "title": "Credential Stuffing",
+  "severity": "warning",
+  "status": "active",
+  "startedAtMs": 8200,
+  "resolvedAtMs": null,
+  "resolution": null,
+  "recoveredAtMs": null,
+  "observedUntilMs": 32000,
+  "origin": {
+    "nodeId": "use-auth",
+    "basis": "declared"
+  },
+  "baseline": {
+    "errorRate": 0.0,
+    "p95LatencyMs": 167.6
+  },
+  "phases": [
+    {
+      "index": 0,
+      "name": "Low and slow",
+      "status": "active",
+      "description": "A trickle of login attempts tests which leaked credentials are still valid.",
+      "atMs": 8200,
+      "sinceStartMs": 0,
+      "endedAtMs": 18200,
+      "prescribed": [
+        {
+          "description": "injected traffic “Replayed credentials” at 63 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway",
+            "use-auth",
+            "use-cedar"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway",
+            "use-gateway->use-auth",
+            "use-gateway->use-cedar"
+          ]
+        },
+        {
+          "description": "98.5% of “Replayed credentials” turned away",
+          "nodeIds": [
+            "use-auth"
+          ],
+          "edgeIds": []
+        }
+      ],
+      "transitions": [],
+      "events": [
+        {
+          "seq": 6,
+          "atMs": 11200,
+          "severity": "notice",
+          "title": "Authentication failures rising",
+          "scripted": true
+        }
+      ],
+      "peakErrorRate": {
+        "value": 0.0,
+        "atMs": 9000
+      },
+      "peakP95LatencyMs": {
+        "value": 167.8,
+        "atMs": 9000
+      }
+    },
+    {
+      "index": 1,
+      "name": "Stuffing burst",
+      "status": "active",
+      "description": "Login attempts surge past the identity service's capacity. Legitimate sign-ins start to fail.",
+      "atMs": 18200,
+      "sinceStartMs": 10000,
+      "endedAtMs": null,
+      "prescribed": [
+        {
+          "description": "injected traffic “Replayed credentials” at 1320 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway",
+            "use-auth",
+            "use-cedar"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway",
+            "use-gateway->use-auth",
+            "use-gateway->use-cedar"
+          ]
+        },
+        {
+          "description": "98.5% of “Replayed credentials” turned away",
+          "nodeIds": [
+            "use-auth"
+          ],
+          "edgeIds": []
+        }
+      ],
+      "transitions": [
+        {
+          "seq": 16,
+          "nodeId": "use-auth",
+          "atMs": 21200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+          }
+        },
+        {
+          "seq": 18,
+          "nodeId": "use-gateway",
+          "atMs": 22000,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+          }
+        },
+        {
+          "seq": 19,
+          "nodeId": "use-auth",
+          "atMs": 22200,
+          "from": "degraded",
+          "to": "critical",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+          }
+        },
+        {
+          "seq": 20,
+          "nodeId": "clients-na",
+          "atMs": 22600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-na->edge-router"
+          }
+        },
+        {
+          "seq": 21,
+          "nodeId": "clients-eu",
+          "atMs": 22600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-eu->edge-router"
+          }
+        },
+        {
+          "seq": 22,
+          "nodeId": "clients-apac",
+          "atMs": 22600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-apac->edge-router"
+          }
+        },
+        {
+          "seq": 23,
+          "nodeId": "partner-api",
+          "atMs": 22600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "partner-api->edge-router"
+          }
+        },
+        {
+          "seq": 24,
+          "nodeId": "edge-router",
+          "atMs": 22600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+          }
+        },
+        {
+          "seq": 44,
+          "nodeId": "use-search",
+          "atMs": 31400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "fault",
+            "effect": "latency ×3"
+          }
+        }
+      ],
+      "events": [
+        {
+          "seq": 15,
+          "atMs": 20800,
+          "severity": "warning",
+          "title": "Suspicious traffic surge",
+          "scripted": false
+        },
+        {
+          "seq": 25,
+          "atMs": 22600,
+          "severity": "warning",
+          "title": "Error budget burning",
+          "scripted": false
+        },
+        {
+          "seq": 28,
+          "atMs": 24200,
+          "severity": "critical",
+          "title": "Credential stuffing pattern detected",
+          "scripted": true
+        },
+        {
+          "seq": 31,
+          "atMs": 28200,
+          "severity": "warning",
+          "title": "Valid credentials replayed without MFA",
+          "scripted": true
+        }
+      ],
+      "peakErrorRate": {
+        "value": 0.0739,
+        "atMs": 26000
+      },
+      "peakP95LatencyMs": {
+        "value": 288.7,
+        "atMs": 32000
+      }
+    }
+  ],
+  "propagation": [
+    {
+      "seq": 16,
+      "nodeId": "use-auth",
+      "atMs": 21200,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "prescribed",
+        "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+      }
+    },
+    {
+      "seq": 18,
+      "nodeId": "use-gateway",
+      "atMs": 22000,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "prescribed",
+        "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+      }
+    },
+    {
+      "seq": 20,
+      "nodeId": "clients-na",
+      "atMs": 22600,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "dependency",
+        "viaNodeId": "edge-router",
+        "edgeId": "clients-na->edge-router"
+      }
+    },
+    {
+      "seq": 21,
+      "nodeId": "clients-eu",
+      "atMs": 22600,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "dependency",
+        "viaNodeId": "edge-router",
+        "edgeId": "clients-eu->edge-router"
+      }
+    },
+    {
+      "seq": 22,
+      "nodeId": "clients-apac",
+      "atMs": 22600,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "dependency",
+        "viaNodeId": "edge-router",
+        "edgeId": "clients-apac->edge-router"
+      }
+    },
+    {
+      "seq": 23,
+      "nodeId": "partner-api",
+      "atMs": 22600,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "dependency",
+        "viaNodeId": "edge-router",
+        "edgeId": "partner-api->edge-router"
+      }
+    },
+    {
+      "seq": 24,
+      "nodeId": "edge-router",
+      "atMs": 22600,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "prescribed",
+        "effect": "injected traffic “Replayed credentials” at 1320 req/s"
+      }
+    },
+    {
+      "seq": 44,
+      "nodeId": "use-search",
+      "atMs": 31400,
+      "from": "healthy",
+      "to": "degraded",
+      "cause": {
+        "kind": "fault",
+        "effect": "latency ×3"
+      }
+    }
+  ],
+  "recovery": [],
+  "decisions": [
+    {
+      "requestId": "stolen-session-export",
+      "principal": "User::\"bob\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [],
+      "count": 10,
+      "firstAtMs": 9600,
+      "firstSeq": 5
+    }
+  ],
+  "impactedNodeIds": [
+    "clients-na",
+    "clients-eu",
+    "clients-apac",
+    "partner-api",
+    "edge-router",
+    "use-gateway",
+    "use-auth",
+    "use-search"
+  ],
+  "stillUnhealthyNodeIds": [
+    "clients-na",
+    "clients-eu",
+    "clients-apac",
+    "partner-api",
+    "edge-router",
+    "use-gateway",
+    "use-auth",
+    "use-search"
+  ],
+  "peakErrorRate": {
+    "value": 0.0739,
+    "atMs": 26000
+  },
+  "peakP95LatencyMs": {
+    "value": 288.7,
+    "atMs": 32000
+  },
+  "peakUnhealthy": {
+    "value": 8.0,
+    "atMs": 31400
+  },
+  "meanErrorRate": 0.0315,
+  "truncated": false
+}

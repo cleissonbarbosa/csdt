@@ -21,6 +21,7 @@ import { formatPercent } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
+import { PolicyDiff } from './PolicyDiff';
 import {
   download,
   formatBytes,
@@ -321,6 +322,7 @@ function Import() {
                   These files are valid. Applying them gives:
                 </p>
                 <Contents workspace={outcome.workspace} />
+                <PolicyDiff files={staged} />
               </div>
             ) : (
               <Problem>

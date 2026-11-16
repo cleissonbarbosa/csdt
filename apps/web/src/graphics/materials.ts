@@ -16,8 +16,6 @@ import {
   abs,
   attribute,
   cameraPosition,
-  cameraViewMatrix,
-  cameraWorldMatrix,
   cross,
   dot,
   float,
@@ -46,7 +44,6 @@ import {
   cos,
   smoothstep,
   step,
-  texture,
   textureLoad,
   time,
   uniform,
@@ -54,7 +51,6 @@ import {
   varying,
   vec2,
   vec3,
-  vec4,
 } from 'three/tsl';
 import * as THREE from 'three/webgpu';
 
@@ -597,70 +593,6 @@ export function createParticleMaterial(
   material.colorNode = vTone;
   material.opacityNode = coverage(beadDistance(p, vShape)).mul(vDim);
   return { material, uniforms: { density, size } };
-}
-
-// ---------------------------------------------------------------------------
-// Labels
-// ---------------------------------------------------------------------------
-
-export interface LabelUniforms {
-  fadeNear: Uniform<number>;
-  fadeFar: Uniform<number>;
-  opacity: Uniform<number>;
-  /** `2·tan(fov/2) / viewportHeight`: turns pixels into sprite scale. */
-  pixelScale: Uniform<number>;
-}
-
-/**
- * Billboarded text from a canvas atlas: every label in one draw call.
- *
- * Labels keep one size on screen however far the camera is, like the names
- * on a map: text is for reading and should not grow into the picture. Which
- * labels are shown at all is decided by distance.
- *
- * A label is hung from its anchor: `aAlign` says where the middle of the
- * text goes, in units of its own width and height. A service's name stands
- * on its anchor, `(0, 0.5)`; a plate's name is pushed off the rim to whichever
- * side is outward on screen, so it never lies across what it names.
- *
- * Instance: `aPos`, `aSize` (width, height in pixels), `aRect` (u, v, w, h),
- *           `aAlign`, `aLabelFx` = (visibility, always shown, alarm, _).
- */
-export function createLabelMaterial(
-  atlas: THREE.Texture,
-  theme: SceneTheme,
-): {
-  material: THREE.SpriteNodeMaterial;
-  uniforms: LabelUniforms;
-} {
-  const material = blended(new THREE.SpriteNodeMaterial());
-  // Names are read, not looked at: nothing in the model may cover them.
-  material.depthTest = false;
-  material.sizeAttenuation = false;
-  const fadeNear = uniform(40);
-  const fadeFar = uniform(80);
-  const opacity = uniform(1);
-  const pixelScale = uniform(0.001);
-
-  const position = attribute('aPos', 'vec3');
-  const rect = attribute('aRect', 'vec4');
-  const fx = attribute('aLabelFx', 'vec4');
-  const size = attribute('aSize', 'vec2').mul(pixelScale);
-  // Pixels become world units at the anchor's depth, along the camera's own
-  // right and up, which is the plane the label is drawn in.
-  const depth = cameraViewMatrix.mul(vec4(position, 1)).z.negate();
-  const hang = attribute('aAlign', 'vec2').mul(size).mul(depth);
-  material.positionNode = position.add(cameraWorldMatrix.mul(vec4(hang, 0, 0)).xyz);
-  material.scaleNode = size;
-
-  const texel = texture(atlas, rect.xy.add(uv().mul(rect.zw)));
-  const distance = length(cameraPosition.sub(position));
-  const fade = max(oneMinus(smoothstep(fadeNear, fadeFar, distance)), fx.y);
-  // Red is the letters, alpha is letters plus halo (see `labels.ts`).
-  const letters = mix(mix(theme.inkDim, theme.ink, fx.y), theme.critical, fx.z);
-  material.colorNode = mix(theme.plate, letters, texel.r);
-  material.opacityNode = texel.a.mul(varying(fade)).mul(fx.x).mul(opacity);
-  return { material, uniforms: { fadeNear, fadeFar, opacity, pixelScale } };
 }
 
 // ---------------------------------------------------------------------------

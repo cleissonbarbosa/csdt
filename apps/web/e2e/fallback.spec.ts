@@ -17,6 +17,12 @@ test('without WebGPU or WebGL 2 the topology is shown as an accessible table', a
   await expect(table.getByRole('status')).toContainText('neither WebGPU nor WebGL 2');
   await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toHaveCount(0);
   await expect(table.getByRole('table')).toHaveCount(4);
+  // Three gateways share a name: what calls them says which is where. A
+  // call that stays in the table's own region needs no more than the name.
+  await expect(table.getByTestId('table-calls-edge-router')).toHaveText(
+    'API Gateway, US East · Primary; API Gateway, EU West; API Gateway, AP Southeast',
+  );
+  await expect(table.getByTestId('table-calls-use-inventory')).toHaveText('Orders DB');
 
   // Everything else still works: live metrics, selection, incidents.
   await openOverview(page);

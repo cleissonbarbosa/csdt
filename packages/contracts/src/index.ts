@@ -97,6 +97,13 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
   critical: 3,
 };
 
+/**
+ * Where the files in use came from: compiled into the server, a workspace it
+ * was started with, or an import made since (held in memory, gone on restart).
+ */
+export const WorkspaceOriginSchema = z.enum(['bundled', 'startup', 'imported']);
+export type WorkspaceOrigin = z.infer<typeof WorkspaceOriginSchema>;
+
 const count = z.number().int().nonnegative();
 const rate = z.number().nonnegative();
 const fraction = z.number().min(0).max(1);
@@ -546,6 +553,230 @@ export const RecordingSummarySchema = z.object({
 export type RecordingSummary = z.infer<typeof RecordingSummarySchema>;
 
 // ---------------------------------------------------------------------------
+// Incident report: an incident read back from the timeline it ran on
+// ---------------------------------------------------------------------------
+
+/** Something the scenario file holds the model to during a phase. */
+export const PrescribedEffectSchema = z.object({
+  /** The effect in a few words: `latency ×6`. */
+  description: z.string(),
+  nodeIds: z.array(z.string()),
+  edgeIds: z.array(z.string()),
+});
+export type PrescribedEffect = z.infer<typeof PrescribedEffectSchema>;
+
+/**
+ * Why a service left its normal state, as far as the run shows.
+ * `prescribed`: the scenario acts on it. `dependency`: something it calls
+ * (or a queue's consumer) was already unwell. `load`: it receives traffic
+ * the scenario adds elsewhere. `fault`: a fault placed by hand is on it.
+ * `unattributed`: none of those; the report does not guess.
+ */
+export const CauseKindSchema = z.enum([
+  'prescribed',
+  'dependency',
+  'load',
+  'fault',
+  'unattributed',
+]);
+export type CauseKind = z.infer<typeof CauseKindSchema>;
+
+export const CauseSchema = z.object({
+  kind: CauseKindSchema,
+  effect: z.string().optional(),
+  viaNodeId: z.string().optional(),
+  edgeId: z.string().optional(),
+});
+export type Cause = z.infer<typeof CauseSchema>;
+
+export const ReportTransitionSchema = z.object({
+  /** Sequence number of the event it was read from. */
+  seq: count,
+  nodeId: z.string(),
+  atMs: count,
+  from: HealthSchema,
+  to: HealthSchema,
+  /** Present when the service got worse. */
+  cause: CauseSchema.optional(),
+});
+export type ReportTransition = z.infer<typeof ReportTransitionSchema>;
+
+export const ReportEventSchema = z.object({
+  seq: count,
+  atMs: count,
+  severity: SeveritySchema,
+  title: z.string(),
+  /** True when the scenario announces it; false when a detection rule raised it. */
+  scripted: z.boolean(),
+});
+export type ReportEvent = z.infer<typeof ReportEventSchema>;
+
+export const PeakSchema = z.object({ value: rate, atMs: count });
+export type Peak = z.infer<typeof PeakSchema>;
+
+export const ReportPhaseSchema = z.object({
+  index: count,
+  name: z.string(),
+  status: IncidentStatusSchema,
+  description: z.string(),
+  /** When the phase was entered, on the simulation clock. */
+  atMs: count,
+  /** The same moment, counted from the start of the incident. */
+  sinceStartMs: count,
+  endedAtMs: count.nullable(),
+  prescribed: z.array(PrescribedEffectSchema),
+  /** Services that got worse during the phase, in order. */
+  transitions: z.array(ReportTransitionSchema),
+  events: z.array(ReportEventSchema),
+  peakErrorRate: PeakSchema.nullable(),
+  peakP95LatencyMs: PeakSchema.nullable(),
+});
+export type ReportPhase = z.infer<typeof ReportPhaseSchema>;
+
+export const ReportDecisionSchema = z.object({
+  requestId: z.string(),
+  principal: z.string(),
+  action: z.string(),
+  resource: z.string(),
+  decision: z.enum(['allow', 'deny']),
+  determiningPolicies: z.array(z.string()),
+  /** Decision events of the incident that carry this request. */
+  count,
+  firstAtMs: count,
+  firstSeq: count,
+});
+export type ReportDecision = z.infer<typeof ReportDecisionSchema>;
+
+export const IncidentReportSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  incidentId: z.string(),
+  scenarioId: z.string(),
+  title: z.string(),
+  severity: SeveritySchema,
+  status: IncidentStatusSchema,
+  startedAtMs: count,
+  /** When the scenario ended or was stopped. */
+  resolvedAtMs: count.nullable(),
+  /** How it ended, in the engine's words. */
+  resolution: z.string().nullable(),
+  /** When the last affected service was back to normal, once it has ended. */
+  recoveredAtMs: count.nullable(),
+  /** The last moment the report covers. */
+  observedUntilMs: count,
+  origin: z
+    .object({
+      nodeId: z.string(),
+      /** On what grounds: the scenario says so, or the run shows it. */
+      basis: z.enum(['declared', 'first-prescribed', 'first-observed']),
+    })
+    .nullable(),
+  /** The platform's figures just before the incident began. */
+  baseline: z.object({ errorRate: fraction, p95LatencyMs: rate }).nullable(),
+  phases: z.array(ReportPhaseSchema),
+  /** The first time each affected service left its normal state, in order. */
+  propagation: z.array(ReportTransitionSchema),
+  recovery: z.array(ReportTransitionSchema),
+  /** What Cedar decided for the scenario's own requests. */
+  decisions: z.array(ReportDecisionSchema),
+  impactedNodeIds: z.array(z.string()),
+  stillUnhealthyNodeIds: z.array(z.string()),
+  peakErrorRate: PeakSchema.nullable(),
+  peakP95LatencyMs: PeakSchema.nullable(),
+  /** Most services not normal at the same time. */
+  peakUnhealthy: PeakSchema.nullable(),
+  meanErrorRate: fraction.nullable(),
+  truncated: z.boolean(),
+});
+export type IncidentReport = z.infer<typeof IncidentReportSchema>;
+
+// ---------------------------------------------------------------------------
+// Sessions and experiments: a timeline as what reproduces it
+// ---------------------------------------------------------------------------
+
+/**
+ * One effect in the format a scenario phase writes it in. The server checks
+ * it; here it is only carried.
+ */
+export const EffectSchema = z.looseObject({ type: z.string() });
+export type Effect = z.infer<typeof EffectSchema>;
+
+/** A command a recording may hold. Outcomes are never among them. */
+export const RecordedCommandSchema = z.object({
+  atMs: count,
+  command: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('startScenario'), scenarioId: z.string() }),
+    z.object({ type: z.literal('abortScenario') }),
+    z.object({ type: z.literal('injectFault'), effect: EffectSchema, rampMs: count }),
+    z.object({ type: z.literal('clearFaults'), effect: EffectSchema.optional() }),
+  ]),
+});
+export type RecordedCommand = z.infer<typeof RecordedCommandSchema>;
+
+/** A seed and a command list: what the engine needs to give a history back. */
+export const RecordingSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  topologyId: z.string(),
+  seed: count,
+  durationMs: count,
+  commands: z.array(RecordedCommandSchema),
+});
+export type Recording = z.infer<typeof RecordingSchema>;
+
+/** The timeline in use, written out as what reproduces it. */
+export const SessionExportSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  recording: RecordingSchema,
+  cursorMs: count,
+  /** Commands a session may not carry, counted. */
+  omitted: z.object({ decisions: count, importedEvents: count }),
+  /** False when loading the recording would not give this history back. */
+  reproducible: z.boolean(),
+  note: z.string().nullable(),
+  /** Anything but `bundled` has to travel with the session. */
+  workspaceOrigin: WorkspaceOriginSchema,
+});
+export type SessionExport = z.infer<typeof SessionExportSchema>;
+
+export const ExperimentRunSchema = z.object({
+  recording: RecordingSchema,
+  report: IncidentReportSchema,
+  samples: z.array(MetricSampleSchema),
+});
+export type ExperimentRun = z.infer<typeof ExperimentRunSchema>;
+
+/** The same incident twice, with one thing changed. */
+export const ExperimentSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  topologyId: z.string(),
+  seed: count,
+  scenarioId: z.string(),
+  scenarioName: z.string(),
+  incidentStartedAtMs: count,
+  durationMs: count,
+  /** The one thing the second run does that the first does not. */
+  intervention: z.object({
+    description: z.string(),
+    nodeIds: z.array(z.string()),
+    /** Counted from the start of the incident. */
+    atMs: count,
+    rampMs: count,
+    effect: EffectSchema,
+  }),
+  baseline: ExperimentRunSchema,
+  variant: ExperimentRunSchema,
+});
+export type Experiment = z.infer<typeof ExperimentSchema>;
+
+export interface ExperimentRequest {
+  scenarioId: string;
+  intervention: { effect: FaultEffect; atMs: number; rampMs?: number };
+}
+
+// ---------------------------------------------------------------------------
 // Authorization
 // ---------------------------------------------------------------------------
 
@@ -699,13 +930,6 @@ export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 // Workspace: the files the platform, its scenarios and its policies come from
 // ---------------------------------------------------------------------------
 
-/**
- * Where the files in use came from: compiled into the server, a workspace it
- * was started with, or an import made since (held in memory, gone on restart).
- */
-export const WorkspaceOriginSchema = z.enum(['bundled', 'startup', 'imported']);
-export type WorkspaceOrigin = z.infer<typeof WorkspaceOriginSchema>;
-
 export const UnavailableScenarioSchema = z.object({
   topologyId: z.string(),
   scenarioId: z.string(),
@@ -765,6 +989,104 @@ export const WorkspaceResponseSchema = z.object({
   playback: PlaybackStateSchema,
 });
 export type WorkspaceResponse = z.infer<typeof WorkspaceResponseSchema>;
+
+// -- what Cedar would decide differently under other files -----------------
+
+const PolicyOutcomeSchema = z.object({
+  decision: z.enum(['allow', 'deny']),
+  determiningPolicies: z.array(z.string()),
+  errors: z.array(z.string()),
+});
+export type PolicyOutcome = z.infer<typeof PolicyOutcomeSchema>;
+
+const IdChangesSchema = z.object({ added: z.array(z.string()), removed: z.array(z.string()) });
+
+export const RequestChangeSchema = z.object({
+  list: z.enum(['traffic-mix', 'scenario-requests']),
+  id: z.string(),
+  /** `attribution`: the same decision, determined by other policies. */
+  kind: z.enum(['decision', 'attribution', 'added', 'removed']),
+  request: z.object({
+    principal: z.string(),
+    action: z.string(),
+    resource: z.string(),
+    context: z.record(z.string(), z.unknown()),
+  }),
+  base: PolicyOutcomeSchema.nullable(),
+  candidate: PolicyOutcomeSchema.nullable(),
+});
+export type RequestChange = z.infer<typeof RequestChangeSchema>;
+
+export const MatrixChangeSchema = z.object({
+  principal: z.string(),
+  action: z.string(),
+  resource: z.string(),
+  base: z.enum(['allow', 'deny']),
+  candidate: z.enum(['allow', 'deny']),
+  /** True when it changed this way in every context tried. */
+  everyContext: z.boolean(),
+  contexts: z.array(z.record(z.string(), z.unknown())),
+  basePolicies: z.array(z.string()),
+  candidatePolicies: z.array(z.string()),
+});
+export type MatrixChange = z.infer<typeof MatrixChangeSchema>;
+
+/**
+ * Uploaded files compared with the ones in use: every answer on either side
+ * is Cedar's. `base` is what is in use, `candidate` what was uploaded.
+ */
+export const WorkspaceDiffSchema = z.object({
+  decisionsChanged: z.boolean(),
+  diff: z.object({
+    policies: z.object({
+      added: z.array(z.string()),
+      removed: z.array(z.string()),
+      changed: z.array(z.string()),
+    }),
+    entitiesChanged: z.boolean(),
+    catalogChanged: z.boolean(),
+    topologies: IdChangesSchema,
+    scenarios: IdChangesSchema,
+    /** Share of ordinary authorization traffic Cedar denies. */
+    deniedAtRest: z.object({ base: fraction, candidate: fraction }),
+    requests: z.object({ compared: count, changes: z.array(RequestChangeSchema) }),
+    /** Scenario flows stopped on one side and let through on the other. */
+    flows: z.array(
+      z.object({
+        topology: z.string(),
+        scenario: z.string(),
+        flow: z.string(),
+        label: z.string(),
+        request: z.string(),
+        base: z.enum(['permitted', 'denied']),
+        candidate: z.enum(['permitted', 'denied']),
+      }),
+    ),
+    availability: z.array(
+      z.object({
+        topology: z.string(),
+        scenario: z.string(),
+        base: z.string().nullable(),
+        candidate: z.string().nullable(),
+      }),
+    ),
+    /** Every request the tracer can build, evaluated on both sides. */
+    matrix: z.object({
+      principals: count,
+      actions: count,
+      resources: count,
+      contextKeys: z.array(z.string()),
+      contexts: count,
+      compared: count,
+      note: z.string().nullable(),
+      allowToDeny: count,
+      denyToAllow: count,
+      attributionOnly: count,
+      changes: z.array(MatrixChangeSchema),
+    }),
+  }),
+});
+export type WorkspaceDiff = z.infer<typeof WorkspaceDiffSchema>;
 
 export const ApiErrorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),

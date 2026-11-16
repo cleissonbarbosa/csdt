@@ -284,6 +284,21 @@
   .timeline-track[data-dragging='true'] .timeline-ends {
     opacity: 1;
   }
+  /*
+   * On a narrow screen the strip has a row to itself: it is tall enough to
+   * drag by touch as it stands, and does not grow over the controls above.
+   */
+  @media (max-width: 639px) {
+    .timeline-track,
+    .timeline-slot:hover .timeline-track,
+    .timeline-track:focus-visible,
+    .timeline-track[data-dragging='true'] {
+      height: 28px;
+    }
+    .timeline-track .timeline-ends {
+      opacity: 1;
+    }
+  }
 
   /* A quiet label next to the thing it names. */
   .caption {

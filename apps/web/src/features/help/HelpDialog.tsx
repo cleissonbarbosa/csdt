@@ -179,6 +179,42 @@ export function HelpDialog() {
             short of their target.
           </p>
 
+          <Heading>Time</Heading>
+          <p className="text-xs leading-relaxed text-ink-dim">
+            The clock is the simulation&apos;s own. The cursor is either at the{' '}
+            <span className="text-ink">simulation&apos;s now</span>, where new history is being
+            made, or in its <span className="text-ink">history</span>, which is re-simulated exactly
+            as it happened; either can be <span className="text-ink">paused</span>. A phase of an
+            incident is timed from the start of that incident (
+            <span className="numeric">+0:14</span>); an event shows both that and the simulation
+            clock, which differ by when the incident began.
+          </p>
+
+          <Heading>Why something happened</Heading>
+          <p className="mb-2 text-xs leading-relaxed text-ink-dim">
+            An incident can be read back from its own record: select a phase, an event or the
+            summary. Each line says what kind of statement it is.
+          </p>
+          <ul className="space-y-1.5 text-xs text-ink-dim">
+            <li>
+              <span className="text-ink">Prescribed</span>: written in the scenario file. The
+              scenario does this by itself.
+            </li>
+            <li>
+              <span className="text-ink">Modelled</span>: a relation of the topology the model
+              follows. A dependency carries failures back to its callers; added traffic flows on to
+              what is called.
+            </li>
+            <li>
+              <span className="text-ink">Observed</span>: an event or a figure the engine recorded
+              during the run.
+            </li>
+            <li>
+              <span className="text-ink">Not explained</span>: none of the relations the report
+              knows accounts for it, and it does not guess.
+            </li>
+          </ul>
+
           <Heading>Kinds of service</Heading>
           <ul className="space-y-1.5">
             {SERVICE_TYPES.map((type) => (

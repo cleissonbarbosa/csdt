@@ -6,16 +6,20 @@ use serde_json::{json, Value};
 
 use std::sync::Arc;
 
+use crate::application::diff::{compare, Diff};
+use crate::application::experiment::Experiment;
+use crate::application::session::SessionExport;
 use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
 use crate::authorization::{
     CatalogAction, CatalogContextKey, CatalogPrincipal, CatalogResource, CatalogTenant,
 };
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, EngineInfo, EngineKind,
-    Incident, IntegrationStatus, MetricsReport, PlaybackState, PolicyDecisionPoint, PolicyInfo,
-    RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary, WorkspaceCheck,
-    WorkspaceOrigin, WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
+    Incident, IncidentReport, IntegrationStatus, MetricsReport, PlaybackState, PolicyDecisionPoint,
+    PolicyInfo, RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary,
+    WorkspaceCheck, WorkspaceOrigin, WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
 };
+use crate::incidents::recordings::Recording;
 use crate::incidents::Effect;
 use crate::workspace::{bundle_of, from_files, Bundle, SourceFile};
 
@@ -156,6 +160,18 @@ pub async fn incidents(State(state): State<AppState>) -> Json<IncidentsResponse>
         schema_version: SCHEMA_VERSION,
         incidents: state.service.incidents(),
     })
+}
+
+/// One incident of the timeline in use, read back from its record: where it
+/// began, what the scenario prescribed, what followed in the model and how
+/// it ended.
+pub async fn incident_report(
+    State(state): State<AppState>,
+    id: Result<Path<String>, PathRejection>,
+) -> ApiResult<IncidentReport> {
+    let Path(id) = id?;
+    check_id("incident id", &id)?;
+    Ok(Json(state.service.incident_report(&id)?))
 }
 
 #[derive(Serialize)]
@@ -385,6 +401,75 @@ pub async fn recording_load(
     Ok(Json(ControlResponse { playback }))
 }
 
+// -- sessions and experiments -----------------------------------------------
+
+/// The timeline in use as a seed and a command list: what reproduces it.
+pub async fn session(State(state): State<AppState>) -> Json<SessionExport> {
+    Json(state.service.session())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoadSessionBody {
+    recording: Recording,
+    /// Where to put the cursor. With one, the timeline waits there, paused.
+    cursor_ms: Option<u64>,
+}
+
+/// Replaces the timeline with the one a session describes. It is simulated
+/// again from its seed and commands: nothing in the body states an outcome.
+pub async fn session_load(
+    State(state): State<AppState>,
+    body: Result<Json<LoadSessionBody>, JsonRejection>,
+) -> ApiResult<ControlResponse> {
+    let Json(body) = body?;
+    let service = state.service.clone();
+    let playback = off_the_workers(move || service.load_session(&body.recording, body.cursor_ms))
+        .await
+        .map_err(|()| internal("the session could not be loaded"))??;
+    Ok(Json(ControlResponse { playback }))
+}
+
+/// The one thing the second run of a comparison does differently.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InterventionBody {
+    effect: Effect,
+    /// When to place it, counted from the start of the incident.
+    at_ms: u64,
+    #[serde(default)]
+    ramp_ms: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompareBody {
+    scenario_id: String,
+    intervention: InterventionBody,
+}
+
+/// Runs a scenario twice with the same seed, once as it is and once with
+/// one fault placed, and reports both. The timeline in use is not touched.
+pub async fn experiment_compare(
+    State(state): State<AppState>,
+    body: Result<Json<CompareBody>, JsonRejection>,
+) -> ApiResult<Experiment> {
+    let Json(body) = body?;
+    check_id("scenarioId", &body.scenario_id)?;
+    let service = state.service.clone();
+    let experiment = off_the_workers(move || {
+        service.compare_intervention(
+            &body.scenario_id,
+            body.intervention.effect,
+            body.intervention.at_ms,
+            body.intervention.ramp_ms,
+        )
+    })
+    .await
+    .map_err(|()| internal("the comparison could not be run"))??;
+    Ok(Json(experiment))
+}
+
 // -- workspace --------------------------------------------------------------
 
 pub async fn workspace(State(state): State<AppState>) -> Json<WorkspaceStatus> {
@@ -503,6 +588,35 @@ pub async fn workspace_check(
         })),
         Err(ImportFailure::Api(error)) => Err(error),
     }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceDiffResponse {
+    /// Whether Cedar decides anything differently: a catalogued request, a
+    /// scenario flow or a cell of the access matrix.
+    decisions_changed: bool,
+    diff: Diff,
+}
+
+/// What Cedar would decide differently under the uploaded files, compared
+/// with what is in use. Both sides are built the way start-up builds them
+/// and every answer on either is Cedar's. Nothing is applied.
+pub async fn workspace_diff(
+    State(state): State<AppState>,
+    body: Result<Json<ImportBody>, JsonRejection>,
+) -> ApiResult<WorkspaceDiffResponse> {
+    import_allowed(&state)?;
+    let Json(body) = body?;
+    let candidate = build_import(&state, body.files).await?;
+    let base = state.service.assets();
+    let diff = off_the_workers(move || compare(&base, &candidate.assets))
+        .await
+        .map_err(|()| internal("the files could not be compared"))??;
+    Ok(Json(WorkspaceDiffResponse {
+        decisions_changed: diff.decisions_changed(),
+        diff,
+    }))
 }
 
 fn apply(state: &AppState, loaded: Loaded) -> Json<WorkspaceResponse> {

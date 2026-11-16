@@ -177,6 +177,8 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         call(&unavailable, Method::GET, "/scenarios", None).await?,
     )?;
     save("incidents", get("/incidents").await?)?;
+    // The incident under way, read back from what is recorded of it so far.
+    save("incident-report", get("/incidents/inc-001/report").await?)?;
     save("metrics", get("/metrics").await?)?;
     save("events", get("/events?limit=1000").await?)?;
     save("providers", get("/providers").await?)?;
@@ -187,6 +189,13 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
     save(
         "stream-snapshot",
         serde_json::from_str(&state.service.snapshot_message())?,
+    )?;
+    // The timeline as what reproduces it, and the same incident run twice
+    // on timelines of its own. Neither changes the timeline in use.
+    save("session", get("/session").await?)?;
+    save(
+        "experiment",
+        post("/demo/experiments/compare", experiment_request()).await?,
     )?;
     let events = state.service.events(0, 5, None, None);
     save(
@@ -242,6 +251,14 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
+    save(
+        "workspace-diff",
+        post(
+            "/demo/workspace/diff",
+            json!({ "files": [policies_without("finance-view-ledger")?] }),
+        )
+        .await?,
+    )?;
     let mut broken = tiny_workspace();
     broken[1]["text"] = json!("{ \"id\": \"slow-door\" }");
     save(
@@ -268,6 +285,30 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )?,
     )?;
     Ok(written)
+}
+
+/// One intervention on a bundled scenario: the authentication service given
+/// three times its capacity twelve seconds into a credential-stuffing run.
+fn experiment_request() -> Value {
+    json!({
+        "scenarioId": "credential-stuffing",
+        "intervention": {
+            "effect": { "type": "capacity", "nodes": "node:use-auth", "factor": 3.0 },
+            "atMs": 12000,
+            "rampMs": 1000,
+        },
+    })
+}
+
+/// The bundled policies as an uploaded file, with one of them left out.
+fn policies_without(id: &str) -> Result<Value, AnyError> {
+    let policies: Vec<Value> = Sources::bundled()?
+        .policies
+        .iter()
+        .filter(|policy| policy.id != id)
+        .map(|policy| json!({ "id": policy.id, "content": policy.content }))
+        .collect();
+    Ok(json!({ "path": "cedar/policies.json", "text": Value::Array(policies).to_string() }))
 }
 
 /// The smallest workspace that replaces something: a two-service platform

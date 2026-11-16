@@ -1,11 +1,7 @@
-import type {
-  AuthorizationCatalog,
-  AuthorizationDecision,
-  EvaluateRequest,
-} from '@aegis/contracts';
+import type { AuthorizationCatalog, AuthorizationDecision } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Play, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, GitCompareArrows, Play, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
 import { evaluationTime, HOST } from '@/app/host';
@@ -15,7 +11,18 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select, Switch } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
 import { cn } from '@/lib/cn';
+import {
+  compare,
+  contextRows,
+  policyFingerprint,
+  requestOf,
+  staleReasons,
+  type EngineChoice,
+  type Evaluation,
+  type EvaluationInputs,
+} from '@/lib/evaluation';
 import { entityId, formatClock } from '@/lib/format';
+import { nodeLabels } from '@/lib/names';
 import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -38,47 +45,152 @@ const STAGE_LABEL = {
   resource: 'Resource',
 } as const;
 
-function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
+/** The configuration a decision answers, written out under it. */
+function EvaluatedWith({
+  decision,
+  catalog,
+  policyCount,
+  action,
+}: {
+  decision: AuthorizationDecision;
+  catalog: AuthorizationCatalog;
+  policyCount: number;
+  /**
+   * What can be done with this configuration and its answer. It sits here,
+   * on the card's own surface: the header is the incident colour when Cedar
+   * denied, and quiet ink cannot be read on it.
+   */
+  action?: ReactNode;
+}) {
+  const rows = contextRows(decision.request.context, catalog.contextKeys);
+  const off = decision.disabledPolicies;
+  return (
+    <div className="mt-3" data-testid="decision-inputs">
+      <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
+        <p className="caption">Evaluated with</p>
+        {action}
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+        {rows.map((row) => (
+          <div key={row.key} className="contents">
+            <dt className="text-ink-faint">{row.label}</dt>
+            <dd
+              className={cn('numeric', row.value === 'absent' ? 'text-ink-faint' : 'text-ink')}
+              data-testid={`decision-context-${row.key}`}
+            >
+              {row.value}
+            </dd>
+          </div>
+        ))}
+        <dt className="text-ink-faint">Policies</dt>
+        <dd className="text-ink" data-testid="decision-policies-used">
+          {decision.engine.kind === 'cedar-agent' ? (
+            "the agent's own policy store"
+          ) : (
+            <>
+              <span className="numeric">
+                {policyCount - off.length} of {policyCount}
+              </span>{' '}
+              active
+              {off.length > 0 && (
+                <>
+                  ; off: <span className="code">{off.join(', ')}</span>
+                </>
+              )}
+            </>
+          )}
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
+function DecisionCard({
+  evaluation,
+  catalog,
+  stale,
+  aside,
+}: {
+  evaluation: Evaluation;
+  catalog: AuthorizationCatalog;
+  /** Why this no longer answers what the form holds; empty when it does. */
+  stale: string[];
+  aside?: ReactNode;
+}) {
+  const { decision } = evaluation;
   const topology = useTelemetry((state) => state.topology);
+  const names = useMemo(() => (topology ? nodeLabels(topology) : null), [topology]);
   const traced = useUi((state) => state.tracedDecision?.id === decision.id);
   const tracing = useUi((state) => state.tracing) && traced;
   const allowed = decision.decision === 'allow';
-  const nameOf = (id: string) => topology?.nodes.find((n) => n.id === id)?.name ?? id;
+  const outdated = stale.length > 0;
+  const nameOf = (id: string) => names?.get(id) ?? id;
   return (
     <div
       className={cn(
         'overflow-hidden rounded-control border',
-        allowed ? 'border-line-strong' : 'border-critical',
+        // A decision that answers something else is not the event any more:
+        // it loses the incident colour and its firm edge.
+        outdated
+          ? 'border-dashed border-line-strong'
+          : allowed
+            ? 'border-line-strong'
+            : 'border-critical',
       )}
       data-testid="decision-card"
       data-decision={decision.decision}
+      data-stale={outdated}
       aria-live="polite"
     >
+      {outdated && (
+        <div
+          className="border-b border-dashed border-line-strong bg-sunken px-3 py-2"
+          role="status"
+          data-testid="decision-stale"
+        >
+          <p className="text-xs font-bold text-ink">Configuration changed. Evaluate again.</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
+            The result below answers the earlier configuration, not the one in the form.
+          </p>
+          <ul className="mt-1 space-y-0.5 text-[11px] text-ink-dim" data-testid="decision-changes">
+            {stale.map((reason) => (
+              <li key={reason}>{reason}.</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* The request the viewer is following either arrived or was stopped.
           Stopped is the event: it takes the incident colour, and a cross,
           and the solid form, so it is not told from Allow by hue alone. */}
       <div
         className={cn(
           'flex items-center justify-between gap-2 px-3 py-2',
-          allowed ? 'border-b border-line text-ink' : 'bg-critical text-on-accent',
+          outdated
+            ? 'border-b border-line text-ink-faint'
+            : allowed
+              ? 'border-b border-line text-ink'
+              : 'bg-critical text-on-accent',
         )}
       >
         <div className="flex items-center gap-2">
           {allowed ? <Check size={18} aria-hidden /> : <X size={18} aria-hidden />}
           <span className="text-lg font-bold leading-none" data-testid="decision-result">
+            {outdated && <span className="text-xs font-normal">Was </span>}
             {allowed ? 'Allow' : 'Deny'}
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          icon={<Play size={12} aria-hidden />}
-          disabled={tracing || decision.hops.length === 0}
-          onClick={() => useUi.getState().traceDecision({ ...decision })}
-          data-testid="decision-trace"
-        >
-          {tracing ? 'Tracing…' : traced ? 'Trace again' : 'Show the path'}
-        </Button>
+        <span className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<Play size={12} aria-hidden />}
+            disabled={tracing || decision.hops.length === 0}
+            onClick={() => useUi.getState().traceDecision({ ...decision })}
+            data-testid="decision-trace"
+          >
+            {tracing ? 'Tracing…' : traced ? 'Trace again' : 'Show the path'}
+          </Button>
+        </span>
       </div>
       <div className="p-3">
         <p className="code break-all text-[11px] text-ink-dim">
@@ -118,6 +230,13 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
             </ul>
           </div>
         )}
+
+        <EvaluatedWith
+          decision={decision}
+          catalog={catalog}
+          policyCount={evaluation.policyCount}
+          action={aside}
+        />
 
         <div className="mt-3">
           <p className="caption mb-1.5">Path through the platform</p>
@@ -205,6 +324,171 @@ function DecisionCard({ decision }: { decision: AuthorizationDecision }) {
   );
 }
 
+function Verdict({ decision }: { decision: 'allow' | 'deny' }) {
+  const allowed = decision === 'allow';
+  return (
+    <span className={cn('inline-flex items-center gap-1 font-bold', !allowed && 'text-critical')}>
+      {allowed ? <Check size={13} aria-hidden /> : <X size={13} aria-hidden />}
+      {allowed ? 'Allow' : 'Deny'}
+    </span>
+  );
+}
+
+/**
+ * Two evaluations side by side: the one kept, and the latest. Both are
+ * Cedar's answers as they came back; this only lays them next to each other
+ * and says in what their configurations differ.
+ */
+function ComparisonSection({
+  a,
+  b,
+  catalog,
+  onClear,
+}: {
+  a: Evaluation;
+  b: Evaluation | null;
+  catalog: AuthorizationCatalog;
+  onClear: () => void;
+}) {
+  const labels = useMemo(
+    () => ({ context: Object.fromEntries(catalog.contextKeys.map((k) => [k.key, k.label])) }),
+    [catalog.contextKeys],
+  );
+  const result = b ? compare(a, b, labels) : null;
+  const contextA = contextRows(a.decision.request.context, catalog.contextKeys);
+  const contextB = b ? contextRows(b.decision.request.context, catalog.contextKeys) : null;
+  const policies = (side: Evaluation) =>
+    side.decision.determiningPolicies.length > 0 ? (
+      <span className="code break-words">{side.decision.determiningPolicies.join(', ')}</span>
+    ) : (
+      <span className="text-ink-faint">none: denied by default</span>
+    );
+  const off = (side: Evaluation) =>
+    side.decision.disabledPolicies.length > 0 ? (
+      <span className="code break-words">{side.decision.disabledPolicies.join(', ')}</span>
+    ) : (
+      <span className="text-ink-faint">none</span>
+    );
+  const cell = 'min-w-0 px-2 py-1 align-top';
+  const pending = <span className="text-ink-faint">not evaluated yet</span>;
+  return (
+    <Section
+      title="Comparison"
+      aside={
+        <Button size="sm" variant="ghost" onClick={onClear} data-testid="comparison-clear">
+          Clear
+        </Button>
+      }
+    >
+      <p className="mb-2 text-[11px] leading-relaxed text-ink-dim" data-testid="comparison-verdict">
+        {!result
+          ? 'A is kept. Change the context or switch a policy, then evaluate: the new result appears here as B.'
+          : !result.sameRequest
+            ? 'A and B are different requests, so the two decisions answer different questions.'
+            : result.decisionChanged
+              ? `The decision changed from ${a.decision.decision === 'allow' ? 'Allow' : 'Deny'} to ${b!.decision.decision === 'allow' ? 'Allow' : 'Deny'}.`
+              : 'The decision is the same on both sides.'}
+      </p>
+      <table className="w-full table-fixed border-collapse text-[11px]" data-testid="comparison">
+        <thead>
+          <tr className="text-left text-ink-faint">
+            <th className="w-[6.5rem] py-1 font-normal" />
+            <th className={cn(cell, 'font-bold text-ink')}>
+              A{' '}
+              <span className="numeric font-normal">
+                at {formatClock(a.decision.virtualTimeMs)}
+              </span>
+            </th>
+            <th className={cn(cell, 'font-bold text-ink')}>
+              B{' '}
+              {b && (
+                <span className="numeric font-normal">
+                  at {formatClock(b.decision.virtualTimeMs)}
+                </span>
+              )}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line border-y border-line">
+          <tr>
+            <th scope="row" className="py-1 text-left font-normal text-ink-faint">
+              Decision
+            </th>
+            <td className={cell} data-testid="comparison-a">
+              <Verdict decision={a.decision.decision} />
+            </td>
+            <td className={cell} data-testid="comparison-b">
+              {b ? <Verdict decision={b.decision.decision} /> : pending}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row" className="py-1 text-left font-normal text-ink-faint">
+              Decided by
+            </th>
+            <td className={cell}>{policies(a)}</td>
+            <td className={cell}>{b ? policies(b) : pending}</td>
+          </tr>
+          {contextA.map((row, i) => {
+            const other = contextB?.[i]?.value;
+            const differs = other !== undefined && other !== row.value;
+            return (
+              <tr key={row.key} className={differs ? 'font-bold' : undefined}>
+                {/* In the form's own words, as the card above has them: a
+                    key cut to `changeWind…` names nothing. */}
+                <th
+                  scope="row"
+                  className="py-1 text-left font-normal text-ink-faint"
+                  title={`context.${row.key}`}
+                >
+                  {row.label}
+                </th>
+                <td className={cn(cell, 'numeric text-ink')}>{row.value}</td>
+                <td className={cn(cell, 'numeric text-ink')}>{other ?? ''}</td>
+              </tr>
+            );
+          })}
+          <tr>
+            <th scope="row" className="py-1 text-left font-normal text-ink-faint">
+              Policies off
+            </th>
+            <td className={cell}>{off(a)}</td>
+            <td className={cell}>{b ? off(b) : ''}</td>
+          </tr>
+        </tbody>
+      </table>
+      {result && (
+        <div className="mt-2 text-[11px] leading-relaxed text-ink-dim">
+          <p className="caption mb-0.5">What differs from A to B</p>
+          {result.differences.length > 0 ? (
+            <ul className="space-y-0.5" data-testid="comparison-differences">
+              {result.differences.map((line) => (
+                <li key={line}>{line}.</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Nothing: the same request under the same context and policies.</p>
+          )}
+          {result.sameRequest && (result.onlyInA.length > 0 || result.onlyInB.length > 0) && (
+            <p className="mt-1" data-testid="comparison-attribution">
+              {result.onlyInA.length > 0 && (
+                <>
+                  Only A is decided by <span className="code">{result.onlyInA.join(', ')}</span>
+                  .{' '}
+                </>
+              )}
+              {result.onlyInB.length > 0 && (
+                <>
+                  Only B is decided by <span className="code">{result.onlyInB.join(', ')}</span>.
+                </>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
   const [principal, setPrincipal] = useState(catalog.principals[0]?.uid ?? '');
   const [action, setAction] = useState(catalog.actions[0]?.uid ?? '');
@@ -217,10 +501,12 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
   const [resource, setResource] = useState(resources[0]?.uid ?? '');
   const [context, setContext] = useState<Record<string, Tri>>({});
   const [disabled, setDisabled] = useState<string[]>([]);
-  const [engine, setEngine] = useState<'embedded' | 'cedar-agent'>('embedded');
+  const [engine, setEngine] = useState<EngineChoice>('embedded');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AuthorizationDecision | null>(null);
+  const [result, setResult] = useState<Evaluation | null>(null);
+  // An evaluation kept aside, to set the next one against.
+  const [kept, setKept] = useState<Evaluation | null>(null);
 
   // Keep the resource valid for the chosen action.
   useEffect(() => {
@@ -233,10 +519,35 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
     if (!agentAvailable && engine === 'cedar-agent') setEngine('embedded');
   }, [agentAvailable, engine]);
 
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    const request: EvaluateRequest = {
+  // A policy that is no longer loaded cannot stay switched off.
+  useEffect(() => {
+    setDisabled((current) => {
+      const known = current.filter((id) => catalog.policies.some((policy) => policy.id === id));
+      return known.length === current.length ? current : known;
+    });
+  }, [catalog.policies]);
+
+  // A request handed over from elsewhere (a guided challenge, a link).
+  const preset = useUi((state) => state.authorizationPreset);
+  useEffect(() => {
+    if (!preset) return;
+    if (catalog.principals.some((p) => p.uid === preset.principal)) setPrincipal(preset.principal);
+    if (catalog.actions.some((a) => a.uid === preset.action)) setAction(preset.action);
+    if (catalog.resources.some((r) => r.uid === preset.resource)) setResource(preset.resource);
+    setContext(
+      Object.fromEntries(
+        Object.entries(preset.context ?? {})
+          .filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')
+          .map(([key, value]) => [key, value ? 'true' : 'false']),
+      ),
+    );
+    setDisabled([]);
+    useUi.getState().presetAuthorization(null);
+  }, [preset, catalog]);
+
+  /** What the form holds right now: what the next evaluation will be made with. */
+  const inputs = useMemo<EvaluationInputs>(
+    () => ({
       principal,
       action,
       resource,
@@ -245,16 +556,37 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           .filter(([, value]) => value !== 'absent')
           .map(([key, value]) => [key, value === 'true']),
       ),
+      disabled: engine === 'embedded' ? [...disabled].sort() : [],
       engine,
-      ...(engine === 'embedded' && disabled.length > 0 ? { disabledPolicies: disabled } : {}),
-    };
-    const outcome = await actions.evaluate(request);
+    }),
+    [principal, action, resource, context, disabled, engine],
+  );
+  const labels = useMemo(
+    () => ({ context: Object.fromEntries(catalog.contextKeys.map((k) => [k.key, k.label])) }),
+    [catalog.contextKeys],
+  );
+  const stale = useMemo(
+    () => (result ? staleReasons(result, inputs, catalog, labels) : []),
+    [result, inputs, catalog, labels],
+  );
+  const current = result !== null && stale.length === 0;
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    const made = inputs;
+    const outcome = await actions.evaluate(requestOf(made));
     setBusy(false);
     if (outcome instanceof ApiError) {
       setError(outcome.message);
       setResult(null);
     } else {
-      setResult(outcome);
+      setResult({
+        decision: outcome,
+        inputs: made,
+        policies: policyFingerprint(catalog),
+        policyCount: catalog.policies.length,
+      });
     }
   };
 
@@ -324,7 +656,8 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
               ; the resource belongs to <span className="text-ink-dim">{resourceInfo.tenant}</span>.
             </p>
           )}
-          <fieldset hidden={catalog.contextKeys.length === 0}>
+          {/* A fieldset is as wide as its content unless told otherwise. */}
+          <fieldset className="min-w-0" hidden={catalog.contextKeys.length === 0}>
             <legend className="caption mb-1.5">Context</legend>
             <div className="space-y-1.5">
               {catalog.contextKeys.map((key) => (
@@ -371,7 +704,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             className="w-full"
             data-testid="authz-evaluate"
           >
-            {busy ? 'Evaluating…' : 'Evaluate with Cedar'}
+            {busy ? 'Evaluating…' : result && !current ? 'Evaluate again' : 'Evaluate with Cedar'}
           </Button>
           {error && (
             <p
@@ -386,8 +719,34 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
 
       {result && (
         <Section title="Decision">
-          <DecisionCard decision={result} />
+          <DecisionCard
+            evaluation={result}
+            catalog={catalog}
+            stale={stale}
+            aside={
+              current && kept?.decision.id !== result.decision.id ? (
+                <button
+                  type="button"
+                  onClick={() => setKept(result)}
+                  className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+                  title="Keep this result, change the context or the policies, and evaluate again to see the two side by side"
+                  data-testid="decision-keep"
+                >
+                  <GitCompareArrows size={12} aria-hidden /> Keep to compare
+                </button>
+              ) : null
+            }
+          />
         </Section>
+      )}
+
+      {kept && (
+        <ComparisonSection
+          a={kept}
+          b={current && result.decision.id !== kept.decision.id ? result : null}
+          catalog={catalog}
+          onClear={() => setKept(null)}
+        />
       )}
 
       <Section
@@ -408,7 +767,8 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
         <ul className="space-y-1.5" data-testid="policy-list">
           {catalog.policies.map((policy) => {
             const off = disabled.includes(policy.id);
-            const determining = result?.determiningPolicies.includes(policy.id) ?? false;
+            // Only a result that answers the form says which policies decide.
+            const determining = current && result.decision.determiningPolicies.includes(policy.id);
             return (
               <li
                 key={policy.id}

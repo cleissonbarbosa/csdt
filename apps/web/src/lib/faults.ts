@@ -6,6 +6,8 @@
  */
 import type { ActiveFault, FaultEffect, FaultKind, Topology } from '@aegis/contracts';
 
+import { nodeLabel } from './names';
+
 function times(value: number): string {
   return `×${Number(value.toFixed(2))}`;
 }
@@ -105,9 +107,13 @@ export function faultEffect(
 
 /** What a fault is on, by name: a service, or the two ends of a connection. */
 export function faultTarget(topology: Topology, fault: ActiveFault): string {
-  if (fault.node !== null) return topology.nodes[fault.node]?.name ?? 'Unknown service';
+  // With its region where the name alone would be one of several.
+  const name = (id: string) => nodeLabel(topology, id);
+  if (fault.node !== null) {
+    const node = topology.nodes[fault.node];
+    return node ? name(node.id) : 'Unknown service';
+  }
   const edge = fault.edge === null ? undefined : topology.edges[fault.edge];
   if (!edge) return 'Unknown connection';
-  const name = (id: string) => topology.nodes.find((node) => node.id === id)?.name ?? id;
   return `${name(edge.source)} → ${name(edge.target)}`;
 }

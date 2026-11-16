@@ -10,9 +10,11 @@ import {
   AuthorizationDecisionSchema,
   ControlResponseSchema,
   EventsResponseSchema,
+  ExperimentSchema,
   HEALTH_BY_CODE,
   HealthResponseSchema,
   HealthSchema,
+  IncidentReportSchema,
   IncidentsResponseSchema,
   IntegrationStatusSchema,
   MetricsReportSchema,
@@ -20,11 +22,13 @@ import {
   SECURITY_STATUS_BY_CODE,
   ScenariosResponseSchema,
   SecurityStatusSchema,
+  SessionExportSchema,
   StreamMessageSchema,
   TopologiesResponseSchema,
   TopologySchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
+  WorkspaceDiffSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
 } from './index';
@@ -47,6 +51,9 @@ const CASES: Record<string, z.ZodType> = {
   metrics: MetricsReportSchema,
   events: EventsResponseSchema,
   incidents: IncidentsResponseSchema,
+  'incident-report': IncidentReportSchema,
+  session: SessionExportSchema,
+  experiment: ExperimentSchema,
   scenarios: ScenariosResponseSchema,
   'scenarios-unavailable': ScenariosResponseSchema,
   recordings: z.array(RecordingSummarySchema),
@@ -64,6 +71,7 @@ const CASES: Record<string, z.ZodType> = {
   workspace: WorkspaceStatusSchema,
   'workspace-check': WorkspaceCheckSchema,
   'workspace-check-invalid': WorkspaceCheckSchema,
+  'workspace-diff': WorkspaceDiffSchema,
   'workspace-response': WorkspaceResponseSchema,
   'workspace-export': WorkspaceBundleSchema,
   'stream-lagged': StreamMessageSchema,
@@ -129,6 +137,54 @@ describe('columnar snapshots', () => {
   });
 });
 
+describe('what is read back from a run', () => {
+  const report = IncidentReportSchema.parse(sample('incident-report'));
+  const topology = TopologySchema.parse(sample('topology'));
+  const experiment = ExperimentSchema.parse(sample('experiment'));
+
+  it('names only services and connections of the topology', () => {
+    const nodes = new Set(topology.nodes.map((node) => node.id));
+    const edges = new Set(topology.edges.map((edge) => edge.id));
+    expect(nodes.has(report.origin?.nodeId ?? '')).toBe(true);
+    for (const phase of report.phases) {
+      for (const effect of phase.prescribed) {
+        expect(effect.nodeIds.every((id) => nodes.has(id))).toBe(true);
+        expect(effect.edgeIds.every((id) => edges.has(id))).toBe(true);
+      }
+    }
+    for (const transition of report.propagation) {
+      expect(nodes.has(transition.nodeId)).toBe(true);
+      // Every service that got worse says why, or says it cannot.
+      expect(transition.cause).toBeDefined();
+    }
+  });
+
+  it('counts a phase from the start of the incident as well as on the clock', () => {
+    for (const phase of report.phases) {
+      expect(phase.atMs - report.startedAtMs).toBe(phase.sinceStartMs);
+    }
+  });
+
+  it('runs a comparison twice from one seed, with one command of difference', () => {
+    const { baseline, variant, intervention } = experiment;
+    expect(variant.recording.seed).toBe(baseline.recording.seed);
+    expect(variant.recording.topologyId).toBe(baseline.recording.topologyId);
+    expect(variant.recording.commands).toHaveLength(baseline.recording.commands.length + 1);
+    const extra = variant.recording.commands.at(-1);
+    expect(extra?.command).toEqual({
+      type: 'injectFault',
+      effect: intervention.effect,
+      rampMs: intervention.rampMs,
+    });
+    // The runs are one run until the intervention is placed.
+    const placedAt = experiment.incidentStartedAtMs + intervention.atMs;
+    const before = (samples: typeof baseline.samples) =>
+      samples.filter((s) => s.virtualTimeMs < placedAt);
+    expect(before(variant.samples)).toEqual(before(baseline.samples));
+    expect(variant.samples).not.toEqual(baseline.samples);
+  });
+});
+
 describe('schemas reject malformed data', () => {
   it('unknown enum members', () => {
     const topology = sample('topology') as { nodes: { serviceType: string }[] };
@@ -153,6 +209,17 @@ describe('schemas reject malformed data', () => {
     const topology = sample('topology') as { schemaVersion: string };
     topology.schemaVersion = '2.0';
     expect(TopologySchema.safeParse(topology).success).toBe(false);
+  });
+
+  it('a session that carries an outcome', () => {
+    const session = sample('session') as {
+      recording: { commands: { atMs: number; command: unknown }[] };
+    };
+    session.recording.commands.push({
+      atMs: 0,
+      command: { type: 'recordDecision', decision: sample('decision-allow') },
+    });
+    expect(SessionExportSchema.safeParse(session).success).toBe(false);
   });
 
   it('unknown stream message types', () => {

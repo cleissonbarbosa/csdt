@@ -110,6 +110,13 @@ export interface TelemetryState {
   replaceHistory: (samples: MetricSample[]) => void;
   /** Drops everything derived from a timeline that no longer exists. */
   clearTimeline: () => void;
+  /**
+   * Lets go of the incident the last snapshot carried. The timeline it was
+   * on has been replaced or cut short, and the snapshot that says what is
+   * running now is on its way: until it arrives, nothing is asked about an
+   * incident that may no longer exist.
+   */
+  forgetIncident: () => void;
 }
 
 /** Merges two seq-ordered event lists, de-duplicating by sequence number. */
@@ -230,6 +237,10 @@ export const useTelemetry = create<TelemetryState>((set, get) => ({
       nodeHistory: emptyNodeHistory(state.topology?.nodes.length ?? 0),
       nodeHistoryVersion: 0,
     })),
+  forgetIncident: () =>
+    set((state) =>
+      state.snapshot?.incident ? { snapshot: { ...state.snapshot, incident: null } } : {},
+    ),
 }));
 
 // -- derived helpers ---------------------------------------------------------

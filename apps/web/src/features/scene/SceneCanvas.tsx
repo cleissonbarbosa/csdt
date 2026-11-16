@@ -46,6 +46,8 @@ declare global {
       stats: () => SceneStats;
       projectNode: (nodeId: string) => { x: number; y: number } | null;
       captureFrame: SceneController['captureFrame'];
+      /** The names on screen, each with the box it is drawn in (CSS pixels). */
+      labels: SceneController['labelBoxes'];
       /** Development builds only. */
       debug?: { scene: THREE.Scene; renderer: THREE.WebGPURenderer };
     };
@@ -129,6 +131,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       stats: () => instance.getStats(),
       projectNode: (id) => instance.projectNode(shownAs(id) ?? id),
       captureFrame: () => instance.captureFrame(),
+      labels: () => instance.labelBoxes(),
       ...(import.meta.env.DEV ? { debug: { scene, renderer: gl } } : {}),
     };
 

@@ -719,7 +719,7 @@ pub fn fault_fits(faults: &ChannelSet, targets: &[(ChannelKey, f64)]) -> bool {
 
 /// The services a set of channels acts on: the service itself, or the two
 /// ends of a connection. Sorted, each once.
-fn touched(topo: &SimTopology, keys: &[ChannelKey]) -> Vec<usize> {
+pub fn touched(topo: &SimTopology, keys: &[ChannelKey]) -> Vec<usize> {
     let mut nodes = Vec::new();
     let mut ends = |edge: u32| {
         nodes.push(topo.edge_src[edge as usize]);

@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/Section';
 import { impactedSet, matchesFilters, nodeHealth } from '@/features/explorer/filtering';
 import { cn } from '@/lib/cn';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
+import { listNames, namedFrom } from '@/lib/names';
 import { SERVICE_TYPE } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -95,12 +96,13 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
             <tbody>
               {rows.map(({ node, index: i, health }) => {
                 const selected = selection?.kind === 'node' && selection.id === node.id;
-                const calls = (index.outgoing[i] ?? [])
-                  .map(
-                    (e) =>
-                      topology.nodes[index.nodeIndex.get(topology.edges[e]!.target) ?? -1]?.name,
-                  )
-                  .filter(Boolean);
+                // A call that leaves this table's region says where it
+                // goes: several services carry the same name.
+                const calls = namedFrom(
+                  topology,
+                  node.region,
+                  (index.outgoing[i] ?? []).map((e) => topology.edges[e]!.target),
+                );
                 return (
                   <tr
                     key={node.id}
@@ -140,11 +142,13 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
                         ? formatPercent(live?.nodes.saturation[i] ?? node.metrics.saturation)
                         : 'n/a'}
                     </td>
+                    {/* Written out, on as many lines as it takes: cut to
+                        one line, three gateways read as one name repeated. */}
                     <td
-                      className="max-w-[22ch] truncate px-3 py-1.5 text-ink-faint"
-                      title={calls.join(', ')}
+                      className="max-w-[36ch] px-3 py-1.5 text-ink-faint"
+                      data-testid={`table-calls-${node.id}`}
                     >
-                      {calls.length > 0 ? calls.join(', ') : '—'}
+                      {calls.length > 0 ? listNames(calls) : '—'}
                     </td>
                   </tr>
                 );

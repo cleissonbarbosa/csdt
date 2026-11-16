@@ -1,0 +1,27 @@
+- generic [ref=e3]:
+  - link "Skip to the topology" [ref=e4] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - img "AEGIS" [ref=e7]
+      - heading "AEGIS" [level=1] [ref=e10]
+    - generic "Signals outside their normal range" [ref=e14]
+    - generic [ref=e15]:
+      - status [ref=e16]: Loading the engine
+      - 'button "Simulated: Produced by the simulation engine, which runs in this tab. Open integrations." [ref=e18] [cursor=pointer]':
+        - generic [ref=e20]: Simulated
+      - button "Search services and commands" [ref=e21] [cursor=pointer]
+      - button "Explore an incident" [ref=e25] [cursor=pointer]
+      - button "More" [ref=e29] [cursor=pointer]
+  - generic [ref=e34]:
+    - main "Infrastructure topology" [ref=e35]:
+      - img "Interactive 3D view of the infrastructure topology" [ref=e36]
+    - toolbar "Scene controls" [ref=e40]:
+      - radiogroup "Topology layout" [ref=e41]:
+        - radio "Overview" [checked] [ref=e42] [cursor=pointer]
+        - radio "Regions" [ref=e43] [cursor=pointer]
+        - radio "Dependencies" [ref=e44] [cursor=pointer]
+      - button "Frame everything" [ref=e45] [cursor=pointer]
+      - button "Reset camera" [ref=e51] [cursor=pointer]
+    - generic:
+      - status

@@ -11,21 +11,27 @@ import {
   AuthorizationDecisionSchema,
   ControlResponseSchema,
   EventsResponseSchema,
+  ExperimentSchema,
   HealthResponseSchema,
+  IncidentReportSchema,
   IncidentsResponseSchema,
   IntegrationStatusSchema,
   MetricsReportSchema,
   RecordingSummarySchema,
   ScenariosResponseSchema,
+  SessionExportSchema,
   TopologiesResponseSchema,
   TopologySchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
+  WorkspaceDiffSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
   type ControlAction,
   type EvaluateRequest,
+  type ExperimentRequest,
   type FaultEffect,
+  type Recording,
   type WorkspaceFile,
 } from '@aegis/contracts';
 import { transport } from '@transport';
@@ -35,6 +41,8 @@ import { z } from 'zod';
 export const API_BASE: string = (import.meta.env.VITE_AEGIS_API_URL ?? '').replace(/\/+$/, '');
 const PREFIX = '/api/v1';
 const TIMEOUT_MS = 8000;
+/** For the few requests that simulate or evaluate a great deal before answering. */
+const LONG_TIMEOUT_MS = 30_000;
 
 export class ApiError extends Error {
   constructor(
@@ -59,9 +67,14 @@ export function streamUrl(): string {
   return url.toString();
 }
 
-async function request<T>(schema: z.ZodType<T>, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body?: unknown,
+  timeoutMs = TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
     response = await transport.fetch(apiUrl(path), {
@@ -114,6 +127,9 @@ export const api = {
   events: (afterSeq = 0, limit = 1000) =>
     request(EventsResponseSchema, `/events?afterSeq=${afterSeq}&limit=${limit}`),
   incidents: () => request(IncidentsResponseSchema, '/incidents'),
+  /** One incident read back from the record of it: origin, phases, what followed. */
+  incidentReport: (incidentId: string) =>
+    request(IncidentReportSchema, `/incidents/${encodeURIComponent(incidentId)}/report`),
   scenarios: () => request(ScenariosResponseSchema, '/scenarios'),
   recordings: () => request(z.array(RecordingSummarySchema), '/recordings'),
   providers: () => request(z.array(IntegrationStatusSchema), '/providers'),
@@ -141,6 +157,19 @@ export const api = {
     request(ControlResponseSchema, '/demo/topology/select', { topologyId }),
   loadRecording: (recordingId: string) =>
     request(ControlResponseSchema, '/demo/recordings/load', { recordingId }),
+  /** The timeline in use as a seed and a command list. */
+  session: () => request(SessionExportSchema, '/session'),
+  /** Replaces the timeline with the one a recording describes, simulated again. */
+  loadSession: (recording: Recording, cursorMs?: number) =>
+    request(
+      ControlResponseSchema,
+      '/demo/session/load',
+      cursorMs === undefined ? { recording } : { recording, cursorMs },
+      LONG_TIMEOUT_MS,
+    ),
+  /** Runs a scenario twice from the same seed, once with one fault placed. */
+  compareIntervention: (body: ExperimentRequest) =>
+    request(ExperimentSchema, '/demo/experiments/compare', body, LONG_TIMEOUT_MS),
   authorizationCatalog: () => request(AuthorizationCatalogSchema, '/demo/authorization/catalog'),
   authorizationDecisions: () =>
     request(z.array(AuthorizationDecisionSchema), '/demo/authorization/decisions'),
@@ -152,6 +181,9 @@ export const api = {
   /** Says what applying the files would give, without applying them. */
   checkWorkspace: (files: WorkspaceFile[]) =>
     request(WorkspaceCheckSchema, '/demo/workspace/check', { files }),
+  /** What Cedar would decide differently under the files, against what is in use. */
+  diffWorkspace: (files: WorkspaceFile[]) =>
+    request(WorkspaceDiffSchema, '/demo/workspace/diff', { files }, LONG_TIMEOUT_MS),
   importWorkspace: (files: WorkspaceFile[]) =>
     request(WorkspaceResponseSchema, '/demo/workspace/import', { files }),
   /** Back to what the server was started with. */

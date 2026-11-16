@@ -6,16 +6,20 @@ import {
   AuthorizationCatalogSchema,
   AuthorizationDecisionSchema,
   EventsResponseSchema,
+  ExperimentSchema,
+  IncidentReportSchema,
   IncidentsResponseSchema,
   IntegrationStatusSchema,
   MetricsReportSchema,
   RecordingSummarySchema,
   ScenariosResponseSchema,
+  SessionExportSchema,
   StreamMessageSchema,
   TopologiesResponseSchema,
   TopologySchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
+  WorkspaceDiffSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
   type InfrastructureNode,
@@ -50,6 +54,11 @@ export const workspaceCheck = () => sample('workspace-check', WorkspaceCheckSche
 export const workspaceCheckInvalid = () => sample('workspace-check-invalid', WorkspaceCheckSchema);
 export const workspaceResponse = () => sample('workspace-response', WorkspaceResponseSchema);
 export const workspaceExport = () => sample('workspace-export', WorkspaceBundleSchema);
+export const workspaceDiff = () => sample('workspace-diff', WorkspaceDiffSchema);
+/** The report of the incident under way in the samples (credential stuffing). */
+export const incidentReport = () => sample('incident-report', IncidentReportSchema);
+export const session = () => sample('session', SessionExportSchema);
+export const experiment = () => sample('experiment', ExperimentSchema);
 
 /** A snapshot taken mid-incident (credential stuffing). */
 export function snapshot(): TelemetrySnapshot {

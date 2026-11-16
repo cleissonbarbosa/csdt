@@ -3,25 +3,32 @@ import { X } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
+import { useMinWidth } from '@/app/hooks';
 import { IN_BROWSER } from '@/app/host';
 import { useAegisConnection } from '@/app/useAegisConnection';
+import { useUrlView } from '@/app/urlState';
 import { usePresence } from '@/app/usePresence';
 import { useTheme } from '@/app/useTheme';
 import { Button, IconButton } from '@/components/ui/Button';
 import { AuthorizationExplorer } from '@/features/authorization/AuthorizationExplorer';
 import { CommandPalette } from '@/features/command/CommandPalette';
+import { ExperimentDialog } from '@/features/experiments/ExperimentDialog';
 import { Explorer } from '@/features/explorer/Explorer';
+import { GuideCard } from '@/features/guide/GuideCard';
+import { Orientation } from '@/features/guide/Orientation';
 import { HelpDialog } from '@/features/help/HelpDialog';
 import { Inspector } from '@/features/inspector/Inspector';
 import { IntegrationsDialog } from '@/features/integrations/IntegrationsDialog';
 import { ScenarioConsole } from '@/features/scenarios/ScenarioConsole';
+import { ScenarioEditor } from '@/features/scenarios/ScenarioEditor';
 import { DevOverlay } from '@/features/scene/DevOverlay';
 import { SceneCanvas } from '@/features/scene/SceneCanvas';
+import { SessionDialog } from '@/features/session/SessionDialog';
 import { HoverCard, Notices, SceneToolbar } from '@/features/scene/SceneOverlays';
 import { TopologyTable } from '@/features/scene/TopologyTable';
 import { SettingsDialog } from '@/features/settings/SettingsDialog';
 import { WorkspaceDialog } from '@/features/workspace/WorkspaceDialog';
-import { Timeline, TIMELINE_HEIGHT, useTimelineVisible } from '@/features/timeline/Timeline';
+import { Timeline, useTimelineHeight, useTimelineVisible } from '@/features/timeline/Timeline';
 import { TopNav } from '@/features/topnav/TopNav';
 import { sceneHandle } from '@/graphics/handle';
 import {
@@ -41,6 +48,12 @@ const GUTTER = 12;
 /** Room the scene keeps clear at the top (its toolbar) and the bottom. */
 const TOP_INSET = 28;
 const BOTTOM_INSET = 8;
+/** Under this width a panel takes the whole stage: nothing fits beside one. */
+const PANELS_FILL_UNDER = 640;
+/** What the guide's card needs of the stage's width, gutters included. */
+const GUIDE_ROOM = 336 + GUTTER * 2;
+/** What the scene's toolbar needs of the stage's width, its margins included. */
+const TOOLBAR_ROOM = 320;
 
 const tabClass =
   'relative z-10 flex-1 px-3 py-2 text-xs text-ink-faint transition-colors hover:text-ink data-[state=active]:font-bold data-[state=active]:text-ink';
@@ -113,6 +126,9 @@ function isTyping(target: EventTarget | null): boolean {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // A dialog that has just closed itself on this key has dealt with it;
+      // the same Escape must not go on to put a panel away as well.
+      if (event.defaultPrevented) return;
       // The command palette opens from anywhere, including while typing.
       if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -233,6 +249,7 @@ function Unreachable({ message }: { message: string }) {
 
 export function App() {
   useAegisConnection();
+  useUrlView();
   useShortcuts();
   const theme = useTheme();
 
@@ -277,8 +294,29 @@ export function App() {
   const left = explorerOpen ? LEFT_WIDTH + GUTTER : 0;
   const right = inspectorOpen ? RIGHT_WIDTH + GUTTER : 0;
   // The timeline floats at the foot of the stage when there is one.
-  const foot = useTimelineVisible() ? TIMELINE_HEIGHT + GUTTER : 0;
-  const bottom = BOTTOM_INSET + foot;
+  const timelineHeight = useTimelineHeight();
+  const foot = useTimelineVisible() ? timelineHeight + GUTTER : 0;
+  // On a first visit the orientation lies over the foot of the stage; the
+  // model is framed above it for as long as it is there.
+  const [orientation, setOrientation] = useState(0);
+  // The guide is a card beside the panels where the stage has room for it
+  // between them. Where it has not (a phone, where a panel takes the whole
+  // width, or a tablet with a panel on each side) the card lies along the
+  // foot and the panels end above it: a challenge is answered in a panel,
+  // and the card must not cover what it asks for.
+  const narrow = !useMinWidth(PANELS_FILL_UNDER);
+  const roomBeside = useMinWidth(left + right + GUIDE_ROOM);
+  const guideAlongFoot = narrow || !roomBeside;
+  const [guide, setGuide] = useState(0);
+  const guideFoot = guideAlongFoot && guide > 0 ? guide + GUTTER : 0;
+  // The toolbar and the notices move over for the panels where the stage
+  // has room for them in between. Where it has not (a phone with a panel
+  // open, a tablet with one on each side) they were squeezed into what was
+  // left and cut at its edge, so there they keep the full width: the
+  // notices over the panels and the toolbar under them.
+  const roomBetween = useMinWidth(left + right + TOOLBAR_ROOM);
+  const beside = roomBetween ? { left, right } : { left: 0, right: 0 };
+  const bottom = BOTTOM_INSET + foot + (orientation > 0 ? orientation + GUTTER : 0) + guideFoot;
   useEffect(() => {
     sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom });
   }, [left, right, bottom, showScene, hasTopology]);
@@ -342,13 +380,13 @@ export function App() {
 
         <div
           className="pointer-events-none absolute top-3 z-10 flex items-start justify-end gap-2 px-3 transition-[left,right] duration-200 ease-arrive"
-          style={{ left, right }}
+          style={beside}
         >
           <div className="pointer-events-auto">{showScene && <SceneToolbar />}</div>
         </div>
         <div
           className="pointer-events-none absolute top-3 z-30 flex justify-center px-3 transition-[left,right] duration-200 ease-arrive"
-          style={{ left, right }}
+          style={beside}
         >
           <Notices />
         </div>
@@ -366,7 +404,7 @@ export function App() {
           side="left"
           open={explorerOpen}
           width={LEFT_WIDTH}
-          foot={foot}
+          foot={foot + guideFoot}
           label="Services and incidents"
         >
           <Tabs.Root
@@ -419,7 +457,7 @@ export function App() {
           side="right"
           open={inspectorOpen}
           width={RIGHT_WIDTH}
-          foot={foot}
+          foot={foot + guideFoot}
           compact
           label={authorizationOpen ? 'Trace a request' : 'Inspector'}
         >
@@ -431,12 +469,22 @@ export function App() {
           </div>
         </Sheet>
 
+        <Orientation bottom={GUTTER + foot} onHeight={setOrientation} />
+        <GuideCard
+          left={guideAlongFoot ? GUTTER : left + GUTTER}
+          bottom={GUTTER + foot}
+          alongFoot={guideAlongFoot}
+          onHeight={setGuide}
+        />
         <Timeline />
       </div>
 
       <IntegrationsDialog />
       <SettingsDialog />
       <WorkspaceDialog />
+      <ExperimentDialog />
+      <SessionDialog />
+      <ScenarioEditor />
       <HelpDialog />
       <CommandPalette />
     </div>

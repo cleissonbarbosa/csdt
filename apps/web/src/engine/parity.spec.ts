@@ -14,6 +14,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { Engine } from './binding';
 
+const POLICIES = fileURLToPath(
+  new URL('../../../../fixtures/cedar/policies.json', import.meta.url),
+);
 const MODULE = fileURLToPath(new URL('./aegis.wasm', import.meta.url));
 const SAMPLES = fileURLToPath(new URL('../../../../packages/contracts/samples/', import.meta.url));
 
@@ -132,6 +135,29 @@ function tinyWorkspace(): { path: string; text: string }[] {
   ];
 }
 
+/** The exporter's intervention: three times the capacity of authentication. */
+const EXPERIMENT = {
+  scenarioId: 'credential-stuffing',
+  intervention: {
+    effect: { type: 'capacity', nodes: 'node:use-auth', factor: 3.0 },
+    atMs: 12000,
+    rampMs: 1000,
+  },
+};
+
+/** The bundled policies as an uploaded file, with one of them left out. */
+function policiesWithout(id: string): { path: string; text: string } {
+  const bundled = JSON.parse(readFileSync(POLICIES, 'utf8')) as { id: string; content: string }[];
+  return {
+    path: 'cedar/policies.json',
+    text: JSON.stringify(
+      bundled
+        .filter((policy) => policy.id !== id)
+        .map((policy) => ({ id: policy.id, content: policy.content })),
+    ),
+  };
+}
+
 describe('the engine built for the browser', () => {
   let engine: Engine;
   let clock = 0;
@@ -209,10 +235,13 @@ describe('the engine built for the browser', () => {
     produced.set('topology', get('/topology'));
     produced.set('scenarios', get('/scenarios'));
     produced.set('incidents', get('/incidents'));
+    produced.set('incident-report', get('/incidents/inc-001/report'));
     produced.set('metrics', get('/metrics'));
     produced.set('events', get('/events?limit=1000'));
     produced.set('providers', get('/providers'));
     produced.set('authorization-decisions', get('/demo/authorization/decisions'));
+    produced.set('session', get('/session'));
+    produced.set('experiment', post('/demo/experiments/compare', EXPERIMENT).body);
     produced.set('stream-snapshot', message(engine.open(clock)[1]!));
     const [replay] = engine.message('{"type":"resync","afterSeq":0}', clock);
     produced.set('stream-events', message(replay!));
@@ -236,6 +265,10 @@ describe('the engine built for the browser', () => {
 
     produced.set('workspace', get('/workspace'));
     produced.set('workspace-check', post('/demo/workspace/check', { files: tinyWorkspace() }).body);
+    produced.set(
+      'workspace-diff',
+      post('/demo/workspace/diff', { files: [policiesWithout('finance-view-ledger')] }).body,
+    );
     const broken = tinyWorkspace();
     broken[1]!.text = '{ "id": "slow-door" }';
     produced.set('workspace-check-invalid', post('/demo/workspace/check', { files: broken }).body);
@@ -257,15 +290,19 @@ describe('the engine built for the browser', () => {
     'topology',
     'scenarios',
     'incidents',
+    'incident-report',
     'metrics',
     'events',
     'authorization-decisions',
+    'session',
+    'experiment',
     'stream-snapshot',
     'stream-timeline',
     'topology-stress-summary',
     'workspace',
     'workspace-check',
     'workspace-check-invalid',
+    'workspace-diff',
     'workspace-response',
     'workspace-export',
     'stream-timeline-workspace',
@@ -348,7 +385,17 @@ describe('every route, in the module', () => {
       ['GET', '/workspace/export'],
       ['GET', '/demo/authorization/catalog'],
       ['GET', '/demo/authorization/decisions'],
+      ['GET', '/session'],
       ['POST', '/demo/scenarios/start', { scenarioId: 'regional-outage' }],
+      ['GET', '/incidents/inc-001/report'],
+      [
+        'POST',
+        '/demo/experiments/compare',
+        {
+          scenarioId: 'regional-outage',
+          intervention: { effect: { type: 'down', nodes: 'node:use-search' }, atMs: 4000 },
+        },
+      ],
       ['POST', '/demo/playback/control', { action: 'setSpeed', speed: 4 }],
       ['POST', '/demo/playback/control', { action: 'pause' }],
       ['POST', '/demo/playback/control', { action: 'step' }],
@@ -378,6 +425,36 @@ describe('every route, in the module', () => {
       ['POST', '/providers/network-scanner/connect', {}],
       ['POST', '/providers/network-scanner/disconnect', {}],
       ['POST', '/demo/recordings/load', { recordingId: 'black-friday-flood' }],
+      [
+        'POST',
+        '/demo/session/load',
+        {
+          recording: {
+            id: 'session',
+            name: 'Session',
+            description: '',
+            topologyId: 'helios-commerce',
+            seed: 7,
+            durationMs: 20000,
+            commands: [
+              { atMs: 2000, command: { type: 'startScenario', scenarioId: 'cedar-denial' } },
+              {
+                atMs: 6000,
+                command: {
+                  type: 'injectFault',
+                  effect: { type: 'latency', nodes: 'node:use-search', factor: 2 },
+                  rampMs: 400,
+                },
+              },
+              { atMs: 9000, command: { type: 'clearFaults' } },
+              { atMs: 12000, command: { type: 'abortScenario' } },
+            ],
+          },
+          cursorMs: 8000,
+        },
+      ],
+      ['POST', '/demo/playback/control', { action: 'play' }],
+      ['POST', '/demo/workspace/diff', { files: [policiesWithout('forbid-suspended')] }],
       ['POST', '/demo/topology/select', { topologyId: 'hyperscale-stress' }],
       ['POST', '/demo/scenarios/reset', { scope: 'simulation' }],
       ['POST', '/demo/workspace/reset', {}],

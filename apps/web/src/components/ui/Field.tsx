@@ -1,5 +1,5 @@
 import * as RadixSwitch from '@radix-ui/react-switch';
-import { useId, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { useId, useState, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -118,5 +118,106 @@ export function Segmented<T extends string | number>({
         );
       })}
     </div>
+  );
+}
+
+/** A one-line text or number field with its label above it. */
+export function TextField({
+  label,
+  hint,
+  className,
+  hideLabel,
+  ...rest
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'className'> & {
+  label: string;
+  hint?: string;
+  hideLabel?: boolean;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      <label htmlFor={id} className={cn('caption', hideLabel && 'sr-only')}>
+        {label}
+      </label>
+      <input
+        id={id}
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        className={cn(
+          'h-8 w-full min-w-0 rounded-control border border-line-strong bg-paper px-2 text-xs text-ink transition-colors hover:border-ink-faint disabled:opacity-50',
+          rest.type === 'number' && 'numeric',
+        )}
+        {...rest}
+      />
+      {hint && (
+        <span id={`${id}-hint`} className="text-[11px] leading-snug text-ink-faint">
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A few lines of text with their label above them. */
+export function TextArea({
+  label,
+  className,
+  ...rest
+}: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'> & {
+  label: string;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      <label htmlFor={id} className="caption">
+        {label}
+      </label>
+      <textarea
+        id={id}
+        rows={2}
+        className="w-full min-w-0 resize-y rounded-control border border-line-strong bg-paper px-2 py-1.5 text-xs leading-relaxed text-ink transition-colors hover:border-ink-faint"
+        {...rest}
+      />
+    </div>
+  );
+}
+
+/**
+ * A figure being typed, for a value that is kept as a number.
+ *
+ * A number in the middle of being typed is not one yet: "1." has no value,
+ * and neither has a field that was just emptied. Put straight back as the
+ * number it parses to, the field takes the decimal point away as it is
+ * pressed, so that "1.5" comes out as 5. This field keeps its own text for
+ * as long as it is being edited and hands on a number whenever the text is
+ * one; left with something that is not, it goes back to the figure it had.
+ */
+export function NumberField({
+  value,
+  onValue,
+  ...rest
+}: Omit<
+  React.ComponentProps<typeof TextField>,
+  'value' | 'onChange' | 'type' | 'onFocus' | 'onBlur'
+> & {
+  value: number;
+  onValue: (value: number) => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <TextField
+      {...rest}
+      type="number"
+      value={text ?? String(value)}
+      onFocus={() => setText(String(value))}
+      onBlur={() => setText(null)}
+      onChange={(event) => {
+        const next = event.target.value;
+        setText(next);
+        const parsed = Number(next);
+        if (next.trim() !== '' && Number.isFinite(parsed)) onValue(parsed);
+      }}
+    />
   );
 }

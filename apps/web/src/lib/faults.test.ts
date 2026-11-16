@@ -70,8 +70,9 @@ describe('faults placed by hand', () => {
       'Search',
     );
     const edge = edgeIndex('use-gateway', 'use-catalog');
+    // Both names are borne by several services: the region says which.
     expect(faultTarget(topology, fault({ kind: 'edgeLatency', edge }))).toBe(
-      'API Gateway → Catalog',
+      'API Gateway, US East · Primary → Catalog, US East · Primary',
     );
   });
 

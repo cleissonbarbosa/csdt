@@ -1,0 +1,128 @@
+{
+  "decisionsChanged": true,
+  "diff": {
+    "policies": {
+      "added": [],
+      "removed": [
+        "finance-view-ledger"
+      ],
+      "changed": []
+    },
+    "entitiesChanged": false,
+    "catalogChanged": false,
+    "topologies": {
+      "added": [],
+      "removed": []
+    },
+    "scenarios": {
+      "added": [],
+      "removed": []
+    },
+    "deniedAtRest": {
+      "base": 0.07,
+      "candidate": 0.15
+    },
+    "requests": {
+      "compared": 15,
+      "changes": [
+        {
+          "list": "traffic-mix",
+          "id": "alice-view-ledger",
+          "kind": "decision",
+          "request": {
+            "principal": "User::\"alice\"",
+            "action": "Action::\"viewLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": {}
+          },
+          "base": {
+            "decision": "allow",
+            "determiningPolicies": [
+              "finance-view-ledger"
+            ],
+            "errors": []
+          },
+          "candidate": {
+            "decision": "deny",
+            "determiningPolicies": [],
+            "errors": []
+          }
+        },
+        {
+          "list": "scenario-requests",
+          "id": "alice-view-ledger",
+          "kind": "decision",
+          "request": {
+            "principal": "User::\"alice\"",
+            "action": "Action::\"viewLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": {}
+          },
+          "base": {
+            "decision": "allow",
+            "determiningPolicies": [
+              "finance-view-ledger"
+            ],
+            "errors": []
+          },
+          "candidate": {
+            "decision": "deny",
+            "determiningPolicies": [],
+            "errors": []
+          }
+        }
+      ]
+    },
+    "flows": [
+      {
+        "topology": "helios-commerce",
+        "scenario": "cedar-denial",
+        "flow": "alice-view-ledger",
+        "label": "Alice · viewLedger",
+        "request": "alice-view-ledger",
+        "base": "permitted",
+        "candidate": "denied"
+      },
+      {
+        "topology": "hyperscale-stress",
+        "scenario": "cedar-denial",
+        "flow": "alice-view-ledger",
+        "label": "Alice · viewLedger",
+        "request": "alice-view-ledger",
+        "base": "permitted",
+        "candidate": "denied"
+      }
+    ],
+    "availability": [],
+    "matrix": {
+      "principals": 6,
+      "actions": 6,
+      "resources": 7,
+      "contextKeys": [
+        "mfa",
+        "changeWindow"
+      ],
+      "contexts": 9,
+      "compared": 756,
+      "note": null,
+      "allowToDeny": 9,
+      "denyToAllow": 0,
+      "attributionOnly": 0,
+      "changes": [
+        {
+          "principal": "User::\"alice\"",
+          "action": "Action::\"viewLedger\"",
+          "resource": "Ledger::\"acme-ledger-2026\"",
+          "base": "allow",
+          "candidate": "deny",
+          "everyContext": true,
+          "contexts": [],
+          "basePolicies": [
+            "finance-view-ledger"
+          ],
+          "candidatePolicies": []
+        }
+      ]
+    }
+  }
+}

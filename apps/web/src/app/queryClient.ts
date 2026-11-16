@@ -17,6 +17,14 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   scenarios: ['scenarios'] as const,
   incidents: ['incidents'] as const,
+  /**
+   * One incident's report. Not under `incidents`: a report is asked for by
+   * the id of an incident, and a timeline that was just replaced no longer
+   * has that id. It is refreshed from the stream, which says in order when
+   * an incident moved on and when the timeline it was on is gone.
+   */
+  reports: ['report'] as const,
+  report: (incidentId: string) => ['report', incidentId] as const,
   recordings: ['recordings'] as const,
   topologies: ['topologies'] as const,
   providers: ['providers'] as const,

@@ -32,6 +32,8 @@ pub use server::Limits;
 pub const MAX_BODY_BYTES: usize = 16 * 1024;
 /// Largest body of a workspace check or import: the files themselves.
 pub const MAX_IMPORT_BYTES: usize = 8 * 1024 * 1024;
+/// Largest body of a session: a recording of up to 512 commands.
+pub const MAX_SESSION_BYTES: usize = 256 * 1024;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -55,6 +57,7 @@ fn route_table() -> Router<AppState> {
         .route("/metrics", get(routes::metrics))
         .route("/events", get(routes::events))
         .route("/incidents", get(routes::incidents))
+        .route("/incidents/{id}/report", get(routes::incident_report))
         .route("/scenarios", get(routes::scenarios))
         .route("/recordings", get(routes::recordings))
         .route("/providers", get(routes::providers))
@@ -70,6 +73,15 @@ fn route_table() -> Router<AppState> {
         .route("/demo/playback/control", post(routes::playback_control))
         .route("/demo/topology/select", post(routes::topology_select))
         .route("/demo/recordings/load", post(routes::recording_load))
+        .route("/session", get(routes::session))
+        .route(
+            "/demo/session/load",
+            post(routes::session_load).layer(DefaultBodyLimit::max(MAX_SESSION_BYTES)),
+        )
+        .route(
+            "/demo/experiments/compare",
+            post(routes::experiment_compare),
+        )
         .route("/workspace", get(routes::workspace))
         .route("/workspace/export", get(routes::workspace_export))
         .route(
@@ -79,6 +91,10 @@ fn route_table() -> Router<AppState> {
         .route(
             "/demo/workspace/import",
             post(routes::workspace_import).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
+        )
+        .route(
+            "/demo/workspace/diff",
+            post(routes::workspace_diff).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
         )
         .route("/demo/workspace/reset", post(routes::workspace_reset))
         .route(

@@ -9,6 +9,7 @@ import { queryKeys } from '@/app/queryClient';
 import { sceneHandle } from '@/graphics/handle';
 import { cn } from '@/lib/cn';
 import { api } from '@/providers/api';
+import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
 import { useSettings, useUi } from '@/stores/ui';
 
@@ -54,6 +55,7 @@ export function CommandPalette() {
           setLayoutMode: (mode) => useUi.getState().setLayoutMode(mode),
           setTheme: (theme) => useSettings.getState().set('theme', theme),
           openPanel: (panel) => useUi.getState().setPanel(panel),
+          openGuide: () => useGuide.getState().setOpen(true),
           toggleOverlay: () => {
             const settings = useSettings.getState();
             settings.set('devOverlay', !settings.devOverlay);

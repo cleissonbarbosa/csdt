@@ -1,0 +1,169 @@
+- generic [ref=e3]:
+  - link "Skip to the topology" [ref=e4] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - img "AEGIS" [ref=e7]
+      - heading "AEGIS" [level=1] [ref=e10]
+    - generic [ref=e56]:
+      - generic [ref=e57]: Environment
+      - combobox "Environment" [ref=e58] [cursor=pointer]:
+        - option "Helios Commerce" [selected]
+        - option "Hyperscale Stress"
+    - generic [ref=e12]:
+      - status [ref=e59]:
+        - 'button "Cascading Service Failure: latency creep, 0 services affected" [ref=e141] [cursor=pointer]'
+      - generic "Signals outside their normal range" [ref=e14]
+    - generic [ref=e15]:
+      - status [ref=e16]: Stream live
+      - 'button "Simulated: Produced by the simulation engine, which runs in this tab. Open integrations." [ref=e18] [cursor=pointer]':
+        - generic [ref=e147]: Simulated, synthetic data
+      - button "Search services and commands" [ref=e21] [cursor=pointer]:
+        - generic [ref=e148]: Search
+        - generic [ref=e149]: Ctrl K
+      - button "Follow the incident" [expanded] [ref=e150] [cursor=pointer]
+      - button "More" [ref=e29] [cursor=pointer]
+  - generic [ref=e34]:
+    - main "Infrastructure topology" [ref=e35]:
+      - img "Interactive 3D view of the infrastructure topology" [ref=e36]
+    - toolbar "Scene controls" [ref=e40]:
+      - radiogroup "Topology layout" [ref=e41]:
+        - radio "Overview" [checked] [ref=e42] [cursor=pointer]
+        - radio "Regions" [ref=e43] [cursor=pointer]
+        - radio "Dependencies" [ref=e44] [cursor=pointer]
+      - button "Frame everything" [ref=e45] [cursor=pointer]
+      - button "Reset camera" [ref=e51] [cursor=pointer]
+    - generic:
+      - status
+    - complementary "Services and incidents" [ref=e63]:
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - tablist "Left panel" [ref=e66]:
+            - tab "Services" [ref=e67] [cursor=pointer]
+            - tab "Incidents (incident active)" [selected] [ref=e151] [cursor=pointer]:
+              - text: Incidents
+              - generic [ref=e152]: (incident active)
+          - button "Close this panel" [ref=e69] [cursor=pointer]
+        - tabpanel "Incidents (incident active)" [ref=e154]:
+          - generic [ref=e74]:
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - heading "Cascading Service Failure" [level=3] [ref=e157]
+                - generic [ref=e158]: Active
+              - generic [ref=e159]:
+                - progressbar "Scenario progress" [ref=e160]
+                - list "Phases" [ref=e162]:
+                  - listitem [ref=e163]:
+                    - generic [aria-hidden] [ref=e164]: "1"
+                    - generic [ref=e165]:
+                      - text: Latency creep0:00
+                      - generic [ref=e166]: Storage latency on the primary database climbs steadily.
+                  - listitem [ref=e167]:
+                    - generic [aria-hidden] [ref=e168]: "2"
+                    - generic [ref=e169]: Connection exhaustion0:14
+                  - listitem [ref=e170]:
+                    - generic [aria-hidden] [ref=e171]: "3"
+                    - generic [ref=e172]: Retry storm0:34
+                  - listitem [ref=e173]:
+                    - generic [aria-hidden] [ref=e174]: "4"
+                    - generic [ref=e175]: Circuit breakers open0:52
+                  - listitem [ref=e176]:
+                    - generic [aria-hidden] [ref=e177]: "5"
+                    - generic [ref=e178]: Replica promoted1:06
+                  - listitem [ref=e179]:
+                    - generic [aria-hidden] [ref=e180]: "6"
+                    - generic [ref=e181]: Backlog drain1:24
+                - generic [ref=e182]:
+                  - button "Pause" [ref=e183] [cursor=pointer]
+                  - button "Stop" [ref=e187] [cursor=pointer]
+                  - radiogroup "Scenario speed" [ref=e190]:
+                    - radio "0.5×" [ref=e191] [cursor=pointer]
+                    - radio "1×" [checked] [ref=e192] [cursor=pointer]
+                    - radio "2×" [ref=e193] [cursor=pointer]
+                    - radio "4×" [ref=e194] [cursor=pointer]
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - heading "Scenarios" [level=3] [ref=e77]
+                - button "Reset" [ref=e78] [cursor=pointer]
+              - paragraph [ref=e82]: Fictional, deterministic incidents that run only inside the simulation engine. Nothing here touches a real system.
+              - list [ref=e83]:
+                - listitem [ref=e84]:
+                  - generic [ref=e85]:
+                    - generic [ref=e86]:
+                      - heading "DDoS Surge" [level=4] [ref=e87]
+                      - paragraph [ref=e88]: Availability, 1:36, 5 phases
+                    - button "Start" [ref=e89] [cursor=pointer]
+                  - paragraph [ref=e92]: A volumetric flood from unattributed sources overwhelms the primary API gateway until edge filtering absorbs it.
+                - listitem [ref=e93]:
+                  - generic [ref=e94]:
+                    - generic [ref=e95]:
+                      - heading "Credential Stuffing" [level=4] [ref=e96]
+                      - paragraph [ref=e97]: Identity, 1:24, 5 phases
+                    - button "Start" [ref=e98] [cursor=pointer]
+                  - paragraph [ref=e101]: Leaked credential pairs are replayed against the login endpoint. Almost all fail; the few that succeed are stopped by policy.
+                - listitem [ref=e102]:
+                  - generic [ref=e103]:
+                    - generic [ref=e104]:
+                      - heading "Cedar Authorization Denial" [level=4] [ref=e105]
+                      - paragraph [ref=e106]: Authorization, 1:10, 5 phases
+                    - button "Start" [ref=e107] [cursor=pointer]
+                  - paragraph [ref=e110]: An authenticated contractor from another tenant repeatedly attempts prohibited actions. Cedar denies every one of them.
+                - listitem [ref=e111]:
+                  - generic [ref=e112]:
+                    - generic [ref=e113]:
+                      - heading "Cascading Service Failure" [level=4] [ref=e114]
+                      - paragraph [ref=e115]: Resilience, 1:44, 6 phases
+                    - button "Restart" [ref=e195] [cursor=pointer]
+                  - paragraph [ref=e119]: The primary orders database degrades. Dependent services fail, queues back up, and circuit breakers finally stop the spread.
+                - listitem [ref=e120]:
+                  - generic [ref=e121]:
+                    - generic [ref=e122]:
+                      - heading "Regional Outage" [level=4] [ref=e123]
+                      - paragraph [ref=e124]: Resilience, 1:40, 5 phases
+                    - button "Start" [ref=e125] [cursor=pointer]
+                  - paragraph [ref=e128]: An entire cloud region becomes unreachable. Health checks fail, traffic is re-routed to the failover region, and the region is later restored.
+              - generic [ref=e129]:
+                - generic [ref=e130]: Load a recorded incident
+                - combobox "Load a recorded incident" [ref=e131] [cursor=pointer]:
+                  - option "Load a recorded incident…" [selected]
+                  - option "Black Friday Flood (4:20)"
+                  - option "Insider Probe, Then Darkness (5:30)"
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - heading "Events" [level=3] [ref=e134]
+                - radiogroup "Minimum severity" [ref=e135]:
+                  - radio "All" [ref=e136] [cursor=pointer]
+                  - radio "Notices" [checked] [ref=e137] [cursor=pointer]
+                  - radio "Warnings" [ref=e138] [cursor=pointer]
+                  - radio "Critical" [ref=e139] [cursor=pointer]
+              - list "Events, newest first" [ref=e199]:
+                - listitem [ref=e200]:
+                  - button "Cascading Service Failure · Latency creep , severity Critical 0:29" [ref=e201] [cursor=pointer]:
+                    - generic [ref=e205]:
+                      - text: Cascading Service Failure · Latency creep
+                      - generic [ref=e206]: ", severity Critical"
+                    - generic [ref=e207]: 0:29
+                - listitem [ref=e208]:
+                  - button "Cascading Service Failure started , severity Critical 0:29" [ref=e209] [cursor=pointer]:
+                    - generic [ref=e213]:
+                      - text: Cascading Service Failure started
+                      - generic [ref=e214]: ", severity Critical"
+                    - generic [ref=e215]: 0:29
+    - region "Timeline and playback" [ref=e216]:
+      - generic [ref=e217]:
+        - button "Pause" [ref=e218] [cursor=pointer]
+        - button "Step one tick forward" [disabled]
+      - generic [ref=e222]:
+        - generic [ref=e223]: 0:30
+        - paragraph [ref=e224]: Live
+      - slider "Timeline position" [ref=e226]:
+        - generic: 0:00
+        - generic: 0:30
+      - generic [ref=e235]:
+        - button "Replay the incident" [ref=e236] [cursor=pointer]
+        - button "Live" [pressed] [ref=e242] [cursor=pointer]
+        - radiogroup "Playback speed" [ref=e250]:
+          - radio "0.5×" [ref=e251] [cursor=pointer]
+          - radio "1×" [checked] [ref=e252] [cursor=pointer]
+          - radio "2×" [ref=e253] [cursor=pointer]
+          - radio "4×" [ref=e254] [cursor=pointer]

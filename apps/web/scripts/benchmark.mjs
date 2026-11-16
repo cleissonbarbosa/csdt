@@ -2,7 +2,10 @@
 // installed Chrome on real GPU hardware.
 //
 //   node scripts/benchmark.mjs [--url http://127.0.0.1:4173] [--seconds 12]
-//        [--headed] [--out results.json]
+//        [--headed] [--out results.json] [--settings '{"labels":false}']
+//
+// `--settings` is laid over the settings every case runs with, to measure
+// what one of them costs (the names over the model, for one).
 //
 // Headless Chrome cannot present a WebGPU canvas, so frames are rendered
 // offscreen: these numbers measure the cost of producing frames, not of
@@ -22,6 +25,7 @@ const args = Object.fromEntries(
 const url = args.url ?? 'http://127.0.0.1:4173';
 const seconds = Number(args.seconds ?? 12);
 const headed = Boolean(args.headed);
+const overrides = args.settings ? JSON.parse(args.settings) : {};
 const GPU_FLAGS = [
   '--enable-unsafe-webgpu',
   '--enable-features=Vulkan,WebGPU',
@@ -49,6 +53,11 @@ async function open(browser, settings) {
   });
   await context.addInitScript((value) => {
     window.localStorage.setItem('aegis.settings.v1', JSON.stringify({ state: value, version: 1 }));
+    // Measured as a returning visitor: the first-visit card is not part of the scene.
+    window.localStorage.setItem(
+      'aegis.guide.v1',
+      JSON.stringify({ state: { oriented: true, completed: [] }, version: 1 }),
+    );
   }, settings);
   const page = await context.newPage();
   page.on('pageerror', (error) => console.error('[page exception]', error.message));
@@ -111,6 +120,10 @@ function summarise(label, result) {
     triangles: result.stats.triangles,
     particlesVisible: result.stats.particles,
     particleCapacity: result.stats.particleCapacity,
+    // Names over the model: how many were shown at the end of the case, and
+    // what placing and drawing them cost a frame (the scene's own average).
+    names: result.stats.names,
+    namesMs: +result.stats.namesMs.toFixed(3),
     heapMB: result.heap ? +(result.heap / 1048576).toFixed(1) : null,
   };
 }
@@ -136,6 +149,7 @@ async function frameRuns(mode, extraFlags) {
       // Keep the picture changing, so every frame is a full redraw.
       autoRotate: true,
       ...(backend === 'webgl2' ? { renderer: 'webgl2' } : {}),
+      ...overrides,
     };
     for (const [topologyId, scenario, settle] of [
       ['helios-commerce', null, 0],

@@ -20,18 +20,36 @@ export async function resetSimulation(page: Page): Promise<void> {
   await post('/demo/playback/control', { action: 'play' });
 }
 
-/** Puts the deterministic settings in place before the page loads. */
-async function applySettings(page: Page): Promise<void> {
-  await page.addInitScript((settings) => {
-    window.localStorage.setItem(
-      'aegis.settings.v1',
-      JSON.stringify({ state: settings, version: 1 }),
-    );
-  }, SETTINGS);
+export interface OpenOptions {
+  /**
+   * Arrive as someone who has never been here. Every other test arrives as
+   * someone who has: the orientation shown on a first visit has been dealt
+   * with and is not on the stage.
+   */
+  firstVisit?: boolean;
 }
 
-export async function openApp(page: Page): Promise<void> {
-  await applySettings(page);
+/** Puts the deterministic settings in place before the page loads. */
+async function applySettings(page: Page, options: OpenOptions = {}): Promise<void> {
+  await page.addInitScript(
+    ({ settings, returning }) => {
+      window.localStorage.setItem(
+        'aegis.settings.v1',
+        JSON.stringify({ state: settings, version: 1 }),
+      );
+      if (returning) {
+        window.localStorage.setItem(
+          'aegis.guide.v1',
+          JSON.stringify({ state: { oriented: true, completed: [] }, version: 1 }),
+        );
+      }
+    },
+    { settings: SETTINGS, returning: !options.firstVisit },
+  );
+}
+
+export async function openApp(page: Page, options: OpenOptions = {}): Promise<void> {
+  await applySettings(page, options);
   await resetSimulation(page);
   await page.goto('/');
   await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
@@ -87,14 +105,24 @@ export const KINDS = 12;
 export const SERVICES = 51;
 
 /**
- * Waits until the 3D scene has been built. The application opens on the
- * overview, which draws one piece per kind of service.
+ * Waits until the 3D scene has been built and drawn. The application opens
+ * on the overview, which draws one piece per kind of service.
  */
 export async function waitForScene(page: Page, nodes = KINDS): Promise<void> {
   await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => window.__aegis?.stats().nodes ?? 0), { timeout: 30_000 })
     .toBe(nodes);
+  // The count changes the moment a topology is handed over; the camera and
+  // the frame's own figures follow with the next frame drawn. Until then a
+  // position is the new arrangement seen from the old shot, and the draw
+  // calls are the previous scene's. A fast machine reads in between.
+  await page.evaluate(
+    () =>
+      new Promise<void>((drawn) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => drawn()));
+      }),
+  );
 }
 
 /** Leaves the overview for an arrangement that shows every service. */
@@ -131,6 +159,27 @@ export async function clockSeconds(page: Page): Promise<number> {
 export async function percent(page: Page, testId: string): Promise<number> {
   const text = (await page.getByTestId(testId).textContent()) ?? '0%';
   return Number.parseFloat(text.replace('<', '').replace('%', ''));
+}
+
+/** How many pairs of names on the model are drawn across each other. */
+export async function overlappingNames(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const names = window.__aegis?.labels() ?? [];
+    let pairs = 0;
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        const a = names[i]!;
+        const b = names[j]!;
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) pairs++;
+      }
+    }
+    return pairs;
+  });
+}
+
+/** The names drawn over the model right now. */
+export async function namesOnModel(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window.__aegis?.labels() ?? []).map((name) => name.text));
 }
 
 /** Console errors that are expected and harmless. */

@@ -73,7 +73,7 @@ pnpm e2e:static       # Playwright against the static build, no server
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -90,10 +90,18 @@ End-to-end notes:
   mode. `pnpm --filter @aegis/web e2e:install` installs the browser.
 - Every test shares one simulation, so the suite runs serially with one worker
   and each test begins with `openApp()` from `e2e/support.ts`, which resets it
-  (the imported files as well as the timeline).
+  (the imported files as well as the timeline). It also arrives as a
+  returning visitor; `openApp(page, { firstVisit: true })` is how the
+  orientation card of a first visit is tested.
 - Projects: `chromium` (software WebGL 2, what CI has), `no-3d` (every GPU API
   disabled, table-view fallback) and `chrome-webgpu`, which only exists with
   `AEGIS_E2E_GPU=1` and needs a locally installed Chrome on a real GPU.
+- A failure stops the tests after it. `AEGIS_E2E_KEEP_GOING=1` runs them all
+  regardless, to see every failure of a run at once.
+- `window.__aegis` answers from the last frame drawn. `waitForScene` waits
+  for the frame after a topology is handed over; read a position or a draw
+  count only after it, or a fast machine reads the new arrangement from the
+  old shot.
 
 Diagnostics that are not part of the normal test run:
 
@@ -129,8 +137,9 @@ domain`.
   load/experience propagation; `channels` are ramped scalars that scenarios
   use to bend the model; `engine::step` is the pure step function; `timeline`
   wraps it with a command log, checkpoints, seek, replay and branching;
-  `decisions` holds Cedar outcomes evaluated once at start-up. One tick is
-  200 ms of virtual time; a checkpoint is taken every 25 ticks.
+  `decisions` holds Cedar outcomes evaluated once at start-up; `report`
+  reads one incident back from the timeline's events and samples. One tick
+  is 200 ms of virtual time; a checkpoint is taken every 25 ticks.
 - `incidents`: scenarios as data. `spec.rs` is the file format and the checks
   that need no topology; the five bundled scenarios are
   `fixtures/scenarios/*.json`, embedded by `catalog.rs`. They name topology
@@ -151,7 +160,9 @@ domain`.
   everything immutable, built from them once at start-up. `diff` compares two
   built `Assets` (policies, catalogued requests, scenario flows and the
   access matrix); it evaluates with each side's Cedar engine and decides
-  nothing itself. `Loaded` pairs a set of sources with the `Assets` built
+  nothing itself. `experiment` runs one scenario twice on timelines of its
+  own, the second time with one fault placed; `session` writes the timeline
+  in use out as a recording. `Loaded` pairs a set of sources with the `Assets` built
   from it; `SimulationService` keeps the one it started with (what a reset
   returns to and an import is laid over) and the one in use.
   `SimulationService` owns the single mutable timeline behind one mutex, is
@@ -177,6 +188,20 @@ Things that are easy to break:
   `fixtures/cedar/catalog.json`. A file cannot state an outcome either:
   `spec.rs` refuses the event kinds, and `recordings.rs` the commands, that
   would put a decision or an imported event on the timeline.
+- **A report says what kind of statement each line is.**
+  `simulation/report.rs` reads an incident back from events, metric samples,
+  the topology and the resolved scenario; it steps nothing and estimates
+  nothing. A cause is `prescribed` (the scenario's own channels),
+  `dependency` or `load` (a relation the propagation model follows), `fault`
+  (placed by hand) or `unattributed`. A new relation is added there with a
+  test in `tests/insight.rs`; a cause is never chosen because it is
+  plausible. The interface words it in `lib/report.ts` and adds nothing.
+- **A session, like a recording, cannot state an outcome.**
+  `Recording::validate_session` refuses `recordDecision` and `importEvents`,
+  and `session::export` leaves them out and counts them. An experiment
+  (`application/experiment.rs`) never touches the timeline in use: both runs
+  are `Timeline::from_recording` on timelines of their own, from the
+  service's seed.
 - **What the server runs on can be replaced.** An import swaps `Loaded` and
   the timeline together inside `SimulationService::replace`, under the
   runtime lock. Nothing may hold on to `Assets` across a request: take
@@ -286,9 +311,20 @@ everything drawn inside it and is fed through store subscriptions set up in
 
 - Telemetry must never re-render a React component in the frame path.
 - Draw calls follow object classes, not object counts: one instanced mesh per
-  service type, one each for connections, beads, labels and ground marks. An
+  service type, one each for connections, beads and ground marks. An
   E2E test fails if switching to the 178-service topology adds more than six
   draw calls.
+- Names are not in the scene. `graphics/labelLayer.ts` draws them on a 2D
+  canvas laid over it, at the display's resolution whatever the scene's is;
+  `SceneController.drawLabels` hands it every name's anchor, presence and
+  rank each frame, and `graphics/labelPlacement.ts` (pure, tested) leaves
+  out a name that would lie across a more important one. Do not put text
+  back into the WebGL pass, and do not show two names over each other: an
+  E2E test reads `window.__aegis.labels()` and fails on an overlap.
+- `captureFrame` reads the canvas's own drawing buffer on WebGL 2 and an
+  output render target on WebGPU. The second path, used on WebGL 2, left the
+  renderer presenting nothing once the arrangement was switched after a
+  capture; do not route WebGL 2 through it again.
 - The model has two levels. The application opens on the **overview**
   (`layoutMode: 'layers'`): the platform reduced to one piece per kind of
   service, in the four layers a request crosses. `lib/overview.ts` derives
@@ -337,7 +373,7 @@ everything drawn inside it and is fed through store subscriptions set up in
 - `graphics/layout.ts` is a pure function of the topology, with no randomness
   and no iteration to convergence.
 
-`window.__aegis` (`stats`, `projectNode`, `captureFrame`) is the handle the
+`window.__aegis` (`stats`, `projectNode`, `captureFrame`, `labels`) is the handle the
 E2E suite, `scripts/capture.mjs` and `scripts/benchmark.mjs` drive the scene
 through. Those scripts and `scripts/capture-docs.sh` also select elements by
 `data-testid` and `aria-label`, so renaming one means updating them.
@@ -362,7 +398,9 @@ against. Read it before touching anything visual. In short:
    model. Cards come with a selection and leave with it, lists and the
    request tracer come when asked for, the timeline is on screen only while
    there is something on it, and a platform signal shows in the top bar only
-   while it is out of range.
+   while it is out of range. The one exception is the orientation card of a
+   first visit (`features/guide/Orientation.tsx`), shown once and remembered
+   in `stores/guide.ts`.
 3. **Overview first, then one path, then the detail.** The opening view is
    the twelve kinds of service; a selection, a traced request or an
    incident's route brings one path forward; opening a service goes to the
@@ -388,6 +426,17 @@ against. Read it before touching anything visual. In short:
    unacknowledged-alarm blink. The camera never moves by itself once the
    viewer has taken it. All of it respects reduced motion, which the E2E
    suite runs with and which leaves every mechanism as it was modelled.
+
+Words are part of the design (`docs/DESIGN.md`, "Words"). Simulated time is
+never called "live": the cursor is at the _simulation's now_ or in its
+_history_, and either may be _paused_ (`describePlayback` in
+`features/timeline/Timeline.tsx`); the contract keeps `mode: 'live'`. A
+phase is timed from the start of its incident (`+0:14`) and an event shows
+both clocks. A Cedar result that no longer matches the form beside it is
+marked stale (`lib/evaluation.ts`), never shown as current. Where a
+service's place is not on show its name carries its region when the name
+repeats (`lib/names.ts`, `<ServiceName>`); in the table view, which is laid
+out by region, that is a call that leaves the row's region (`namedFrom`).
 
 Tokens are CSS custom properties in `apps/web/src/index.css`, mirrored as
 literals in `apps/web/src/lib/palette.ts` because the 3D scene cannot read

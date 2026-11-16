@@ -1,0 +1,514 @@
+{
+  "measuredAt": "2026-11-16T05:39:44.394Z",
+  "browser": "Chrome 157.0.8103.78 (headless, offscreen)",
+  "viewport": "1920x1080 @ 1x device pixel ratio",
+  "secondsPerCase": 12,
+  "frames": [
+    {
+      "case": "helios-commerce idle [vsync]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 721,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2345,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.008,
+      "heapMB": 20.3
+    },
+    {
+      "case": "helios-commerce + ddos-surge [vsync]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 722,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.64,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2933,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.009,
+      "heapMB": 16.6
+    },
+    {
+      "case": "hyperscale-stress idle [vsync]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 721,
+      "fps": 60,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 2136,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.004,
+      "heapMB": 17.7
+    },
+    {
+      "case": "hyperscale-stress + regional-outage [vsync]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 721,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 1960,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.005,
+      "heapMB": 25.2
+    },
+    {
+      "case": "helios-commerce idle [vsync]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 721,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.64,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2354,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.005,
+      "heapMB": 23.5
+    },
+    {
+      "case": "helios-commerce + ddos-surge [vsync]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 721,
+      "fps": 60,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2934,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.016,
+      "heapMB": 17.6
+    },
+    {
+      "case": "hyperscale-stress idle [vsync]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 721,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 2137,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.011,
+      "heapMB": 27
+    },
+    {
+      "case": "hyperscale-stress + regional-outage [vsync]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 721,
+      "fps": 60.1,
+      "frameMs": {
+        "mean": 16.65,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 1964,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.015,
+      "heapMB": 25.6
+    },
+    {
+      "case": "helios-commerce idle [uncapped]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 6098,
+      "fps": 508.1,
+      "frameMs": {
+        "mean": 1.97,
+        "p50": 1.9,
+        "p95": 2.4,
+        "p99": 2.8,
+        "max": 7.6
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78973,
+      "particlesVisible": 2330,
+      "particleCapacity": 8242,
+      "names": 0,
+      "namesMs": 0.006,
+      "heapMB": 23.3
+    },
+    {
+      "case": "helios-commerce + ddos-surge [uncapped]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 5436,
+      "fps": 453,
+      "frameMs": {
+        "mean": 2.21,
+        "p50": 2.2,
+        "p95": 2.7,
+        "p99": 4.1,
+        "max": 7.5
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2933,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.005,
+      "heapMB": 23.7
+    },
+    {
+      "case": "hyperscale-stress idle [uncapped]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 5663,
+      "fps": 471.8,
+      "frameMs": {
+        "mean": 2.12,
+        "p50": 2.1,
+        "p95": 2.6,
+        "p99": 3.1,
+        "max": 8.6
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 2132,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.004,
+      "heapMB": 21.5
+    },
+    {
+      "case": "hyperscale-stress + regional-outage [uncapped]",
+      "backend": "webgpu",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 5052,
+      "fps": 421,
+      "frameMs": {
+        "mean": 2.38,
+        "p50": 2.3,
+        "p95": 2.9,
+        "p99": 4.7,
+        "max": 8.3
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 1960,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.004,
+      "heapMB": 27.8
+    },
+    {
+      "case": "helios-commerce idle [uncapped]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 1435,
+      "fps": 119.5,
+      "frameMs": {
+        "mean": 8.37,
+        "p50": 8.3,
+        "p95": 9.3,
+        "p99": 10.9,
+        "max": 28.7
+      },
+      "over16ms": 0.07,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2353,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.004,
+      "heapMB": 26
+    },
+    {
+      "case": "helios-commerce + ddos-surge [uncapped]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 51,
+      "edges": 75,
+      "frames": 1403,
+      "fps": 116.8,
+      "frameMs": {
+        "mean": 8.56,
+        "p50": 8.4,
+        "p95": 9.8,
+        "p99": 10.9,
+        "max": 14.5
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 28,
+      "triangles": 78971,
+      "particlesVisible": 2933,
+      "particleCapacity": 8241,
+      "names": 0,
+      "namesMs": 0.004,
+      "heapMB": 16.5
+    },
+    {
+      "case": "hyperscale-stress idle [uncapped]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 1425,
+      "fps": 118.7,
+      "frameMs": {
+        "mean": 8.42,
+        "p50": 8.3,
+        "p95": 9.4,
+        "p99": 10.3,
+        "max": 14.6
+      },
+      "over16ms": 0,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 2132,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.008,
+      "heapMB": 23.5
+    },
+    {
+      "case": "hyperscale-stress + regional-outage [uncapped]",
+      "backend": "webgl2",
+      "quality": "ultra",
+      "nodes": 178,
+      "edges": 648,
+      "frames": 1371,
+      "fps": 114.2,
+      "frameMs": {
+        "mean": 8.75,
+        "p50": 8.6,
+        "p95": 10.3,
+        "p99": 11.5,
+        "max": 24.8
+      },
+      "over16ms": 0.07,
+      "over33ms": 0,
+      "drawCalls": 34,
+      "triangles": 260213,
+      "particlesVisible": 1964,
+      "particleCapacity": 8975,
+      "names": 0,
+      "namesMs": 0.001,
+      "heapMB": 26.7
+    }
+  ],
+  "stability": {
+    "rebuilds": [
+      {
+        "heapMB": 15.8,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 15.8,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 15.4,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.1,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.6,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.6,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.9,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.7,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 18.2,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.9,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 18.2,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 17,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 18.3,
+        "geometries": 19,
+        "textures": 4
+      }
+    ],
+    "playback": [
+      {
+        "heapMB": 17.9,
+        "geometries": 19,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.8,
+        "geometries": 20,
+        "textures": 4
+      },
+      {
+        "heapMB": 16.9,
+        "geometries": 20,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.2,
+        "geometries": 20,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.3,
+        "geometries": 20,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.3,
+        "geometries": 20,
+        "textures": 4
+      },
+      {
+        "heapMB": 17.4,
+        "geometries": 20,
+        "textures": 4
+      }
+    ]
+  }
+}

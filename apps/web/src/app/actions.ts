@@ -8,6 +8,7 @@ import type {
   ControlResponse,
   EvaluateRequest,
   FaultEffect,
+  Recording,
   WorkspaceFile,
   WorkspaceResponse,
   WorkspaceStatus,
@@ -105,6 +106,16 @@ export const actions = {
   loadRecording: async (recordingId: string) =>
     adopt(await run(() => api.loadRecording(recordingId), 'The recording could not be loaded.')),
 
+  /**
+   * Replaces the timeline with the one a recording describes: the engine
+   * simulates it again from its seed and commands. With a cursor the
+   * timeline waits there, paused.
+   */
+  loadSession: async (recording: Recording, cursorMs?: number) =>
+    adopt(
+      await run(() => api.loadSession(recording, cursorMs), 'The session could not be loaded.'),
+    ),
+
   setProvider: async (id: string, connect: boolean) => {
     const statuses = await run(
       () => (connect ? api.connectProvider(id) : api.disconnectProvider(id)),
@@ -149,6 +160,7 @@ export const actions = {
       const decision = await api.evaluate(request);
       void queryClient.invalidateQueries({ queryKey: queryKeys.decisions });
       useUi.getState().traceDecision(decision);
+      useUi.getState().setLastDecision(decision);
       return decision;
     } catch (error) {
       return error instanceof ApiError ? error : new ApiError(0, 'unknown', describe(error));

@@ -18,9 +18,9 @@ use std::sync::Arc;
 
 use crate::domain::{
     ActiveFault, AuthorizationDecision, DataSource, EdgeColumns, EdgeMetrics, FaultKind, Health,
-    Incident, IncidentPulse, InfrastructureEdge, InfrastructureNode, MetricSample, MetricsReport,
-    NodeColumns, NodeMetrics, PlaybackMode, PlaybackState, PlaybackStatus, RegionStatus, Scenario,
-    SecurityEvent, TelemetrySnapshot, Topology, SCHEMA_VERSION,
+    Incident, IncidentPulse, IncidentReport, InfrastructureEdge, InfrastructureNode, MetricSample,
+    MetricsReport, NodeColumns, NodeMetrics, PlaybackMode, PlaybackState, PlaybackStatus,
+    RegionStatus, Scenario, SecurityEvent, TelemetrySnapshot, Topology, SCHEMA_VERSION,
 };
 use crate::incidents::recordings::Recording;
 use crate::incidents::ResolvedScenario;
@@ -30,6 +30,7 @@ use super::decisions::DecisionTable;
 use super::engine::{self, is_ingress, Command, SimState, StepContext};
 use super::math::round_to;
 use super::model::{SimTopology, TICK_MS};
+use super::report::{self, ReportInput};
 
 /// A channel of the fault set as the contract shows it.
 fn active_fault(channel: &Channel) -> Option<ActiveFault> {
@@ -328,6 +329,33 @@ impl Timeline {
 
     pub fn incidents(&self) -> &[Incident] {
         &self.state.incidents
+    }
+
+    /// The commands issued on this timeline that are still in its window,
+    /// each with the tick it was issued at.
+    pub fn commands(&self) -> &[(u64, Command)] {
+        &self.commands
+    }
+
+    /// An incident read back from everything recorded of it, up to the head
+    /// of the timeline wherever the cursor is. `None` when it is unknown or
+    /// its start is no longer in the window.
+    pub fn incident_report(&self, incident_id: &str) -> Option<IncidentReport> {
+        report::build(
+            &ReportInput {
+                topo: &self.topo,
+                scenarios: &self.scenarios,
+                events: &self.events,
+                metrics: &self.metrics,
+                head_ms: self.head_tick * TICK_MS,
+            },
+            incident_id,
+        )
+    }
+
+    /// Metric samples, one per virtual second, up to the head.
+    pub fn samples(&self) -> Vec<MetricSample> {
+        self.metrics.iter().copied().collect()
     }
 
     /// Decisions evaluated on demand, up to the cursor.

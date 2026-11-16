@@ -15,11 +15,13 @@ import { showRegion } from '@/app/navigate';
 import { DecisionTag, HealthBadge, HealthGlyph, HealthMark } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { EmptyState, Fold, Section, Stat } from '@/components/ui/Section';
+import { ServiceName } from '@/components/ui/ServiceName';
 import { RangeBar, Sparkline } from '@/components/ui/Sparkline';
 import { Hud } from '@/features/hud/Hud';
 import { foldEvents } from '@/features/scenarios/events';
 import { sceneHandle } from '@/graphics/handle';
 import { entityId, formatClock, formatMs, formatPercent, formatRate } from '@/lib/format';
+import { nodeLabel } from '@/lib/names';
 import {
   COLOR,
   DATA_SOURCE_LABEL,
@@ -165,7 +167,6 @@ function NodeInspector({
     const edge = liveEdge(topology, snapshot, edgeIndex);
     if (!edge) return null;
     const peerId = outgoing ? edge.edge.target : edge.edge.source;
-    const peer = topology.nodes[index.nodeIndex.get(peerId) ?? -1];
     const status = SECURITY_STATUS_BY_CODE[edge.securityCode] ?? 'secure';
     return (
       <li key={edge.edge.id} className="flex items-center gap-1">
@@ -180,8 +181,10 @@ function NodeInspector({
           className="flex min-w-0 flex-1 items-baseline gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
         >
           <SecurityMark status={status} />
+          {/* Several services share a name across regions; in a list of
+              them the region is what tells one from another. */}
           <span className="min-w-0 flex-1 truncate text-xs text-ink">
-            {peer?.name ?? peerId}
+            <ServiceName topology={topology} id={peerId} />
             <span className="sr-only">
               , {RELATIONSHIP_LABEL[edge.edge.relationship]}, {edge.edge.protocol.toUpperCase()}
             </span>
@@ -199,7 +202,7 @@ function NodeInspector({
           </span>
         </button>
         <IconButton
-          label={`Inspect connection to ${peer?.name ?? peerId}`}
+          label={`Inspect connection to ${nodeLabel(topology, peerId)}`}
           size="sm"
           onClick={() => useUi.getState().select({ kind: 'edge', id: edge.edge.id })}
         >
@@ -388,29 +391,27 @@ function NodeInspector({
 
 function EdgeInspector({
   topology,
-  index,
   snapshot,
   edgeIndex,
 }: {
   topology: Topology;
-  index: TopologyIndex;
   snapshot: TelemetrySnapshot | null;
   edgeIndex: number;
 }) {
   const live = liveEdge(topology, snapshot, edgeIndex);
   if (!live) return null;
   const { edge } = live;
-  const source = topology.nodes[index.nodeIndex.get(edge.source) ?? -1];
-  const target = topology.nodes[index.nodeIndex.get(edge.target) ?? -1];
   const status = SECURITY_STATUS_BY_CODE[live.securityCode] ?? 'secure';
-  const endpoint = (label: string, id: string, name: string | undefined) => (
+  const endpoint = (label: string, id: string) => (
     <button
       type="button"
       onClick={() => useUi.getState().selectNode(id)}
       className="min-w-0 flex-1 rounded-control border border-line px-2 py-1.5 text-left hover:border-line-strong hover:bg-raised"
     >
       <span className="caption block">{label}</span>
-      <span className="block truncate text-xs text-ink">{name ?? id}</span>
+      <span className="block truncate text-xs text-ink">
+        <ServiceName topology={topology} id={id} />
+      </span>
     </button>
   );
   return (
@@ -431,9 +432,9 @@ function EdgeInspector({
           </IconButton>
         </div>
         <div className="mt-2 flex items-center gap-1.5">
-          {endpoint('From', edge.source, source?.name)}
+          {endpoint('From', edge.source)}
           <ArrowRight size={14} aria-hidden className="shrink-0 text-ink-faint" />
-          {endpoint('To', edge.target, target?.name)}
+          {endpoint('To', edge.target)}
         </div>
         <p
           className="mt-2 flex items-center gap-1.5 text-[11px]"
@@ -658,7 +659,6 @@ export function Inspector({ selection }: { selection: Selection }) {
         <EdgeInspector
           key={selection.id}
           topology={topology}
-          index={index}
           snapshot={live}
           edgeIndex={edgeIndex}
         />

@@ -114,16 +114,34 @@ export function Notices() {
       aria-live="polite"
     >
       {notices.map((notice) => (
-        <button
+        <div
           key={notice.id}
-          type="button"
-          onClick={() => useNotices.getState().dismiss(notice.id)}
-          className={`panel pointer-events-auto max-w-md animate-rise px-3 py-1.5 text-left text-xs ${
-            notice.tone === 'error' ? 'font-bold text-critical' : 'text-ink'
-          }`}
+          className="panel pointer-events-auto flex max-w-md animate-rise items-center gap-1"
         >
-          {notice.message}
-        </button>
+          <button
+            type="button"
+            onClick={() => useNotices.getState().dismiss(notice.id)}
+            title="Dismiss"
+            className={`min-w-0 px-3 py-1.5 text-left text-xs ${
+              notice.tone === 'error' ? 'font-bold text-critical' : 'text-ink'
+            }`}
+          >
+            {notice.message}
+          </button>
+          {notice.action && (
+            <button
+              type="button"
+              onClick={() => {
+                notice.action?.run();
+                useNotices.getState().dismiss(notice.id);
+              }}
+              className="mr-1.5 shrink-0 rounded-control border border-line-strong px-2 py-0.5 text-[11px] text-ink hover:bg-raised"
+              data-testid="notice-action"
+            >
+              {notice.action.label}
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

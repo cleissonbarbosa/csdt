@@ -147,4 +147,21 @@ describe('live views', () => {
     const edge = index.edgeIndex.get('use-gateway->use-auth')!;
     expect(liveEdge(helios, base, edge)!.rejectedRps).toBeGreaterThan(100);
   });
+
+  it('lets go of the incident of a timeline that was replaced, and of nothing else', () => {
+    const store = useTelemetry.getState();
+    store.setTopology(helios);
+    store.applySnapshot(base);
+    const before = useTelemetry.getState().snapshot!;
+    expect(before.incident?.id).toBe('inc-001');
+    useTelemetry.getState().forgetIncident();
+    const after = useTelemetry.getState().snapshot!;
+    expect(after.incident).toBeNull();
+    // The figures stay until the next snapshot replaces them.
+    expect(after.nodes).toBe(before.nodes);
+    expect(after.global).toBe(before.global);
+    // With no incident there is nothing to let go of, and nothing changes.
+    useTelemetry.getState().forgetIncident();
+    expect(useTelemetry.getState().snapshot).toBe(after);
+  });
 });

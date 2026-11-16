@@ -1,5 +1,5 @@
 import type { TelemetrySnapshot } from '@aegis/contracts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { useTelemetry } from '@/stores/telemetry';
 
@@ -37,6 +37,36 @@ export function useThrottledSnapshot(intervalMs = 1000): TelemetrySnapshot | nul
     };
   }, [intervalMs]);
   return snapshot;
+}
+
+/**
+ * Reports how tall an element is for as long as it is on screen, and zero
+ * once it has gone. A card laid over the stage tells the layout this, so
+ * that what lies beneath it can make room.
+ */
+export function useReportedHeight<T extends HTMLElement>(
+  visible: boolean,
+  onHeight: (height: number) => void,
+): RefObject<T | null> {
+  const element = useRef<T>(null);
+  const report = useRef(onHeight);
+  report.current = onHeight;
+  useEffect(() => {
+    const node = element.current;
+    if (!visible || !node) {
+      report.current(0);
+      return;
+    }
+    report.current(node.offsetHeight);
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => report.current(node.offsetHeight));
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      report.current(0);
+    };
+  }, [visible]);
+  return element;
 }
 
 /** True while the viewport is at least `minWidth` CSS pixels wide. */

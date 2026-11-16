@@ -210,10 +210,46 @@ samples already produced.
 - **Branch**: issuing a command in the past discards the future beyond the
   cursor and continues live.
 - **Recordings** are a seed plus a command list. Loading one re-simulates it.
+- **A session** is the timeline in use written out in that same form
+  (`GET /session`), and loaded like one (`POST /demo/session/load`). The
+  interface adds where the cursor is, how the model is being looked at and,
+  when the platform is not the bundled one, its files; a small one fits in
+  the fragment of a link. A decision or an imported event is left out and
+  counted: a file may not state an outcome.
+- **An experiment** runs one scenario twice on timelines of its own, from
+  the server's seed: as it is, and with one fault placed at a chosen moment
+  (`POST /demo/experiments/compare`). The answer holds both runs, each with
+  its recording, so what differs between them is one command and is said as
+  such. The timeline in use is not touched.
 
 Tests assert bit-for-bit equality of the state digest after arbitrary seeks,
 equality of regenerated events, and that history stays bounded (30 minutes of
 virtual time, 8 000 events).
+
+### Reading a run back
+
+`simulation/report.rs` reads one incident back from the timeline it ran on:
+its events, its metric samples, the topology and the resolved scenario. It
+simulates nothing and estimates nothing. Each line of a report is one of
+three kinds of statement, and says which:
+
+| Kind       | Where it comes from                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prescribed | the scenario file: a phase's effects (the channels it holds, in words) and the events it announces                                                            |
+| Modelled   | a relation of the topology the propagation model follows: a synchronous dependency (or a queue's consumer) that was already unwell, or traffic added upstream |
+| Observed   | a health transition, an alert a detection rule raised, a metric sample, a Cedar decision event                                                                |
+
+A service that got worse is attributed in that order: the scenario acts on
+it; a fault placed by hand is in force on it; it is saturated by traffic the
+scenario adds elsewhere; something it depends on was already unwell. When
+none holds the cause is `unattributed`: the report does not choose one.
+Everything of one tick is applied before any of it is explained, since
+within a tick the model has already carried a failure back to its callers.
+
+The report covers the whole record of the incident wherever the cursor is,
+so it is the same during a replay. The interface uses it three ways: to
+explain a phase or an event while an incident runs, as the summary of an
+incident with its moments, and as the two halves of an experiment.
 
 ---
 
@@ -229,6 +265,7 @@ are mirrored in `packages/contracts`.
 | `GET /metrics`                                         | current platform metrics and history         |
 | `GET /events?afterSeq&limit&nodeId&minSeverity`        | timeline events                              |
 | `GET /incidents` · `/scenarios` · `/recordings`        | incident data                                |
+| `GET /incidents/{id}/report`                           | one incident read back from its record       |
 | `GET /providers` · `POST /providers/{id}/(dis)connect` | integrations                                 |
 | `POST /demo/scenarios/start` · `/reset`                | scenario control                             |
 | `POST /demo/playback/control`                          | play, pause, step, seek, speed, replay, live |
@@ -236,8 +273,11 @@ are mirrored in `packages/contracts`.
 | `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                     |
 | `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                       |
 | `POST /demo/topology/select` · `/demo/recordings/load` | switch context                               |
+| `GET /session` · `POST /demo/session/load`             | the timeline as what reproduces it           |
+| `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed    |
 | `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
 | `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
+| `POST /demo/workspace/diff`                            | what Cedar would decide differently          |
 | `WS /stream`                                           | telemetry and events                         |
 
 ### Stream protocol
@@ -331,16 +371,33 @@ connections as hairlines, traffic as beads. Why it looks like that is in
 [DESIGN.md](DESIGN.md); how it is drawn is here.
 
 Draw calls follow the number of object classes, not the number of objects
-(29 for 51 services, 35 for 178):
+(28 for 51 services, 34 for 178):
 
-| What         | How                                                                 |
-| ------------ | ------------------------------------------------------------------- |
-| Pieces       | one instanced mesh per service type, modelled solids                |
-| Ground marks | one instanced mesh: contact shadow, status lamp, selection ring     |
-| Connections  | one instanced mesh of camera-facing hairlines along Bézier curves   |
-| Traffic      | one instanced mesh of stateless sprites ("beads")                   |
-| Labels       | one instanced mesh sampling a canvas text atlas, constant on screen |
-| Plates       | one mesh per region, plus the shadow it casts                       |
+| What         | How                                                                |
+| ------------ | ------------------------------------------------------------------ |
+| Pieces       | one instanced mesh per service type, modelled solids               |
+| Ground marks | one instanced mesh: contact shadow, status lamp, selection ring    |
+| Connections  | one instanced mesh of camera-facing hairlines along Bézier curves  |
+| Traffic      | one instanced mesh of stateless sprites ("beads")                  |
+| Names        | not in the scene: a 2D canvas over it, at the display's resolution |
+| Plates       | one mesh per region, plus the shadow it casts                      |
+
+**Names** are drawn by `graphics/labelLayer.ts` on a canvas of their own,
+laid over the scene. The scene is rendered at whatever resolution the
+machine can hold, down to three quarters of a CSS pixel; text drawn into
+that picture is soft, and softest on the small and slow screens where it
+matters most. The names' canvas always has every pixel the display has.
+Each frame the controller hands the layer every name's anchor on the
+screen, how present it is and how much it matters (the piece in hand, then
+a failing service, then places, then the rest, nearest first);
+`graphics/labelPlacement.ts` leaves out a name that would lie across a more
+important one, and the layer redraws only when the picture changed. The
+overview's headings are written in full where they fit and cut to their
+numbers, all together, where they would touch. A name left out comes back
+when the camera moves in or its piece is selected or pointed at. In the
+overview a name lies on the plate at the foot of its piece, which is where
+the ring of a selection is drawn, so the name of the piece in hand steps
+out as the ring comes and the ring never runs through the words.
 
 **Pieces** are modelled, not drawn by hand: `apps/web/scripts/build-pieces.py`
 builds every service type in Blender, in code, and exports one GLB
@@ -448,11 +505,16 @@ for the detailed arrangement last used, where the service stands on its own.
 
 ### State
 
-| Store                  | Holds                                             |
-| ---------------------- | ------------------------------------------------- |
-| `telemetry`            | topology, latest snapshot, events, metric history |
-| `ui`                   | selection, filters, panels, layout and view mode  |
-| `settings` (persisted) | theme, quality, motion, renderer preference       |
+| Store                  | Holds                                                   |
+| ---------------------- | ------------------------------------------------------- |
+| `telemetry`            | topology, latest snapshot, events, metric history       |
+| `ui`                   | selection, filters, panels, layout and view mode        |
+| `settings` (persisted) | theme, quality, motion, renderer preference             |
+| `guide` (persisted)    | whether the first visit was oriented, challenges solved |
+
+The arrangement, the selection and the table view are also kept in the
+address (`app/urlState.ts`), so the address in the bar is a link to the view.
+A whole experiment travels as a session (`app/session.ts`).
 
 TanStack Query holds request/response data (scenarios, providers, policy
 catalogue). The client talks to the server only through the

@@ -86,6 +86,13 @@ it: it arrives when time stops being simply "now" (an incident, a pause, a
 replay) and goes again afterwards. A panel that is always open is a healthy
 service with a green dot: it says nothing and takes the room.
 
+A first visit is the one exception, once. The model alone does not say what
+can be learnt from it, so a card at the foot of the stage says what this is
+and offers the three things it is for: understand the platform, investigate
+a failure, test an authorization. Taking one, or dismissing the card, is
+remembered, and it does not come back; the model is framed above it while it
+is there. Everything it offers stays in the bar and its menu.
+
 **3. Overview first, then one path, then the detail.** The opening view is
 not the platform; it is a summary of it that cannot be outgrown. One piece
 per kind of service, twelve at most, whether the platform has fifty services
@@ -268,6 +275,17 @@ the model. In the overview a piece's name lies on the plate at its foot,
 toward the viewer, and the pieces of one column stand far enough apart that
 the nearer covers neither the farther nor its name.
 
+**A name is for reading, or it is not there.** Names are not part of the
+scene's picture, whose resolution follows what the machine can render: they
+are drawn over it at the display's own resolution, so they are as sharp on a
+phone at the lowest quality tier as anywhere. And no two are printed across
+each other. When there is not room for all of them the more important are
+placed first: the piece in hand, a service that is failing, the places, then
+the rest from the nearest. The overview's headings are written in full where
+they fit and cut to their numbers together where they would touch. A name
+that was left out comes back when the camera moves in, or when its piece is
+pointed at or selected.
+
 _The overview_ is four low plates, one per layer, left to right in the order
 a request crosses them and numbered in that order. Within a layer its steps
 are columns (clients, the edge router, the gateways) and the kinds of one
@@ -282,6 +300,38 @@ _By dependency_, it is a set of swimlanes: tiers are columns from left to
 right, each region is a lane across them, and a tier lines up between
 regions. A lane is a plate like any other, so it takes its region's state
 colour and goes dark with it.
+
+## Words
+
+**Time is the simulation's.** The cursor is at the _simulation's now_, where
+new history is being made, or in its _history_, which is re-simulated
+exactly; either can be _paused_. The interface does not call simulated time
+"live": that word is kept for data measured from a connected system, and
+"live, paused" contradicts itself. A phase of an incident is timed from the
+start of that incident (`+0:14`); an event shows that and the simulation
+clock, which differ by when the incident began.
+
+**A statement says what kind it is.** An explanation of an incident mixes
+three things that deserve different trust, and each line is tagged with
+which it is: _prescribed_ (written in the scenario file), _modelled_ (a
+relation of the topology the model follows) or _observed_ (recorded during
+the run). What the report cannot account for is _not explained_, in those
+words. The tags are ink, not colours: none of them is an alarm.
+
+**A result belongs to what it was asked.** A Cedar decision is shown with
+the context and the policies it was evaluated under. The moment the form
+beside it changes, it is marked as the answer to something else, loses the
+colour and the firm edge of an answer, and lists what changed. Two decisions
+compared are two evaluations kept side by side, never one of them inferred.
+
+**A name says which one.** A platform runs the same service in several
+regions under one name. Where the place is not on show (what a service
+calls, what an incident affected, a path) a name borne by more than one
+service is followed by its region; a name that is unique is left alone.
+In the table view, which is laid out by region, a name alone is a service
+of that table's region, and a call that leaves the region says where it
+goes: the edge router calls "API Gateway, US East · Primary; API Gateway,
+EU West; API Gateway, AP Southeast", not one name three times.
 
 ## Tokens
 
@@ -388,7 +438,29 @@ Text is set in sentence case throughout.
   and the overview draws a fifth of it. Density still follows request rate.
 - **No service names at overview distance, in the detailed arrangements.**
   There only the plates are named until the camera approaches. In the
-  overview every piece is named, because there are twelve.
+  overview every piece is named where there is room for its name.
+- **A name can be missing.** On a narrow screen the overview shows fewer
+  names than pieces, and its headings as numbers. That is a loss, taken in
+  preference to names nobody can read; selecting or approaching a piece
+  names it, and the table view lists everything.
+- **A phone's bar says less.** Under 640 pixels the three things to do
+  first are still on the bar, but the request tracer is its icon and the
+  incident button its last word.
+- **A card gives way to the panels.** The guide's card stands beside the
+  panels where the stage has room for it between them. Where it has not (a
+  phone, where a panel takes the whole width, or a tablet with a panel on
+  each side) it lies along the foot and the panels end above it, because a
+  challenge is answered in a panel. The scene's toolbar and the notices
+  keep the full width there instead of being squeezed into what is left.
+- **Names are not in the captured frame.** They are drawn on a canvas over
+  the scene, so a frame read back from the renderer does not contain them
+  (`scripts/capture.mjs --readback` lays them on).
+- **The first screen is not silent.** A first visit starts with a card over
+  the model. It is the only thing that is on screen without being asked
+  for, and it is there once.
+- **Three things on the bar.** Search, the request tracer and the incidents
+  are each one step away. The tracer used to be in the menu, where the part
+  of the application that is about authorization was the hardest to find.
 - **A round plate for a region that is not round.** A small region with a
   long chain of tiers gets a plate wider than its lines need, because a
   circle is as wide as it is deep. The plates stay round by region so that
@@ -430,7 +502,15 @@ rendered frame back and asserts that no sampled pixel has a hue while the
 platform is healthy and nothing is selected, in both themes; that a hue
 appears with a selection and with a traced request, and goes again when they
 are let go of; and that hue appears once an incident is under way
-(`apps/web/e2e/aegis.spec.ts`). Unit tests hold the palette to its own rules
+(`apps/web/e2e/aegis.spec.ts`). The same suite asserts that no two names
+on the model overlap, at a desktop width and on a phone, that the names'
+canvas has the display's resolution while the scene's is lower, that on a
+phone every playback control stays inside the screen, that the request
+tracer is on the bar there too, and that a challenge's card never lies
+over the panel it is answered in, on a phone or on a tablet with a panel on
+each side.
+Unit tests hold the
+palette to its own rules
 (`apps/web/src/lib/palette.test.ts`) and the overview to its arithmetic
 (`apps/web/src/lib/overview.test.ts`).
 

@@ -8,7 +8,9 @@
 //! the only place that advances it.
 
 pub mod diff;
+pub mod experiment;
 mod service;
+pub mod session;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

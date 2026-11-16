@@ -127,10 +127,10 @@ export async function stage(
   return { files: [...files.values()], skipped };
 }
 
-/** Hands the files in use to the browser as one document to save. */
-export function download(bundle: WorkspaceBundle, name = 'aegis-workspace.json'): void {
+/** Hands a document to the browser to save, as indented JSON. */
+export function downloadJson(value: unknown, name: string): void {
   const url = URL.createObjectURL(
-    new Blob([`${JSON.stringify(bundle, null, 2)}\n`], { type: 'application/json' }),
+    new Blob([`${JSON.stringify(value, null, 2)}\n`], { type: 'application/json' }),
   );
   const link = document.createElement('a');
   link.href = url;
@@ -139,4 +139,9 @@ export function download(bundle: WorkspaceBundle, name = 'aegis-workspace.json')
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Hands the files in use to the browser as one document to save. */
+export function download(bundle: WorkspaceBundle, name = 'aegis-workspace.json'): void {
+  downloadJson(bundle, name);
 }

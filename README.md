@@ -98,14 +98,21 @@ in [docs/DESIGN.md](docs/DESIGN.md).
   double-click to move in. Search, and filter by kind, state, region or
   incident.
 - Light and night themes with the same rules. Names keep one size on screen,
-  like the names on a map, and appear as you get closer.
+  like the names on a map, and appear as you get closer. They are drawn at
+  the display's own resolution whatever the scene's is, and never across
+  each other: where there is not room for all of them the more important
+  come first, and the rest return when you move in or select their piece.
 
 **Quiet until asked**
 
 - At rest the screen holds the model and one bar: what this is, a sentence
-  saying how the platform is, and two things to do. A card comes with a
-  selection and leaves with it, lists come when asked for, and the timeline
-  is on screen only while there is something on it.
+  saying how the platform is, and three things to do: find something, test
+  an authorization, follow an incident. A card comes with a selection and
+  leaves with it, lists come when asked for, and the timeline is on screen
+  only while there is something on it.
+- A first visit is told once what this is for and offered three ways in:
+  understand the platform, investigate a failure, test an authorization.
+  Taken or dismissed, the card does not come back.
 - A traced request and an incident's traffic are each one route across the
   model: the route stays in front while the rest recedes, a badge marks where
   it was stopped, and among every service the camera moves in on it.
@@ -140,6 +147,39 @@ scripted events) run by the engine. Start, pause, resume, stop, restart,
 change speed, inspect every event, see what was affected. When a fault
 spreads, the log folds the consequences so the cause stays visible.
 
+**Why it happened**
+
+An incident can be read back from its own record. Select a phase or an event
+and the engine says what the scenario prescribed there, what followed from
+it in the model and what was observed, each line tagged with which of the
+three it is: "Orders became degraded at +0:16 because it calls Orders DB,
+which was already not normal" is _modelled_; "latency ×6 on Orders DB" is
+_prescribed_. What it cannot account for it reports as not explained. When
+the incident ends the same record becomes a summary: origin, propagation,
+peak impact, recovery, Cedar's decisions, and the moments to go back to,
+with a text to take away. Every figure in it is one the run produced.
+
+**The same incident twice**
+
+Because the engine is deterministic, a scenario run again from the same seed
+is the same incident. **Compare an intervention** runs it twice on timelines
+of their own, the second time with one change (more capacity here, a service
+taken out there, at a moment you choose), and lays the runs side by side:
+errors, latency, services affected, time to recover. It says exactly what
+changed, down to the one command the runs differ by, and either run can be
+put on the timeline to watch.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/incident-explained.png" alt="A cascading failure under way in the overview, with its summary beside the model: the moments to go back to, the origin on the scenario's word, and the services that left their normal state in order, each line tagged as prescribed by the scenario or modelled from a dependency" /></td>
+    <td width="50%"><img src="docs/assets/comparison.png" alt="The comparison of an intervention: the one change of run B stated in a sentence, a table of error rate, latency, services affected and time to recover for both runs, and two charts with run A dashed and run B solid" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>An incident read back from its record: what was prescribed, what followed, and when.</sub></td>
+    <td align="center"><sub>The same incident twice, the second time with twice the capacity on one service.</sub></td>
+  </tr>
+</table>
+
 **Real Cedar authorization**
 
 Build a request (principal, action, resource, context) and watch it travel
@@ -147,12 +187,34 @@ client → gateway → authentication → Cedar → resource. The decision, the
 determining policy ids and the diagnostics are what `cedar-policy` returned.
 Switch policies off to see the outcome change.
 
+A decision is shown with the context and the policies it was evaluated
+under, and the moment the form beside it changes it is marked as the answer
+to something else, with what changed. Keep one result and evaluate again to
+set two side by side: the decision on each, the policies that determine it,
+and in what the two configurations differ.
+
 **Time travel**
 
 A virtual clock with play, pause, step, seek, 0.5×–4× and replay. Seeking
 restores topology, metrics, health and incident state exactly; replay
 re-simulates recorded history bit for bit. Prerecorded incidents load as a
 seed plus a command list.
+
+**Sessions**
+
+What is on screen can be saved and opened again, or handed to someone else:
+the platform, the seed, the commands issued, the moment and the view, as a
+file or, when it is small, as a link. Opening one has the engine simulate
+it again; no figure travels with it, and a link is shown before it is
+opened. The address also follows the arrangement and the selection, so it is
+always a link to the view.
+
+**Guided challenges**
+
+A question about the platform, answered by using it: find where a cascade
+begins, find where a flood is stopped, make Cedar allow an export it denied.
+The answer is checked against the model itself (the incident's record,
+Cedar's decision), and so is the hint a wrong answer gets.
 
 **Your own platform**
 
@@ -165,7 +227,11 @@ a starting point and `check-workspace` validates a directory and says why a
 scenario cannot run on a topology. Replace only the policies and the same
 platform shows what the new set permits and denies; `diff-workspace` lists
 every request Cedar decides differently between two sets and which simulated
-flows stop because of it, and can fail a pipeline when a decision changes. It is still a simulation:
+flows stop because of it, and can fail a pipeline when a decision changes; the
+import dialog asks the same of the files you staged, against the ones in use,
+before anything is applied. A scenario can also be written in the interface:
+phases, effects placed by role, region or service, the events it announces,
+checked by the engine as you write and saved as the file it is. It is still a simulation:
 the figures on your topology are computed, and labelled synthetic. See
 [docs/WORKSPACE.md](docs/WORKSPACE.md) and the six-service
 [example](examples/corner-shop).
@@ -325,8 +391,9 @@ commands) → events`. No clock, no global counters, randomness only from a
    analytic mixture of log-normals over client populations, so p50 < p95 < p99
    always holds and nothing is sampled or invented.
 3. **Draw calls follow object classes, not object counts.** One instanced
-   mesh per service type, one for connections, one for beads, one for labels,
-   one for everything that lies on the plates: 29 draw calls for 51 services, 35 for 178.
+   mesh per service type, one for connections, one for beads, one for
+   everything that lies on the plates: 28 draw calls for 51 services, 34 for 178.
+   Names are drawn over the scene, on a canvas of their own.
 
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -364,20 +431,23 @@ quality ultra, light theme, production build, interface in its default state.
 
 | Scene                    | Services / connections | WebGPU | WebGL 2 | Draw calls |
 | ------------------------ | ---------------------: | -----: | ------: | ---------: |
-| Helios · steady state    |                51 / 75 | 1.7 ms |  7.0 ms |         29 |
-| Helios · DDoS surge      |                51 / 75 | 1.9 ms |  7.3 ms |         29 |
-| Stress · steady state    |              178 / 648 | 1.9 ms |  7.5 ms |         35 |
-| Stress · regional outage |              178 / 648 | 1.9 ms |  8.1 ms |         35 |
+| Helios · steady state    |                51 / 75 | 2.3 ms |  9.0 ms |         28 |
+| Helios · DDoS surge      |                51 / 75 | 3.1 ms |  9.7 ms |         28 |
+| Stress · steady state    |              178 / 648 | 2.5 ms |  9.3 ms |         34 |
+| Stress · regional outage |              178 / 648 | 2.8 ms |  9.7 ms |         34 |
 
 <sub>Mean time to produce one frame with the frame-rate limit off.</sub>
 
 - Both backends produce a 1080p frame well inside the 16.7 ms a 60 Hz display
-  allows; 3.5× the services and 8.6× the connections add 6 draw calls and no
-  measurable frame time.
+  allows; 3.5× the services and 8.6× the connections add 6 draw calls and a
+  few tenths of a millisecond.
 - With Chrome's default 60 Hz pacing, the whole page held
   60.0–60.1 frames/s in every scene on both backends.
+- Names are drawn over the scene at the display's resolution, not in it.
+  Placing and drawing them is 0.02–0.15 ms of script per frame; a
+  frame with names takes 0.3–1.1 ms longer than one without.
 - GPU geometry and texture counts are identical after 12 full scene
-  rebuilds. The JS heap stayed between 15.0 and 16.6 MB, rising about 0.1 MB
+  rebuilds. The JS heap stayed between 15.4 and 18.3 MB, rising about 0.2 MB
   per rebuild; a run this short cannot rule out a slow leak.
 - One engine tick costs 26 µs for 51 services and 41 µs for 178.
 - The benchmark earned its keep: on an earlier design it showed that
@@ -422,20 +492,20 @@ pnpm test:engine            # the module against the server's own output
 pnpm e2e:static             # Playwright against the static site, no server
 ```
 
-| Suite       | Tests | Covers                                                                                                                                                                                                                                               |
-| ----------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rust        |   187 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, the boundary of the engine built for the browser    |
-| Contracts   |    71 | Every zod schema against samples exported by the server binary; the published JSON Schemas against the bundled files and the examples                                                                                                                |
-| Web         |   258 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, stores, stream client, event folding, command search, interface, the engine's client and transport                                                            |
-| End to end  |    12 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, no-GPU fallback |
-| Engine      |    28 | The built WebAssembly module, loaded in Node: 23 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                   |
-| Static site |     6 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, and what it shows when the engine cannot load                |
+| Suite       | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust        |   208 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, incident reports and what each line of one rests on, comparing an intervention, sessions, the boundary of the engine built for the browser                                                                                                                                                                                                                                                                                                                            |
+| Contracts   |    68 | Every zod schema against samples exported by the server binary; what a report, a comparison and a session may and may not carry; the published JSON Schemas against the bundled files and the examples                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Web         |   386 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, placing names without overlap, stores, stream client, event folding, command search, stale Cedar results, report wording, scenario files, challenges, session links, interface, the engine's client and transport                                                                                                                                                                                                                                                                                                                                                               |
+| End to end  |    25 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, a fault placed by hand, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, the first visit, a stale Cedar result and two side by side, the playback bar on a phone, the bar and a challenge on a phone, names that never overlap, an incident explained and summarised, an intervention compared, a session saved and brought back, the address following the view, a scenario written in the editor, a guided challenge, policies compared before they are applied, no-GPU fallback |
+| Engine      |    32 | The built WebAssembly module, loaded in Node: 27 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Static site |     7 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, what it shows when the engine cannot load, and an incident compared with an intervention and read back                                                                                                                                                                                                                                                                                                                                                                         |
 
-All 562 pass locally. The end-to-end suite runs the real server and a production
+All 726 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
-incident is under way. The same suite passes on a real GPU through WebGPU (11
+incident is under way. The same suite passes on a real GPU through WebGPU (24
 tests; the fallback test does not apply there). The last two suites need the
 engine module (`pnpm engine:build`) and run in their own CI job. One more Rust
 test compares the embedded engine with a real `cedar-agent` binary and is
@@ -461,10 +531,11 @@ scripts             Screenshot and benchmark runners
 
 - Generic OpenTelemetry provider (OTLP traces → topology and edge metrics).
 - Merge live probe data into the scene as its own clearly-labelled region.
-- Topology and scenario editors in the interface (files are already read
-  from a [workspace](docs/WORKSPACE.md)).
+- A topology editor in the interface, and injected flows in the scenario
+  editor (both are files today, read from a [workspace](docs/WORKSPACE.md)).
 - True orthographic projection as an option, with its own picking and zoom.
-- Persist timelines to disk and share them as replayable files.
+- Sessions that carry the decisions asked for by hand, re-evaluated on
+  opening instead of left out.
 
 ## License
 
