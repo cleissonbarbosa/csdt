@@ -17,6 +17,8 @@ coverage/
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/blob-report/
+# Page snapshots and screenshots a Playwright MCP session leaves behind
+.playwright-mcp/
 
 # Environment — never commit real configuration
 .env
