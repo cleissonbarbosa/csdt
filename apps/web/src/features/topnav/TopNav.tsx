@@ -27,6 +27,7 @@ import { Select } from '@/components/ui/Field';
 import { Menu } from '@/components/ui/Menu';
 import { Deviations } from '@/features/hud/Hud';
 import { cn } from '@/lib/cn';
+import { formatClock } from '@/lib/format';
 import { COLOR, DATA_SOURCE_HINT, DATA_SOURCE_LABEL, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useGuide } from '@/stores/guide';
@@ -49,6 +50,12 @@ function PlatformStatus() {
   const faults = useTelemetry((state) => state.snapshot?.faults.length ?? 0);
   const topology = useTelemetry((state) => state.topology);
   const acknowledged = useUi((state) => state.acknowledgedIncidentId);
+  // The snapshot is of the moment the cursor is at. In the history that is
+  // not now, and the sentence has to say which moment it speaks of: "all
+  // normal" read as the present while an incident ran at the head.
+  const replayedAt = useTelemetry((state) =>
+    state.playback?.mode === 'replay' ? formatClock(state.playback.virtualTimeMs) : null,
+  );
   const { data: scenarios } = useQuery({ queryKey: queryKeys.scenarios, queryFn: api.scenarios });
   if (!global || !topology) return null;
 
@@ -78,6 +85,7 @@ function PlatformStatus() {
     sentence = `${unhealthy} of ${total} services not normal`;
     level = worst;
   }
+  if (replayedAt !== null) sentence = `At ${replayedAt}, in history: ${sentence}`;
   const abnormal = level !== 'healthy';
   const fresh = incident !== null && incident.status !== 'resolved' && incident.id !== acknowledged;
 
@@ -93,16 +101,20 @@ function PlatformStatus() {
           abnormal ? 'font-bold' : 'text-ink-faint hover:text-ink',
         )}
         style={abnormal ? { color: HEALTH_COLOR[level] } : undefined}
-        title={
+        // The sentence is cut where the bar is short of room; pointing at it
+        // says all of it, and then what the button does.
+        title={`${sentence}. ${
           abnormal
             ? 'Show the incident'
             : faults > 0
               ? 'Show what was placed by hand'
               : 'Show the platform overview'
-        }
+        }`}
         onClick={() => {
           const ui = useUi.getState();
-          if (abnormal || faults > 0) {
+          if (incident && incident.status !== 'resolved') {
+            followIncident(incident.id);
+          } else if (abnormal || faults > 0) {
             if (abnormal) ui.acknowledgeIncident(incident?.id ?? null);
             ui.setLeftTab('incidents');
           } else {
@@ -189,12 +201,12 @@ function Provenance() {
       >
         {/* A mark, not a lamp: it has no state to show. */}
         <span aria-hidden className="size-1.5 rounded-full border border-current" />
-        <span className="max-xl:hidden">
+        <span className="max-2xl:hidden">
           {connected
             ? `Simulated, with ${live} live integration${live === 1 ? '' : 's'}`
             : `Simulated, ${(topology ? DATA_SOURCE_LABEL[topology.dataSource] : 'Synthetic').toLowerCase()} data`}
         </span>
-        <span className="xl:hidden">Simulated</span>
+        <span className="2xl:hidden">Simulated</span>
       </button>
     </div>
   );
@@ -221,6 +233,25 @@ function TopologyPicker() {
       ))}
     </Select>
   );
+}
+
+/**
+ * Brings the incident under way in front of the viewer: its phases, at the
+ * head of the incidents, whatever that panel was showing. The button used
+ * to close the panel when it was open, which took the incident away from
+ * someone who had asked to follow it. A summary of this same incident that
+ * is being read is left where it is.
+ */
+function followIncident(incidentId: string): void {
+  const ui = useUi.getState();
+  ui.acknowledgeIncident(incidentId);
+  ui.inspectEvent(null);
+  if (ui.inspectedIncidentId !== incidentId) ui.inspectIncident(null);
+  ui.setLeftTab('incidents');
+  requestAnimationFrame(() => {
+    const list = document.querySelector('[data-testid="scenario-console"]');
+    if (list) list.scrollTop = 0;
+  });
 }
 
 /**
@@ -251,13 +282,13 @@ export function TopNav() {
       <div className="hidden md:block">
         <TopologyPicker />
       </div>
-      {/* The sentence comes first and keeps its width; the instruments take
-          what is left of the row. */}
+      {/* The sentence comes first. The instruments take what is left of the
+          row, and at least the room of one: where the two do not both fit,
+          the sentence is the one that is cut, and says the rest when
+          pointed at. */}
       <div className="flex min-w-0 flex-[1_1_11rem] items-center gap-5">
         <PlatformStatus />
-        <div className="hidden min-w-0 flex-1 basis-0 md:block">
-          <Deviations />
-        </div>
+        <Deviations className="hidden flex-1 basis-0 md:flex" />
       </div>
 
       <div className="ml-auto flex h-12 shrink-0 items-center gap-2">
@@ -272,7 +303,7 @@ export function TopNav() {
         >
           <Search size={14} aria-hidden />
           <span className="max-lg:hidden">Search</span>
-          <kbd className="code text-[10px] text-ink-faint max-xl:hidden">Ctrl K</kbd>
+          <kbd className="code text-[10px] text-ink-faint max-2xl:hidden">Ctrl K</kbd>
         </button>
         {/* What makes this a security model, not only an operations one:
             on the bar itself, a step from anywhere. On a phone too, where
@@ -291,10 +322,15 @@ export function TopNav() {
         <Button
           variant="primary"
           icon={<Play size={13} aria-hidden />}
-          aria-expanded={incidentsOpen}
+          // With an incident under way the button does what it says and
+          // never closes what it leads to, so it has nothing to expand.
+          aria-expanded={incidentActive ? undefined : incidentsOpen}
           onClick={() => {
             const ui = useUi.getState();
-            if (incidentsOpen) ui.setExplorerOpen(false);
+            const incident = useTelemetry.getState().snapshot?.incident;
+            if (incident && incident.status !== 'resolved') {
+              followIncident(incident.id);
+            } else if (incidentsOpen) ui.setExplorerOpen(false);
             else ui.setLeftTab('incidents');
           }}
           data-testid="explore-incident"

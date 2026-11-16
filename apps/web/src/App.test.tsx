@@ -261,6 +261,26 @@ describe('panels on demand', () => {
     });
   });
 
+  it('says which moment it speaks of while the cursor is in the history', () => {
+    const past = fixtures.snapshot();
+    past.incident = null;
+    past.faults = [];
+    past.global.activeIncidents = 0;
+    past.global.health = { healthy: 51, degraded: 0, critical: 0, down: 0 };
+    past.playback = { ...past.playback, mode: 'replay', virtualTimeMs: 76_400 };
+    useTelemetry.getState().applySnapshot(past);
+    renderApp();
+    // "All normal" is true of 1:16, not of now, and the sentence says so.
+    const status = screen.getByTestId('platform-status');
+    expect(status).toHaveTextContent('At 1:16, in history: 51 services, all normal');
+    act(() =>
+      useTelemetry
+        .getState()
+        .setPlayback({ ...past.playback, mode: 'live', virtualTimeMs: 90_000 }),
+    );
+    expect(status).toHaveTextContent(/^51 services, all normal$/);
+  });
+
   it('opens the overview from the status sentence while all is well', async () => {
     const quiet = fixtures.snapshot();
     quiet.incident = null;
@@ -297,12 +317,39 @@ describe('panels on demand', () => {
   });
 
   it('opens the incidents from the one command in the top bar', async () => {
+    const quiet = fixtures.snapshot();
+    quiet.incident = null;
+    quiet.global.activeIncidents = 0;
+    useTelemetry.getState().applySnapshot(quiet);
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByTestId('explore-incident'));
+    const command = screen.getByTestId('explore-incident');
+    expect(command).toHaveTextContent('Explore an incident');
+    await user.click(command);
     expect(await screen.findByTestId('scenario-console')).toBeInTheDocument();
-    await user.click(screen.getByTestId('explore-incident'));
+    expect(command).toHaveAttribute('aria-expanded', 'true');
+    await user.click(command);
     await waitFor(() => expect(screen.queryByTestId('scenario-console')).not.toBeInTheDocument());
+  });
+
+  it('follows the incident under way instead of closing what shows it', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const command = screen.getByTestId('explore-incident');
+    expect(command).toHaveTextContent('Follow the incident');
+    await user.click(command);
+    expect(await screen.findByTestId('active-incident')).toBeInTheDocument();
+    expect(useUi.getState().acknowledgedIncidentId).toBe(fixtures.snapshot().incident?.id);
+
+    // Reading one of its events, then asking to follow it again: the panel
+    // stays, and goes back to the incident's phases.
+    act(() => useUi.getState().inspectEvent(fixtures.events().events[0]!.seq));
+    expect(await screen.findByTestId('event-detail')).toBeInTheDocument();
+    await user.click(command);
+    expect(await screen.findByTestId('active-incident')).toBeInTheDocument();
+    expect(useUi.getState()).toMatchObject({ explorerOpen: true, leftTab: 'incidents' });
+    // It leads somewhere and never away, so it has nothing to collapse.
+    expect(command).not.toHaveAttribute('aria-expanded');
   });
 
   it('keeps the timeline off the screen until there is something on it', async () => {

@@ -69,7 +69,8 @@ a command is not a signal.
 A traced request that Cedar denies is marked in red where it stopped. The
 policy did its job; the red does not say the system is broken. It says that
 the request the viewer chose to follow ended here, which is the event they
-asked about.
+asked about. For the same reason it is not listed among what needs
+attention on the platform: the viewer asked, and was answered.
 
 **2. Normal is silent.** A healthy service has no dot, no badge and no label
 saying so. One sentence in the top bar gives the state of the platform;
@@ -144,7 +145,11 @@ heavier line. They never blur what is behind them.
 normal band, and so are the figures on every card. A value takes a colour
 only when it has left the band. In the top bar an instrument is on show only
 while its reading is outside the band: with the platform well the bar shows
-none of them, and the one that appears is the one to look at.
+none of them, and the one that appears is the one to look at. Where the bar
+has not room for every instrument that is out of range, it shows whole ones,
+the most urgent first (failures before slowness before fullness), and counts
+the rest beside them. A reading that is out of range is never simply left
+out, and the sentence beside the instruments is what gives up the room.
 
 **7. Shape before colour.** Ordinary traffic is told apart by the shape of
 its bead: disc for a request, ring for a response, diamond for
@@ -269,6 +274,30 @@ covers another hides whatever stands under its rim.
 the camera first takes, so its lines run across the picture and nothing
 important stands behind something else.
 
+**A piece with a front faces its traffic.** A gate is gone through, a shield
+is faced, a container is loaded at its door end and a queue is joined at its
+tail. Those four are turned so that this side meets what calls them,
+wherever the arrangement has put them, and the line of traffic goes into the
+opening of the gate, not into its flank. The other eight are the same from
+every side that matters and stand as they were modelled. A gate and a shield
+are told by their face, and on a path that runs across the picture a face
+turned all the way to its traffic shows the viewer its edge: a slab and a
+blade. So those two turn toward their traffic no further than 45° from the
+line of sight, where the arch is still an arch and the line still passes
+through its opening, which is wider than the gate is deep.
+
+**On a stage taller than wide, the model is seen along the path.** A phone
+held upright is a picture four hundred pixels across, and the overview is a
+row of four layers: drawn across it, the row was a strip a hundred pixels
+tall under names larger than its pieces. There the camera stands at the
+entry and looks along the path, a little higher than usual, so the layers
+stand one above another and take the height of the screen. Depth is still
+distance along the path (rule 4), more plainly than before. Every piece
+that is not turned to its traffic is turned by as much as the camera went
+round, so its front still faces the viewer, and a layer's heading is its
+number, standing beside the plate instead of above it. Only the overview changes; the two detailed
+arrangements are round or nearly square, and keep their attitude.
+
 **A name stands clear of what it names.** A plate's name is hung from a
 point just outside the plate, on the side that faces away from the rest of
 the model. In the overview a piece's name lies on the plate at its foot,
@@ -309,7 +338,10 @@ exactly; either can be _paused_. The interface does not call simulated time
 "live": that word is kept for data measured from a connected system, and
 "live, paused" contradicts itself. A phase of an incident is timed from the
 start of that incident (`+0:14`); an event shows that and the simulation
-clock, which differ by when the incident began.
+clock, which differ by when the incident began. While the cursor is in the
+history the sentence in the top bar says which moment it speaks of ("At
+1:16, in history: 51 services, all normal"): unmarked, it read as the
+present while an incident ran at the simulation's now.
 
 **A statement says what kind it is.** An explanation of an incident mixes
 three things that deserve different trust, and each line is tagged with
@@ -446,12 +478,28 @@ Text is set in sentence case throughout.
 - **A phone's bar says less.** Under 640 pixels the three things to do
   first are still on the bar, but the request tracer is its icon and the
   incident button its last word.
+- **A gate is not quite square to its path.** Where requests cross the
+  picture a gate stands at three quarters to them, not across them: the
+  price of an arch that can be read as one. Seen along the path, on a phone
+  or in a region that lies in front of the hub, it stands square.
+- **Upright, a heading is its number.** Beside a plate on a phone there is
+  room for "02" and not for "02 Identity", so on a stage taller than wide
+  the layers are numbered and not named, on a tablet as well, where the
+  names would have fitted. Selecting a piece says which layer it is in.
+- **On a phone a card takes half the stage.** A card there is as wide as the
+  screen, so the model cannot move over beside it; it used to be asked to,
+  and left the picture when a piece was selected. The card keeps to the
+  upper half, scrolling what does not fit, and the model is framed in what
+  is left under it: smaller, but there, with the selection marked on it.
 - **A card gives way to the panels.** The guide's card stands beside the
   panels where the stage has room for it between them. Where it has not (a
   phone, where a panel takes the whole width, or a tablet with a panel on
   each side) it lies along the foot and the panels end above it, because a
   challenge is answered in a panel. The scene's toolbar and the notices
   keep the full width there instead of being squeezed into what is left.
+  Where the card does stand beside the panels the model moves over for it
+  as it does for a panel, and the card goes to the foot instead when that
+  would leave the model less than 320 pixels.
 - **Names are not in the captured frame.** They are drawn on a canvas over
   the scene, so a frame read back from the renderer does not contain them
   (`scripts/capture.mjs --readback` lays them on).

@@ -141,6 +141,8 @@ export function useAegisConnection(): void {
         if (replaced) useUi.getState().resetForTopology();
         if (reason === 'reset' || reason === 'topology' || reason === 'recording' || replaced) {
           state.clearTimeline();
+          // What was traced or opened was read off the timeline that went.
+          useUi.getState().forgetTimeline();
         }
         if (reason !== 'seek') {
           // History changed shape: an incident that was on it may be gone,

@@ -711,10 +711,81 @@ test('on a phone Cedar is on the bar, and a challenge leaves its panel in reach'
   await expect(tracer).toBeVisible();
   await expect.poll(() => apart(tracer)).toBe(true);
   await expect.poll(() => apart(incidents)).toBe(true);
-  // With one of them closed the card stands beside the other.
+  // With one of them closed there would be room for the card beside the
+  // other, but none left for the model: the card stays along the foot.
   await page.getByTestId('close-explorer').click();
   await expect(incidents).toHaveCount(0);
   await expect.poll(() => apart(tracer)).toBe(true);
+});
+
+test('on a phone the overview stands upright, and stays in the picture under a card', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 780 });
+  await openApp(page);
+  await waitForScene(page);
+  const topology = (await (await page.request.get(`${API}/topology`)).json()) as {
+    nodes: { serviceType: string }[];
+  };
+  const kinds = [...new Set(topology.nodes.map((node) => node.serviceType))];
+  const canvas = page.getByRole('img', { name: /Interactive 3D view/ });
+  // Where every kind of service is drawn, in the page's own coordinates.
+  const pieces = async () => {
+    const box = (await canvas.boundingBox())!;
+    const points = await page.evaluate(
+      (ids) => ids.map((id) => window.__aegis!.projectNode(id)),
+      kinds.map((kind) => `kind:${kind}`),
+    );
+    return points.map((point) => (point ? { x: box.x + point.x, y: box.y + point.y } : null));
+  };
+  const spread = (values: number[]) => Math.max(...values) - Math.min(...values);
+
+  // Seen along the path, the four layers stand one above another: the model
+  // is taller than it is wide and takes most of the height it has. Drawn
+  // across a phone it was a strip a hundred pixels tall.
+  await expect
+    .poll(async () => {
+      const shown = (await pieces()).filter((point) => point !== null);
+      if (shown.length < kinds.length) return 0;
+      return spread(shown.map((p) => p.y)) / spread(shown.map((p) => p.x));
+    })
+    .toBeGreaterThan(1.2);
+  const upright = (await pieces()).filter((point) => point !== null);
+  expect(spread(upright.map((p) => p.y))).toBeGreaterThan(300);
+  for (const point of upright) {
+    expect(point.x).toBeGreaterThan(0);
+    expect(point.x).toBeLessThan(390);
+  }
+  // The layers are numbered there, in the order a request crosses them.
+  expect((await namesOnModel(page)).filter((name) => /^0\d$/.test(name))).toHaveLength(4);
+  expect(await overlappingNames(page)).toBe(0);
+
+  // Selecting a piece brings its card, which is as wide as the screen. The
+  // model used to be moved out from under it, and out of the picture: now
+  // the card keeps to the upper part and every piece is drawn below it.
+  const gateway = (await pieces())[kinds.indexOf('api-gateway')]!;
+  await page.mouse.click(gateway.x, gateway.y - 6);
+  const card = page.getByRole('complementary', { name: 'Inspector' });
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId('inspector-title')).toHaveText('API gateways');
+  await expect
+    .poll(async () => {
+      const box = (await card.boundingBox())!;
+      const shown = await pieces();
+      return shown.every(
+        (point) => point !== null && point.y > box.y + box.height && point.y < 780,
+      );
+    })
+    .toBe(true);
+  const box = (await card.boundingBox())!;
+  expect(box.height).toBeLessThan(780 * 0.6);
+
+  // Let go of it and the model has the stage again.
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+  await expect
+    .poll(async () => spread((await pieces()).filter((p) => p !== null).map((p) => p.y)))
+    .toBeGreaterThan(300);
 });
 
 test('names on the model are sharp and never printed across each other', async ({ page }) => {

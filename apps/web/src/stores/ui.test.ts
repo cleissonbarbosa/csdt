@@ -99,6 +99,50 @@ describe('a traced request', () => {
     expect(useUi.getState().tracing).toBe(false);
     expect(useUi.getState().openPanel).toBeNull();
   });
+
+  it('is put away when a dialog takes the place of the tracer', () => {
+    for (const leave of [
+      () => useUi.getState().openExperiment(),
+      () => useUi.getState().setPanel('settings'),
+      () => useUi.getState().togglePanel('help'),
+      () => useUi.getState().togglePanel('authorization'),
+    ]) {
+      useUi.setState(useUi.getInitialState(), true);
+      useUi.getState().togglePanel('authorization');
+      useUi.getState().traceDecision(decisionDeny());
+      leave();
+      // Neither a path with no card to explain it, nor an overview nobody
+      // asked for where the tracer was.
+      expect(useUi.getState()).toMatchObject({
+        tracedDecision: null,
+        tracing: false,
+        inspectorOpen: false,
+      });
+    }
+  });
+
+  it('leaves the sidebar to a selection when the tracer goes', () => {
+    useUi.getState().select({ kind: 'group', id: 'kind:database' });
+    useUi.getState().togglePanel('authorization');
+    useUi.getState().setPanel('settings');
+    expect(useUi.getState()).toMatchObject({ inspectorOpen: true, openPanel: 'settings' });
+  });
+
+  it('does not outlive the timeline it was asked on', () => {
+    useUi.getState().togglePanel('authorization');
+    useUi.getState().traceDecision(decisionDeny());
+    useUi.getState().setLastDecision(decisionDeny());
+    useUi.getState().inspectEvent(42);
+    useUi.getState().forgetTimeline();
+    expect(useUi.getState()).toMatchObject({
+      tracedDecision: null,
+      tracing: false,
+      lastDecision: null,
+      inspectedEventSeq: null,
+      // The tracer itself stays: only what it read off that timeline goes.
+      openPanel: 'authorization',
+    });
+  });
 });
 
 describe('filters', () => {

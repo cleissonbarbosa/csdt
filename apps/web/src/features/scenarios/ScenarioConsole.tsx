@@ -21,7 +21,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { actions } from '@/app/actions';
 import { HOST } from '@/app/host';
@@ -715,6 +715,18 @@ export function ScenarioConsole() {
   );
   const inspectedIncident = useUi((state) => state.inspectedIncidentId);
   const [confirming, setConfirming] = useState(false);
+  // An incident that begins is laid at the head of this list, above the
+  // scenario whose button started it. The browser keeps the button where it
+  // was, so the list has to be taken to its head for the phases to be seen,
+  // and before it is painted, or the scenarios are seen to jump twice.
+  // Only for an incident that begins at the simulation's now: moving through
+  // history crosses many, and must not take the list from under its reader.
+  const incidentId = useTelemetry((state) => state.snapshot?.incident?.id ?? null);
+  const list = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (incidentId === null || useTelemetry.getState().playback?.mode !== 'live') return;
+    if (list.current) list.current.scrollTop = 0;
+  }, [incidentId]);
 
   if (inspected) {
     return <EventDetail event={inspected} onBack={() => useUi.getState().inspectEvent(null)} />;
@@ -730,7 +742,7 @@ export function ScenarioConsole() {
   const active = data?.scenarios.find((s) => s.id === activeId);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" data-testid="scenario-console">
+    <div ref={list} className="min-h-0 flex-1 overflow-y-auto" data-testid="scenario-console">
       <ActiveIncident scenario={active} />
       <RecordedIncidents />
       <PlacedByHand />

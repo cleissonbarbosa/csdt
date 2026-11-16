@@ -54,7 +54,13 @@ import {
   hang,
   nameAnchor,
   nodePosition,
+  TOLD_BY_FACE,
+  UPRIGHT_ASPECT,
+  askew,
   VIEW,
+  VIEW_UPRIGHT,
+  headingOf,
+  viewOf,
   type LayoutMode,
   type SceneLayout,
   type Vec3,
@@ -144,6 +150,8 @@ const EDGE_SEGMENTS = 20;
  * 0.95 times 1.06 of the size), so this leaves a little of the plate between.
  */
 const RING_CLEARANCE = 0.5;
+/** The vertical, which the pieces are turned about to face the attitude in use. */
+const UP = new THREE.Vector3(0, 1, 0);
 /**
  * Beads are ink on a light plate: past a certain density a stream turns into
  * a solid rope and stops saying anything. The budget keeps single beads
@@ -306,6 +314,8 @@ interface TypeBatch {
   mesh: THREE.InstancedMesh;
   tint: THREE.InstancedBufferAttribute;
   fx: THREE.InstancedBufferAttribute;
+  /** Cosine and sine of the turn each piece has about the vertical. */
+  turn: THREE.InstancedBufferAttribute;
 }
 
 interface TraceSegment {
@@ -461,6 +471,21 @@ export class SceneController {
   private labelAnchors = new Float32Array(0);
   /** Where a node's name hangs from its anchor, in units of its own size. */
   private labelAlign: [number, number] = [0, 0.5];
+  /** Whether the stage is taller than wide, which the overview is seen differently on. */
+  private upright = false;
+  /** The size of the stage the shot and the names were last taken for. */
+  private stageWidth = 0;
+  private stageHeight = 0;
+  /** The way toward the viewer on the ground, `[x, z]`: where an overview name lies from its piece. */
+  private nameToward: [number, number] = [0, 1];
+  /**
+   * How far each piece is turned about the vertical, and how far it is to
+   * be: toward its traffic if it has a side for that, else by as much as
+   * the attitude in use is turned from the one the pieces were modelled for.
+   */
+  private yaw = new Float32Array(0);
+  private yawAim = new Float32Array(0);
+  private readonly facingTurn = new THREE.Quaternion();
   /** Per node: how present its name is, whether it is always shown, its alarm. */
   private labelNamed = new Float32Array(0);
   private labelEmphasis = new Uint8Array(0);
@@ -690,6 +715,14 @@ export class SceneController {
 
     this.controls.minDistance = 6 * LENS;
     this.controls.maxDistance = layout.radius * 5 * LENS;
+    // The shot is taken from the attitude of the stage as it is now.
+    this.syncStage(false);
+    // Pieces that walk to a new arrangement turn to it on the way. A model
+    // that is laid out afresh arrives already turned.
+    if (this.yaw.length !== n) this.yaw = new Float32Array(n);
+    this.yawAim = new Float32Array(n);
+    this.aimPieces();
+    if (walkFrom === null || this.options.reducedMotion) this.yaw.set(this.yawAim);
     if (first) this.intro();
     else this.frameAll(!this.options.reducedMotion);
   }
@@ -803,6 +836,7 @@ export class SceneController {
         mesh,
         tint: instanced(geometry, 'aTint', 3, members.length),
         fx: instanced(geometry, 'aFx', 4, members.length),
+        turn: instanced(geometry, 'aTurn', 2, members.length),
       };
     });
   }
@@ -993,13 +1027,34 @@ export class SceneController {
     // take a moment, and with reduced motion the assembly takes none).
     this.regionNamed = new Float32Array(layout.regions.length).fill(1);
     if (this.assembling) this.applyBases(this.time - this.assembleAt);
-    topology.nodes.forEach((_, i) => {
+    this.placeNames();
+    this.labelsReady = true;
+    this.applyQuality(this.quality);
+  }
+
+  /**
+   * Where every name is anchored. It follows the attitude the model is seen
+   * from, so it is done again when a stage turns from wide to upright.
+   */
+  private placeNames(): void {
+    const layout = this.layout;
+    if (!layout || this.labelAnchors.length !== (this.n + layout.regions.length) * 3) return;
+    const upright = this.upright && layout.mode === 'layers';
+    this.labelLayer.shortHeadings = upright;
+    this.nameToward = upright
+      ? [Math.sin(VIEW_UPRIGHT.azimuth), Math.cos(VIEW_UPRIGHT.azimuth)]
+      : [0, 1];
+    const [tx, tz] = this.nameToward;
+    for (let i = 0; i < this.n; i++) {
       const p = nodePosition(layout, i);
       const s = layout.scales[i] ?? 1;
       if (layout.mode === 'layers') {
         // In the overview a name lies on the plate at the foot of its piece,
         // toward the viewer, where it covers nothing that stands behind.
-        this.labelAnchors.set([p[0], layout.ground[i] ?? 0, p[2] + s * 1.3], i * 3);
+        this.labelAnchors.set(
+          [p[0] + tx * s * 1.3, layout.ground[i] ?? 0, p[2] + tz * s * 1.3],
+          i * 3,
+        );
       } else {
         // A service's name stands above its piece, clear of the silhouette.
         this.labelAnchors.set(
@@ -1007,16 +1062,65 @@ export class SceneController {
           i * 3,
         );
       }
-    });
+    }
     this.labelAlign = layout.mode === 'layers' ? [0, -0.5] : [0, 0.5];
     // A plate's name stands on the table just off its rim, on the side that
     // faces away from the rest of the model. Which way that is on screen
     // depends on the camera, so the text is hung from the anchor every frame.
     layout.regions.forEach((region, k) => {
-      this.labelAnchors.set(nameAnchor(region), (this.n + k) * 3);
+      this.labelAnchors.set(nameAnchor(region, upright), (this.n + k) * 3);
     });
-    this.labelsReady = true;
-    this.applyQuality(this.quality);
+  }
+
+  /**
+   * Which way every piece is to face. A piece with a side its traffic
+   * arrives at is turned to where that traffic comes from: a gate stands
+   * across the path. The others have a front that was modelled toward the
+   * usual attitude, and seen along the path instead they are turned by as
+   * much as the camera went round.
+   */
+  private aimPieces(): void {
+    const layout = this.layout;
+    if (!layout || this.yawAim.length !== this.n) return;
+    const turned =
+      this.upright && layout.mode === 'layers' ? VIEW_UPRIGHT.azimuth - VIEW.layers.azimuth : 0;
+    const sight = viewOf(layout.mode, this.upright).azimuth;
+    const nodes = this.topology?.nodes;
+    for (let i = 0; i < this.n; i++) {
+      const toTraffic = layout.facing[i]!;
+      if (!Number.isFinite(toTraffic)) this.yawAim[i] = turned;
+      else {
+        // A gate turned all the way along a path that crosses the picture
+        // shows its flank: it is held where its arch can still be seen.
+        const byFace = nodes !== undefined && TOLD_BY_FACE.has(nodes[i]!.serviceType);
+        this.yawAim[i] = byFace ? askew(toTraffic, sight) : toTraffic;
+      }
+    }
+  }
+
+  /**
+   * Takes up the stage as it is now. A stage that has changed size is a
+   * different picture, and one that has turned upright, or back, is seen
+   * from another attitude: the names are placed again for it. Unless the
+   * viewer has taken the camera, the shot is taken again as well. It used
+   * to be kept, so a model framed before the canvas had its size, or before
+   * a window was made narrower, stayed cut off at both sides until "Frame
+   * everything" was asked for.
+   */
+  private syncStage(reframe: boolean): void {
+    const width = this.dom.clientWidth;
+    const height = this.dom.clientHeight;
+    if (width === 0 || height === 0) return;
+    if (width === this.stageWidth && height === this.stageHeight) return;
+    this.stageWidth = width;
+    this.stageHeight = height;
+    const upright = height > width * UPRIGHT_ASPECT;
+    if (upright !== this.upright) {
+      this.upright = upright;
+      this.placeNames();
+      this.aimPieces();
+    }
+    if (reframe && this.layout && !this.userMoved) this.reframe();
   }
 
   // ---------------------------------------------------------------------------
@@ -1409,6 +1513,14 @@ export class SceneController {
     // The path had the camera. With it gone the camera goes back to where
     // it stood, unless the viewer has taken it in the meantime.
     if (this.steered) return;
+    // Where it stood was the scene's own shot unless the viewer had chosen
+    // one. The scene's own is taken again for the stage as it is now: a
+    // panel that came or went while the path was up changed what fits, and
+    // the shot from before left the model lying under it.
+    if (!this.userMoved) {
+      this.reframe();
+      return;
+    }
     void this.controls.setLookAt(
       ...trace.before.position,
       ...trace.before.target,
@@ -1452,7 +1564,8 @@ export class SceneController {
     // The classic axonometric attitude: a little under 40° above the horizon,
     // turned so that three faces of every piece show. The layout is drawn
     // for this view (see `VIEW`).
-    const { azimuth, elevation } = VIEW[this.layoutMode];
+    const upright = this.upright && this.layoutMode === 'layers';
+    const { azimuth, elevation } = viewOf(this.layoutMode, this.upright);
     const toCamera: Vec3 = [
       Math.sin(azimuth) * Math.cos(elevation),
       Math.sin(elevation),
@@ -1508,13 +1621,14 @@ export class SceneController {
         }
         if (this.options.labels) {
           const outward: Vec3 = [region.outward[0], 0, region.outward[1]];
-          const w = nameWidth(region.name);
+          // Upright, a heading is its number: that is all the room it asks for.
+          const w = nameWidth(upright ? region.name.split(' ')[0]! : region.name);
           names.push({
-            anchor: nameAnchor(region),
+            anchor: nameAnchor(region, upright),
             width: w,
             height: REGION_LABEL_PX,
             hang:
-              region.heading?.align ??
+              headingOf(region, upright)?.align ??
               hang(dot(outward, right), dot(outward, up), w, REGION_LABEL_PX),
           });
         }
@@ -1630,6 +1744,7 @@ export class SceneController {
     const width = this.dom.clientWidth;
     const height = this.dom.clientHeight;
     if (width === 0 || height === 0) return;
+    this.syncStage(true);
     // A panel slides in over a fifth of a second; the picture slides with it
     // instead of jumping to its new centre.
     const shown = this.insetsShown;
@@ -2090,9 +2205,18 @@ export class SceneController {
       size *= 1 + emphasis * 0.08;
       y += size - base + emphasis * base * 0.14;
 
+      // It turns the short way round to where it is to face.
+      const aim = this.yawAim[i]!;
+      const round = Math.atan2(Math.sin(aim - this.yaw[i]!), Math.cos(aim - this.yaw[i]!));
+      this.yaw[i] = motion ? this.yaw[i]! + round * ease : aim;
+      this.facingTurn.setFromAxisAngle(UP, this.yaw[i]!);
       this.position.set(x, y, z);
       this.scale.setScalar(size);
-      batch.mesh.setMatrixAt(slot, this.matrix.compose(this.position, this.quaternion, this.scale));
+      batch.mesh.setMatrixAt(slot, this.matrix.compose(this.position, this.facingTurn, this.scale));
+      // The working part is moved in the shader, in the piece's own frame:
+      // it has to be told the turn, or the part moves as if the piece
+      // still stood the way it was modelled.
+      batch.turn.setXY(slot, Math.cos(this.yaw[i]!), Math.sin(this.yaw[i]!));
       // With motion off every mechanism rests as it was modelled.
       batch.fx.setXYZW(slot, motion ? this.work[i]! : -1, this.manner[i]!, present, size);
       shown[i * 4] = x;
@@ -2128,6 +2252,7 @@ export class SceneController {
       batch.mesh.instanceMatrix.needsUpdate = true;
       batch.tint.needsUpdate = true;
       batch.fx.needsUpdate = true;
+      batch.turn.needsUpdate = true;
     }
     ring.pos.needsUpdate = true;
     ring.color.needsUpdate = true;
@@ -2164,10 +2289,11 @@ export class SceneController {
     for (let i = 0; i < this.n; i++) {
       const present = this.labelNamed[i]!;
       const emphasis = this.labelEmphasis[i] === 1;
+      const out = clearance * this.labelRing[i]! * (layout.scales[i] ?? 1);
       this.scratch.set(
-        anchors[i * 3]!,
+        anchors[i * 3]! + out * this.nameToward[0],
         anchors[i * 3 + 1]!,
-        anchors[i * 3 + 2]! + clearance * this.labelRing[i]! * (layout.scales[i] ?? 1),
+        anchors[i * 3 + 2]! + out * this.nameToward[1],
       );
       const distance = this.scratch.distanceTo(eye);
       // Away from the camera a name fades out, unless it is the one in hand.
@@ -2200,7 +2326,8 @@ export class SceneController {
       const [w, h] = layer.sizeOf(i);
       // A heading keeps the place it was given; a name is hung off the rim.
       const [ax, ay] =
-        region.heading?.align ?? hang(ox * m[0]! + oz * m[2]!, ox * m[4]! + oz * m[6]!, w, h);
+        headingOf(region, this.upright && layout.mode === 'layers')?.align ??
+        hang(ox * m[0]! + oz * m[2]!, ox * m[4]! + oz * m[6]!, w, h);
       layer.set(
         i,
         (this.scratch.x * 0.5 + 0.5) * width,

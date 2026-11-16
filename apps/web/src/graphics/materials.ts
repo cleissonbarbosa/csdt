@@ -343,10 +343,11 @@ function mechanism(
  *           and `aAo`, how open each vertex is to the sky, baked when the
  *           piece was modelled.
  * Instance: `aTint` rgb — the piece colour, already decided by the scene
- *           (neutral when healthy, a signal colour when not) — and
+ *           (neutral when healthy, a signal colour when not) —
  *           `aFx` = (seconds its mechanism has worked or -1 for at rest,
  *           the state it works in from 0 healthy to 3 down,
- *           visibility, size).
+ *           visibility, size), and `aTurn` = (cosine, sine) of how far the
+ *           piece is turned about the vertical.
  */
 export function createPieceMaterial(
   theme: SceneTheme,
@@ -360,12 +361,18 @@ export function createPieceMaterial(
   const detail = saturate(part);
   const mark = saturate(part.sub(1));
 
-  // By the time this runs the instance has been placed and scaled. A piece
-  // is never turned, so what its mechanism adds only needs the piece's size,
-  // and the turned normal is already in world space.
+  // By the time this runs the instance has been placed, scaled and turned
+  // about the vertical. What its mechanism adds is worked out in the piece's
+  // own frame, so it needs the same turn and the piece's size; so does the
+  // normal, to be in world space. Left out, a turned piece moved its part
+  // as if it still stood the way it was modelled: a door swung out of the
+  // side of its gate, and every face was lit from the wrong quarter.
+  const turn = attribute('aTurn', 'vec2');
+  const about = (v: ShaderNode) =>
+    vec3(v.x.mul(turn.x).add(v.z.mul(turn.y)), v.y, v.z.mul(turn.x).sub(v.x.mul(turn.y)));
   const working = mechanism(mechanisms, fx.x, fx.y);
-  material.positionNode = positionLocal.add(working.shift.mul(fx.w));
-  const normal = normalize(varying(working.normal));
+  material.positionNode = positionLocal.add(about(working.shift).mul(fx.w));
+  const normal = normalize(varying(about(working.normal)));
 
   // Details are a neighbouring tone of the same piece; marks take the
   // contrasting "core" colour so a silhouette's defining feature stays readable.

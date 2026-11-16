@@ -106,6 +106,13 @@ export class LabelLayer {
   private spritesFor = '';
   /** How many names the last frame drew, for whoever measures the scene. */
   drawn = 0;
+  /**
+   * Headings are cut to their short form whatever room they have among
+   * themselves. Set where a heading stands beside its plate on a stage with
+   * no width to spare: there the full text would not touch another heading,
+   * it would run off the edge.
+   */
+  shortHeadings = false;
 
   /** `beside` is the scene's canvas; the names go in a canvas laid over it. */
   constructor(beside: HTMLElement) {
@@ -237,7 +244,9 @@ export class LabelLayer {
     }
     // Headings first: the tier they all fit at, decided among themselves.
     const visibleRegions = this.regions.filter((i) => this.presence[i]! > 0.03);
-    this.tier = clearTier(TIERS.map((_, t) => visibleRegions.map((i) => this.box(i, t))));
+    this.tier = this.shortHeadings
+      ? TIERS.length - 1
+      : clearTier(TIERS.map((_, t) => visibleRegions.map((i) => this.box(i, t))));
 
     // What was shown last frame is offered first, so that of two names of
     // equal weight the one already there stays.

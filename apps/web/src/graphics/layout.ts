@@ -54,6 +54,26 @@ export const VIEW: Record<LayoutMode, { azimuth: number; elevation: number }> = 
   dependencies: { azimuth: -0.3, elevation: 0.74 },
 };
 
+/**
+ * The overview on a stage that is taller than it is wide, a phone held
+ * upright. Drawn for the usual attitude, its four layers run across the
+ * picture, and a picture 390 pixels across left them a strip a hundred
+ * pixels tall with names larger than the pieces. Here the camera stands at
+ * the entry and looks along the path instead, so the layers stand one above
+ * another and fill the height: depth into the picture is still distance
+ * along the path, more plainly than before. It stands a little higher as
+ * well, so a piece does not cover the name of the one behind it.
+ */
+export const VIEW_UPRIGHT = { azimuth: -Math.PI / 2 + 0.3, elevation: 0.9 };
+
+/** How much taller than wide a stage has to be for the upright attitude. */
+export const UPRIGHT_ASPECT = 1.15;
+
+/** The attitude an arrangement is seen from, on a stage that is `upright` or not. */
+export function viewOf(mode: LayoutMode, upright: boolean): { azimuth: number; elevation: number } {
+  return upright && mode === 'layers' ? VIEW_UPRIGHT : VIEW[mode];
+}
+
 /** A plate: the surface a region's services stand on. */
 export interface RegionLayout {
   id: string;
@@ -79,7 +99,12 @@ export interface RegionLayout {
    * anchored, and where the middle of the text goes from there, in units of
    * its own width and height.
    */
-  heading?: { anchor: Vec3; align: [number, number] };
+  heading?: {
+    anchor: Vec3;
+    align: [number, number];
+    /** The same, for the attitude of a stage that is taller than wide. */
+    upright?: { anchor: Vec3; align: [number, number] };
+  };
 }
 
 export interface SceneLayout {
@@ -95,7 +120,31 @@ export interface SceneLayout {
   /** Centre and radius of a sphere enclosing everything. */
   center: Vec3;
   radius: number;
+  /**
+   * How far each piece is turned about the vertical so that the side its
+   * traffic arrives at faces where that traffic comes from (see `ARRIVAL`).
+   * Not a number for a piece that has no such side, or nothing arriving.
+   */
+  facing: Float32Array;
 }
+
+/**
+ * The side of a piece its traffic arrives at, as a direction on the ground
+ * in the piece's own frame, `[x, z]`. A gate is gone through, a shield is
+ * faced, a container is loaded at its door end and a queue is joined at its
+ * tail. The other pieces are the same from every side that matters, and
+ * keep the attitude they were modelled for.
+ *
+ * The gate and the shield used to stand as they were modelled, facing the
+ * viewer, whichever way requests came: the line of traffic went into the
+ * flank of the arch and out of the other.
+ */
+export const ARRIVAL: Partial<Record<ServiceType, readonly [number, number]>> = {
+  'api-gateway': [0, 1],
+  'auth-service': [0, 1],
+  container: [-1, 0],
+  'message-queue': [-1, 0],
+};
 
 /** Clear space between two neighbours in a line, and two lines of one tier. */
 const PIECE_CLEAR = 0.9;
@@ -394,7 +443,7 @@ function edgeCast(members: Indexed[]) {
   return { core, monitors, rest };
 }
 
-function layoutRegions(topology: Topology): SceneLayout {
+function layoutRegions(topology: Topology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   const links = neighboursOf(topology);
 
@@ -547,7 +596,7 @@ interface LanePlan {
   depth: number;
 }
 
-function layoutDependencies(topology: Topology): SceneLayout {
+function layoutDependencies(topology: Topology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   const links = neighboursOf(topology);
   const n = topology.nodes.length;
@@ -746,7 +795,7 @@ function layoutDependencies(topology: Topology): SceneLayout {
  * column stand side by side across the path. A plate is as deep as what
  * stands on it, like any other, and all of them are centred on the path.
  */
-function layoutLayers(topology: Topology): SceneLayout {
+function layoutLayers(topology: Topology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   for (let i = 0; i < scales.length; i++) scales[i] = layerScale(scales[i]!);
   const links = neighboursOf(topology);
@@ -800,6 +849,14 @@ function layoutLayers(topology: Topology): SceneLayout {
       heading: {
         anchor: [left + 0.3, 0, -halfDepth - NAME_GAP],
         align: [0.5, 0.5],
+        // Seen along the path the far rim is the next layer's near one, so
+        // nothing can stand above a layer. Its heading stands beside it
+        // instead, off the left rim and level with the layer's middle,
+        // clear of the pieces and of the names at their feet.
+        upright: {
+          anchor: [left + plan.width / 2, 0, -halfDepth - NAME_GAP * 0.5],
+          align: [-0.5, 0],
+        },
       },
     });
     left += plan.width + LAYER_GAP;
@@ -815,14 +872,113 @@ function layoutLayers(topology: Topology): SceneLayout {
   };
 }
 
+/**
+ * The pieces that are told by their face: an arch, a shield. Turned fully
+ * along a path that runs across the picture they show the viewer their
+ * edge, a slab and a blade, and the kind can no longer be read.
+ */
+export const TOLD_BY_FACE: ReadonlySet<ServiceType> = new Set(['api-gateway', 'auth-service']);
+
+/** The most such a face is turned away from the line of sight. */
+export const MOST_ASKEW = Math.PI / 4;
+
+/**
+ * Where a piece that is told by its face ends up facing. It turns toward
+ * its traffic (`facing`) as far as it can with its face, or the back of it,
+ * still no more than `MOST_ASKEW` from the line of sight (`sight`, the way
+ * to the camera on the ground, as an angle from `+z` toward `+x`). At that
+ * angle the line of traffic still goes through the opening of the gate,
+ * which is wider than the gate is deep, and the arch is still an arch.
+ */
+export function askew(facing: number, sight: number): number {
+  const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
+  const fromSight = wrap(facing - sight);
+  // Whichever of its two faces is the nearer to the viewer is the one kept in view.
+  const back = Math.abs(fromSight) > Math.PI / 2;
+  const off = back ? wrap(fromSight - Math.PI) : fromSight;
+  const held = Math.max(-MOST_ASKEW, Math.min(MOST_ASKEW, off));
+  return wrap(sight + (back ? Math.PI : 0) + held);
+}
+
+/** A layout before the pieces are turned to their traffic. */
+type Arrangement = Omit<SceneLayout, 'facing'>;
+
+/**
+ * Which way each piece with an arrival side is turned: toward what calls
+ * it, each caller counted once whatever its distance, or away from what it
+ * calls when nothing calls it. Callers are taken in the order of their ids,
+ * so the answer does not depend on the order the topology lists them in.
+ */
+function facingOf(topology: Topology, positions: Float32Array): Float32Array {
+  const n = topology.nodes.length;
+  const facing = new Float32Array(n).fill(Number.NaN);
+  const index = new Map(topology.nodes.map((node, i) => [node.id, i]));
+  const callers: number[][] = Array.from({ length: n }, () => []);
+  const callees: number[][] = Array.from({ length: n }, () => []);
+  for (const edge of topology.edges) {
+    const source = index.get(edge.source);
+    const target = index.get(edge.target);
+    if (source === undefined || target === undefined || source === target) continue;
+    callers[target]!.push(source);
+    callees[source]!.push(target);
+  }
+  const byId = (a: number, b: number) =>
+    topology.nodes[a]!.id < topology.nodes[b]!.id
+      ? -1
+      : topology.nodes[a]!.id > topology.nodes[b]!.id
+        ? 1
+        : 0;
+  topology.nodes.forEach((node, i) => {
+    const arrival = ARRIVAL[node.serviceType];
+    if (!arrival) return;
+    const toward = (others: number[]): [number, number] => {
+      let x = 0;
+      let z = 0;
+      for (const j of [...others].sort(byId)) {
+        const dx = positions[j * 3]! - positions[i * 3]!;
+        const dz = positions[j * 3 + 2]! - positions[i * 3 + 2]!;
+        const length = Math.hypot(dx, dz);
+        if (length < 1e-6) continue;
+        x += dx / length;
+        z += dz / length;
+      }
+      return [x, z];
+    };
+    let [x, z] = toward(callers[i]!);
+    if (Math.hypot(x, z) < 1e-3) {
+      const [ox, oz] = toward(callees[i]!);
+      x = -ox;
+      z = -oz;
+    }
+    if (Math.hypot(x, z) < 1e-3) return;
+    // A turn of `t` about the vertical takes `+z` toward `+x` by `t`.
+    facing[i] = Math.atan2(x, z) - Math.atan2(arrival[0], arrival[1]);
+  });
+  return facing;
+}
+
 export function computeLayout(topology: Topology, mode: LayoutMode): SceneLayout {
-  if (mode === 'layers') return layoutLayers(topology);
-  return mode === 'regions' ? layoutRegions(topology) : layoutDependencies(topology);
+  const layout =
+    mode === 'layers'
+      ? layoutLayers(topology)
+      : mode === 'regions'
+        ? layoutRegions(topology)
+        : layoutDependencies(topology);
+  return { ...layout, facing: facingOf(topology, layout.positions) };
+}
+
+/** A plate's heading as it is placed for the attitude in use, if it has one. */
+export function headingOf(
+  region: RegionLayout,
+  upright = false,
+): { anchor: Vec3; align: [number, number] } | undefined {
+  return (upright && region.heading?.upright) || region.heading;
 }
 
 /** The point beside a plate, off its rim on the outward side, where its name is anchored. */
-export function nameAnchor(region: RegionLayout): Vec3 {
-  if (region.heading) return region.heading.anchor;
+export function nameAnchor(region: RegionLayout, upright = false): Vec3 {
+  const heading = headingOf(region, upright);
+  if (heading) return heading.anchor;
   const [ox, oz] = region.outward;
   const reach =
     region.shape === 'disc'

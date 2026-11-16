@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { largeTopology, topology } from '@/test/fixtures';
 
 import {
+  ARRIVAL,
+  askew,
   bezierPoint,
   computeLayout,
   curveLength,
   edgeControl,
   hang,
+  MOST_ASKEW,
   nameAnchor,
   nodePosition,
+  TOLD_BY_FACE,
   VIEW,
   type RegionLayout,
   type SceneLayout,
@@ -54,6 +58,7 @@ describe('layout', () => {
       helios.nodes.forEach((node, i) => {
         const j = shuffled.nodes.findIndex((other) => other.id === node.id);
         expect(nodePosition(reordered, j)).toEqual(nodePosition(original, i));
+        expect(reordered.facing[j]).toEqual(original.facing[i]);
       });
     }
   });
@@ -292,6 +297,63 @@ describe('layout', () => {
       expect(Array.from(layout.positions).every(Number.isFinite)).toBe(true);
       expect(minimumSeparation(layout)).toBeGreaterThan(2.4);
     }
+  });
+});
+
+describe('pieces that have a side their traffic arrives at', () => {
+  const helios = topology();
+  const indexOf = (id: string) => helios.nodes.findIndex((n) => n.id === id);
+
+  it('turns that side to what calls the piece, wherever the arrangement puts it', () => {
+    for (const mode of ['regions', 'dependencies'] as const) {
+      const layout = computeLayout(helios, mode);
+      let gates = 0;
+      helios.nodes.forEach((node, i) => {
+        const arrival = ARRIVAL[node.serviceType];
+        // A piece that is the same from every side is not turned at all.
+        if (!arrival) {
+          expect(layout.facing[i]).toBeNaN();
+          return;
+        }
+        const callers = helios.edges.filter((edge) => edge.target === node.id);
+        if (callers.length !== 1) return;
+        const from = nodePosition(layout, indexOf(callers[0]!.source));
+        const at = nodePosition(layout, i);
+        const length = Math.hypot(from[0] - at[0], from[2] - at[2]);
+        // Where the arrival side points once the piece is turned: a turn
+        // about the vertical takes `+z` toward `+x`.
+        const turn = layout.facing[i]!;
+        const side = [
+          arrival[0] * Math.cos(turn) + arrival[1] * Math.sin(turn),
+          -arrival[0] * Math.sin(turn) + arrival[1] * Math.cos(turn),
+        ];
+        expect(side[0]).toBeCloseTo((from[0] - at[0]) / length, 4);
+        expect(side[1]).toBeCloseTo((from[2] - at[2]) / length, 4);
+        if (node.serviceType === 'api-gateway') gates += 1;
+      });
+      // Every region's gate has one caller, the edge router, and faces it.
+      expect(gates).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('names only kinds of service there are', () => {
+    const kinds = new Set(helios.nodes.map((node) => node.serviceType));
+    for (const kind of Object.keys(ARRIVAL)) expect(kinds).toContain(kind);
+    for (const kind of TOLD_BY_FACE) expect(ARRIVAL).toHaveProperty(kind);
+  });
+
+  it('holds a face no further from the line of sight than it can be read at', () => {
+    // Within reach, a gate faces its traffic exactly.
+    expect(askew(0.2, 0)).toBeCloseTo(0.2, 6);
+    expect(askew(-0.3 - MOST_ASKEW, -0.3)).toBeCloseTo(-0.3 - MOST_ASKEW, 6);
+    // A path across the picture: the gate turns as far as it may, no further.
+    expect(askew(-Math.PI / 2, -0.3)).toBeCloseTo(-0.3 - MOST_ASKEW, 6);
+    // From the other side of the picture it is the back that is held in view.
+    expect(askew(Math.PI / 2, -0.3)).toBeCloseTo(-0.3 + Math.PI - MOST_ASKEW, 6);
+    // Traffic that comes from behind the piece: its back is as good a face.
+    expect(askew(3.0, 0)).toBeCloseTo(3.0, 6);
+    expect(askew(2.0, 0)).toBeCloseTo(Math.PI - MOST_ASKEW, 6);
+    expect(askew(-2.0, 0)).toBeCloseTo(-Math.PI + MOST_ASKEW, 6);
   });
 });
 

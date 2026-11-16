@@ -1,7 +1,14 @@
 import { SERVICE_TYPES, TopologySchema } from '@aegis/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { computeLayout, nodePosition } from '@/graphics/layout';
+import {
+  computeLayout,
+  headingOf,
+  nameAnchor,
+  nodePosition,
+  VIEW,
+  viewOf,
+} from '@/graphics/layout';
 import * as fixtures from '@/test/fixtures';
 
 import {
@@ -178,5 +185,30 @@ describe('the overview', () => {
     expect(at('kind:microservice')).toBeLessThan(at('kind:database'));
     // The same topology always gives the same picture.
     expect(computeLayout(overview.topology, 'layers').positions).toEqual(layout.positions);
+  });
+
+  it('is seen along the path on a stage taller than wide, and only the overview is', () => {
+    expect(viewOf('layers', false)).toBe(VIEW.layers);
+    expect(viewOf('regions', true)).toBe(VIEW.regions);
+    expect(viewOf('dependencies', true)).toBe(VIEW.dependencies);
+    // The camera stands on the ground at the entry's side of the model, so
+    // the layers, which follow one another along x, run into the picture.
+    const { azimuth, elevation } = viewOf('layers', true);
+    expect(Math.sin(azimuth)).toBeLessThan(-0.9);
+    expect(elevation).toBeGreaterThan(VIEW.layers.elevation);
+
+    // There a heading stands beside its layer: off the rim that is on the
+    // left of the picture, level with the middle of the plate.
+    const layout = computeLayout(overview.topology, 'layers');
+    for (const region of layout.regions) {
+      const heading = headingOf(region, true)!;
+      expect(heading.anchor[0]).toBeCloseTo(region.center[0], 6);
+      expect(heading.anchor[2]).toBeLessThan(region.center[2] - region.halfDepth);
+      expect(heading.align[0]).toBeLessThan(0);
+      expect(nameAnchor(region, true)).toEqual(heading.anchor);
+      // The usual attitude keeps the place it had.
+      expect(nameAnchor(region)).toEqual(region.heading!.anchor);
+      expect(headingOf(region)).toBe(region.heading);
+    }
   });
 });

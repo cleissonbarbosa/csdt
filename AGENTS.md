@@ -371,7 +371,17 @@ everything drawn inside it and is fed through store subscriptions set up in
 - Snapshots are columnar: per-node and per-edge arrays aligned index for index
   with the topology.
 - `graphics/layout.ts` is a pure function of the topology, with no randomness
-  and no iteration to convergence.
+  and no iteration to convergence. It also says where each arrangement is
+  seen from (`VIEW`). On a stage taller than wide the overview alone is seen
+  along the path instead (`VIEW_UPRIGHT`, `viewOf`): `SceneController` turns
+  the pieces to face that attitude and places the names for it
+  (`placeNames`), so anything that depends on where the camera first stands
+  has to hold for both. A piece with a side its traffic arrives at
+  (`ARRIVAL`: gate, shield, container, queue) is turned toward what calls it
+  (`layout.facing`); a gate and a shield no further than `MOST_ASKEW` from
+  the line of sight, or they show their edge. The piece material is told
+  each piece's turn (`aTurn`), because a mechanism is worked out in the
+  piece's own frame: anything added to its vertex stage is turned with it.
 
 `window.__aegis` (`stats`, `projectNode`, `captureFrame`, `labels`) is the handle the
 E2E suite, `scripts/capture.mjs` and `scripts/benchmark.mjs` drive the scene

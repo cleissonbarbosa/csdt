@@ -144,6 +144,20 @@ export interface UiState {
   setCommandOpen: (open: boolean) => void;
   /** Clears state tied to a topology that is being replaced. */
   resetForTopology: () => void;
+  /** Clears what was read off a timeline that has been replaced by another. */
+  forgetTimeline: () => void;
+}
+
+/**
+ * What goes with the tracer when something else takes its place in
+ * `openPanel`: the path it drew on the model, and the sidebar it lived in
+ * unless a selection still has something to show there. Left behind, the
+ * path stood on the model with no card to say whose request it was, and the
+ * sidebar fell back to an overview nobody had asked for.
+ */
+function leavingTracer(state: UiState, next: PanelId | null): Partial<UiState> {
+  if (state.openPanel !== 'authorization' || next === 'authorization') return {};
+  return { tracedDecision: null, tracing: false, inspectorOpen: state.selection !== null };
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -225,14 +239,19 @@ export const useUi = create<UiState>((set) => ({
   // The tracer lives in the right sidebar: asking for it brings that forward.
   setPanel: (openPanel) =>
     set((s) => ({
+      ...leavingTracer(s, openPanel),
       openPanel,
-      inspectorOpen: openPanel === 'authorization' ? true : s.inspectorOpen,
+      ...(openPanel === 'authorization' ? { inspectorOpen: true } : {}),
     })),
   togglePanel: (panel) =>
-    set((s) => ({
-      openPanel: s.openPanel === panel ? null : panel,
-      inspectorOpen: panel === 'authorization' && s.openPanel !== panel ? true : s.inspectorOpen,
-    })),
+    set((s) => {
+      const openPanel = s.openPanel === panel ? null : panel;
+      return {
+        ...leavingTracer(s, openPanel),
+        openPanel,
+        ...(openPanel === 'authorization' ? { inspectorOpen: true } : {}),
+      };
+    }),
   setLeftTab: (leftTab) => set({ leftTab, explorerOpen: true }),
   setExplorerOpen: (explorerOpen) => set({ explorerOpen }),
   // Closing the sidebar also leaves the authorization tab that lives in it.
@@ -278,7 +297,11 @@ export const useUi = create<UiState>((set) => ({
     ),
   setLastDecision: (lastDecision) => set({ lastDecision }),
   openExperiment: (scenarioId) =>
-    set({ openPanel: 'experiment', experimentScenarioId: scenarioId ?? null }),
+    set((s) => ({
+      ...leavingTracer(s, 'experiment'),
+      openPanel: 'experiment',
+      experimentScenarioId: scenarioId ?? null,
+    })),
   acknowledgeIncident: (acknowledgedIncidentId) => set({ acknowledgedIncidentId }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),
   resetForTopology: () =>
@@ -292,6 +315,12 @@ export const useUi = create<UiState>((set) => ({
       inspectedIncidentId: null,
       lastDecision: null,
     }),
+  // A decision was Cedar's answer at a moment of a timeline, and an event is
+  // a line of one. With that timeline gone, the path would be drawn over a
+  // simulation the request was never part of, and an event's number would
+  // come to mean whichever event the new timeline gives it.
+  forgetTimeline: () =>
+    set({ tracedDecision: null, tracing: false, lastDecision: null, inspectedEventSeq: null }),
 }));
 
 // -- persisted settings ------------------------------------------------------

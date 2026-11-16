@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from 'react';
+
 import { RangeBar } from '@/components/ui/Sparkline';
 import { cn } from '@/lib/cn';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
 import { COLOR } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
+import { useUi } from '@/stores/ui';
 
 /** Colour for a value that is fine below `warn` and alarming above `alarm`. */
 function grade(value: number, warn: number, alarm: number): string | undefined {
@@ -121,44 +124,127 @@ export function Hud() {
   );
 }
 
+/** What one instrument takes of the bar, the gap between two, and the count of the rest. */
+const INSTRUMENT_WIDTH = 116;
+const INSTRUMENT_GAP = 16;
+const REST_WIDTH = 28;
+
+/**
+ * Which reading is said first where there is not room for all of them: the
+ * one further out of range, and between two as far out, failures before
+ * slowness before fullness before volume.
+ */
+const URGENCY: Record<PlatformSignal['key'], number> = { errors: 0, p95: 1, saturation: 2, rps: 3 };
+
+function byUrgency(a: PlatformSignal, b: PlatformSignal): number {
+  const alarm = (signal: PlatformSignal) => (signal.tone === COLOR.critical ? 0 : 1);
+  return alarm(a) - alarm(b) || URGENCY[a.key] - URGENCY[b.key];
+}
+
+/**
+ * How many of `count` instruments a row `room` pixels wide shows whole. When
+ * they do not all fit, room is kept to say how many were left out. A width
+ * that is not known yet leaves none out.
+ */
+export function instrumentsShown(count: number, room: number | null): number {
+  if (room === null) return count;
+  const whole = (width: number) =>
+    Math.max(0, Math.floor((width + INSTRUMENT_GAP) / (INSTRUMENT_WIDTH + INSTRUMENT_GAP)));
+  if (whole(room) >= count) return count;
+  return Math.min(count, whole(room - REST_WIDTH - INSTRUMENT_GAP));
+}
+
 /**
  * The dark cockpit applied to the top bar: an instrument is on show only
  * while its reading is outside the normal range. With the platform well this
  * renders nothing; the readings themselves are always in the overview.
+ *
+ * The bar has room for all of them on a wide screen and for one on a
+ * laptop's. Only whole instruments are drawn, the most urgent first, and the
+ * ones that do not fit are counted beside them: a reading that is out of
+ * range is never simply absent. The row asks the bar for the width of one
+ * instrument and that count, which the sentence beside it gives up.
  */
-export function Deviations() {
+export function Deviations({ className }: { className?: string }) {
   const signals = usePlatformSignals();
-  const abnormal = signals?.filter((signal) => signal.tone) ?? [];
+  const abnormal = (signals?.filter((signal) => signal.tone) ?? []).sort(byUrgency);
+  const row = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+  useEffect(() => {
+    const node = row.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    // Not laid out (a phone, where the row is not shown) is not "no room".
+    const measure = () => setRoom(node.clientWidth > 0 ? node.clientWidth : null);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const shown = instrumentsShown(abnormal.length, room);
+  const rest = abnormal.slice(shown);
+  const needs =
+    abnormal.length === 0
+      ? 0
+      : abnormal.length === 1
+        ? INSTRUMENT_WIDTH
+        : INSTRUMENT_WIDTH + INSTRUMENT_GAP + REST_WIDTH;
   return (
-    // One row, and only whole instruments: one that does not fit beside the
-    // others wraps out of sight instead of running under what is next to it.
-    // The gap between rows is taller than the row, so none of it shows.
-    <dl
-      className="flex h-[30px] flex-wrap content-start items-center gap-x-4 gap-y-10 overflow-hidden"
-      aria-label="Signals outside their normal range"
+    <div
+      ref={row}
+      className={cn('h-[30px] items-center overflow-hidden', className)}
+      style={{ minWidth: needs, gap: INSTRUMENT_GAP }}
     >
-      {abnormal.map((signal) => (
-        <div
-          key={signal.key}
-          className="min-w-[104px] shrink-0 animate-swap"
-          title={signal.label}
-          data-testid={`deviation-${signal.key}`}
-        >
-          <div className="flex items-baseline justify-between gap-3 whitespace-nowrap">
-            <dt className="caption">{signal.short}</dt>
-            <dd className="numeric text-xs font-bold" style={{ color: signal.tone }}>
-              {signal.value}
-            </dd>
+      <dl
+        className="flex items-center"
+        style={{ gap: INSTRUMENT_GAP }}
+        aria-label="Signals outside their normal range"
+      >
+        {abnormal.slice(0, shown).map((signal) => (
+          <div
+            key={signal.key}
+            className="shrink-0 animate-swap"
+            style={{ width: INSTRUMENT_WIDTH }}
+            title={signal.label}
+            data-testid={`deviation-${signal.key}`}
+          >
+            <div className="flex items-baseline justify-between gap-2 whitespace-nowrap">
+              <dt className="caption">{signal.short}</dt>
+              <dd className="numeric text-xs font-bold" style={{ color: signal.tone }}>
+                {signal.value}
+              </dd>
+            </div>
+            <RangeBar
+              value={signal.reading}
+              max={signal.max}
+              normal={signal.normal}
+              tone={signal.tone}
+              className="mt-1"
+            />
           </div>
-          <RangeBar
-            value={signal.reading}
-            max={signal.max}
-            normal={signal.normal}
-            tone={signal.tone}
-            className="mt-1"
-          />
-        </div>
-      ))}
-    </dl>
+        ))}
+      </dl>
+      {rest.length > 0 && (
+        <button
+          type="button"
+          className="numeric shrink-0 rounded-control px-1 text-xs font-bold transition-colors hover:bg-raised"
+          style={{ color: rest[0]!.tone }}
+          aria-label={`${rest.length} more ${rest.length === 1 ? 'signal' : 'signals'} outside the normal range: ${rest
+            .map((signal) => `${signal.label} ${signal.value}`)
+            .join(', ')}. Show the platform signals.`}
+          title={rest.map((signal) => `${signal.label} ${signal.value}`).join(', ')}
+          onClick={() => {
+            // The overview is the inspector with nothing selected.
+            const ui = useUi.getState();
+            ui.select(null);
+            ui.setPanel(null);
+            ui.setInspectorOpen(true);
+          }}
+          data-testid="deviations-more"
+        >
+          +{rest.length}
+        </button>
+      )}
+    </div>
   );
 }

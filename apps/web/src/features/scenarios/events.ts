@@ -31,3 +31,19 @@ export function foldEvents(events: SecurityEvent[]): LogEntry[] {
       : entry,
   );
 }
+
+/**
+ * Whether an event is Cedar's answer to a request the viewer made in the
+ * tracer. It is on the timeline like any other decision, and the engine
+ * marks a denial as a warning there, but it says nothing about how the
+ * platform is: the viewer asked and was answered.
+ */
+export function askedByViewer(event: SecurityEvent): boolean {
+  if (event.kind !== 'authz-decision') return false;
+  const details: unknown = event.details;
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    (details as { origin?: unknown }).origin === 'explorer'
+  );
+}

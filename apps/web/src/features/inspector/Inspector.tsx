@@ -18,7 +18,7 @@ import { EmptyState, Fold, Section, Stat } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
 import { RangeBar, Sparkline } from '@/components/ui/Sparkline';
 import { Hud } from '@/features/hud/Hud';
-import { foldEvents } from '@/features/scenarios/events';
+import { askedByViewer, foldEvents } from '@/features/scenarios/events';
 import { sceneHandle } from '@/graphics/handle';
 import { entityId, formatClock, formatMs, formatPercent, formatRate } from '@/lib/format';
 import { nodeLabel } from '@/lib/names';
@@ -485,14 +485,17 @@ function Overview({
   const events = useTelemetry((state) => state.events);
   const cursor = snapshot?.virtualTimeMs ?? Infinity;
   // What needs attention is what went wrong lately, not everything that ever
-  // did: alerts older than a minute and a half have had their moment.
+  // did: alerts older than a minute and a half have had their moment. A
+  // request the viewer had Cedar deny in the tracer is not one of them: it
+  // was listed here as a warning beside a bar that said "all normal".
   const alerts = useMemo(() => {
     const recent: SecurityEvent[] = [];
     for (let i = events.length - 1; i >= 0 && recent.length < 60; i--) {
       const event = events[i]!;
       if (event.virtualTimeMs > cursor) continue;
       if (cursor - event.virtualTimeMs > ALERT_WINDOW_MS) break;
-      if (event.severity === 'warning' || event.severity === 'critical') recent.push(event);
+      const loud = event.severity === 'warning' || event.severity === 'critical';
+      if (loud && !askedByViewer(event)) recent.push(event);
     }
     return foldEvents(recent).slice(0, 8);
   }, [events, cursor]);

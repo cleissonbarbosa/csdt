@@ -1,7 +1,7 @@
 import type { SecurityEvent, Severity } from '@aegis/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { foldEvents } from './events';
+import { askedByViewer, foldEvents } from './events';
 
 let seq = 0;
 function event(kind: string, severity: Severity, title: string): SecurityEvent {
@@ -61,5 +61,23 @@ describe('folding the event log', () => {
 
   it('returns nothing for nothing', () => {
     expect(foldEvents([])).toEqual([]);
+  });
+});
+
+describe('a decision the viewer asked for', () => {
+  it('is told apart from one the platform made', () => {
+    const asked = {
+      ...event('authz-decision', 'warning', 'Deny'),
+      details: { origin: 'explorer' },
+    };
+    const sampled = { ...event('authz-decision', 'notice', 'Deny'), details: { requestId: 'r1' } };
+    const inIncident = event('authz-decision', 'warning', 'Deny');
+    expect(askedByViewer(asked)).toBe(true);
+    expect(askedByViewer(sampled)).toBe(false);
+    expect(askedByViewer(inIncident)).toBe(false);
+    // Only a decision can be one: the same mark on anything else is not.
+    expect(
+      askedByViewer({ ...event('alert', 'warning', 'x'), details: { origin: 'explorer' } }),
+    ).toBe(false);
   });
 });

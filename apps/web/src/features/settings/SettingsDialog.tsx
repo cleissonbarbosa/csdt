@@ -73,7 +73,7 @@ export function SettingsDialog() {
       <h3 className="mb-1 text-xs font-bold text-ink">Appearance</h3>
       <Row
         label="Theme"
-        hint="Light for a lit room, night for a dark one. Both follow the same rule: colour means something is wrong."
+        hint="Light for a lit room, night for a dark one. Both follow the same rule: a colour is an answer, to you or to the data."
       >
         <Segmented
           label="Theme"
@@ -86,7 +86,7 @@ export function SettingsDialog() {
       <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Model</h3>
       <Row
         label="Topology layout"
-        hint="Cluster by cloud region, or lay services out by dependency tier."
+        hint="The overview by kind of service, or every service on its own: by cloud region, or by dependency tier."
       >
         <Segmented
           label="Topology layout"

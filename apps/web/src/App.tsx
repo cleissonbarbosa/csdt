@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
-import { useMinWidth } from '@/app/hooks';
+import { useMinWidth, useReportedHeight } from '@/app/hooks';
 import { IN_BROWSER } from '@/app/host';
 import { useAegisConnection } from '@/app/useAegisConnection';
 import { useUrlView } from '@/app/urlState';
@@ -50,8 +50,16 @@ const TOP_INSET = 28;
 const BOTTOM_INSET = 8;
 /** Under this width a panel takes the whole stage: nothing fits beside one. */
 const PANELS_FILL_UNDER = 640;
-/** What the guide's card needs of the stage's width, gutters included. */
-const GUIDE_ROOM = 336 + GUTTER * 2;
+/**
+ * How much of the stage's height a card may take there, so that what it is
+ * about stays in the picture under it.
+ */
+const CARD_SHARE_WHEN_NARROW = '52%';
+/** How wide the guide's card is, and what it needs of the stage with its gutters. */
+const GUIDE_WIDTH = 336;
+const GUIDE_ROOM = GUIDE_WIDTH + GUTTER * 2;
+/** The least width the model is left with beside the cards for it to be read. */
+const MODEL_ROOM = 320;
 /** What the scene's toolbar needs of the stage's width, its margins included. */
 const TOOLBAR_ROOM = 320;
 
@@ -70,7 +78,9 @@ function Sheet({
   width,
   label,
   compact,
+  share,
   foot,
+  onHeight,
   children,
 }: {
   side: 'left' | 'right';
@@ -78,14 +88,24 @@ function Sheet({
   width: number;
   label: string;
   compact?: boolean;
+  /** The most of the stage's height a compact card may take, as a CSS length. */
+  share?: string;
   /** Room to leave at the bottom of the stage, for the timeline. */
   foot: number;
+  /** Told how tall the card is while it is open, and zero once it is not. */
+  onHeight?: (height: number) => void;
   children: ReactNode;
 }) {
   const presence = usePresence(open);
+  const element = useReportedHeight<HTMLElement>(
+    open && onHeight !== undefined,
+    onHeight ?? ignore,
+  );
   if (!presence.mounted) return null;
+  const room = `calc(100% - ${GUTTER * 2 + foot}px)`;
   return (
     <aside
+      ref={element}
       className="sheet panel floating absolute z-20 flex flex-col overflow-hidden"
       data-side={side}
       data-state={presence.state}
@@ -96,7 +116,7 @@ function Sheet({
         width: `min(${width}px, calc(100% - ${GUTTER * 2}px))`,
         top: GUTTER,
         ...(compact
-          ? { maxHeight: `calc(100% - ${GUTTER * 2 + foot}px)` }
+          ? { maxHeight: share ? `min(${share}, ${room})` : room }
           : { bottom: GUTTER + foot }),
         [side]: GUTTER,
       }}
@@ -106,6 +126,8 @@ function Sheet({
     </aside>
   );
 }
+
+function ignore(): void {}
 
 /** The line under the active tab; it travels when the tab changes. */
 function TabMarker({ index, count }: { index: number; count: number }) {
@@ -305,10 +327,15 @@ export function App() {
   // foot and the panels end above it: a challenge is answered in a panel,
   // and the card must not cover what it asks for.
   const narrow = !useMinWidth(PANELS_FILL_UNDER);
-  const roomBeside = useMinWidth(left + right + GUIDE_ROOM);
+  const roomBeside = useMinWidth(left + right + GUIDE_ROOM + MODEL_ROOM);
   const guideAlongFoot = narrow || !roomBeside;
   const [guide, setGuide] = useState(0);
   const guideFoot = guideAlongFoot && guide > 0 ? guide + GUTTER : 0;
+  // Beside the panels the card stands on the model's side of them, and the
+  // model moves over for it as it does for a panel. It used to stay where it
+  // was, under the card: the first layer of the overview, and the edge's
+  // lane with its name, could not be seen while a challenge was open.
+  const guideBeside = !guideAlongFoot && guide > 0 ? GUIDE_WIDTH + GUTTER : 0;
   // The toolbar and the notices move over for the panels where the stage
   // has room for them in between. Where it has not (a phone with a panel
   // open, a tablet with one on each side) they were squeezed into what was
@@ -317,12 +344,32 @@ export function App() {
   const roomBetween = useMinWidth(left + right + TOOLBAR_ROOM);
   const beside = roomBetween ? { left, right } : { left: 0, right: 0 };
   const bottom = BOTTOM_INSET + foot + (orientation > 0 ? orientation + GUTTER : 0) + guideFoot;
+  // On a phone a card takes the width of the stage, so the model cannot move
+  // over beside it. It used to be asked to, and went out of the picture the
+  // moment a piece was selected. There the card keeps to the upper part of
+  // the stage and the model is framed in what is left under it.
+  const [card, setCard] = useState(0);
+  const onCard = useCallback((height: number) => setCard(Math.ceil(height / 8) * 8), []);
+  const under = narrow && inspectorOpen && card > 0;
+  const sceneLeft = narrow ? 0 : left + guideBeside;
+  const sceneRight = narrow ? 0 : right;
+  const sceneTop = under ? GUTTER + card : TOP_INSET;
   useEffect(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom });
-  }, [left, right, bottom, showScene, hasTopology]);
+    sceneHandle.current?.setViewInsets({
+      left: sceneLeft,
+      right: sceneRight,
+      top: sceneTop,
+      bottom,
+    });
+  }, [sceneLeft, sceneRight, sceneTop, bottom, showScene, hasTopology]);
   const onRuntime = useCallback(() => {
-    sceneHandle.current?.setViewInsets({ left, right, top: TOP_INSET, bottom });
-  }, [left, right, bottom]);
+    sceneHandle.current?.setViewInsets({
+      left: sceneLeft,
+      right: sceneRight,
+      top: sceneTop,
+      bottom,
+    });
+  }, [sceneLeft, sceneRight, sceneTop, bottom]);
 
   const unavailable =
     sceneError !== null
@@ -459,6 +506,8 @@ export function App() {
           width={RIGHT_WIDTH}
           foot={foot + guideFoot}
           compact
+          share={narrow ? CARD_SHARE_WHEN_NARROW : undefined}
+          onHeight={onCard}
           label={authorizationOpen ? 'Trace a request' : 'Inspector'}
         >
           <div className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}>
