@@ -42,6 +42,13 @@ AEGIS_WORKSPACE=<dir> cargo run -p aegis-server
 `pnpm dev` starts Vite plus a typecheck watch on the contracts; it does not
 start the server.
 
+The version, which a release is made from (see "Project rules"):
+
+```bash
+./scripts/version.sh              # print it; fails if a manifest states another
+./scripts/version.sh set 0.2.0    # write it everywhere; runs the exporter of contract samples
+```
+
 The static site, with the engine in the browser and no server:
 
 ```bash
@@ -491,6 +498,14 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   and an E2E test fails if it does.
 - **Publishing is a person's decision.** `.github/workflows/pages.yml`
   deploys the static site and runs only when started by hand.
+  `.github/workflows/release.yml` pushes the two container images and
+  creates a tagged GitHub release, but only for a version that has no tag
+  yet: the decision is the commit that changes the version, and no other
+  push publishes anything. `Cargo.toml` states the version (the server
+  reports it), and three `package.json` files, `Cargo.lock` and the health
+  sample repeat it. Change it with `./scripts/version.sh set <version>`,
+  never in one of them by hand, and never as part of other work: on `main`
+  that commit is a public release.
 - **Rust lints.** `unsafe` is forbidden and `dbg!` / `todo!` are denied.
   `unwrap()` outside tests is a Clippy warning, which CI's `-D warnings`
   turns into a failure. Request bodies deserialise into types that reject

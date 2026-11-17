@@ -308,6 +308,15 @@ docker compose up --build
 Open **http://localhost:8080**. No credentials, accounts, tokens or external
 services are involved.
 
+A [released version](#releases) runs from its published images, with nothing
+to build:
+
+```bash
+export AEGIS_SERVER_IMAGE=ghcr.io/cleissonbarbosa/aegis-server:latest
+export AEGIS_WEB_IMAGE=ghcr.io/cleissonbarbosa/aegis-web:latest
+docker compose up --no-build
+```
+
 Without Docker (Rust stable, Node ≥ 22.12, pnpm):
 
 ```bash
@@ -510,6 +519,27 @@ tests; the fallback test does not apply there). The last two suites need the
 engine module (`pnpm engine:build`) and run in their own CI job. One more Rust
 test compares the embedded engine with a real `cedar-agent` binary and is
 skipped unless `AEGIS_TEST_CEDAR_AGENT_BIN` is set.
+
+## Releases
+
+A release is made by changing the version, and by nothing else:
+
+```bash
+./scripts/version.sh set 0.2.0    # every manifest, the lockfile and the health sample
+```
+
+Once that commit has passed CI on `main`, the
+[release workflow](.github/workflows/release.yml) builds the two images from
+the commit CI tested, starts them together and asks the server for its
+version, and only then pushes them to the GitHub Container Registry as
+`ghcr.io/cleissonbarbosa/aegis-server` and `ghcr.io/cleissonbarbosa/aegis-web`,
+tagged with the version, its `MAJOR.MINOR` and `latest`. Last, it tags the
+commit `v0.2.0` and publishes a
+[GitHub release](https://github.com/cleissonbarbosa/csdt/releases) that lists
+each image's digest and the commits since the release before. A version with a
+suffix (`0.2.0-rc.1`) is published as a pre-release under its own tag and
+moves neither `latest` nor `0.2`. A push that leaves the version alone
+publishes nothing.
 
 ## Project layout
 

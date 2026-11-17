@@ -267,6 +267,15 @@ to reach, because there is no server.
 - Dependencies come from crates.io and npm only.
 - No secrets are needed to build, test or run; none are in the repository.
   `.env` files are git-ignored and `.env.example` contains no values.
+- A release (`.github/workflows/release.yml`) is built from the commit CI
+  tested, and only when the version in `Cargo.toml` has no tag yet. The two
+  jobs that hold a token that can write run no third-party action:
+  `actions/checkout`, then the runner's own `docker` and `gh`. One may write
+  packages and the other the tag and the release; neither holds the other's
+  permission, and no job triggered by a pull request holds either.
+- The images are started together and the server is asked for its version
+  before anything is pushed. A release lists each image's digest, so a
+  deployment can name `image@sha256:…` instead of a tag that moves.
 
 ## Deploying beyond localhost
 

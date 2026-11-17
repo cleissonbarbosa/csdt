@@ -1,0 +1,245 @@
+name: Release
+
+# Publishes a version of AEGIS: its two container images to the GitHub
+# Container Registry, then a tagged GitHub release that names them.
+#
+# The version is the one `Cargo.toml` states (`./scripts/version.sh`), which
+# is also what the server reports about itself. A run publishes only when
+# that version has no tag yet, so a release is made by changing the version
+# on `main` and by nothing else: after every other push the first job finds
+# the tag and the run ends there. It starts from a finished CI run and
+# releases the commit that run tested.
+#
+# Order matters: the tag is what marks a version as released, so it is made
+# last. A run that fails before it leaves nothing to undo and can be run
+# again ("Re-run failed jobs"), or is repeated by the next push.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One release at a time, and never cancelled part-way through.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # The commit CI tested. Everything here is built from it, not from `main`
+  # as it is by the time this runs.
+  SHA: ${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  plan:
+    name: Is there a version to release?
+    # A push to this repository that passed every check. The branch filter
+    # above is not enough: a pull request from a fork can come from a branch
+    # called `main` too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      previous: ${{ steps.plan.outputs.previous }}
+      images: ${{ steps.plan.outputs.images }}
+      tags: ${{ steps.plan.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+          # Every tag, and the history the release notes are read from.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare the version with the tags
+        id: plan
+        run: |
+          version=$(./scripts/version.sh)
+          if git rev-parse --quiet --verify "refs/tags/v$version" >/dev/null; then
+            echo "release=false" >>"$GITHUB_OUTPUT"
+            echo "v$version is already released, so there is nothing to do. A release is made by changing the version: \`./scripts/version.sh set <version>\`." >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # A version with a suffix (0.2.0-rc.1) is a pre-release: it gets its
+          # own tag and moves nothing. Any other must be the newest so far,
+          # because it takes `latest` and its MAJOR.MINOR with it.
+          prerelease=true
+          tags=$version
+          if [[ $version != *-* ]]; then
+            prerelease=false
+            tags="$version ${version%.*} latest"
+            newest=$(git tag --list 'v[0-9]*' | awk '!/-/ { print substr($0, 2) }' | sort --version-sort | tail -n 1)
+            if [[ -n $newest && $(printf '%s\n' "$newest" "$version" | sort --version-sort | tail -n 1) != "$version" ]]; then
+              echo "::error::Cargo.toml states $version, which is older than the newest release (v$newest)."
+              exit 1
+            fi
+          fi
+
+          {
+            echo "release=true"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$SHA" 2>/dev/null || true)"
+            echo "images=$REGISTRY/${GITHUB_REPOSITORY_OWNER,,}"
+            echo "tags=$tags"
+          } >>"$GITHUB_OUTPUT"
+          echo "Releasing v$version from $SHA." >>"$GITHUB_STEP_SUMMARY"
+
+  images:
+    name: Images · build, run, push
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      IMAGES: ${{ needs.plan.outputs.images }}
+    outputs:
+      server: ${{ steps.push.outputs.server }}
+      web: ${{ steps.push.outputs.web }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+      - name: Build
+        run: |
+          declare -A about=(
+            [server]='AEGIS server: the deterministic simulation and the Cedar decision point behind the API'
+            [web]='AEGIS web client, served by nginx, which also proxies the API of an aegis-server'
+          )
+          # A label left unset keeps the base image's answer: nginx's own page
+          # and licence would be read as this image's. The page is set to this
+          # repository and the licence to nothing.
+          for name in server web; do
+            docker build \
+              --file "apps/$name/Dockerfile" \
+              --tag "$IMAGES/aegis-$name:$VERSION" \
+              --provenance=false \
+              --label "org.opencontainers.image.title=aegis-$name" \
+              --label "org.opencontainers.image.description=${about[$name]}" \
+              --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              --label "org.opencontainers.image.url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              --label "org.opencontainers.image.licenses=" \
+              --label "org.opencontainers.image.version=$VERSION" \
+              --label "org.opencontainers.image.revision=$SHA" \
+              --label "org.opencontainers.image.created=$(git log -1 --format=%cI)" \
+              .
+          done
+      - name: Run the two together
+        # The images about to be pushed, started the way the README says a
+        # release is run.
+        run: |
+          export AEGIS_SERVER_IMAGE="$IMAGES/aegis-server:$VERSION"
+          export AEGIS_WEB_IMAGE="$IMAGES/aegis-web:$VERSION"
+          docker compose up --detach --no-build --wait --wait-timeout 120
+          curl --fail --silent --show-error http://127.0.0.1:8080/ | grep -q '<title>AEGIS'
+          # The server in the image answers with the version it is tagged as.
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health \
+            | jq --exit-status --arg version "$VERSION" '.status == "ok" and .version == $version'
+      - name: Logs
+        if: ${{ failure() }}
+        run: docker compose logs --no-color
+      - name: Stop
+        if: ${{ always() }}
+        run: docker compose down --volumes
+      - name: Push
+        id: push
+        env:
+          TAGS: ${{ needs.plan.outputs.tags }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          docker login "$REGISTRY" --username "$GITHUB_ACTOR" --password-stdin <<<"$GITHUB_TOKEN"
+          for name in server web; do
+            image="$IMAGES/aegis-$name"
+            for tag in $TAGS; do
+              docker tag "$image:$VERSION" "$image:$tag"
+              docker push "$image:$tag"
+            done
+            # What the registry now serves under the version, asked of it.
+            digest=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$image:$VERSION" | jq --raw-output .digest)
+            [[ $digest == sha256:* ]]
+            echo "$name=$digest" >>"$GITHUB_OUTPUT"
+          done
+      - name: Can anyone pull them?
+        # A package can start out private although the repository is public,
+        # and only a person can change that, in its settings. Ask the
+        # registry as a stranger and say so, instead of leaving a release
+        # that names images nobody else can pull.
+        run: |
+          docker logout "$REGISTRY"
+          for name in server web; do
+            if ! docker buildx imagetools inspect "$IMAGES/aegis-$name:$VERSION" >/dev/null 2>&1; then
+              echo "::warning title=aegis-$name is not public::$IMAGES/aegis-$name was pushed but cannot be pulled without signing in. Make the package public once: its page on GitHub → Package settings → Change visibility."
+            fi
+          done
+
+  release:
+    name: GitHub release
+    needs: [plan, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      IMAGES: ${{ needs.plan.outputs.images }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Write the notes
+        env:
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+          SERVER_DIGEST: ${{ needs.images.outputs.server }}
+          WEB_DIGEST: ${{ needs.images.outputs.web }}
+        run: |
+          {
+            echo "AEGIS $VERSION, built from $SHA after its checks passed."
+            echo
+            echo '## Run it'
+            echo
+            echo '```bash'
+            echo "curl --fail --location --remote-name $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/v$VERSION/docker-compose.yml"
+            echo "export AEGIS_SERVER_IMAGE=$IMAGES/aegis-server:$VERSION"
+            echo "export AEGIS_WEB_IMAGE=$IMAGES/aegis-web:$VERSION"
+            echo 'docker compose up --no-build    # then open http://localhost:8080'
+            echo '```'
+            echo
+            echo '## Images'
+            echo
+            echo '| Image | Digest |'
+            echo '| ----- | ------ |'
+            echo "| \`$IMAGES/aegis-server:$VERSION\` | \`$SERVER_DIGEST\` |"
+            echo "| \`$IMAGES/aegis-web:$VERSION\` | \`$WEB_DIGEST\` |"
+            echo
+            echo "## Changes${PREVIOUS:+ since $PREVIOUS}"
+            echo
+            git log --no-merges --format='- %s (%h)' "${PREVIOUS:+$PREVIOUS..}$SHA"
+          } >"$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >>"$GITHUB_STEP_SUMMARY"
+      - name: Tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+        run: |
+          gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --title "AEGIS $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --prerelease="$PRERELEASE"

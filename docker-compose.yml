@@ -2,6 +2,12 @@
 #
 #   docker compose up --build        then open http://localhost:8080
 #
+# A released version runs from its published images instead of a build:
+#
+#   export AEGIS_SERVER_IMAGE=ghcr.io/cleissonbarbosa/aegis-server:latest
+#   export AEGIS_WEB_IMAGE=ghcr.io/cleissonbarbosa/aegis-web:latest
+#   docker compose up --no-build
+#
 # Nothing here needs credentials or reaches outside the compose network.
 # Connected Mode is opt-in: see `.env.example` and docs/INTEGRATIONS.md.
 
@@ -10,7 +16,7 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    image: aegis-server:local
+    image: ${AEGIS_SERVER_IMAGE:-aegis-server:local}
     environment:
       AEGIS_BIND: 0.0.0.0:8787
       # Origins browsers will load the UI from (checked for CORS and the stream).
@@ -43,7 +49,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    image: aegis-web:local
+    image: ${AEGIS_WEB_IMAGE:-aegis-web:local}
     environment:
       AEGIS_UPSTREAM: server:8787
     depends_on:

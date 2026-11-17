@@ -27,6 +27,10 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: One version in every manifest
+        # The release workflow publishes this version; `Cargo.lock` and the
+        # health sample, which state it too, are held by the steps below.
+        run: ./scripts/version.sh
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
