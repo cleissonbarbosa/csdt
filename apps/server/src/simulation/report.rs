@@ -22,14 +22,18 @@ use serde_json::Value;
 
 use crate::domain::{
     Cause, CauseKind, Decision, EventKind, Health, IncidentReport, IncidentStatus, MetricSample,
-    OriginBasis, Peak, PrescribedEffect, Relationship, ReportBaseline, ReportDecision, ReportEvent,
-    ReportOrigin, ReportPhase, ReportTransition, SecurityEvent, Severity, SCHEMA_VERSION,
+    ObjectiveKind, OriginBasis, Peak, PrescribedEffect, Relationship, ReportBaseline,
+    ReportDecision, ReportEvent, ReportObjective, ReportOrigin, ReportPhase, ReportTransition,
+    SecurityEvent, Severity, SCHEMA_VERSION,
 };
 use crate::incidents::{ResolvedPhase, ResolvedScenario};
 
 use super::channels::ChannelKey;
+use super::engine::{ERROR_OBJECTIVE, LATENCY_OBJECTIVE_FACTOR};
 use super::math::round_to;
 use super::model::SimTopology;
+use super::timeline::METRIC_INTERVAL;
+use super::TICK_MS;
 
 /// Most transitions a phase, the propagation or the recovery lists.
 pub const MAX_LISTED: usize = 240;
@@ -764,6 +768,34 @@ pub fn build(input: &ReportInput<'_>, incident_id: &str) -> Option<IncidentRepor
         peak_p95_latency_ms: peak_of(during.iter().copied(), |s| s.p95_latency_ms),
         peak_unhealthy,
         mean_error_rate,
+        objectives: objectives_over(topo, &during),
         truncated,
     })
+}
+
+/// How long each of the platform's objectives was not met over the samples
+/// of an incident. A sample is a second of the simulation; one at or over
+/// the threshold is a second the objective was not met.
+fn objectives_over(topo: &SimTopology, during: &[MetricSample]) -> Vec<ReportObjective> {
+    let second = METRIC_INTERVAL * TICK_MS;
+    let over = |kind: ObjectiveKind, threshold: f64, figure: fn(&MetricSample) -> f64| {
+        let mut breached = during.iter().filter(|sample| figure(sample) >= threshold);
+        let first = breached.next();
+        ReportObjective {
+            kind,
+            threshold,
+            breached_ms: first.map_or(0, |_| (breached.count() as u64 + 1) * second),
+            first_breached_at_ms: first.map(|sample| sample.virtual_time_ms),
+        }
+    };
+    vec![
+        over(ObjectiveKind::ErrorRate, ERROR_OBJECTIVE, |sample| {
+            sample.error_rate
+        }),
+        over(
+            ObjectiveKind::LatencyP95,
+            round_to(topo.baseline_p95 * LATENCY_OBJECTIVE_FACTOR, 1),
+            |sample| sample.p95_latency_ms,
+        ),
+    ]
 }

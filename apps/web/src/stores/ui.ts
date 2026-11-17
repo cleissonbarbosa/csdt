@@ -45,7 +45,11 @@ export type PanelId =
   /** Saving, sharing and opening a session. */
   | 'session'
   /** Writing a scenario by hand. */
-  | 'scenario-editor';
+  | 'scenario-editor'
+  /** Who may do what: every request of the catalogue, asked of Cedar. */
+  | 'matrix'
+  /** Editing the Cedar policies in the page. */
+  | 'policies';
 export type LeftTab = 'explorer' | 'incidents';
 
 export interface Filters {
@@ -111,6 +115,12 @@ export interface UiState {
   lastDecision: AuthorizationDecision | null;
   /** The scenario a comparison is opened on. */
   experimentScenarioId: string | null;
+  /**
+   * The services a trial of a fault reached, while its result is on show:
+   * the model keeps them in front. Nothing about them is a state of the
+   * timeline in use; it is the answer to a question the viewer asked.
+   */
+  reach: string[] | null;
   /** The incident the viewer has already looked at; newer ones ask for attention. */
   acknowledgedIncidentId: string | null;
   commandOpen: boolean;
@@ -140,6 +150,7 @@ export interface UiState {
   setLastDecision: (decision: AuthorizationDecision | null) => void;
   /** Opens the comparison of an intervention, on a scenario if one is named. */
   openExperiment: (scenarioId?: string) => void;
+  setReach: (nodeIds: string[] | null) => void;
   acknowledgeIncident: (id: string | null) => void;
   setCommandOpen: (open: boolean) => void;
   /** Clears state tied to a topology that is being replaced. */
@@ -183,6 +194,7 @@ export const useUi = create<UiState>((set) => ({
   authorizationPreset: null,
   lastDecision: null,
   experimentScenarioId: null,
+  reach: null,
   acknowledgedIncidentId: null,
   commandOpen: false,
 
@@ -302,6 +314,7 @@ export const useUi = create<UiState>((set) => ({
       openPanel: 'experiment',
       experimentScenarioId: scenarioId ?? null,
     })),
+  setReach: (reach) => set({ reach }),
   acknowledgeIncident: (acknowledgedIncidentId) => set({ acknowledgedIncidentId }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),
   resetForTopology: () =>
@@ -314,6 +327,7 @@ export const useUi = create<UiState>((set) => ({
       inspectedEventSeq: null,
       inspectedIncidentId: null,
       lastDecision: null,
+      reach: null,
     }),
   // A decision was Cedar's answer at a moment of a timeline, and an event is
   // a line of one. With that timeline gone, the path would be drawn over a

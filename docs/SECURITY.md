@@ -68,6 +68,15 @@ Whichever way it arrives, a workspace is held to this:
   20 000 connections per topology, 512 policies, scenarios of at most 30
   virtual minutes. Files are parsed into typed structures that reject unknown
   fields, and numbers outside their range are refused before anything runs.
+- **A Compose file is read, not run.** A `docker-compose.yml` given as a
+  topology is parsed as text for its services, what each depends on, what is
+  published and the image names. No image is pulled, nothing is built or
+  started, no `env_file`, `extends` or `include` is followed, and no
+  variable is substituted. Two things the YAML parser does not bound are
+  checked before it is given the text: a file whose values nest more than 64
+  deep is refused, because the parser follows each level by calling itself,
+  and so is one whose aliases would write out to more than 100 000 values.
+  What comes out is a topology like any other, held to everything here.
 - **Data, not behaviour.** A scenario is a list of the eleven effects the
   engine understands, each a bounded number applied to a node or a connection
   of the model. No effect reads a file, opens a socket or runs anything, and
@@ -115,6 +124,16 @@ takes an outcome, and what each can make the server do is bounded.
 - **A comparison touches nothing.** `POST /demo/experiments/compare`
   simulates one scenario twice on timelines of its own, bounded the same
   way, and answers with both. The timeline in use is not changed.
+- **A trial touches nothing either.** `POST /demo/experiments/trial`
+  simulates the platform at rest twice, sixty seconds each, once with one
+  fault, and answers with what the engine recorded. The fault is held to
+  what a fault placed by hand is held to.
+- **Asking Cedar records nothing.** `POST /demo/authorization/explain` puts
+  each policy in force to one request by itself, and
+  `POST /demo/authorization/matrix` asks every request the catalogue
+  describes (at most 20 000, off the async workers). Neither is placed on
+  the timeline: there is no event, no decision in the list and no path on
+  the model. Both take at most 32 policy ids to leave out.
 - **A policy comparison applies nothing.** `POST /demo/workspace/diff`
   builds the uploaded files as a check does and has Cedar evaluate the
   catalogued requests, and every request the tracer can build (at most
@@ -132,7 +151,9 @@ takes an outcome, and what each can make the server do is bounded.
   written into the address as they change
   (`?arrangement=regions&select=node:use-auth`). They are identifiers of the
   platform on show, which the API serves to anyone who can reach it, and
-  opening such an address changes nothing on the server.
+  opening such an address changes nothing on the server. So does
+  `?challenge=<id>`, which opens the guide on one question; the questions
+  answered are kept in the browser's own storage and sent nowhere.
 
 ## Server
 
@@ -245,6 +266,19 @@ holds there unchanged. What is different is where it runs.
   set headers should send it, and `X-Content-Type-Options: nosniff`.
   The end-to-end suite of the static site runs under this policy and fails
   on any violation.
+
+- **It can be kept by the browser.** The build writes a service worker
+  (`sw.js`) that keeps the site's own files, so the site opens with no
+  network. It answers only for requests to its own origin that it was built
+  with a file for, fetches nothing from anywhere else, and keeps one cache,
+  named after the build, which the next build's worker replaces. The page
+  itself is asked of the network first, so a visitor who is online gets the
+  published build.
+- **It can be shown inside another page.** `?embed=1` leaves the bar out and
+  says in one line what this is. `&scenario=<id>` also starts an incident,
+  and only here: on a server the simulation is shared, and there an address
+  starts nothing. A host that can set headers and does not want the site
+  framed should send `frame-ancestors`.
 
 The site is static files. Publishing it shows the bundled, fictional
 platform to whoever opens it and nothing else: there is no state on a server

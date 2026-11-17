@@ -5,11 +5,13 @@ import { incidentReport, topology as sampleTopology } from '@/test/fixtures';
 
 import {
   bothClocks,
+  describeObjective,
   describeOrigin,
   describeOutcome,
   describePrescribed,
   explainCause,
   moments,
+  objectiveName,
   reportText,
   sinceStart,
 } from './report';
@@ -128,6 +130,23 @@ describe('an incident report in words', () => {
     // An incident that has not ended has no end to go to.
     expect(list.some((moment) => moment.id === 'end' || moment.id === 'recovered')).toBe(false);
     expect(list.some((moment) => moment.id === 'peak-errors')).toBe(true);
+  });
+
+  it('says how long each objective was not met, or that it was met throughout', () => {
+    const [errors, latency] = report.objectives;
+    expect(objectiveName(errors!)).toBe('Error rate under 5.00%');
+    expect(objectiveName(latency!)).toBe('Latency p95 under 417 ms');
+    // The sample's incident: ten of its seconds had one request in twenty failing.
+    expect(errors!.breachedMs).toBe(10_000);
+    expect(describeObjective(errors!, report)).toBe(
+      `not met for 0:10, first at ${sinceStart(report, errors!.firstBreachedAtMs!)}`,
+    );
+    expect(describeObjective(latency!, report)).toBe('met throughout');
+    // The text that is taken away says the same, and what kind of statement it is.
+    const text = reportText(report, topology);
+    expect(text).toContain('Objectives (observed)');
+    expect(text).toContain('  Error rate under 5.00%: not met for 0:10');
+    expect(text).toContain('  Latency p95 under 417 ms: met throughout');
   });
 
   it('can be taken away as text that says where its figures come from', () => {

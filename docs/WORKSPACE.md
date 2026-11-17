@@ -108,6 +108,7 @@ only saves. The API behind it:
 <workspace>/
   workspace.json           optional format version; omitted means version 1
   topologies/*.json         the platforms on offer
+  topologies/*.yml          … or a Compose file, read as one (see below)
   scenarios/*.json          incident scenarios
   recordings/*.json         prerecorded incidents
   cedar/policies.json       policies as a JSON list …
@@ -250,6 +251,36 @@ Constraints, each reported with the id involved:
 - Ids are 1 to 64 letters, digits, `-`, `_` or `.`, and unique.
 - Every connection joins two declared nodes; every node sits in a declared
   region; every role points at a node or a region.
+
+### From a Compose file
+
+A `docker-compose.yml` already says which services a platform has and which
+of them need which. Put one in `topologies/` (or drop it on the import
+dialog) and it is read as a topology:
+
+| From the file                                   | In the topology                                                                                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| each service                                    | a node named after it                                                                                                                                    |
+| its `image` (or, with none, its name)           | the node's type: `postgres`, `redis`… a database; `rabbitmq`, `kafka`… a queue; `nginx`, `traefik`… an API gateway; and so on. Anything else a container |
+| `depends_on` and `links`, also through `<<: *x` | a connection from the service to what it needs                                                                                                           |
+| `ports`                                         | a connection from `clients` to each service that publishes one; with none published, to each service nothing depends on                                  |
+| the top-level `name`, or the file's name        | the platform's id and name                                                                                                                               |
+
+What a Compose file does not say is how much traffic there is or how slow
+anything is, and a topology has to. Those figures are the converter's own
+defaults (100 requests a second from `clients`, a latency by type of
+service) and the topology's description says so. Nothing is pulled, built or
+run: the file is text. Treat the result as a first draft: import it, save it
+as one file from the same dialog, and edit the figures and the roles.
+
+The bundled scenarios ask for roles a Compose file may not have something
+to be (`securityMonitor`, `primaryAuthorizer`…). The converter names the
+ones it finds (the first API gateway, database, authentication service,
+authorizer and monitor) and a scenario that still cannot run says which
+role is missing. A file whose services depend on each other in a circle, or
+on a service it does not declare, is refused with the reason; so is one
+whose YAML nests more than 64 deep or whose aliases would write out to more
+than 100 000 values.
 
 ### Roles
 

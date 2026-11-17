@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     AuthorizationRequest, AuthzError, Decision, EngineInfo, EngineKind, PolicyDecision,
-    PolicyDecisionPoint, PolicyEffect, PolicyInfo,
+    PolicyDecisionPoint, PolicyEffect, PolicyInfo, PolicyStanding,
 };
 use crate::simulation::RequestTemplate;
 
@@ -461,6 +461,45 @@ impl CedarEngine {
         self.policies.iter().map(|p| p.info.clone()).collect()
     }
 
+    /// How each policy in force stands to a request: whether its scope
+    /// takes the request in, and whether the whole of it holds. Cedar is
+    /// asked both, of the policy by itself.
+    ///
+    /// A request that no policy permits is denied with nothing to show for
+    /// it: this is what says which permits were about the request and did
+    /// not hold, and which forbids were about it and did not bite.
+    pub fn standings(
+        &self,
+        request: &AuthorizationRequest,
+        disabled: &[String],
+    ) -> Result<Vec<PolicyStanding>, AuthzError> {
+        let cedar_request = cedar_request(request)?;
+        // Names a disabled policy that does not exist, as an evaluation would.
+        self.policy_set(disabled)?;
+        let mut standings = Vec::with_capacity(self.policies.len());
+        for loaded in &self.policies {
+            if disabled.contains(&loaded.info.id) {
+                continue;
+            }
+            standings.push(PolicyStanding {
+                policy_id: loaded.info.id.clone(),
+                effect: loaded.info.effect,
+                in_scope: self.allows_alone(&cedar_request, as_permit(&loaded.policy, true)?)?,
+                holds: self.allows_alone(&cedar_request, as_permit(&loaded.policy, false)?)?,
+            });
+        }
+        Ok(standings)
+    }
+
+    /// Whether a request is allowed when `policy` is the only one there is.
+    fn allows_alone(&self, request: &Request, policy: Policy) -> Result<bool, AuthzError> {
+        let mut set = PolicySet::new();
+        set.add(policy)
+            .map_err(|e| AuthzError::Protocol(e.to_string()))?;
+        let response = self.authorizer.is_authorized(request, &set, &self.entities);
+        Ok(response.decision() == CedarDecision::Allow)
+    }
+
     fn policy_set(&self, disabled: &[String]) -> Result<PolicySet, AuthzError> {
         for id in disabled {
             if !self.policies.iter().any(|p| &p.info.id == id) {
@@ -479,6 +518,46 @@ impl CedarEngine {
     }
 }
 
+/// A policy as a permit of its own, with its conditions or, `scope_only`,
+/// without them: what Cedar is asked so as to learn whether the policy takes
+/// a request in. A forbid is turned into a permit for the asking, because a
+/// forbid alone allows nothing whether it holds or not.
+///
+/// It goes through Cedar's JSON form of the policy, which keeps the scope
+/// and the conditions apart. Nothing of the policy is rewritten by hand.
+fn as_permit(policy: &Policy, scope_only: bool) -> Result<Policy, AuthzError> {
+    let unreadable = |what: String| AuthzError::Protocol(what);
+    let mut json = policy.to_json().map_err(|e| unreadable(e.to_string()))?;
+    let object = json
+        .as_object_mut()
+        .ok_or_else(|| unreadable("a policy is not an object in Cedar's JSON form".into()))?;
+    object.insert("effect".into(), "permit".into());
+    if scope_only {
+        object.insert("conditions".into(), serde_json::Value::Array(Vec::new()));
+    }
+    Policy::from_json(Some(PolicyId::new("standing")), json).map_err(|e| unreadable(e.to_string()))
+}
+
+/// The request as Cedar takes it.
+fn cedar_request(request: &AuthorizationRequest) -> Result<Request, AuthzError> {
+    validate_request(request)?;
+    let principal = parse_uid("principal", &request.principal)?;
+    let action = parse_uid("action", &request.action)?;
+    let resource = parse_uid("resource", &request.resource)?;
+    let context =
+        Context::from_json_value(serde_json::Value::Object(request.context.clone()), None)
+            .map_err(|e| AuthzError::InvalidRequest {
+                field: "context",
+                message: e.to_string(),
+            })?;
+    Request::new(principal, action, resource, context, None).map_err(|e| {
+        AuthzError::InvalidRequest {
+            field: "request",
+            message: e.to_string(),
+        }
+    })
+}
+
 impl PolicyDecisionPoint for CedarEngine {
     fn engine(&self) -> EngineInfo {
         EngineInfo {
@@ -492,23 +571,7 @@ impl PolicyDecisionPoint for CedarEngine {
         request: &AuthorizationRequest,
         disabled_policies: &[String],
     ) -> Result<PolicyDecision, AuthzError> {
-        validate_request(request)?;
-        let principal = parse_uid("principal", &request.principal)?;
-        let action = parse_uid("action", &request.action)?;
-        let resource = parse_uid("resource", &request.resource)?;
-        let context =
-            Context::from_json_value(serde_json::Value::Object(request.context.clone()), None)
-                .map_err(|e| AuthzError::InvalidRequest {
-                    field: "context",
-                    message: e.to_string(),
-                })?;
-        let cedar_request =
-            Request::new(principal, action, resource, context, None).map_err(|e| {
-                AuthzError::InvalidRequest {
-                    field: "request",
-                    message: e.to_string(),
-                }
-            })?;
+        let cedar_request = cedar_request(request)?;
         let policies = self.policy_set(disabled_policies)?;
         let response = self
             .authorizer
@@ -571,6 +634,122 @@ mod tests {
         assert_eq!(info.kind, EngineKind::EmbeddedCedar);
         let version = info.version.expect("version known");
         assert!(version.starts_with("4."), "unexpected version {version}");
+    }
+
+    /// How one policy stands to a request, as `(in scope, holds)`.
+    fn standing(engine: &CedarEngine, request: &AuthorizationRequest, id: &str) -> (bool, bool) {
+        let standings = engine.standings(request, &[]).expect("standings");
+        let found = standings
+            .iter()
+            .find(|s| s.policy_id == id)
+            .unwrap_or_else(|| panic!("no standing for {id}"));
+        (found.in_scope, found.holds)
+    }
+
+    #[test]
+    fn a_default_deny_shows_the_permit_that_was_about_it_and_did_not_hold() {
+        let engine = engine();
+        // A support agent refunding an order above the limit: nothing permits
+        // it, and Cedar gives no reason for a denial by default.
+        let big = request("bob", "refundOrder", BIG_ORDER, serde_json::json!({}));
+        let outcome = engine.evaluate(&big, &[]).expect("evaluates");
+        assert_eq!(outcome.decision, Decision::Deny);
+        assert!(outcome.determining_policies.is_empty());
+
+        // The refund policy is about this request and its condition fails.
+        assert_eq!(
+            standing(&engine, &big, "support-refund-limit"),
+            (true, false)
+        );
+        // The administrators' permit is not about a support agent at all.
+        assert_eq!(standing(&engine, &big, "admin-own-tenant"), (false, false));
+        // Another action's permit is out of scope whatever else is true.
+        assert_eq!(
+            standing(&engine, &big, "tenant-view-orders"),
+            (false, false)
+        );
+        // A forbid whose scope is everything is about it, and does not bite.
+        assert_eq!(
+            standing(&engine, &big, "forbid-cross-tenant"),
+            (true, false)
+        );
+
+        // Within the limit the same policy holds, and it is the reason given.
+        let small = request("bob", "refundOrder", ACME_ORDER, serde_json::json!({}));
+        assert_eq!(
+            standing(&engine, &small, "support-refund-limit"),
+            (true, true)
+        );
+        let outcome = engine.evaluate(&small, &[]).expect("evaluates");
+        assert_eq!(outcome.determining_policies, vec!["support-refund-limit"]);
+    }
+
+    #[test]
+    fn standings_agree_with_the_decision_on_every_catalogued_request() {
+        let engine = engine();
+        let catalog = AuthzCatalog::bundled().expect("catalogue");
+        let mut asked = 0;
+        for principal in &catalog.principals {
+            for action in &catalog.actions {
+                for resource in catalog
+                    .resources
+                    .iter()
+                    .filter(|r| r.resource_type == action.resource_type)
+                {
+                    let request = AuthorizationRequest {
+                        principal: principal.uid.clone(),
+                        action: action.uid.clone(),
+                        resource: resource.uid.clone(),
+                        context: serde_json::Map::new(),
+                    };
+                    let outcome = engine.evaluate(&request, &[]).expect("evaluates");
+                    let standings = engine.standings(&request, &[]).expect("standings");
+                    assert_eq!(standings.len(), engine.policies().len());
+                    let holds = |effect: PolicyEffect| {
+                        let mut ids: Vec<String> = standings
+                            .iter()
+                            .filter(|s| s.effect == effect && s.holds)
+                            .map(|s| s.policy_id.clone())
+                            .collect();
+                        ids.sort();
+                        ids
+                    };
+                    // Cedar's rule, read off the standings: a forbid that
+                    // holds denies; otherwise a permit that holds allows.
+                    let forbids = holds(PolicyEffect::Forbid);
+                    let permits = holds(PolicyEffect::Permit);
+                    let (decision, reasons) = if !forbids.is_empty() {
+                        (Decision::Deny, forbids)
+                    } else if !permits.is_empty() {
+                        (Decision::Allow, permits)
+                    } else {
+                        (Decision::Deny, Vec::new())
+                    };
+                    assert_eq!(outcome.decision, decision, "{request:?}");
+                    assert_eq!(outcome.determining_policies, reasons, "{request:?}");
+                    // A policy that holds is in scope; never the reverse.
+                    assert!(standings.iter().all(|s| s.in_scope || !s.holds));
+                    asked += 1;
+                }
+            }
+        }
+        assert!(asked > 20, "only {asked} requests in the catalogue");
+    }
+
+    #[test]
+    fn a_disabled_policy_has_no_standing() {
+        let engine = engine();
+        let small = request("bob", "refundOrder", ACME_ORDER, serde_json::json!({}));
+        let disabled = vec!["support-refund-limit".to_string()];
+        let standings = engine.standings(&small, &disabled).expect("standings");
+        assert_eq!(standings.len(), engine.policies().len() - 1);
+        assert!(standings
+            .iter()
+            .all(|s| s.policy_id != "support-refund-limit"));
+        assert_eq!(
+            engine.standings(&small, &["no-such-policy".to_string()]),
+            Err(AuthzError::UnknownPolicy("no-such-policy".into()))
+        );
     }
 
     #[test]

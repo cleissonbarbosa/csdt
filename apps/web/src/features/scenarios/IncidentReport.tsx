@@ -26,11 +26,13 @@ import {
   BASIS_HINT,
   BASIS_LABEL,
   bothClocks,
+  describeObjective,
   describeOrigin,
   describeOutcome,
   describePrescribed,
   explainCause,
   moments,
+  objectiveName,
   reportText,
   sinceStart,
   type Basis,
@@ -503,6 +505,36 @@ export function IncidentSummary({
             </p>
           )}
         </Section>
+
+        {report.objectives.length > 0 && (
+          <Section title="Objectives">
+            <ul className="space-y-1.5" data-testid="summary-objectives">
+              {report.objectives.map((objective) => (
+                <li
+                  key={objective.kind}
+                  className="text-xs leading-snug"
+                  data-objective={objective.kind}
+                  data-met={objective.breachedMs === 0}
+                >
+                  <span className="text-ink">{objectiveName(objective)}</span>
+                  <span
+                    className={
+                      objective.breachedMs === 0
+                        ? 'block text-ink-faint'
+                        : 'block font-bold text-ink'
+                    }
+                  >
+                    {describeObjective(objective, report)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="caption mt-2">
+              Observed: the objectives are the ones the engine alerts on, and the time each was not
+              met is its samples counted, one a second.
+            </p>
+          </Section>
+        )}
 
         {report.decisions.length > 0 && (
           <Section title="What Cedar decided">

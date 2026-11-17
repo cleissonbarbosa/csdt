@@ -27,6 +27,7 @@ describe('staging files for an import', () => {
         file('shop.json', '{"nodes":[],"edges":[]}'),
         file('shop.cedar', 'permit(principal, action, resource);'),
         file('schema.cedarschema', 'entity User;'),
+        file('docker-compose.yml', 'services: {}'),
         file('README.md', '# notes'),
         file('photo.PNG', 'binary'),
       ]),
@@ -35,6 +36,8 @@ describe('staging files for an import', () => {
       { path: 'shop.json', text: '{"nodes":[],"edges":[]}' },
       { path: 'shop.cedar', text: 'permit(principal, action, resource);' },
       { path: 'schema.cedarschema', text: 'entity User;' },
+      // A Compose file goes to the engine, which reads it as a topology.
+      { path: 'docker-compose.yml', text: 'services: {}' },
     ]);
     expect(skipped.map((entry) => entry.path)).toEqual(['README.md', 'photo.PNG']);
     expect(skipped[0]?.reason).toMatch(/not a \.json/);

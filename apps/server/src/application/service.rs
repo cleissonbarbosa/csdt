@@ -19,7 +19,7 @@ use crate::simulation::engine::{fault_fits, MAX_FAULT_RAMP_MS};
 use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
-use super::experiment::{self, Experiment};
+use super::experiment::{self, Experiment, Trial};
 use super::session::{self, SessionExport};
 use super::{Assets, Loaded};
 
@@ -583,6 +583,30 @@ impl SimulationService {
         rt.accumulator_ms = 0.0;
         self.broadcast_timeline(&mut rt, TimelineReason::Recording);
         Ok(rt.timeline.playback(rt.status, rt.speed))
+    }
+
+    /// Tries one fault on the platform at rest, on timelines of its own, on
+    /// the topology in use and with the server's seed. The timeline in use
+    /// is not touched: this is how a fault is looked at before it is placed.
+    pub fn try_fault(&self, effect: Effect, ramp_ms: u64) -> Result<Trial, ServiceError> {
+        effect.validate().map_err(ServiceError::InvalidFault)?;
+        if ramp_ms > MAX_FAULT_RAMP_MS {
+            return Err(ServiceError::InvalidFault(format!(
+                "rampMs must be at most {MAX_FAULT_RAMP_MS}, got {ramp_ms}"
+            )));
+        }
+        let (assets, topology_id) = {
+            let rt = self.lock();
+            (
+                Arc::clone(&rt.loaded.assets),
+                rt.timeline.topology().spec.id.clone(),
+            )
+        };
+        let world = assets
+            .world(&topology_id)
+            .ok_or(ServiceError::UnknownTopology(topology_id))?;
+        experiment::trial(world, &assets.decisions, self.seed, effect, ramp_ms)
+            .map_err(ServiceError::InvalidFault)
     }
 
     /// Runs a scenario twice on timelines of its own, on the topology in

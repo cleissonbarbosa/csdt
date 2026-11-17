@@ -6,18 +6,20 @@ use serde_json::{json, Value};
 
 use std::sync::Arc;
 
+use crate::application::access;
 use crate::application::diff::{compare, Diff};
-use crate::application::experiment::Experiment;
+use crate::application::experiment::{Experiment, Trial};
 use crate::application::session::SessionExport;
 use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
 use crate::authorization::{
     CatalogAction, CatalogContextKey, CatalogPrincipal, CatalogResource, CatalogTenant,
 };
 use crate::domain::{
-    AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, EngineInfo, EngineKind,
-    Incident, IncidentReport, IntegrationStatus, MetricsReport, PlaybackState, PolicyDecisionPoint,
-    PolicyInfo, RecordingSummary, Scenario, SecurityEvent, Severity, Topology, TopologySummary,
-    WorkspaceCheck, WorkspaceOrigin, WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
+    AccessMatrix, AuthorizationDecision, AuthorizationExplanation, AuthorizationRequest,
+    AuthzError, DataSource, EngineInfo, EngineKind, Incident, IncidentReport, IntegrationStatus,
+    MetricsReport, PlaybackState, PolicyDecisionPoint, PolicyInfo, RecordingSummary, Scenario,
+    SecurityEvent, Severity, Topology, TopologySummary, WorkspaceCheck, WorkspaceOrigin,
+    WorkspaceProblem, WorkspaceStatus, SCHEMA_VERSION,
 };
 use crate::incidents::recordings::Recording;
 use crate::incidents::Effect;
@@ -470,6 +472,29 @@ pub async fn experiment_compare(
     Ok(Json(experiment))
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TrialBody {
+    effect: Effect,
+    #[serde(default)]
+    ramp_ms: u64,
+}
+
+/// Tries one fault on the platform at rest and reports what the engine
+/// recorded: which services left normal, in what order, and how far the
+/// platform's figures went. The timeline in use is not touched.
+pub async fn experiment_trial(
+    State(state): State<AppState>,
+    body: Result<Json<TrialBody>, JsonRejection>,
+) -> ApiResult<Trial> {
+    let Json(body) = body?;
+    let service = state.service.clone();
+    let trial = off_the_workers(move || service.try_fault(body.effect, body.ramp_ms))
+        .await
+        .map_err(|()| internal("the trial could not be run"))??;
+    Ok(Json(trial))
+}
+
 // -- workspace --------------------------------------------------------------
 
 pub async fn workspace(State(state): State<AppState>) -> Json<WorkspaceStatus> {
@@ -734,7 +759,7 @@ pub async fn authorization_evaluate(
     body: Result<Json<EvaluateBody>, JsonRejection>,
 ) -> ApiResult<AuthorizationDecision> {
     let Json(body) = body?;
-    if body.disabled_policies.len() > 32 {
+    if body.disabled_policies.len() > MAX_DISABLED_POLICIES {
         return Err(ApiError::bad_request("too many disabled policies"));
     }
     let input = EvaluateInput {
@@ -771,4 +796,72 @@ pub async fn authorization_evaluate(
             )))
         }
     }
+}
+
+/// Most policies a caller may switch off for one question.
+const MAX_DISABLED_POLICIES: usize = 32;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExplainBody {
+    principal: String,
+    action: String,
+    resource: String,
+    #[serde(default)]
+    context: serde_json::Map<String, Value>,
+    #[serde(default)]
+    disabled_policies: Vec<String>,
+}
+
+/// One request taken policy by policy. It is the embedded engine that is
+/// asked, and nothing is recorded: no event, no decision in the list, no
+/// path on the model.
+pub async fn authorization_explain(
+    State(state): State<AppState>,
+    body: Result<Json<ExplainBody>, JsonRejection>,
+) -> ApiResult<AuthorizationExplanation> {
+    let Json(body) = body?;
+    if body.disabled_policies.len() > MAX_DISABLED_POLICIES {
+        return Err(ApiError::bad_request("too many disabled policies"));
+    }
+    let input = EvaluateInput {
+        request: AuthorizationRequest {
+            principal: body.principal,
+            action: body.action,
+            resource: body.resource,
+            context: body.context,
+        },
+        disabled_policies: body.disabled_policies,
+    };
+    state.service.validate_evaluation(&input)?;
+    let assets = state.service.assets();
+    Ok(Json(access::explain(&assets, &input)?))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MatrixBody {
+    #[serde(default)]
+    context: serde_json::Map<String, Value>,
+    #[serde(default)]
+    disabled_policies: Vec<String>,
+}
+
+/// Who may do what under one context: every request the catalogue describes,
+/// asked of the embedded engine. Nothing is recorded.
+pub async fn authorization_matrix(
+    State(state): State<AppState>,
+    body: Result<Json<MatrixBody>, JsonRejection>,
+) -> ApiResult<AccessMatrix> {
+    let Json(body) = body?;
+    if body.disabled_policies.len() > MAX_DISABLED_POLICIES {
+        return Err(ApiError::bad_request("too many disabled policies"));
+    }
+    let assets = state.service.assets();
+    // Up to a few thousand evaluations: CPU work, kept off the async workers.
+    let matrix =
+        off_the_workers(move || access::matrix(&assets, body.context, body.disabled_policies))
+            .await
+            .map_err(|()| internal("the access matrix could not be worked out"))??;
+    Ok(Json(matrix))
 }

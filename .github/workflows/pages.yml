@@ -39,6 +39,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build the engine module and the site
         run: pnpm build:static
+        env:
+          # Where the site will be: a link to it is shown with its address
+          # and one of the captured pictures, which have to be absolute.
+          AEGIS_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
       - name: The module answers as the server does
         run: pnpm test:engine
       - uses: actions/upload-pages-artifact@v4

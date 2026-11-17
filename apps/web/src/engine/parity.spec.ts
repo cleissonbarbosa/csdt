@@ -223,6 +223,18 @@ describe('the engine built for the browser', () => {
         resource: 'Ledger::"acme-ledger-2026"',
       }).body,
     );
+    produced.set(
+      'authorization-explanation',
+      post('/demo/authorization/explain', {
+        principal: 'User::"bob"',
+        action: 'Action::"refundOrder"',
+        resource: 'Order::"acme-ord-9000"',
+      }).body,
+    );
+    produced.set(
+      'access-matrix',
+      post('/demo/authorization/matrix', { context: { mfa: true } }).body,
+    );
     for (const provider of ['network-scanner', 'security-alerts']) {
       post(`/providers/${provider}/connect`, {});
     }
@@ -242,6 +254,13 @@ describe('the engine built for the browser', () => {
     produced.set('authorization-decisions', get('/demo/authorization/decisions'));
     produced.set('session', get('/session'));
     produced.set('experiment', post('/demo/experiments/compare', EXPERIMENT).body);
+    produced.set(
+      'trial',
+      post('/demo/experiments/trial', {
+        effect: { type: 'down', nodes: 'node:use-orders-db' },
+        rampMs: 1000,
+      }).body,
+    );
     produced.set('stream-snapshot', message(engine.open(clock)[1]!));
     const [replay] = engine.message('{"type":"resync","afterSeq":0}', clock);
     produced.set('stream-events', message(replay!));
@@ -287,6 +306,8 @@ describe('the engine built for the browser', () => {
     'control-response',
     'decision-allow',
     'decision-deny',
+    'authorization-explanation',
+    'access-matrix',
     'topology',
     'scenarios',
     'incidents',
@@ -296,6 +317,7 @@ describe('the engine built for the browser', () => {
     'authorization-decisions',
     'session',
     'experiment',
+    'trial',
     'stream-snapshot',
     'stream-timeline',
     'topology-stress-summary',
@@ -385,6 +407,16 @@ describe('every route, in the module', () => {
       ['GET', '/workspace/export'],
       ['GET', '/demo/authorization/catalog'],
       ['GET', '/demo/authorization/decisions'],
+      [
+        'POST',
+        '/demo/authorization/explain',
+        {
+          principal: 'User::"bob"',
+          action: 'Action::"refundOrder"',
+          resource: 'Order::"acme-ord-9000"',
+        },
+      ],
+      ['POST', '/demo/authorization/matrix', {}],
       ['GET', '/session'],
       ['POST', '/demo/scenarios/start', { scenarioId: 'regional-outage' }],
       ['GET', '/incidents/inc-001/report'],
@@ -396,6 +428,7 @@ describe('every route, in the module', () => {
           intervention: { effect: { type: 'down', nodes: 'node:use-search' }, atMs: 4000 },
         },
       ],
+      ['POST', '/demo/experiments/trial', { effect: { type: 'down', nodes: 'node:use-search' } }],
       ['POST', '/demo/playback/control', { action: 'setSpeed', speed: 4 }],
       ['POST', '/demo/playback/control', { action: 'pause' }],
       ['POST', '/demo/playback/control', { action: 'step' }],

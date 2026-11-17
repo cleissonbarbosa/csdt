@@ -208,11 +208,18 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       );
     };
     /** Hands the scene a topology and everything that is read against it. */
+    /** The services a trial reached, at the level being shown. */
+    const applyReach = () => {
+      const reach = useUi.getState().reach ?? [];
+      const overview = summary();
+      instance.setReached(overview ? projectNodeIds(overview, reach) : reach);
+    };
     const applyAll = () => {
       applyTopology();
       applySnapshot();
       applySelection();
       applyVisibility();
+      applyReach();
       if (useUi.getState().tracedDecision) applyTrace();
     };
 
@@ -245,6 +252,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
         }
         if (state.filters !== previous.filters) applyVisibility();
         if (state.tracedDecision !== previous.tracedDecision) applyTrace();
+        if (state.reach !== previous.reach) applyReach();
       }),
       useSettings.subscribe(() => instance.setOptions(sceneOptions(themeRef.current))),
     ];

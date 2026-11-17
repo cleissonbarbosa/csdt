@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -66,6 +67,77 @@ function staticSite(): Plugin {
 }
 
 /**
+ * The picture a link to the site is shown with, and the address it is a
+ * link to. Both have to be absolute, which a build cannot know by itself:
+ * they are written only when `AEGIS_SITE_URL` says where the site will be.
+ * The picture is one of the captures in `docs/assets`, taken from the
+ * running application by `scripts/capture-docs.sh`; none is drawn for this.
+ */
+const PREVIEW_IMAGE = path('../../docs/assets/overview.png');
+/** The name it is published under, beside the page. */
+const PREVIEW_FILE = 'preview.png';
+
+function linkPreview(): Plugin {
+  const site = process.env.AEGIS_SITE_URL?.trim().replace(/\/*$/, '/');
+  return {
+    name: 'aegis-link-preview',
+    apply: 'build',
+    generateBundle() {
+      if (!site || !existsSync(PREVIEW_IMAGE)) return;
+      this.emitFile({
+        type: 'asset',
+        fileName: PREVIEW_FILE,
+        source: readFileSync(PREVIEW_IMAGE),
+      });
+    },
+    transformIndexHtml() {
+      if (!site || !existsSync(PREVIEW_IMAGE)) return [];
+      return [
+        { tag: 'meta', attrs: { property: 'og:url', content: site }, injectTo: 'head' },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: `${site}${PREVIEW_FILE}` },
+          injectTo: 'head',
+        },
+      ];
+    },
+  };
+}
+
+/**
+ * The static site, kept by the browser so that it opens with no network.
+ * It makes no request but for its own files, so those files are all there
+ * is to keep: the worker is written with their names, which carry a hash of
+ * their content, under a cache named after all of them together. A new
+ * build is a new cache; the old one is dropped when the new worker takes
+ * over. The page itself is asked of the network first, so a visitor who is
+ * online gets the build that is published, and falls back on the kept one.
+ */
+function offline(): Plugin {
+  return {
+    name: 'aegis-offline',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      // Source maps and the picture a link is shown with are published, and
+      // the page asks for neither: they are not kept.
+      const files = Object.keys(bundle)
+        .filter((name) => !name.endsWith('.map') && name !== PREVIEW_FILE)
+        .sort();
+      // What `public/` holds is copied beside the bundle, not through it.
+      const kept = ['./', 'favicon.svg', 'manifest.webmanifest', ...files];
+      const version = createHash('sha256').update(kept.join('\n')).digest('hex').slice(0, 16);
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: readFileSync(path('./src/engine/offline.sw.js'), 'utf8')
+          .replace('__AEGIS_CACHE__', `aegis-${version}`)
+          .replace("'__AEGIS_FILES__'", JSON.stringify(kept)),
+      });
+    },
+  };
+}
+
+/**
  * `--mode static` builds the application around the engine compiled to
  * WebAssembly (`apps/wasm`) instead of the server: no API, no proxy, and
  * relative URLs so the result can be served from any path of any static
@@ -74,7 +146,12 @@ function staticSite(): Plugin {
 export default defineConfig(({ mode }) => {
   const inBrowser = mode === 'static';
   return {
-    plugins: [react(), tailwindcss(), ...(inBrowser ? [staticSite()] : [])],
+    plugins: [
+      react(),
+      tailwindcss(),
+      linkPreview(),
+      ...(inBrowser ? [staticSite(), offline()] : []),
+    ],
     base: inBrowser ? './' : '/',
     resolve: {
       alias: {

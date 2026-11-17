@@ -34,6 +34,10 @@ serde = { version = "1", features = ["derive"] }
 # which the determinism of a recording depends on.
 serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
+# A Compose file is read into a topology (`workspace/compose.rs`): nothing
+# else in the server is YAML. Without the legacy encodings it has no unsafe
+# dependency.
+yaml-rust2 = { version = "0.13", default-features = false }
 tower = { version = "0.5", features = ["util"] }
 tracing = "0.1"
 

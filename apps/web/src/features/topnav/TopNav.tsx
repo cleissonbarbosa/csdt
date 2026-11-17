@@ -8,6 +8,7 @@ import {
   Flag,
   FolderOpen,
   GitCompareArrows,
+  Grid3x3,
   History,
   KeyRound,
   List,
@@ -352,6 +353,12 @@ export function TopNav() {
               label: 'Trace a request through Cedar',
               icon: <KeyRound size={14} />,
               onSelect: () => useUi.getState().togglePanel('authorization'),
+            },
+            {
+              id: 'matrix',
+              label: 'Who may do what',
+              icon: <Grid3x3 size={14} />,
+              onSelect: () => useUi.getState().setPanel('matrix'),
             },
             {
               id: 'experiment',

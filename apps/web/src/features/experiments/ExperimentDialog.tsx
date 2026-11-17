@@ -28,6 +28,12 @@ import {
   placedAtMs,
   sameUntilPlaced,
   type InterventionKind,
+  lowestAt,
+  MAX_SWEEP,
+  parseSweep,
+  SWEEP_VALUES,
+  sweepOf,
+  type Sweep,
 } from '@/lib/experiment';
 import { formatClock, formatMs, formatPercent } from '@/lib/format';
 import { nodeLabel } from '@/lib/names';
@@ -274,6 +280,190 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
  * platform, not a population of clients outside it. The last such target is
  * the deepest one the scenario reaches, which is usually what it is about.
  */
+const SWEEP_W = 250;
+const SWEEP_H = 72;
+
+/**
+ * One measure of a sweep against the figure it was run at. A dot is a run
+ * the engine made; the line between two dots only joins them, and says
+ * nothing of the figures in between. The hairline is the incident as it is.
+ */
+function SweepChart({
+  sweep,
+  label,
+  measure,
+  format,
+  unit,
+}: {
+  sweep: Sweep;
+  label: string;
+  measure: (point: Sweep['baseline']) => number | null;
+  format: (value: number) => string;
+  unit: 'factor' | 'percent';
+}) {
+  const points = sweep.points.flatMap((point) => {
+    const value = measure(point);
+    return value === null ? [] : [{ at: point.value, value }];
+  });
+  const asItIs = measure(sweep.baseline);
+  if (points.length === 0) return null;
+  const low = Math.min(...points.map((point) => point.at));
+  const high = Math.max(...points.map((point) => point.at));
+  const top = Math.max(...points.map((point) => point.value), asItIs ?? 0, 1e-9);
+  const x = (at: number) =>
+    high === low ? SWEEP_W / 2 : 6 + ((at - low) / (high - low)) * (SWEEP_W - 12);
+  const y = (value: number) => SWEEP_H - 4 - (value / top) * (SWEEP_H - 14);
+  const figure = (at: number) => (unit === 'factor' ? `×${at}` : `${at}%`);
+  return (
+    <figure className="min-w-0">
+      <figcaption className="caption mb-1">
+        {label}, up to {format(top)}
+      </figcaption>
+      <svg
+        viewBox={`0 0 ${SWEEP_W} ${SWEEP_H}`}
+        className="h-[72px] w-full"
+        role="img"
+        aria-label={`${label} by figure: ${points
+          .map((point) => `${figure(point.at)} ${format(point.value)}`)
+          .join(', ')}${asItIs === null ? '' : `; as it is ${format(asItIs)}`}`}
+      >
+        {asItIs !== null && (
+          <line
+            x1={0}
+            x2={SWEEP_W}
+            y1={y(asItIs)}
+            y2={y(asItIs)}
+            stroke="var(--color-line-strong)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+        )}
+        <polyline
+          points={points
+            .map((point) => `${x(point.at).toFixed(1)},${y(point.value).toFixed(1)}`)
+            .join(' ')}
+          fill="none"
+          stroke="var(--color-ink)"
+          strokeWidth={1.25}
+        />
+        {points.map((point) => (
+          <circle
+            key={point.at}
+            cx={x(point.at)}
+            cy={y(point.value)}
+            r={2.5}
+            fill="var(--color-ink)"
+          />
+        ))}
+      </svg>
+      <div className="numeric flex justify-between text-[10px] text-ink-faint">
+        <span>{figure(low)}</span>
+        {high !== low && <span>{figure(high)}</span>}
+      </div>
+    </figure>
+  );
+}
+
+/** The same intervention at several figures: what each did, read from its run. */
+function SweepResults({ sweep, unit }: { sweep: Sweep; unit: 'factor' | 'percent' }) {
+  const figure = (value: number) => (unit === 'factor' ? `×${value}` : `${value}%`);
+  const error = (point: Sweep['baseline']) => point.peakErrorRate;
+  const latency = (point: Sweep['baseline']) => point.peakP95LatencyMs;
+  const calmest = lowestAt(sweep, error);
+  const rows = [
+    { key: 'as it is', point: sweep.baseline },
+    ...sweep.points.map((point) => ({ key: figure(point.value), point })),
+  ];
+  return (
+    <div className="mt-4 space-y-3 border-t border-line pt-4" data-testid="sweep-results">
+      <p className="text-xs leading-relaxed text-ink">
+        <span className="font-bold">The same change at {sweep.points.length} figures.</span> Each
+        row is a run of its own from the same seed; the first is the incident as it is.
+        {calmest !== null && (
+          <>
+            {' '}
+            The highest error rate was lowest at <span className="numeric">{figure(calmest)}</span>.
+          </>
+        )}
+      </p>
+      <table className="w-full border-collapse text-xs" data-testid="sweep-table">
+        <thead>
+          <tr className="border-b border-line-strong text-left">
+            <th scope="col" className="caption py-1 pr-2 font-normal">
+              Figure
+            </th>
+            <th scope="col" className="caption px-2 py-1 font-normal">
+              Highest error rate
+            </th>
+            <th scope="col" className="caption px-2 py-1 font-normal">
+              Highest latency p95
+            </th>
+            <th scope="col" className="caption px-2 py-1 font-normal">
+              Services affected
+            </th>
+            <th scope="col" className="caption py-1 pl-2 font-normal">
+              All back to normal
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ key, point }, i) => (
+            <tr
+              key={key}
+              className="border-b border-line last:border-b-0"
+              data-testid={`sweep-row-${i}`}
+            >
+              <th
+                scope="row"
+                className={
+                  i === 0
+                    ? 'py-1 pr-2 font-normal text-ink-dim'
+                    : 'numeric py-1 pr-2 font-bold text-ink'
+                }
+              >
+                {key}
+              </th>
+              <td className="numeric px-2 py-1 text-ink">
+                {point.peakErrorRate === null ? 'n/a' : formatPercent(point.peakErrorRate)}
+              </td>
+              <td className="numeric px-2 py-1 text-ink">
+                {point.peakP95LatencyMs === null ? 'n/a' : formatMs(point.peakP95LatencyMs)}
+              </td>
+              <td className="numeric px-2 py-1 text-ink">{point.affected}</td>
+              <td className="numeric py-1 pl-2 text-ink">
+                {point.affected === 0
+                  ? 'nothing was affected'
+                  : point.recoveredMs === null
+                    ? 'not within the run'
+                    : `+${formatClock(point.recoveredMs)}`}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SweepChart
+          sweep={sweep}
+          label="Highest error rate"
+          measure={error}
+          format={formatPercent}
+          unit={unit}
+        />
+        <SweepChart
+          sweep={sweep}
+          label="Highest latency p95"
+          measure={latency}
+          format={formatMs}
+          unit={unit}
+        />
+      </div>
+      <p className="caption">
+        A dot is a run; the line only joins them. The dashed line is the incident as it is.
+      </p>
+    </div>
+  );
+}
+
 function firstTarget(targets: string[], topology: Topology | null): string {
   const services = targets.filter(
     (id) => topology?.nodes.find((node) => node.id === id)?.serviceType !== 'external-client',
@@ -303,6 +493,10 @@ export function ExperimentDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Experiment | null>(null);
+  // The same change at several figures, and how far the runs have got.
+  const [range, setRange] = useState(SWEEP_VALUES.factor.join(', '));
+  const [sweep, setSweep] = useState<Sweep | null>(null);
+  const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
 
   const scenario = available.find((entry) => entry.id === scenarioId);
   // What the form asks, counted: an answer is shown only if the form is
@@ -311,6 +505,7 @@ export function ExperimentDialog() {
   const forget = () => {
     question.current += 1;
     setResult(null);
+    setSweep(null);
   };
   // Opening on a scenario takes it up, with the service it targets and a
   // moment a fifth of the way in: something to run as it stands. It is
@@ -387,6 +582,42 @@ export function ExperimentDialog() {
     }
   };
 
+  const figures = choice.unit === null ? null : parseSweep(range, choice.unit);
+  const runRange = async () => {
+    if (!scenario || !valid || choice.unit === null || figures === null) return;
+    setBusy(true);
+    setError(null);
+    question.current += 1;
+    const asking = question.current;
+    setResult(null);
+    setSweep(null);
+    const runs: { value: number; experiment: Experiment }[] = [];
+    try {
+      // One after another: each is two runs of the whole incident.
+      for (const [i, value] of figures.entries()) {
+        if (asking !== question.current) return;
+        setProgress({ done: i, of: figures.length });
+        const experiment = await api.compareIntervention({
+          scenarioId: scenario.id,
+          intervention: {
+            effect: interventionEffect(kind, nodeId, value),
+            atMs: Math.round(at * 1000),
+            rampMs: RAMP_MS,
+          },
+        });
+        runs.push({ value, experiment });
+      }
+      if (asking === question.current) setSweep(sweepOf(runs));
+    } catch (cause) {
+      if (asking === question.current) {
+        setError(cause instanceof ApiError ? cause.message : 'The comparison could not be run.');
+      }
+    } finally {
+      setProgress(null);
+      setBusy(false);
+    }
+  };
+
   const regions = topology?.regions ?? [];
   return (
     <Dialog
@@ -432,6 +663,7 @@ export function ExperimentDialog() {
             const next = INTERVENTIONS.find((entry) => entry.kind === event.target.value)!;
             setKind(next.kind);
             setValue(String(next.value));
+            setRange(next.unit === null ? '' : SWEEP_VALUES[next.unit].join(', '));
             forget();
           }}
           data-testid="experiment-kind"
@@ -519,7 +751,37 @@ export function ExperimentDialog() {
           )}
         </div>
       </form>
+      {choice.unit !== null && (
+        <form
+          className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void runRange();
+          }}
+          data-testid="sweep-form"
+        >
+          <TextField
+            label={`Or the same change at several figures (${choice.unit === 'factor' ? 'multipliers' : 'percentages'})`}
+            value={range}
+            onChange={(event) => {
+              setRange(event.target.value);
+              setSweep(null);
+            }}
+            hint={`Up to ${MAX_SWEEP}, separated by commas. Each is run against the incident as it is.`}
+            className="min-w-[16rem] flex-1"
+            data-testid="sweep-values"
+          />
+          <Button
+            type="submit"
+            disabled={!valid || busy || figures === null}
+            data-testid="sweep-run"
+          >
+            {progress ? `Running ${progress.done + 1} of ${progress.of}…` : 'Run them all'}
+          </Button>
+        </form>
+      )}
       {result && <Results experiment={result} onWatch={() => useUi.getState().setPanel(null)} />}
+      {sweep && choice.unit !== null && <SweepResults sweep={sweep} unit={choice.unit} />}
     </Dialog>
   );
 }

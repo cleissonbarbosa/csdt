@@ -144,6 +144,28 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
+    // Two questions that leave the timeline as it was: a denial taken policy
+    // by policy, and every request the catalogue describes.
+    save(
+        "authorization-explanation",
+        post(
+            "/demo/authorization/explain",
+            json!({
+                "principal": "User::\"bob\"",
+                "action": "Action::\"refundOrder\"",
+                "resource": "Order::\"acme-ord-9000\"",
+            }),
+        )
+        .await?,
+    )?;
+    save(
+        "access-matrix",
+        post(
+            "/demo/authorization/matrix",
+            json!({ "context": { "mfa": true } }),
+        )
+        .await?,
+    )?;
     for provider in ["network-scanner", "security-alerts"] {
         post_dynamic(&state, &format!("/providers/{provider}/connect")).await?;
     }
@@ -196,6 +218,15 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
     save(
         "experiment",
         post("/demo/experiments/compare", experiment_request()).await?,
+    )?;
+    // One fault tried on the platform at rest, also on timelines of its own.
+    save(
+        "trial",
+        post(
+            "/demo/experiments/trial",
+            json!({ "effect": { "type": "down", "nodes": "node:use-orders-db" }, "rampMs": 1000 }),
+        )
+        .await?,
     )?;
     let events = state.service.events(0, 5, None, None);
     save(

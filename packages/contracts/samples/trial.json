@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "1.0",
+  "dataSource": "synthetic",
+  "topologyId": "helios-commerce",
+  "seed": 42,
+  "fault": {
+    "description": "unreachable",
+    "nodeIds": [
+      "use-orders-db"
+    ],
+    "atMs": 4000,
+    "rampMs": 1000,
+    "effect": {
+      "type": "down",
+      "nodes": "node:use-orders-db"
+    }
+  },
+  "durationMs": 64000,
+  "affected": [
+    {
+      "nodeId": "use-orders-db",
+      "atMs": 800,
+      "health": "down",
+      "worst": "down"
+    },
+    {
+      "nodeId": "use-gateway",
+      "atMs": 1000,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "use-cart",
+      "atMs": 1000,
+      "health": "degraded",
+      "worst": "critical"
+    },
+    {
+      "nodeId": "use-orders",
+      "atMs": 1000,
+      "health": "critical",
+      "worst": "critical"
+    },
+    {
+      "nodeId": "use-inventory",
+      "atMs": 1000,
+      "health": "critical",
+      "worst": "critical"
+    },
+    {
+      "nodeId": "use-order-worker",
+      "atMs": 1000,
+      "health": "critical",
+      "worst": "critical"
+    },
+    {
+      "nodeId": "clients-na",
+      "atMs": 1600,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "clients-eu",
+      "atMs": 1600,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "clients-apac",
+      "atMs": 1600,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "partner-api",
+      "atMs": 1600,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "edge-router",
+      "atMs": 1600,
+      "health": "degraded",
+      "worst": "degraded"
+    },
+    {
+      "nodeId": "use-order-events",
+      "atMs": 5200,
+      "health": "degraded",
+      "worst": "critical"
+    }
+  ],
+  "before": {
+    "errorRate": 0.0,
+    "p95LatencyMs": 167.7
+  },
+  "peak": {
+    "errorRate": 0.0522,
+    "p95LatencyMs": 448.7
+  },
+  "recording": {
+    "id": "trial",
+    "name": "The platform at rest, with unreachable",
+    "description": "Trial of one fault on helios-commerce at rest, with seed 42.",
+    "topologyId": "helios-commerce",
+    "seed": 42,
+    "durationMs": 64000,
+    "commands": [
+      {
+        "atMs": 4000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "down",
+            "nodes": "node:use-orders-db"
+          },
+          "rampMs": 1000
+        }
+      }
+    ]
+  }
+}

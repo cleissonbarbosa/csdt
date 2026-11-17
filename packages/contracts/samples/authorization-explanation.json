@@ -1,0 +1,73 @@
+{
+  "request": {
+    "principal": "User::\"bob\"",
+    "action": "Action::\"refundOrder\"",
+    "resource": "Order::\"acme-ord-9000\"",
+    "context": {}
+  },
+  "decision": "deny",
+  "determiningPolicies": [],
+  "errors": [],
+  "disabledPolicies": [],
+  "policies": [
+    {
+      "policyId": "tenant-view-orders",
+      "effect": "permit",
+      "inScope": false,
+      "holds": false
+    },
+    {
+      "policyId": "support-refund-limit",
+      "effect": "permit",
+      "inScope": true,
+      "holds": false
+    },
+    {
+      "policyId": "support-view-customers",
+      "effect": "permit",
+      "inScope": false,
+      "holds": false
+    },
+    {
+      "policyId": "finance-view-ledger",
+      "effect": "permit",
+      "inScope": false,
+      "holds": false
+    },
+    {
+      "policyId": "finance-export-ledger-mfa",
+      "effect": "permit",
+      "inScope": false,
+      "holds": false
+    },
+    {
+      "policyId": "admin-own-tenant",
+      "effect": "permit",
+      "inScope": false,
+      "holds": false
+    },
+    {
+      "policyId": "forbid-cross-tenant",
+      "effect": "forbid",
+      "inScope": true,
+      "holds": false
+    },
+    {
+      "policyId": "forbid-suspended",
+      "effect": "forbid",
+      "inScope": true,
+      "holds": false
+    },
+    {
+      "policyId": "forbid-destructive-outside-change-window",
+      "effect": "forbid",
+      "inScope": false,
+      "holds": false
+    }
+  ],
+  "engine": {
+    "kind": "embedded-cedar",
+    "version": "4.14.1"
+  },
+  "dataSource": "synthetic"
+}

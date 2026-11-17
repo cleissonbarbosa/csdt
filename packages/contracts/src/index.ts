@@ -647,6 +647,22 @@ export const ReportDecisionSchema = z.object({
 });
 export type ReportDecision = z.infer<typeof ReportDecisionSchema>;
 
+/**
+ * One of the platform's objectives over an incident: the figure it holds the
+ * platform under, and how long it was not met. The objectives are the ones
+ * the engine's own detection rules alert on; the time is counted from the
+ * samples it recorded, one a second.
+ */
+export const ReportObjectiveSchema = z.object({
+  kind: z.enum(['error-rate', 'latency-p95']),
+  /** A share of requests for the error rate; milliseconds for latency. */
+  threshold: z.number().nonnegative(),
+  breachedMs: count,
+  /** When it first was not met, on the simulation clock. */
+  firstBreachedAtMs: count.nullable(),
+});
+export type ReportObjective = z.infer<typeof ReportObjectiveSchema>;
+
 export const IncidentReportSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   dataSource: DataSourceSchema,
@@ -686,6 +702,8 @@ export const IncidentReportSchema = z.object({
   /** Most services not normal at the same time. */
   peakUnhealthy: PeakSchema.nullable(),
   meanErrorRate: fraction.nullable(),
+  /** The platform's objectives, and how long each was not met. */
+  objectives: z.array(ReportObjectiveSchema),
   truncated: z.boolean(),
 });
 export type IncidentReport = z.infer<typeof IncidentReportSchema>;
@@ -776,6 +794,51 @@ export interface ExperimentRequest {
   intervention: { effect: FaultEffect; atMs: number; rampMs?: number };
 }
 
+/**
+ * What one fault does to the platform at rest, tried on timelines of its
+ * own: the same quiet run twice from one seed, the second time with the
+ * fault. A service is listed because the engine recorded it leaving its
+ * normal state in the run with the fault and not in the run without.
+ */
+export const TrialSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  topologyId: z.string(),
+  seed: count,
+  fault: z.object({
+    description: z.string(),
+    nodeIds: z.array(z.string()),
+    /** On the trial's own clock. */
+    atMs: count,
+    rampMs: count,
+    effect: EffectSchema,
+  }),
+  durationMs: count,
+  /** In the order they first left normal, timed from the fault being placed. */
+  affected: z.array(
+    z.object({
+      nodeId: z.string(),
+      atMs: count,
+      /** What it became when it first left normal. */
+      health: HealthSchema,
+      /** The worst it was at any time after. */
+      worst: HealthSchema,
+    }),
+  ),
+  /** The platform just before the fault was placed. */
+  before: z.object({ errorRate: fraction, p95LatencyMs: z.number().nonnegative() }),
+  /** The worst each figure got afterwards. */
+  peak: z.object({ errorRate: fraction, p95LatencyMs: z.number().nonnegative() }),
+  /** What reproduces the run with the fault. */
+  recording: RecordingSchema,
+});
+export type Trial = z.infer<typeof TrialSchema>;
+
+export interface TrialRequest {
+  effect: FaultEffect;
+  rampMs?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Authorization
 // ---------------------------------------------------------------------------
@@ -826,6 +889,60 @@ export const AuthorizationDecisionSchema = z.object({
   dataSource: DataSourceSchema,
 });
 export type AuthorizationDecision = z.infer<typeof AuthorizationDecisionSchema>;
+
+/**
+ * How one policy stands to one request. Both facts are Cedar's own: the
+ * policy was evaluated by itself, and once more with its conditions left out.
+ */
+export const PolicyStandingSchema = z.object({
+  policyId: z.string(),
+  effect: z.enum(['permit', 'forbid']),
+  /** Whether the policy's scope takes the request in, whatever its conditions say. */
+  inScope: z.boolean(),
+  /** Whether the whole policy holds for the request: scope and conditions. */
+  holds: z.boolean(),
+});
+export type PolicyStanding = z.infer<typeof PolicyStandingSchema>;
+
+/** A request explained policy by policy. Asking for one records nothing. */
+export const AuthorizationExplanationSchema = z.object({
+  request: AuthorizationRequestSchema,
+  decision: z.enum(['allow', 'deny']),
+  determiningPolicies: z.array(z.string()),
+  errors: z.array(z.string()),
+  /** Policies left out of the evaluation; they have no standing. */
+  disabledPolicies: z.array(z.string()),
+  policies: z.array(PolicyStandingSchema),
+  engine: EngineInfoSchema,
+  dataSource: DataSourceSchema,
+});
+export type AuthorizationExplanation = z.infer<typeof AuthorizationExplanationSchema>;
+
+/** One request of the access matrix and Cedar's answer to it. */
+export const AccessCellSchema = z.object({
+  principal: z.string(),
+  action: z.string(),
+  resource: z.string(),
+  decision: z.enum(['allow', 'deny']),
+  determiningPolicies: z.array(z.string()),
+});
+export type AccessCell = z.infer<typeof AccessCellSchema>;
+
+/**
+ * Who may do what: every principal, action and resource of the catalogue
+ * that go together, each asked of Cedar under one context.
+ */
+export const AccessMatrixSchema = z.object({
+  context: z.record(z.string(), z.unknown()),
+  disabledPolicies: z.array(z.string()),
+  /** In the catalogue's order: by principal, then action, then resource. */
+  cells: z.array(AccessCellSchema),
+  /** Said when the catalogue is too large to ask in one go; then `cells` is empty. */
+  note: z.string().nullable(),
+  engine: EngineInfoSchema,
+  dataSource: DataSourceSchema,
+});
+export type AccessMatrix = z.infer<typeof AccessMatrixSchema>;
 
 export const PolicyInfoSchema = z.object({
   id: z.string(),

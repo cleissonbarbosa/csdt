@@ -157,7 +157,8 @@ domain`.
 - `integrations`: opt-in adapters and fixture parsers. Every outbound target
   goes through `guard.rs`.
 - `workspace`: sorts files into the parts of a workspace, checks each and
-  lays them over a set of sources. `load` reads the directory (or bundle
+  lays them over a set of sources. `workspace/compose.rs` reads a Compose
+  file as a topology. `load` reads the directory (or bundle
   file) named by `AEGIS_WORKSPACE` once, before the server listens, and is
   the only file I/O in the server. `from_files` does the same for files
   already in memory and touches nothing; the import route calls it, so a file
@@ -167,8 +168,10 @@ domain`.
   everything immutable, built from them once at start-up. `diff` compares two
   built `Assets` (policies, catalogued requests, scenario flows and the
   access matrix); it evaluates with each side's Cedar engine and decides
-  nothing itself. `experiment` runs one scenario twice on timelines of its
-  own, the second time with one fault placed; `session` writes the timeline
+  nothing itself. `access` puts questions to Cedar that are recorded nowhere (one request
+  policy by policy, every request of the catalogue). `experiment` runs one
+  scenario twice on timelines of its own, the second time with one fault
+  placed, and `trial` does the same to the platform at rest; `session` writes the timeline
   in use out as a recording. `Loaded` pairs a set of sources with the `Assets` built
   from it; `SimulationService` keeps the one it started with (what a reset
   returns to and an import is laid over) and the one in use.
@@ -203,6 +206,30 @@ Things that are easy to break:
   (placed by hand) or `unattributed`. A new relation is added there with a
   test in `tests/insight.rs`; a cause is never chosen because it is
   plausible. The interface words it in `lib/report.ts` and adds nothing.
+- **A policy's standing is Cedar's answer, not a reading of the policy.**
+  `CedarEngine::standings` puts each policy to the request by itself, as it
+  is and with its conditions left out, both made from Cedar's own JSON form
+  of the policy. Nothing in the server or the client parses a policy to say
+  why it did not apply. A test holds the standings of every catalogued
+  request to the decision Cedar gave; keep it passing when Cedar is
+  upgraded.
+- **Asking is not recording.** `explain`, `matrix` and `trial` place nothing
+  on the timeline: no command, no event, no decision. They are bounded
+  (`MATRIX_LIMIT`, `MAX_DISABLED_POLICIES`, `TRIAL_MS`), and the matrix and
+  the trial run through `off_the_workers`.
+- **An objective is an alert rule's threshold.** `ERROR_OBJECTIVE` and
+  `LATENCY_OBJECTIVE_FACTOR` in `simulation/engine.rs` are what the
+  detection rules alert on and what `report::objectives_over` counts the
+  samples against. They are one pair of constants on purpose; the
+  interface calls them objectives, never an SLO.
+- **A Compose file is text.** `workspace/compose.rs` reads services,
+  `depends_on`, `links`, `ports` and the image name, and nothing else: it
+  pulls, builds and resolves nothing. Every figure it writes is a default
+  of its own and the topology's description says so. The YAML parser bounds
+  neither nesting in the block style, which it follows by calling itself,
+  nor what aliases expand to: `document()` checks both first
+  (`MAX_YAML_DEPTH`, `MAX_YAML_VALUES`), and no YAML may reach the parser
+  any other way. Without the first, one request ends the process.
 - **A session, like a recording, cannot state an outcome.**
   `Recording::validate_session` refuses `recordDecision` and `importEvents`,
   and `session::export` leaves them out and counts them. An experiment
@@ -389,6 +416,26 @@ everything drawn inside it and is fed through store subscriptions set up in
   the line of sight, or they show their edge. The piece material is told
   each piece's turn (`aTurn`), because a mechanism is worked out in the
   piece's own frame: anything added to its vertex stage is turned with it.
+
+What the viewer asked to see reaches the scene through `stores/ui.ts`: the
+selection, the traced request, and `reach`, a set of service ids a card
+wants kept in front (a fault tried before it is placed, a service's
+exposure). `SceneController.setReached` treats it as a selection's path is
+treated; it is the viewer's blue, never a state colour, because nothing has
+happened to those services.
+
+The address carries three things besides the view: `?challenge=<id>` opens
+the guide on one challenge (`features/guide/GuideCard.tsx`), `?embed=1`
+leaves out the bar (`app/embed.ts`, `features/topnav/EmbedBar.tsx`), and
+with it `&scenario=<id>` starts an incident, on the static site only: on a
+server the simulation is shared and an address must start nothing.
+
+The static build also writes a service worker and a link preview
+(`vite.config.ts`: `offline()` from `src/engine/offline.sw.js`,
+`linkPreview()` from `AEGIS_SITE_URL` and `docs/assets/overview.png`). The
+worker keeps the build's own files and fetches nothing else; the static
+Playwright suite blocks service workers except in the one test that is
+about them, so a cached file never answers for a missing one.
 
 `window.__aegis` (`stats`, `projectNode`, `captureFrame`, `labels`) is the handle the
 E2E suite, `scripts/capture.mjs` and `scripts/benchmark.mjs` drive the scene

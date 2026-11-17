@@ -169,6 +169,21 @@ errors, latency, services affected, time to recover. It says exactly what
 changed, down to the one command the runs differ by, and either run can be
 put on the timeline to watch.
 
+One figure is one answer, so the same change can be run at several: up to
+eight values of its one number (a capacity of ×0.5, ×1, ×1.5, ×2, ×3), each
+a run of its own from the same seed, tabled and charted against the incident
+as it is, with the figure at which the highest error rate was lowest said in
+a sentence.
+
+A fault can be tried before it is placed. **Try one first** simulates the
+platform at rest twice, once with the fault, and lists the services that
+would leave normal and when, with the rest of the model set back; nothing is
+put on the timeline until you place it.
+
+A report also says for how long the platform was outside its two objectives
+(error rate, p95 latency). They are the thresholds the engine's own
+detection rules alert on, and the time is its samples, counted.
+
 <table>
   <tr>
     <td width="50%"><img src="docs/assets/incident-explained.png" alt="A cascading failure under way in the overview, with its summary beside the model: the moments to go back to, the origin on the scenario's word, and the services that left their normal state in order, each line tagged as prescribed by the scenario or modelled from a dependency" /></td>
@@ -193,6 +208,25 @@ to something else, with what changed. Keep one result and evaluate again to
 set two side by side: the decision on each, the policies that determine it,
 and in what the two configurations differ.
 
+- **Why not?** Under a decision, every policy in force has a line: it holds,
+  it is about this request but its condition does not hold, or it is not
+  about this request at all. Cedar names no policy for a denial by default,
+  so each policy is put to the request by itself, as it is and with its
+  conditions left out; the lines are Cedar's answers, and the permit that
+  came nearest is said first.
+- **Who can do what.** The access matrix asks Cedar every request the
+  catalogue describes, principals down and actions across, under a context
+  and with any policies switched off, and marks the cells that changed.
+  Any cell opens in the tracer.
+- **Edit the policies.** The policies in force open as Cedar text. As you
+  write they are checked by the engine, and what Cedar would decide
+  differently is listed before anything is applied. Applied, they are an
+  import like any other, undone with a click.
+- **Exposure.** A service's card follows its connections all the way:
+  everything it could open a connection toward, the shortest way to it from
+  outside, and how Cedar answers the requests that end at it. It is what
+  the topology allows, not a claim that an attack would succeed.
+
 **Time travel**
 
 A virtual clock with play, pause, step, seek, 0.5×–4× and replay. Seeking
@@ -212,9 +246,12 @@ always a link to the view.
 **Guided challenges**
 
 A question about the platform, answered by using it: find where a cascade
-begins, find where a flood is stopped, make Cedar allow an export it denied.
-The answer is checked against the model itself (the incident's record,
-Cedar's decision), and so is the hint a wrong answer gets.
+begins, find where a flood is stopped, make Cedar allow an export it denied,
+find the rule that stops a contractor, the region that goes dark, the
+deletion nobody may make. The answer is checked against the model itself
+(the incident's record, Cedar's decision), and so is the hint a wrong answer
+gets. The card keeps count of the ones you have answered, in your browser
+and nowhere else, and each has a link that opens the application on it.
 
 **Your own platform**
 
@@ -231,7 +268,10 @@ flows stop because of it, and can fail a pipeline when a decision changes; the
 import dialog asks the same of the files you staged, against the ones in use,
 before anything is applied. A scenario can also be written in the interface:
 phases, effects placed by role, region or service, the events it announces,
-checked by the engine as you write and saved as the file it is. It is still a simulation:
+checked by the engine as you write and saved as the file it is. A
+`docker-compose.yml` is read as a topology too: its services, what each
+depends on and what is published, with the traffic and latency figures the
+file does not hold filled in by defaults that say so. It is still a simulation:
 the figures on your topology are computed, and labelled synthetic. See
 [docs/WORKSPACE.md](docs/WORKSPACE.md) and the six-service
 [example](examples/corner-shop).
@@ -250,6 +290,11 @@ sequence that produced the contract samples and requires the same output,
 value for value. Importing your own files works there too, and stays in the
 tab. What needs a network stays with the server: the live adapters, a
 simulation shared between viewers and a workspace read at start-up.
+
+Once opened, the site is kept by the browser and opens again with no network
+at all. It can also be shown inside another page: `?embed=1` leaves out the
+bar and says in one line what this is, and `&scenario=ddos-surge` starts an
+incident in it.
 
 **Signals with their range**
 
@@ -501,20 +546,20 @@ pnpm test:engine            # the module against the server's own output
 pnpm e2e:static             # Playwright against the static site, no server
 ```
 
-| Suite       | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ----------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rust        |   208 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, incident reports and what each line of one rests on, comparing an intervention, sessions, the boundary of the engine built for the browser                                                                                                                                                                                                                                                                                                                                                                                             |
-| Contracts   |    68 | Every zod schema against samples exported by the server binary; what a report, a comparison and a session may and may not carry; the published JSON Schemas against the bundled files and the examples                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Web         |   400 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, placing names without overlap, stores, stream client, event folding, command search, stale Cedar results, report wording, scenario files, challenges, session links, interface, the engine's client and transport                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| End to end  |    26 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, a fault placed by hand, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, the first visit, a stale Cedar result and two side by side, the playback bar on a phone, the bar and a challenge on a phone, the overview upright on a phone and in the picture under a card, names that never overlap, an incident explained and summarised, an intervention compared, a session saved and brought back, the address following the view, a scenario written in the editor, a guided challenge, policies compared before they are applied, no-GPU fallback |
-| Engine      |    32 | The built WebAssembly module, loaded in Node: 27 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Static site |     7 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, what it shows when the engine cannot load, and an incident compared with an intervention and read back                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Suite       | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust        |   223 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, incident reports and what each line of one rests on, comparing an intervention, sessions, the boundary of the engine built for the browser, a request explained policy by policy and the access matrix, a fault tried before it is placed, how long the objectives were not met, Compose files read as topologies and the two bounds on their YAML                                                                                                                                                                                                                                                                                                                                                                         |
+| Contracts   |    71 | Every zod schema against samples exported by the server binary; what a report, a comparison and a session may and may not carry; the published JSON Schemas against the bundled files and the examples; an explanation, an access matrix and a trial                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Web         |   446 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, placing names without overlap, stores, stream client, event folding, command search, stale Cedar results, report wording, scenario files, challenges, session links, interface, the engine's client and transport, policy standings, the access matrix, policies as Cedar text, exposure, the same change at several figures, objectives, embedding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| End to end  |    29 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, a fault placed by hand, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, the first visit, a stale Cedar result and two side by side, the playback bar on a phone, the bar and a challenge on a phone, the overview upright on a phone and in the picture under a card, names that never overlap, an incident explained and summarised, an intervention compared, a session saved and brought back, the address following the view, a scenario written in the editor, a guided challenge, policies compared before they are applied, a denial taken policy by policy with the access matrix and policies edited in the page, a fault tried before it is placed, a challenge opened from a link and a service's exposure, no-GPU fallback |
+| Engine      |    35 | The built WebAssembly module, loaded in Node: 30 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Static site |     8 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, what it shows when the engine cannot load, and an incident compared with an intervention and read back, and opening again with no network on the files the browser kept                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-All 741 pass locally. The end-to-end suite runs the real server and a production
+All 812 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
-incident is under way. The same suite passes on a real GPU through WebGPU (24
+incident is under way. The same suite passes on a real GPU through WebGPU (28
 tests; the fallback test does not apply there). The last two suites need the
 engine module (`pnpm engine:build`) and run in their own CI job. One more Rust
 test compares the embedded engine with a real `cedar-agent` binary and is
@@ -564,6 +609,7 @@ scripts             Screenshot and benchmark runners
 - A topology editor in the interface, and injected flows in the scenario
   editor (both are files today, read from a [workspace](docs/WORKSPACE.md)).
 - True orthographic projection as an option, with its own picking and zoom.
+- The interface in other languages; it is in English only.
 - Sessions that carry the decisions asked for by hand, re-evaluated on
   opening instead of left out.
 

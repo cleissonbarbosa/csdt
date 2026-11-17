@@ -1,6 +1,6 @@
 import type { AuthorizationCatalog, AuthorizationDecision } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { Check, GitCompareArrows, Play, X } from 'lucide-react';
+import { Check, GitCompareArrows, Grid3x3, PencilLine, Play, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
@@ -26,6 +26,8 @@ import { nodeLabels } from '@/lib/names';
 import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
+
+import { PolicyByPolicy } from './PolicyByPolicy';
 
 type Tri = 'absent' | 'true' | 'false';
 const TRI: { value: Tri; label: string }[] = [
@@ -214,6 +216,8 @@ function DecisionCard({
             </p>
           )}
         </div>
+
+        <PolicyByPolicy decision={decision} catalog={catalog} />
 
         {decision.errors.length > 0 && (
           <div className="mt-3">
@@ -541,7 +545,13 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           .map(([key, value]) => [key, value ? 'true' : 'false']),
       ),
     );
-    setDisabled([]);
+    // The policies the request was asked without, where it says: a cell of
+    // the access matrix is followed under the policies it was counted with.
+    setDisabled(
+      (preset.disabledPolicies ?? []).filter((id) =>
+        catalog.policies.some((policy) => policy.id === id),
+      ),
+    );
     useUi.getState().presetAuthorization(null);
   }, [preset, catalog]);
 
@@ -757,6 +767,24 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           </span>
         }
       >
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <Button
+            size="sm"
+            icon={<Grid3x3 size={12} aria-hidden />}
+            onClick={() => useUi.getState().setPanel('matrix')}
+            data-testid="open-matrix"
+          >
+            Who may do what
+          </Button>
+          <Button
+            size="sm"
+            icon={<PencilLine size={12} aria-hidden />}
+            onClick={() => useUi.getState().setPanel('policies')}
+            data-testid="open-policy-editor"
+          >
+            Edit the policies
+          </Button>
+        </div>
         <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
           These are the real Cedar policies being evaluated. Switch one off to see how the decision
           changes

@@ -42,6 +42,9 @@ const api = vi.hoisted(() => ({
   authorizationCatalog: vi.fn(),
   authorizationDecisions: vi.fn(),
   evaluate: vi.fn(),
+  explain: vi.fn(),
+  tryFault: vi.fn(),
+  accessMatrix: vi.fn(),
   workspace: vi.fn(),
   exportWorkspace: vi.fn(),
   checkWorkspace: vi.fn(),
@@ -57,6 +60,7 @@ vi.mock('@/providers/api', async (original) => ({
 vi.mock('@/app/useAegisConnection', () => ({ useAegisConnection: () => undefined }));
 
 const { App } = await import('./App');
+const { CHALLENGES } = await import('@/features/guide/challenges');
 
 function seed() {
   const telemetry = useTelemetry.getState();
@@ -117,6 +121,9 @@ beforeEach(() => {
   api.authorizationCatalog.mockResolvedValue(fixtures.catalog());
   api.authorizationDecisions.mockResolvedValue([]);
   api.evaluate.mockResolvedValue(fixtures.decisionDeny());
+  api.explain.mockResolvedValue(fixtures.explanation());
+  api.tryFault.mockResolvedValue(fixtures.trial());
+  api.accessMatrix.mockResolvedValue(fixtures.accessMatrix());
   api.workspace.mockResolvedValue(fixtures.workspace());
   api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
   api.checkWorkspace.mockResolvedValue(fixtures.workspaceCheck());
@@ -789,6 +796,55 @@ describe('authorization explorer', () => {
     expect(useUi.getState().tracedDecision?.decision).toBe('deny');
   });
 
+  it('takes a denial by default policy by policy, and names the permit it came closest to', async () => {
+    // Bob, a support agent, refunding an order above the limit: no policy
+    // permits it and Cedar names none. Each policy is put to the request.
+    const explanation = fixtures.explanation();
+    api.evaluate.mockResolvedValue({
+      ...fixtures.decisionDeny(),
+      request: explanation.request,
+      determiningPolicies: [],
+    });
+    const user = userEvent.setup();
+    renderOpen();
+    await fromMenu(user, 'Trace a request through Cedar');
+    await user.click(await screen.findByTestId('authz-evaluate'));
+
+    const card = await screen.findByTestId('decision-card');
+    const standings = await within(card).findByTestId('policy-standings');
+    expect(api.explain).toHaveBeenCalledWith({
+      principal: 'User::"bob"',
+      action: 'Action::"refundOrder"',
+      resource: 'Order::"acme-ord-9000"',
+      context: {},
+      disabledPolicies: [],
+    });
+    expect(within(standings).getByTestId('policy-closest')).toHaveTextContent(
+      'Closest: support-refund-limit is about this request, but its condition does not hold.',
+    );
+    const refund = within(standings).getByTestId('standing-support-refund-limit');
+    expect(refund).toHaveAttribute('data-standing', 'near');
+    // The policy can be read where it is named.
+    await user.click(within(refund).getByRole('button'));
+    expect(refund).toHaveTextContent('resource.amount <= 500');
+    expect(refund).toHaveTextContent('its condition does not hold: it does not permit');
+    // The ones that are not about the request are counted, not listed.
+    expect(standings).toHaveTextContent('6 not about this request');
+  });
+
+  it('shows no standings that answer other policies than the decision did', async () => {
+    // The explanation is a second question to the engine. If the policies
+    // were replaced in between, its answer is not this decision's.
+    api.explain.mockResolvedValue({ ...fixtures.explanation(), decision: 'allow' });
+    const user = userEvent.setup();
+    renderOpen();
+    await fromMenu(user, 'Trace a request through Cedar');
+    await user.click(await screen.findByTestId('authz-evaluate'));
+    const card = await screen.findByTestId('decision-card');
+    expect(await within(card).findByTestId('policy-standings-moved')).toBeInTheDocument();
+    expect(within(card).queryByTestId('policy-standings')).not.toBeInTheDocument();
+  });
+
   it('lets policies be switched off for an evaluation', async () => {
     const user = userEvent.setup();
     renderOpen();
@@ -851,6 +907,167 @@ describe('authorization explorer', () => {
     const engines = await screen.findByRole('radiogroup', { name: 'Policy engine' });
     expect(within(engines).getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByText(/Connect a local cedar-agent/)).toBeInTheDocument();
+  });
+});
+
+describe('the model inside another page', () => {
+  it('has no bar, says what it is in a line and leads to the whole application', () => {
+    useGuide.setState({ ...useGuide.getInitialState(), oriented: false }, true);
+    window.history.replaceState(null, '', '/?embed=1&scenario=ddos-surge&arrangement=regions');
+    renderApp();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    // Nobody's first visit: the orientation is not spent on an embed.
+    expect(screen.queryByRole('region', { name: 'Where to start' })).not.toBeInTheDocument();
+    expect(useGuide.getState().oriented).toBe(false);
+    const bar = screen.getByTestId('embed-bar');
+    expect(bar).toHaveTextContent('Simulated, synthetic data');
+    expect(within(bar).getByTestId('embed-status')).toBeInTheDocument();
+    expect(within(bar).getByTestId('embed-open')).toHaveAttribute('href', '/?arrangement=regions');
+    // The simulation is the server's here, and shared: the address starts nothing.
+    expect(api.startScenario).not.toHaveBeenCalled();
+  });
+
+  it('is the whole application everywhere else', () => {
+    renderApp();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('embed-bar')).not.toBeInTheDocument();
+  });
+});
+
+describe('who may do what', () => {
+  it("counts Cedar's answers by principal and action, and opens one in the tracer", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await fromMenu(user, 'Who may do what');
+    const matrix = await screen.findByTestId('access-matrix');
+    // Every request of the catalogue was asked, with nothing switched off.
+    expect(api.accessMatrix).toHaveBeenCalledWith({ context: {}, disabledPolicies: [] });
+    const cells = fixtures.accessMatrix().cells;
+    const allowed = cells.filter((cell) => cell.decision === 'allow').length;
+    expect(within(matrix).getByTestId('matrix-summary')).toHaveTextContent(
+      `Cedar allows ${allowed} of ${cells.length} requests.`,
+    );
+    const catalog = fixtures.catalog();
+    expect(within(matrix).getAllByRole('rowheader')).toHaveLength(catalog.principals.length);
+
+    // Bob, a support agent, refunding orders: one answer per order.
+    const bob = catalog.principals.findIndex((p) => p.uid === 'User::"bob"');
+    const refund = catalog.actions.findIndex((a) => a.uid === 'Action::"refundOrder"');
+    const cell = within(matrix).getByTestId(`matrix-cell-${bob}-${refund}`);
+    expect(cell).toHaveAccessibleName('Bob, Refund order: 1 of 3');
+    await user.click(cell);
+    const answers = within(within(matrix).getByTestId('matrix-detail')).getAllByTestId(
+      'matrix-answer',
+    );
+    expect(answers).toHaveLength(3);
+    const denied = answers.find((answer) => answer.textContent?.includes('4,200'))!;
+    expect(denied).toHaveAttribute('data-decision', 'deny');
+    expect(denied).toHaveTextContent('no policy permits it');
+
+    // Following it hands the request to the tracer, context and all.
+    await user.click(within(denied).getByTestId('matrix-trace'));
+    const form = await screen.findByTestId('authz-form');
+    expect(within(form).getByTestId('authz-principal')).toHaveValue('User::"bob"');
+    expect(within(form).getByTestId('authz-action')).toHaveValue('Action::"refundOrder"');
+    expect(within(form).getByTestId('authz-resource')).toHaveValue('Order::"acme-ord-9000"');
+    expect(screen.queryByTestId('access-matrix')).not.toBeInTheDocument();
+  });
+
+  it('asks again with a policy switched off, and says how many answers moved', async () => {
+    // Under all policies; with one off, a single answer turns round.
+    const all = fixtures.accessMatrix();
+    const turned = {
+      ...all,
+      disabledPolicies: ['forbid-cross-tenant'],
+      cells: all.cells.map((cell, i) => (i === 0 ? { ...cell, decision: 'deny' as const } : cell)),
+    };
+    expect(all.cells[0]!.decision).toBe('allow');
+    api.accessMatrix.mockImplementation((question: { disabledPolicies?: string[] }) =>
+      Promise.resolve((question.disabledPolicies ?? []).length > 0 ? turned : all),
+    );
+    const user = userEvent.setup();
+    renderApp();
+    await fromMenu(user, 'Who may do what');
+    const matrix = await screen.findByTestId('access-matrix');
+    await user.click(within(matrix).getByText(/Policies in force: 9 of 9/));
+    await user.click(within(matrix).getByRole('switch', { name: /^forbid-cross-tenant/ }));
+    await waitFor(() =>
+      expect(api.accessMatrix).toHaveBeenCalledWith({
+        context: {},
+        disabledPolicies: ['forbid-cross-tenant'],
+      }),
+    );
+    await waitFor(() =>
+      expect(within(matrix).getByTestId('matrix-summary')).toHaveTextContent(
+        '1 differs from all policies in force',
+      ),
+    );
+    const moved = within(matrix).getByTestId('matrix-cell-0-0');
+    expect(moved).toHaveAttribute('data-changed', '1');
+    expect(moved).toHaveTextContent(/was /);
+  });
+});
+
+describe('editing the policies in the page', () => {
+  it('checks the text as files, shows what would change, and applies only when asked', async () => {
+    api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('policies'));
+    const editor = await screen.findByTestId('policy-editor');
+    const text = within(editor).getByTestId('policy-text') as HTMLTextAreaElement;
+    // The policies in force, each under its id.
+    expect(text.value).toContain('@id("support-refund-limit")');
+    expect(within(editor).getByTestId('policy-check')).toHaveTextContent(
+      'These are the policies in use.',
+    );
+    expect(within(editor).getByTestId('policy-apply')).toBeDisabled();
+    expect(api.checkWorkspace).not.toHaveBeenCalled();
+
+    await user.type(text, '// a note');
+    // The engine is asked about the files in use with the policies replaced.
+    await waitFor(() => expect(api.checkWorkspace).toHaveBeenCalled());
+    const files = api.checkWorkspace.mock.lastCall![0] as { path: string; text: string }[];
+    expect(files.filter((file) => file.path.startsWith('cedar/polic'))).toEqual([
+      { path: 'cedar/policies.cedar', text: text.value },
+    ]);
+    const kept = fixtures
+      .workspaceExport()
+      .files.filter((file) => file.path !== 'cedar/policies.json');
+    expect(files.filter((file) => file.path !== 'cedar/policies.cedar')).toEqual(kept);
+    await waitFor(() =>
+      expect(within(editor).getByTestId('policy-check')).toHaveTextContent('Cedar accepts them'),
+    );
+    expect(api.importWorkspace).not.toHaveBeenCalled();
+
+    await user.click(within(editor).getByTestId('policy-apply'));
+    await waitFor(() => expect(api.importWorkspace).toHaveBeenCalledWith(files));
+    // Out of the editor, to what the policies now decide.
+    await waitFor(() => expect(useUi.getState().openPanel).toBe('matrix'));
+  });
+
+  it('says what the engine refuses, and applies nothing', async () => {
+    api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
+    api.checkWorkspace.mockResolvedValue({
+      valid: false,
+      problem: { path: 'cedar/policies.cedar', message: 'unexpected token `permitt`' },
+    });
+    const user = userEvent.setup();
+    renderApp();
+    act(() => useUi.getState().setPanel('policies'));
+    const editor = await screen.findByTestId('policy-editor');
+    await user.type(within(editor).getByTestId('policy-text'), 'permitt');
+    await waitFor(() =>
+      expect(within(editor).getByTestId('policy-check')).toHaveTextContent(
+        'Not valid. cedar/policies.cedar: unexpected token `permitt`',
+      ),
+    );
+    expect(within(editor).getByTestId('policy-apply')).toBeDisabled();
+    // Putting back what is in use asks nothing more.
+    await user.click(within(editor).getByTestId('policy-revert'));
+    expect(within(editor).getByTestId('policy-check')).toHaveTextContent(
+      'These are the policies in use.',
+    );
   });
 });
 
@@ -937,7 +1154,7 @@ describe('platform files', () => {
       scenario(),
     ]);
     expect(await within(dialog).findByTestId('workspace-skipped')).toHaveTextContent(
-      'README.md (not a .json, .cedar or .cedarschema file)',
+      'README.md (not a .json, .cedar, .cedarschema or Compose (.yml) file)',
     );
     await waitFor(() =>
       expect(api.checkWorkspace).toHaveBeenCalledWith([
@@ -1057,6 +1274,58 @@ describe('integrations and settings', () => {
   });
 });
 
+describe('what a service is exposed to', () => {
+  it('follows its connections, shows the way in from outside and what Cedar guards there', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    // Requests for an order end at the orders service of the primary region.
+    act(() => useUi.getState().selectNode('use-orders'));
+    const exposure = within(screen.getByTestId('node-inspector')).getByTestId('node-exposure');
+    await user.click(within(exposure).getByText('Exposure'));
+
+    const reaches = within(exposure).getByTestId('exposure-reaches');
+    expect(Number(reaches.getAttribute('data-count'))).toBeGreaterThan(3);
+    expect(reaches).toHaveTextContent(/It reaches \d+ services, \d+ of them stores of data\./);
+    expect(reaches).toHaveTextContent('Orders DB');
+    // The way in starts outside the platform and ends here.
+    const wayIn = within(exposure).getByTestId('exposure-way-in');
+    expect(wayIn).toHaveTextContent(/The shortest way in from outside, 3 connections:/);
+    expect(wayIn).toHaveTextContent('Global Edge Router');
+
+    // What is kept in front on the model is this service and what it reaches.
+    await user.click(within(exposure).getByTestId('exposure-show'));
+    expect(useUi.getState().reach?.[0]).toBe('use-orders');
+    expect(useUi.getState().reach).toContain('use-orders-db');
+
+    // Cedar's answers about orders, counted from the engine's own matrix.
+    const guarded = await within(exposure).findByTestId('exposure-guarded');
+    const cells = fixtures
+      .accessMatrix()
+      .cells.filter((cell) => cell.resource.startsWith('Order::'));
+    const allowed = cells.filter((cell) => cell.decision === 'allow').length;
+    expect(guarded).toHaveTextContent(
+      `Of the ${cells.length} the catalogue describes, Cedar allows ${allowed}`,
+    );
+    expect(api.accessMatrix).toHaveBeenCalledWith({ context: {}, disabledPolicies: [] });
+    await user.click(within(guarded).getByTestId('exposure-matrix'));
+    expect(useUi.getState().openPanel).toBe('matrix');
+  });
+
+  it('lets go of what it kept in front when another service is selected', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().selectNode('use-orders'));
+    const exposure = within(screen.getByTestId('node-inspector')).getByTestId('node-exposure');
+    await user.click(within(exposure).getByText('Exposure'));
+    await user.click(within(exposure).getByTestId('exposure-show'));
+    expect(useUi.getState().reach).not.toBeNull();
+    act(() => useUi.getState().selectNode('use-gateway'));
+    await waitFor(() => expect(useUi.getState().reach).toBeNull());
+    // A gateway stands for no kind of resource: nothing is said of Cedar.
+    expect(screen.queryByTestId('exposure-guarded')).not.toBeInTheDocument();
+  });
+});
+
 describe('faults placed by hand', () => {
   /** The platform in range, with the one fault the sample was taken with. */
   function withAFault() {
@@ -1100,6 +1369,64 @@ describe('faults placed by hand', () => {
     renderApp();
     expect(screen.getByTestId('scenario-console')).toBeInTheDocument();
     expect(screen.queryByTestId('faults-in-force')).not.toBeInTheDocument();
+  });
+
+  it('can be tried first, on a timeline of their own, and placed from what was seen', async () => {
+    withAFault();
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().selectNode('use-orders-db'));
+    const faults = within(screen.getByTestId('node-inspector')).getByTestId('faults');
+    await user.click(within(faults).getByText('Faults'));
+    await user.selectOptions(within(faults).getByTestId('fault-try'), 'Unreachable');
+    // The engine is asked what it would do; nothing is placed.
+    expect(api.tryFault).toHaveBeenCalledWith({
+      effect: { type: 'down', nodes: 'node:use-orders-db' },
+      rampMs: 1000,
+    });
+    expect(api.injectFault).not.toHaveBeenCalled();
+
+    const trial = fixtures.trial();
+    const result = await within(faults).findByTestId('fault-trial');
+    expect(result).toHaveTextContent('Tried, not placed: unreachable');
+    expect(result).toHaveTextContent(`${trial.affected.length} services leave normal within 1:00.`);
+    expect(within(result).getByTestId('trial-errors')).toHaveTextContent('up to 5.22% from 0%');
+    // In the order the engine recorded them: the faulted store first.
+    const listed = within(within(result).getByTestId('trial-affected')).getAllByRole('listitem');
+    expect(listed).toHaveLength(6);
+    expect(listed[0]).toHaveTextContent('Orders DB');
+    expect(listed[0]).toHaveTextContent('down');
+    await user.click(within(result).getByText(`Show all ${trial.affected.length}`));
+    expect(
+      within(within(result).getByTestId('trial-affected')).getAllByRole('listitem'),
+    ).toHaveLength(trial.affected.length);
+    // The model keeps what the trial reached in front.
+    expect(useUi.getState().reach).toEqual(trial.affected.map((effect) => effect.nodeId));
+
+    // Placing it is the fault that was tried, on the timeline in use.
+    await user.click(within(result).getByTestId('trial-place'));
+    expect(api.injectFault).toHaveBeenCalledWith(
+      { type: 'down', nodes: 'node:use-orders-db' },
+      2000,
+    );
+    expect(within(faults).queryByTestId('fault-trial')).not.toBeInTheDocument();
+    expect(useUi.getState().reach).toBeNull();
+  });
+
+  it('put a trial away with the card it was asked on', async () => {
+    withAFault();
+    const user = userEvent.setup();
+    renderOpen();
+    act(() => useUi.getState().selectNode('use-orders-db'));
+    const faults = within(screen.getByTestId('node-inspector')).getByTestId('faults');
+    await user.click(within(faults).getByText('Faults'));
+    await user.selectOptions(within(faults).getByTestId('fault-try'), 'Unreachable');
+    await within(faults).findByTestId('fault-trial');
+    expect(useUi.getState().reach).not.toBeNull();
+    // Another service is another question: nothing of the trial stays.
+    act(() => useUi.getState().selectNode('use-gateway'));
+    await waitFor(() => expect(useUi.getState().reach).toBeNull());
+    expect(screen.queryByTestId('fault-trial')).not.toBeInTheDocument();
   });
 
   it('are placed and lifted from the card of a service', async () => {
@@ -1532,6 +1859,45 @@ describe('an incident read back from its record', () => {
 });
 
 describe('comparing an intervention', () => {
+  it('runs the same change at several figures and lines the runs up by figure', async () => {
+    const user = userEvent.setup();
+    renderOpen();
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    await user.click(await screen.findByTestId('scenario-compare-credential-stuffing'));
+    const dialog = await screen.findByRole('dialog', { name: 'Compare an intervention' });
+    const sweep = within(dialog).getByTestId('sweep-form');
+    // It starts from a handful of multipliers; the viewer writes their own.
+    const values = within(sweep).getByTestId('sweep-values');
+    expect(values).toHaveValue('0.5, 1, 1.5, 2, 3');
+    await user.clear(values);
+    await user.type(values, '1, 4, nine');
+    expect(within(sweep).getByTestId('sweep-run')).toBeDisabled();
+    await user.clear(values);
+    await user.type(values, '4, 1');
+
+    await user.click(within(sweep).getByTestId('sweep-run'));
+    await waitFor(() => expect(api.compareIntervention).toHaveBeenCalledTimes(2));
+    // The same intervention, at each figure, in the order it was written.
+    expect(
+      api.compareIntervention.mock.calls.map(
+        ([body]) =>
+          (body as { intervention: { effect: { factor: number } } }).intervention.effect.factor,
+      ),
+    ).toEqual([4, 1]);
+    const results = await within(dialog).findByTestId('sweep-results');
+    const rows = within(within(results).getByTestId('sweep-table')).getAllByRole('row');
+    // A heading, the incident as it is, and a row for each figure, in order.
+    expect(rows).toHaveLength(4);
+    expect(rows[1]).toHaveTextContent('as it is');
+    expect(rows[2]).toHaveTextContent('×1');
+    expect(rows[3]).toHaveTextContent('×4');
+    expect(results).toHaveTextContent('The same change at 2 figures.');
+    // Changing the form takes the answer away: it no longer answers it.
+    await user.selectOptions(within(dialog).getByTestId('experiment-kind'), 'latency');
+    expect(within(dialog).queryByTestId('sweep-results')).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId('sweep-values')).toHaveValue('0.5, 1, 1.5, 2, 3');
+  });
+
   it('runs a scenario twice, says exactly what changed and lays the runs side by side', async () => {
     const user = userEvent.setup();
     renderOpen();
@@ -1871,6 +2237,36 @@ describe('writing a scenario', () => {
 });
 
 describe('guided challenges', () => {
+  it('say how many are solved, and offer first the one a link names', async () => {
+    useGuide.setState({ completed: ['flood-stopped'] });
+    window.history.replaceState(null, '', '/?challenge=region-dark');
+    renderApp();
+    // The link opens the guide; nothing has been started by it.
+    const guide = await screen.findByTestId('guide');
+    expect(api.reset).not.toHaveBeenCalled();
+    expect(api.startScenario).not.toHaveBeenCalled();
+    expect(within(guide).getByTestId('guide-progress')).toHaveTextContent(
+      `1 of ${CHALLENGES.length} solved`,
+    );
+    const items = within(guide).getAllByRole('listitem');
+    expect(items[0]).toHaveAttribute('data-invited', 'true');
+    expect(items[0]).toHaveTextContent('The one you were sent');
+    expect(items[0]).toHaveTextContent('Find the region that went dark');
+
+    const user = userEvent.setup();
+    await user.click(within(guide).getByTestId('guide-forget'));
+    expect(within(guide).getByTestId('guide-progress')).toHaveTextContent(
+      `0 of ${CHALLENGES.length} solved`,
+    );
+    expect(useGuide.getState().completed).toEqual([]);
+  });
+
+  it('ignore a link that names no challenge', () => {
+    window.history.replaceState(null, '', '/?challenge=no-such-challenge');
+    renderApp();
+    expect(screen.queryByTestId('guide')).not.toBeInTheDocument();
+  });
+
   /** The guide is a card that stays; its menu entry says whether it is there. */
   async function openGuide(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'More' }));
@@ -1891,7 +2287,7 @@ describe('guided challenges', () => {
     renderApp();
     await openGuide(user);
     const guide = await screen.findByTestId('guide');
-    expect(within(guide).getAllByRole('heading', { level: 4 })).toHaveLength(3);
+    expect(within(guide).getAllByRole('heading', { level: 4 })).toHaveLength(CHALLENGES.length);
     await user.click(within(guide).getByTestId('guide-start-cascade-origin'));
     await waitFor(() => expect(api.startScenario).toHaveBeenCalledWith('cascading-failure'));
     expect(api.reset).toHaveBeenCalledWith('simulation');

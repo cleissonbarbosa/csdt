@@ -356,6 +356,30 @@ beside it changes, it is marked as the answer to something else, loses the
 colour and the firm edge of an answer, and lists what changed. Two decisions
 compared are two evaluations kept side by side, never one of them inferred.
 
+**A decision is taken apart, never restated.** Under a Cedar decision each
+policy in force has one line: it _holds_, it is _about this request but its
+condition does not hold_, or it is _not about this request_. Each is Cedar's
+answer about that policy alone, so a denial by default, where Cedar names no
+policy, still says which permit came nearest. The lines are ink: a permit
+is an outlined tag and a forbid a filled one, because which is which is
+told by shape (rule 7) and neither is an alarm. The access matrix is drawn
+the same way. A cell is a count and a glyph, a denial is not red, and the
+one mark it carries is on a cell that the context or the switched-off
+policies changed.
+
+**A trial is not an event.** What a fault would do, shown before it is
+placed, takes no signal hue: nothing has happened on the platform, so
+nothing on screen may look as if it had. The services it would reach are
+brought forward the way a selection's path is, in the viewer's blue,
+because it is the viewer who asked; so is everything a service could reach
+(its _exposure_). Exposure is worded as what the topology allows, never as
+what an attacker would do.
+
+**An objective is the engine's own threshold.** A report says for how long
+the error rate and the latency were past the values the engine's detection
+rules alert on, tagged _observed_. It does not call them an SLO or an error
+budget: nobody agreed them with anybody.
+
 **A name says which one.** A platform runs the same service in several
 regions under one name. Where the place is not on show (what a service
 calls, what an incident affected, a path) a name borne by more than one

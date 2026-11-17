@@ -244,3 +244,46 @@ test('an incident is compared with an intervention, and read back, in the tab', 
   await expect(page.getByTestId('session-contents')).toContainText('places a fault by hand');
   expect(requests.filter((url) => new URL(url).pathname.includes('/api/'))).toEqual([]);
 });
+
+test.describe('kept by the browser', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('opens again with no network, on the files it was built with', async ({ page, context }) => {
+    const requests = collectRequests(page);
+    await openStatic(page);
+    await waitForScene(page);
+    // The worker has every file of the build, and has taken the page.
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+    await expect
+      .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+      .toBe(true);
+    const kept = await page.evaluate(async () => {
+      const names = await caches.keys();
+      const cache = await caches.open(names[0]!);
+      return { names, files: (await cache.keys()).map((request) => new URL(request.url).pathname) };
+    });
+    expect(kept.names).toHaveLength(1);
+    expect(kept.names[0]).toMatch(/^aegis-[0-9a-f]{16}$/);
+    expect(kept.files.some((file) => file.endsWith('.wasm'))).toBe(true);
+    expect(kept.files.some((file) => file.endsWith('.glb'))).toBe(true);
+    // It kept nothing but the site's own files, and asked nobody else for any.
+    const origin = new URL(page.url()).origin;
+    expect(requests.filter((url) => !url.startsWith(origin) && !url.startsWith('blob:'))).toEqual(
+      [],
+    );
+
+    // With no network at all the site opens, the engine starts and it runs.
+    await context.setOffline(true);
+    await page.reload();
+    await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
+    await waitForScene(page);
+    await expect(page.getByTestId('platform-status')).toContainText('services, all normal');
+    await page.getByTestId('explore-incident').click();
+    await page.getByTestId('scenario-start-ddos-surge').click();
+    await expect(page.getByTestId('active-incident')).toHaveAttribute(
+      'data-scenario',
+      'ddos-surge',
+    );
+    await context.setOffline(false);
+  });
+});

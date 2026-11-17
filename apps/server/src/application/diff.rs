@@ -306,25 +306,7 @@ fn union(into: &mut Vec<String>, more: &[String]) {
 
 fn compare_matrix(base: &Assets, candidate: &Assets) -> Result<Matrix, AuthzError> {
     let catalog: &AuthzCatalog = &candidate.catalog;
-    let triples: Vec<(&str, &str, &str)> = catalog
-        .principals
-        .iter()
-        .flat_map(|principal| {
-            catalog.actions.iter().flat_map(move |action| {
-                catalog
-                    .resources
-                    .iter()
-                    .filter(move |resource| resource.resource_type == action.resource_type)
-                    .map(move |resource| {
-                        (
-                            principal.uid.as_str(),
-                            action.uid.as_str(),
-                            resource.uid.as_str(),
-                        )
-                    })
-            })
-        })
-        .collect();
+    let triples = super::access::triples(catalog);
     let all_keys: Vec<String> = catalog.context_keys.iter().map(|k| k.key.clone()).collect();
     let mut matrix = Matrix {
         principals: catalog.principals.len(),

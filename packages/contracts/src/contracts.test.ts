@@ -31,6 +31,9 @@ import {
   WorkspaceDiffSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
+  AccessMatrixSchema,
+  AuthorizationExplanationSchema,
+  TrialSchema,
 } from './index';
 
 const SAMPLES = join(dirname(fileURLToPath(import.meta.url)), '..', 'samples');
@@ -54,6 +57,7 @@ const CASES: Record<string, z.ZodType> = {
   'incident-report': IncidentReportSchema,
   session: SessionExportSchema,
   experiment: ExperimentSchema,
+  trial: TrialSchema,
   scenarios: ScenariosResponseSchema,
   'scenarios-unavailable': ScenariosResponseSchema,
   recordings: z.array(RecordingSummarySchema),
@@ -62,6 +66,8 @@ const CASES: Record<string, z.ZodType> = {
   'authorization-decisions': z.array(AuthorizationDecisionSchema),
   'decision-allow': AuthorizationDecisionSchema,
   'decision-deny': AuthorizationDecisionSchema,
+  'authorization-explanation': AuthorizationExplanationSchema,
+  'access-matrix': AccessMatrixSchema,
   'control-response': ControlResponseSchema,
   'stream-hello': StreamMessageSchema,
   'stream-snapshot': StreamMessageSchema,

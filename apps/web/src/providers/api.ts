@@ -6,9 +6,11 @@
  * server over HTTP, or the same engine running in this tab.
  */
 import {
+  AccessMatrixSchema,
   ApiErrorSchema,
   AuthorizationCatalogSchema,
   AuthorizationDecisionSchema,
+  AuthorizationExplanationSchema,
   ControlResponseSchema,
   EventsResponseSchema,
   ExperimentSchema,
@@ -33,6 +35,8 @@ import {
   type FaultEffect,
   type Recording,
   type WorkspaceFile,
+  TrialSchema,
+  type TrialRequest,
 } from '@aegis/contracts';
 import { transport } from '@transport';
 import { z } from 'zod';
@@ -170,11 +174,20 @@ export const api = {
   /** Runs a scenario twice from the same seed, once with one fault placed. */
   compareIntervention: (body: ExperimentRequest) =>
     request(ExperimentSchema, '/demo/experiments/compare', body, LONG_TIMEOUT_MS),
+  /** One fault tried on the platform at rest. The timeline in use is not touched. */
+  tryFault: (body: TrialRequest) =>
+    request(TrialSchema, '/demo/experiments/trial', body, LONG_TIMEOUT_MS),
   authorizationCatalog: () => request(AuthorizationCatalogSchema, '/demo/authorization/catalog'),
   authorizationDecisions: () =>
     request(z.array(AuthorizationDecisionSchema), '/demo/authorization/decisions'),
   evaluate: (body: EvaluateRequest) =>
     request(AuthorizationDecisionSchema, '/demo/authorization/evaluate', body),
+  /** One request taken policy by policy. Nothing is recorded on the timeline. */
+  explain: (body: Omit<EvaluateRequest, 'engine'>) =>
+    request(AuthorizationExplanationSchema, '/demo/authorization/explain', body),
+  /** Who may do what under one context: every request the catalogue describes. */
+  accessMatrix: (body: { context?: Record<string, unknown>; disabledPolicies?: string[] }) =>
+    request(AccessMatrixSchema, '/demo/authorization/matrix', body, LONG_TIMEOUT_MS),
   /** The files the platform, its scenarios and its policies come from. */
   workspace: () => request(WorkspaceStatusSchema, '/workspace'),
   exportWorkspace: () => request(WorkspaceBundleSchema, '/workspace/export'),

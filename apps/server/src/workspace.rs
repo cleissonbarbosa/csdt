@@ -46,6 +46,7 @@ use crate::incidents::recordings::{self, Recording};
 use crate::incidents::{catalog, ScenarioDef};
 use crate::simulation::topologies;
 
+pub mod compose;
 pub mod schemas;
 
 /// Version of all AEGIS-authored file formats inside one workspace.
@@ -188,6 +189,18 @@ impl Entry {
         serde_json::from_str(&self.text()?).map_err(|e| fail(self.path(), e.to_string()))
     }
 
+    /// The topology a file describes: in the topology format, or, for a
+    /// Compose file, what `compose` reads from it.
+    fn topology(&self) -> Result<TopologySpec, WorkspaceError> {
+        let name = self.name()?;
+        if COMPOSE_EXTENSIONS.contains(&extension(name)) {
+            compose::topology_from_compose(name, &self.text()?)
+                .map_err(|problem| fail(self.path(), problem))
+        } else {
+            self.json()
+        }
+    }
+
     fn name(&self) -> Result<&str, WorkspaceError> {
         self.path()
             .file_name()
@@ -248,20 +261,26 @@ fn has_extension(path: &Path, extension: &str) -> bool {
     path.extension().is_some_and(|e| e == extension) && is_file(path)
 }
 
+/// A topology may also be a Compose file, read by `compose`.
+const COMPOSE_EXTENSIONS: [&str; 2] = ["yml", "yaml"];
+
 /// The `.json` files of one part of a directory, or `None` when the
 /// directory does not exist. Anything else in it is recorded as ignored.
+/// `also` names other extensions the part takes.
 fn json_part(
     root: &Path,
     name: &str,
+    also: &[&str],
     ignored: &mut Vec<PathBuf>,
 ) -> Result<Option<Vec<Entry>>, WorkspaceError> {
     let dir = root.join(name);
     if !is_dir(&dir)? {
         return Ok(None);
     }
-    let (files, others): (Vec<PathBuf>, Vec<PathBuf>) = files_in(&dir)?
-        .into_iter()
-        .partition(|path| has_extension(path, "json"));
+    let (files, others): (Vec<PathBuf>, Vec<PathBuf>) =
+        files_in(&dir)?.into_iter().partition(|path| {
+            has_extension(path, "json") || also.iter().any(|other| has_extension(path, other))
+        });
     ignored.extend(others);
     if files.len() > MAX_ITEMS {
         return Err(fail(
@@ -296,9 +315,9 @@ fn parts_in(root: &Path) -> Result<Parts, WorkspaceError> {
             parts.ignored.push(path);
         }
     }
-    parts.topologies = json_part(root, TOPOLOGIES, &mut parts.ignored)?;
-    parts.scenarios = json_part(root, SCENARIOS, &mut parts.ignored)?;
-    parts.recordings = json_part(root, RECORDINGS, &mut parts.ignored)?;
+    parts.topologies = json_part(root, TOPOLOGIES, &COMPOSE_EXTENSIONS, &mut parts.ignored)?;
+    parts.scenarios = json_part(root, SCENARIOS, &[], &mut parts.ignored)?;
+    parts.recordings = json_part(root, RECORDINGS, &[], &mut parts.ignored)?;
 
     let cedar = root.join(CEDAR);
     if is_dir(&cedar)? {
@@ -409,7 +428,11 @@ fn extension(name: &str) -> &str {
 fn kind_by_place(parent: Option<&str>, name: &str) -> Option<Kind> {
     let json = extension(name) == "json";
     match parent? {
-        TOPOLOGIES => Some(if json { Kind::Topology } else { Kind::Ignored }),
+        TOPOLOGIES => Some(if json || COMPOSE_EXTENSIONS.contains(&extension(name)) {
+            Kind::Topology
+        } else {
+            Kind::Ignored
+        }),
         SCENARIOS => Some(if json { Kind::Scenario } else { Kind::Ignored }),
         RECORDINGS => Some(if json { Kind::Recording } else { Kind::Ignored }),
         CEDAR => Some(match name {
@@ -430,6 +453,17 @@ fn kind_by_content(path: &Path, name: &str, text: &str) -> Result<Kind, Workspac
         "cedar" => return Ok(Kind::PolicyFile),
         "cedarschema" => return Ok(Kind::Schema),
         "json" => {}
+        // The one kind of YAML that is read: a Compose file, as a topology.
+        "yml" | "yaml" => {
+            return if compose::is_compose(text) {
+                Ok(Kind::Topology)
+            } else {
+                Err(fail(
+                    path,
+                    "is YAML but not a Compose file: it has no `services`. Compose files are the only YAML AEGIS reads",
+                ))
+            };
+        }
         _ => return Ok(Kind::Ignored),
     }
     let unknown = || {
@@ -625,12 +659,12 @@ fn overlay(parts: Parts, mut sources: Sources) -> Result<Workspace, WorkspaceErr
         if files.is_empty() {
             return Err(fail(
                 &parts.topologies_at,
-                "holds no .json file; remove the directory to keep the bundled topologies",
+                "holds no .json or Compose file; remove the directory to keep the bundled topologies",
             ));
         }
         sources.topologies = files
             .iter()
-            .map(Entry::json::<TopologySpec>)
+            .map(Entry::topology)
             .collect::<Result<_, _>>()?;
         replaced.push(TOPOLOGIES);
     }

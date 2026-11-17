@@ -14,7 +14,8 @@ export const MAX_FILES = 256;
  */
 export const MAX_TOTAL_BYTES = 6 * 1024 * 1024;
 
-const EXTENSIONS = ['json', 'cedar', 'cedarschema'];
+/** What a workspace is made of, and a Compose file, which is read as a topology. */
+const EXTENSIONS = ['json', 'cedar', 'cedarschema', 'yml', 'yaml'];
 
 /** A file together with where it sits in what was picked. */
 export interface Picked {
@@ -99,7 +100,7 @@ export async function stage(
   for (const { file, path } of picked) {
     const extension = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : '';
     if (!EXTENSIONS.includes(extension)) {
-      skipped.push({ path, reason: 'not a .json, .cedar or .cedarschema file' });
+      skipped.push({ path, reason: 'not a .json, .cedar, .cedarschema or Compose (.yml) file' });
       continue;
     }
     if (file.size > MAX_FILE_BYTES) {

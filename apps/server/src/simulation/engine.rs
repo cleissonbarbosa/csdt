@@ -40,6 +40,13 @@ pub const MAX_FAULT_RAMP_MS: u64 = 60_000;
 /// One fault on a region holds one per service in it.
 pub const MAX_FAULT_CHANNELS: usize = 256;
 
+/// The platform's objectives, as the detection rules below hold it to them
+/// and as an incident's report counts the time they were not met: no more
+/// than this share of client requests failing, and a p95 latency no more
+/// than this many times what it is at rest.
+pub const ERROR_OBJECTIVE: f64 = 0.05;
+pub const LATENCY_OBJECTIVE_FACTOR: f64 = 2.5;
+
 const ALERT_ERROR_RATE: usize = 0;
 const ALERT_DENIALS: usize = 1;
 const ALERT_SUSPICIOUS: usize = 2;
@@ -1071,7 +1078,7 @@ fn evaluate_alerts(ctx: &StepContext, state: &mut SimState, em: &mut Emitter) {
         (
             ALERT_ERROR_RATE,
             g.error_rate,
-            0.05,
+            ERROR_OBJECTIVE,
             0.02,
             "Error budget burning",
             "Error rate back within objective",
@@ -1108,7 +1115,7 @@ fn evaluate_alerts(ctx: &StepContext, state: &mut SimState, em: &mut Emitter) {
         (
             ALERT_LATENCY,
             latency_ratio,
-            2.5,
+            LATENCY_OBJECTIVE_FACTOR,
             1.5,
             "Latency objective breached",
             "Latency back within objective",

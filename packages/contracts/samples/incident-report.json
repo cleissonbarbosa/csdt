@@ -389,5 +389,19 @@
     "atMs": 31400
   },
   "meanErrorRate": 0.0315,
+  "objectives": [
+    {
+      "kind": "error-rate",
+      "threshold": 0.05,
+      "breachedMs": 10000,
+      "firstBreachedAtMs": 23000
+    },
+    {
+      "kind": "latency-p95",
+      "threshold": 417.0,
+      "breachedMs": 0,
+      "firstBreachedAtMs": null
+    }
+  ],
   "truncated": false
 }

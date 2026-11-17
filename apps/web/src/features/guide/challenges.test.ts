@@ -162,3 +162,137 @@ describe('explaining a denied export', () => {
     expect(exported.check(evidence()).headline).toBe('Nothing has been evaluated yet.');
   });
 });
+
+describe('finding where a request of an incident is stopped', () => {
+  const contractor = challengeById('contractor-stopped')!;
+  it('reads where the snapshot says the traffic stops, whichever incident it is', () => {
+    const snapshot = fixtures.snapshot();
+    const stopped = snapshot.flows.find((flow) => flow.blockedAt !== null);
+    if (!stopped) throw new Error('the sample has no stopped flow');
+    for (const challenge of [flood, contractor]) {
+      const right = challenge.check(
+        evidence({ selection: { kind: 'node', id: stopped.blockedAt! } }),
+      );
+      expect(right.correct).toBe(true);
+      expect(right.lines[0]).toEqual({
+        basis: 'observed',
+        text: expect.stringContaining(stopped.label),
+      });
+    }
+    // What differs is who is said to decide the stop: the scenario may
+    // prescribe a rejection, but a denial is only ever Cedar's.
+    const said = (challenge: typeof flood) =>
+      challenge.check(evidence({ selection: { kind: 'node', id: stopped.blockedAt! } })).lines[1]!;
+    expect(said(flood).basis).toBe('prescribed');
+    expect(said(contractor)).toEqual({
+      basis: 'cedar',
+      text: expect.stringContaining('No scenario can write a denial'),
+    });
+  });
+});
+
+describe('finding the region that went dark', () => {
+  const region = challengeById('region-dark')!;
+  const topology = fixtures.topology();
+  /** The sample's snapshot with one region out, as the engine reports one. */
+  const outage = (down: string) => {
+    const snapshot = fixtures.snapshot();
+    snapshot.regions = snapshot.regions.map((status) =>
+      status.id === down
+        ? { ...status, health: 'down' as const, nodesUnhealthy: status.nodesTotal }
+        : { ...status, health: 'healthy' as const, nodesUnhealthy: 0 },
+    );
+    return snapshot;
+  };
+  const inRegion = (id: string) => topology.nodes.find((node) => node.region === id)!;
+
+  it('accepts any service that stands in the region the snapshot reports down', () => {
+    const snapshot = outage('eu-west');
+    const feedback = region.check(
+      evidence({ snapshot, selection: { kind: 'node', id: inRegion('eu-west').id } }),
+    );
+    expect(feedback.correct).toBe(true);
+    expect(feedback.headline).toBe('Yes: EU West is dark.');
+    const total = snapshot.regions.find((status) => status.id === 'eu-west')!.nodesTotal;
+    expect(feedback.lines[0]).toEqual({
+      basis: 'observed',
+      text: `${total} of the ${total} services that stand in EU West are out of their normal state.`,
+    });
+  });
+
+  it('says where a wrong answer stands, and that its region still answers', () => {
+    const chosen = inRegion('us-east');
+    const feedback = region.check(
+      evidence({ snapshot: outage('eu-west'), selection: { kind: 'node', id: chosen.id } }),
+    );
+    expect(feedback.correct).toBe(false);
+    expect(feedback.lines[0]!.text).toContain('It stands in US East · Primary');
+    expect(feedback.lines[1]!.text).toContain('its plate is the one that has gone dark');
+  });
+
+  it('gives away nothing while no region is down', () => {
+    const snapshot = fixtures.snapshot();
+    snapshot.regions = snapshot.regions.map((status) => ({
+      ...status,
+      health: 'degraded' as const,
+    }));
+    const feedback = region.check(
+      evidence({ snapshot, selection: { kind: 'node', id: inRegion('eu-west').id } }),
+    );
+    expect(feedback.correct).toBe(false);
+    expect(feedback.headline).toBe('No region is dark yet.');
+  });
+});
+
+describe('finding the circumstance a forbid makes an exception for', () => {
+  const deletion = challengeById('deletion-denied')!;
+  const asked = {
+    principal: 'User::"carol"',
+    action: 'Action::"deleteCustomer"',
+    resource: 'Customer::"acme-cust-77"',
+  };
+  const decided = (over: Partial<ReturnType<typeof fixtures.decisionDeny>>) => ({
+    ...fixtures.decisionDeny(),
+    request: { ...asked, context: {} },
+    ...over,
+  });
+
+  it('is offered for a request the catalogue knows', () => {
+    expect(deletion.unavailable(evidence())).toBeNull();
+    expect(deletion.setup).toEqual({ kind: 'request', request: { ...asked, context: {} } });
+  });
+
+  it('says a forbid decided, and that no permit overrides one', () => {
+    const feedback = deletion.check(
+      evidence({
+        decision: decided({ determiningPolicies: ['forbid-destructive-outside-change-window'] }),
+      }),
+    );
+    expect(feedback.correct).toBe(false);
+    expect(feedback.lines[0]).toEqual({
+      basis: 'cedar',
+      text: expect.stringContaining('a forbid, which no permit overrides'),
+    });
+  });
+
+  it('accepts the answer Cedar allows, and says what it shows', () => {
+    const feedback = deletion.check(
+      evidence({
+        decision: decided({
+          decision: 'allow',
+          determiningPolicies: ['admin-own-tenant'],
+          request: { ...asked, context: { changeWindow: true } },
+        }),
+      }),
+    );
+    expect(feedback.correct).toBe(true);
+    expect(feedback.lines[0]!.text).toContain('changeWindow = true');
+    expect(feedback.lines.at(-1)!.text).toContain('a forbid is never overridden');
+  });
+
+  it('does not take another request for an answer', () => {
+    const feedback = deletion.check(evidence({ decision: fixtures.decisionAllow() }));
+    expect(feedback.correct).toBe(false);
+    expect(feedback.lines[0]!.text).toContain('Keep Carol, the deletion and the Acme customer');
+  });
+});

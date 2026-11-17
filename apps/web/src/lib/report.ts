@@ -13,6 +13,7 @@ import type {
   ReportPhase,
   ReportTransition,
   Topology,
+  ReportObjective,
 } from '@aegis/contracts';
 
 import { formatClock, formatMs, formatPercent, entityId } from './format';
@@ -128,6 +129,26 @@ export function describeOrigin(report: IncidentReport, topology: Topology | null
 }
 
 /** How the incident stands or ended, in one sentence. */
+/** What an objective holds the platform to, in a few words. */
+export function objectiveName(objective: ReportObjective): string {
+  return objective.kind === 'error-rate'
+    ? `Error rate under ${formatPercent(objective.threshold)}`
+    : `Latency p95 under ${formatMs(objective.threshold)}`;
+}
+
+/**
+ * How an objective fared over an incident: met throughout, or not met for
+ * how long and from when. The time is the engine's samples counted, so it
+ * is said in whole seconds and nothing finer.
+ */
+export function describeObjective(
+  objective: ReportObjective,
+  report: Pick<IncidentReport, 'startedAtMs'>,
+): string {
+  if (objective.breachedMs === 0 || objective.firstBreachedAtMs === null) return 'met throughout';
+  return `not met for ${formatClock(objective.breachedMs)}, first at ${sinceStart(report, objective.firstBreachedAtMs)}`;
+}
+
 export function describeOutcome(report: IncidentReport): string {
   if (report.resolvedAtMs === null) {
     return `Still running: ${sinceStart(report, report.observedUntilMs)} recorded so far.`;
@@ -235,6 +256,12 @@ export function reportText(report: IncidentReport, topology: Topology | null): s
   }
   if (report.meanErrorRate !== null) {
     lines.push(`  Mean error rate over the incident: ${formatPercent(report.meanErrorRate)}`);
+  }
+  if (report.objectives.length > 0) {
+    lines.push('', 'Objectives (observed)');
+    for (const objective of report.objectives) {
+      lines.push(`  ${objectiveName(objective)}: ${describeObjective(objective, report)}`);
+    }
   }
 
   if (report.decisions.length > 0) {

@@ -776,3 +776,92 @@ async fn the_comparison_refuses_broken_files_and_respects_the_import_switch() {
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     assert_eq!(reply.body["error"]["code"], "import_disabled");
 }
+
+#[tokio::test]
+async fn the_objectives_are_the_alert_rules_and_their_time_is_counted_from_the_samples() {
+    let state = state();
+    advance(&state, 6);
+    start(&state, "ddos-surge").await;
+    advance(&state, 150);
+
+    let report = get(&state, &path("/incidents/inc-001/report")).await.body;
+    let objectives = report["objectives"].as_array().unwrap();
+    let of = |kind: &str| {
+        objectives
+            .iter()
+            .find(|objective| objective["kind"] == kind)
+            .unwrap_or_else(|| panic!("no objective {kind}"))
+            .clone()
+    };
+    let errors = of("error-rate");
+    let latency = of("latency-p95");
+    assert_eq!(objectives.len(), 2);
+    // No more than one request in twenty failing; a p95 no more than two
+    // and a half times what it was before the incident.
+    assert_eq!(errors["threshold"], 0.05);
+    let rest = report["baseline"]["p95LatencyMs"].as_f64().unwrap();
+    let held = latency["threshold"].as_f64().unwrap();
+    assert!((held / rest - 2.5).abs() < 0.1, "{held} against {rest}");
+
+    // Counted from the engine's own samples, one a second, over the incident.
+    let from = report["startedAtMs"].as_u64().unwrap();
+    let until = report["observedUntilMs"].as_u64().unwrap();
+    let metrics = get(&state, &path("/metrics")).await.body;
+    let during: Vec<&Value> = metrics["history"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|sample| {
+            let at = sample["virtualTimeMs"].as_u64().unwrap();
+            at >= from && at <= until
+        })
+        .collect();
+    let seconds_over = |field: &str, threshold: f64| {
+        during
+            .iter()
+            .filter(|sample| sample[field].as_f64().unwrap() >= threshold)
+            .count() as u64
+    };
+    let failing = seconds_over("errorRate", 0.05);
+    assert!(
+        failing > 10,
+        "a volumetric flood fails requests for a while: {failing} s"
+    );
+    assert_eq!(errors["breachedMs"], failing * 1000);
+    assert_eq!(
+        latency["breachedMs"],
+        seconds_over("p95LatencyMs", held) * 1000
+    );
+    let first = during
+        .iter()
+        .find(|sample| sample["errorRate"].as_f64().unwrap() >= 0.05)
+        .unwrap()["virtualTimeMs"]
+        .clone();
+    assert_eq!(errors["firstBreachedAtMs"], first);
+
+    // It is the rule the engine alerts on: the alert is on the same record.
+    let events = get(&state, &path("/events?limit=1000")).await.body;
+    assert!(strings(&json!(events["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|event| event["title"].clone())
+        .collect::<Vec<_>>()))
+    .contains(&"Error budget burning"));
+
+    // An incident that never fails a request has met that objective throughout.
+    let quiet = common::state();
+    advance(&quiet, 6);
+    start(&quiet, "cedar-denial").await;
+    advance(&quiet, 30);
+    let report = get(&quiet, &path("/incidents/inc-001/report")).await.body;
+    let errors = report["objectives"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|objective| objective["kind"] == "error-rate")
+        .unwrap()
+        .clone();
+    assert_eq!(errors["breachedMs"], 0);
+    assert_eq!(errors["firstBreachedAtMs"], Value::Null);
+}

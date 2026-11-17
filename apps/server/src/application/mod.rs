@@ -7,6 +7,7 @@
 //! recordings). [`SimulationService`] owns the single mutable timeline and is
 //! the only place that advances it.
 
+pub mod access;
 pub mod diff;
 pub mod experiment;
 mod service;

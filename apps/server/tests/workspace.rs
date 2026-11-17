@@ -757,7 +757,9 @@ fn a_mistake_in_a_file_is_reported_with_the_file() {
 
     let empty = TempDir::new();
     fs::create_dir_all(empty.path().join("topologies")).unwrap();
-    assert!(load_error(&empty).message.contains("holds no .json file"));
+    assert!(load_error(&empty)
+        .message
+        .contains("holds no .json or Compose file"));
 
     let file = TempDir::new();
     file.write("scenarios", "not a directory");
@@ -971,4 +973,173 @@ fn an_invalid_workspace_stops_the_server_from_starting() {
         build_state(config(cycle.path())),
         Err(StartupError::Bootstrap(BootstrapError::Topology { .. }))
     ));
+}
+
+const COMPOSE: &str = r#"
+name: shop
+services:
+  proxy:
+    image: nginx:1.27
+    ports: ["8080:80"]
+    depends_on: [web]
+  web:
+    build: ./web
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+      queue:
+        condition: service_started
+  worker:
+    image: ghcr.io/acme/worker:2
+    depends_on: [queue, db]
+  db:
+    image: postgres:16
+  cache:
+    image: redis:7-alpine
+  queue:
+    image: docker.io/library/rabbitmq:3-management
+"#;
+
+#[test]
+fn a_compose_file_is_read_as_a_topology_the_engine_can_run() {
+    let dir = TempDir::new();
+    dir.write("topologies/docker-compose.yml", COMPOSE);
+    let sources = workspace::load(dir.path())
+        .expect("workspace loads")
+        .sources;
+    let spec = sources
+        .topologies
+        .iter()
+        .find(|topology| topology.id == "shop")
+        .expect("the project's name is the platform's");
+    assert_eq!(spec.name, "shop");
+
+    // Its services, each what its image says it is; anything else a container.
+    let kind = |id: &str| {
+        let node = spec
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .unwrap_or_else(|| panic!("no node {id}"));
+        serde_json::to_value(node.service_type).unwrap()
+    };
+    assert_eq!(spec.nodes.len(), 7, "six services and who uses them");
+    assert_eq!(kind("clients"), "external-client");
+    assert_eq!(kind("proxy"), "api-gateway");
+    assert_eq!(kind("web"), "container");
+    assert_eq!(kind("worker"), "container");
+    assert_eq!(kind("db"), "database");
+    assert_eq!(kind("cache"), "database");
+    assert_eq!(kind("queue"), "message-queue");
+
+    // What depends on what, as the file declares it, and nothing more.
+    let mut edges: Vec<String> = spec
+        .edges
+        .iter()
+        .map(|edge| {
+            format!(
+                "{} -> {} ({})",
+                edge.source,
+                edge.target,
+                serde_json::to_value(edge.relationship)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+            )
+        })
+        .collect();
+    edges.sort();
+    assert_eq!(
+        edges,
+        [
+            // Only the proxy publishes a port: it is the way in.
+            "clients -> proxy (route)",
+            "proxy -> web (call)",
+            "web -> cache (data)",
+            "web -> db (data)",
+            "web -> queue (publish)",
+            "worker -> db (data)",
+            "worker -> queue (publish)",
+        ]
+    );
+    let tier = |id: &str| spec.nodes.iter().find(|node| node.id == id).unwrap().tier;
+    assert_eq!(
+        (tier("clients"), tier("proxy"), tier("web"), tier("db")),
+        (0, 1, 2, 3)
+    );
+
+    // It says of itself what was read and what was assumed, and is synthetic.
+    assert_eq!(serde_json::to_value(spec.data_source).unwrap(), "synthetic");
+    assert!(
+        spec.description.contains("docker-compose.yml"),
+        "{}",
+        spec.description
+    );
+    assert!(
+        spec.description.contains("not measurements"),
+        "{}",
+        spec.description
+    );
+    assert_eq!(
+        spec.roles.get("primaryGateway").map(String::as_str),
+        Some("proxy")
+    );
+    assert_eq!(
+        spec.roles.get("primaryDatabase").map(String::as_str),
+        Some("db")
+    );
+
+    // The engine takes it: it compiles, runs, and carries traffic to the store.
+    let assets = Assets::build(sources).expect("the topology compiles");
+    let mut timeline = timeline(&assets, "shop");
+    for _ in 0..50 {
+        timeline.step();
+    }
+    let view = timeline.topology_view();
+    let throughput = |id: &str| {
+        view.nodes
+            .iter()
+            .find(|node| node.id == id)
+            .unwrap()
+            .metrics
+            .throughput_rps
+    };
+    assert!(throughput("proxy") > 50.0, "{}", throughput("proxy"));
+    assert!(throughput("db") > 10.0, "{}", throughput("db"));
+    // The bundled scenarios ask for anchors a Compose file may not have. One
+    // that cannot run says which is missing; it is not made to run anyway.
+    let cascade = timeline
+        .scenarios()
+        .into_iter()
+        .find(|scenario| scenario.id == "cascading-failure")
+        .expect("bundled scenario");
+    assert!(!cascade.available);
+    assert_eq!(
+        cascade.unavailable_reason.as_deref(),
+        Some("topology does not define the `securityMonitor` role")
+    );
+}
+
+#[test]
+fn a_compose_file_that_cannot_be_a_topology_says_why() {
+    let refused = |text: &str| {
+        let dir = TempDir::new();
+        dir.write("topologies/compose.yaml", text);
+        load_error(&dir).to_string()
+    };
+    let unknown = refused("services:\n  web:\n    image: app\n    depends_on: [db]\n");
+    assert!(
+        unknown.contains("compose.yaml") && unknown.contains("depends on `db`"),
+        "{unknown}"
+    );
+    let circle = refused(
+        "services:\n  a:\n    image: app\n    ports: ['80']\n    depends_on: [b]\n  b:\n    image: app\n    depends_on: [a]\n",
+    );
+    assert!(circle.contains("in a circle"), "{circle}");
+    let none = refused("volumes:\n  data: {}\n");
+    assert!(none.contains("no `services`"), "{none}");
+    let empty = refused("services: {}\n");
+    assert!(empty.contains("declares no service"), "{empty}");
 }

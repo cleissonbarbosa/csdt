@@ -173,6 +173,34 @@ pub struct ReportDecision {
     pub first_seq: u64,
 }
 
+/// What an objective of the platform holds it to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ObjectiveKind {
+    /// The share of client requests that fail.
+    ErrorRate,
+    /// The 95th percentile of latency, against what it is at rest.
+    LatencyP95,
+}
+
+/// One of the platform's objectives over an incident: the figure it holds
+/// the platform under, and how long it was not met. The objectives are the
+/// ones the engine's own detection rules raise an alert on; how long is
+/// counted from the samples it recorded, one a second, and nothing is
+/// estimated between two of them.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportObjective {
+    pub kind: ObjectiveKind,
+    /// A share of requests for the error rate; milliseconds for latency.
+    pub threshold: f64,
+    /// How long the figure was at or over the threshold, over what the
+    /// report covers of the incident.
+    pub breached_ms: u64,
+    /// When it first was, on the simulation clock.
+    pub first_breached_at_ms: Option<u64>,
+}
+
 /// A figure and the moment it was reached.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -271,6 +299,8 @@ pub struct IncidentReport {
     pub peak_unhealthy: Option<Peak>,
     /// Mean share of failing client requests over the incident.
     pub mean_error_rate: Option<f64>,
+    /// The platform's objectives, and how long each was not met.
+    pub objectives: Vec<ReportObjective>,
     /// Set when lists were cut to their bound.
     pub truncated: bool,
 }

@@ -42,9 +42,21 @@ export function Badge({ color, children, className, title }: BadgeProps) {
  * alone: a triangle for degraded, a square for critical, a cross for down.
  * Healthy has no mark at all: normal is silent.
  */
-export function HealthGlyph({ health, size = 9 }: { health: Health; size?: number }) {
+export function HealthGlyph({
+  health,
+  size = 9,
+  plain = false,
+}: {
+  health: Health;
+  size?: number;
+  /**
+   * In the ink of the text around it, without the state's colour: for a
+   * state that is not the platform's own, such as one a trial arrived at.
+   */
+  plain?: boolean;
+}) {
   if (health === 'healthy') return null;
-  const color = HEALTH_COLOR[health];
+  const color = plain ? 'currentColor' : HEALTH_COLOR[health];
   return (
     <svg
       width={size}

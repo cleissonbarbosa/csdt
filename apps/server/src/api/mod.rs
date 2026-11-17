@@ -82,6 +82,7 @@ fn route_table() -> Router<AppState> {
             "/demo/experiments/compare",
             post(routes::experiment_compare),
         )
+        .route("/demo/experiments/trial", post(routes::experiment_trial))
         .route("/workspace", get(routes::workspace))
         .route("/workspace/export", get(routes::workspace_export))
         .route(
@@ -108,6 +109,14 @@ fn route_table() -> Router<AppState> {
         .route(
             "/demo/authorization/evaluate",
             post(routes::authorization_evaluate),
+        )
+        .route(
+            "/demo/authorization/explain",
+            post(routes::authorization_explain),
+        )
+        .route(
+            "/demo/authorization/matrix",
+            post(routes::authorization_matrix),
         )
 }
 

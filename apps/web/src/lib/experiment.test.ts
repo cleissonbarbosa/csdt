@@ -7,8 +7,12 @@ import {
   comparedRows,
   INTERVENTIONS,
   interventionEffect,
+  lowestAt,
+  MAX_SWEEP,
+  parseSweep,
   placedAtMs,
   sameUntilPlaced,
+  sweepOf,
 } from './experiment';
 import { formatPercent } from './format';
 
@@ -23,8 +27,22 @@ describe('two runs of one incident', () => {
       'peak-latency',
       'affected',
       'at-once',
+      'objective-error-rate',
+      'objective-latency-p95',
       'recovered',
     ]);
+    // With three times the capacity the error objective is met throughout,
+    // where the incident as it is misses it for seventeen seconds.
+    const errors = rows.find((row) => row.id === 'objective-error-rate')!;
+    expect(errors.label).toBe('Error rate at 5.00% or over for');
+    expect(errors.a).toBe('0:17');
+    expect(errors.b).toBe('met throughout');
+    expect(errors.delta).toBe('−0:17');
+    expect(rows.find((row) => row.id === 'objective-latency-p95')).toMatchObject({
+      a: 'met throughout',
+      b: 'met throughout',
+      delta: '',
+    });
     const peak = rows[0]!;
     expect(peak.a).toBe(formatPercent(experiment.baseline.report.peakErrorRate!.value));
     expect(peak.b).toBe(formatPercent(experiment.variant.report.peakErrorRate!.value));
@@ -94,5 +112,53 @@ describe('an intervention', () => {
     for (const choice of INTERVENTIONS) {
       expect(interventionEffect(choice.kind, 'x', choice.value).type).toBe(choice.kind);
     }
+  });
+});
+
+describe('one intervention at several figures', () => {
+  /** The sample's comparison, as if it had been run at another figure with another outcome. */
+  const at = (value: number, peakError: number) => ({
+    value,
+    experiment: {
+      ...experiment,
+      variant: {
+        ...experiment.variant,
+        report: {
+          ...experiment.variant.report,
+          peakErrorRate: { value: peakError, atMs: 0 },
+        },
+      },
+    } as typeof experiment,
+  });
+
+  it('reads the figures written in a field, and refuses what is not one', () => {
+    expect(parseSweep('0.5, 1, 2', 'factor')).toEqual([0.5, 1, 2]);
+    expect(parseSweep(' 5;10  20 ', 'percent')).toEqual([5, 10, 20]);
+    // Written twice is run once.
+    expect(parseSweep('2, 2, 3', 'factor')).toEqual([2, 3]);
+    expect(parseSweep('', 'factor')).toBeNull();
+    expect(parseSweep('1, two', 'factor')).toBeNull();
+    expect(parseSweep('-1', 'factor')).toBeNull();
+    expect(parseSweep('120', 'percent')).toBeNull();
+    expect(
+      parseSweep(Array.from({ length: MAX_SWEEP + 1 }, (_, i) => i).join(','), 'factor'),
+    ).toBeNull();
+  });
+
+  it('lines the runs up by figure, each number read from its own report', () => {
+    const sweep = sweepOf([at(3, 0.31), at(1, 0.22), at(2, 0.4)])!;
+    expect(sweep.points.map((point) => point.value)).toEqual([1, 2, 3]);
+    expect(sweep.points.map((point) => point.peakErrorRate)).toEqual([0.22, 0.4, 0.31]);
+    // The incident as it is does not depend on the figure tried.
+    expect(sweep.baseline.peakErrorRate).toBe(experiment.baseline.report.peakErrorRate?.value);
+    expect(sweep.baseline.affected).toBe(experiment.baseline.report.impactedNodeIds.length);
+    expect(sweepOf([])).toBeNull();
+  });
+
+  it('says at which figure a measure was lowest', () => {
+    const sweep = sweepOf([at(1, 0.22), at(2, 0.4), at(3, 0.22)])!;
+    // The smaller figure on a tie: the least that was needed.
+    expect(lowestAt(sweep, (point) => point.peakErrorRate)).toBe(1);
+    expect(lowestAt(sweep, () => null)).toBeNull();
   });
 });

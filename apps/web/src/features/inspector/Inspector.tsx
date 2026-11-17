@@ -40,6 +40,7 @@ import {
 } from '@/stores/telemetry';
 import { useUi, type Selection } from '@/stores/ui';
 
+import { Exposure } from './Exposure';
 import { Faults } from './Faults';
 import { GroupCard } from './GroupCard';
 
@@ -338,6 +339,7 @@ function NodeInspector({
           <p className="text-xs text-ink-faint">Nothing calls this service.</p>
         )}
       </Fold>
+      <Exposure topology={topology} nodeId={topology.nodes[nodeIndex]!.id} />
       <Faults topology={topology} snapshot={snapshot} position={{ node: nodeIndex }} />
 
       {decisions.length > 0 && (

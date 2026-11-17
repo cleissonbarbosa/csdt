@@ -93,6 +93,22 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
     b: String(unwellB),
     delta: signed(unwellB - unwellA, (v) => String(v)),
   });
+  // How long each objective was not met, where both runs report it.
+  for (const objective of a.objectives) {
+    const other = b.objectives.find((entry) => entry.kind === objective.kind);
+    if (!other) continue;
+    const time = (ms: number) => (ms === 0 ? 'met throughout' : formatClock(ms));
+    rows.push({
+      id: `objective-${objective.kind}`,
+      label:
+        objective.kind === 'error-rate'
+          ? `Error rate at ${formatPercent(objective.threshold)} or over for`
+          : `Latency p95 at ${formatMs(objective.threshold)} or over for`,
+      a: time(objective.breachedMs),
+      b: time(other.breachedMs),
+      delta: signed(other.breachedMs - objective.breachedMs, (v) => formatClock(v)),
+    });
+  }
   const backA = recovery(experiment.baseline);
   const backB = recovery(experiment.variant);
   rows.push({
@@ -200,4 +216,93 @@ export function interventionEffect(
     case 'down':
       return { type: 'down', nodes };
   }
+}
+
+// -- one intervention at several figures ------------------------------------
+
+/** The figures a sweep starts from, for a kind of intervention that has one. */
+export const SWEEP_VALUES: Record<'factor' | 'percent', readonly number[]> = {
+  factor: [0.5, 1, 1.5, 2, 3],
+  percent: [5, 10, 20, 40],
+};
+/** Most figures tried in one sweep: each is two simulated runs. */
+export const MAX_SWEEP = 8;
+
+/**
+ * The figures written in a field, in the order they were written, without
+ * repeats. `null` when something in it is not a figure, there are none, or
+ * there are too many to run.
+ */
+export function parseSweep(text: string, unit: 'factor' | 'percent'): number[] | null {
+  const parts = text
+    .split(/[\s,;]+/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+  if (parts.length === 0 || parts.length > MAX_SWEEP) return null;
+  const values: number[] = [];
+  for (const part of parts) {
+    const value = Number(part);
+    if (!Number.isFinite(value) || value < 0 || (unit === 'percent' && value > 100)) return null;
+    if (!values.includes(value)) values.push(value);
+  }
+  return values;
+}
+
+/** One run of a sweep, read from its report: what the figure it was run at did. */
+export interface SweepPoint {
+  value: number;
+  peakErrorRate: number | null;
+  peakP95LatencyMs: number | null;
+  affected: number;
+  /** When everything was back to normal, from the start of the incident; `null` if not within the run. */
+  recoveredMs: number | null;
+}
+
+export interface Sweep {
+  /** The incident as it is: the same in every comparison, since the seed is. */
+  baseline: Omit<SweepPoint, 'value'>;
+  points: SweepPoint[];
+}
+
+function pointOf(run: ExperimentRun): Omit<SweepPoint, 'value'> {
+  const { report } = run;
+  return {
+    peakErrorRate: report.peakErrorRate?.value ?? null,
+    peakP95LatencyMs: report.peakP95LatencyMs?.value ?? null,
+    affected: report.impactedNodeIds.length,
+    recoveredMs:
+      report.recoveredAtMs === null || report.impactedNodeIds.length === 0
+        ? null
+        : report.recoveredAtMs - report.startedAtMs,
+  };
+}
+
+/**
+ * Several comparisons of one incident, each with the same intervention at
+ * another figure, lined up by figure. Every number is read from a report of
+ * a run the engine made; none is interpolated between two figures.
+ */
+export function sweepOf(runs: readonly { value: number; experiment: Experiment }[]): Sweep | null {
+  const first = runs[0];
+  if (!first) return null;
+  return {
+    baseline: pointOf(first.experiment.baseline),
+    points: runs
+      .map((run) => ({ value: run.value, ...pointOf(run.experiment.variant) }))
+      .sort((a, b) => a.value - b.value),
+  };
+}
+
+/** The figure of a sweep at which a measure was lowest, the smaller figure on a tie. */
+export function lowestAt(
+  sweep: Sweep,
+  measure: (point: Omit<SweepPoint, 'value'>) => number | null,
+): number | null {
+  let best: { value: number; measured: number } | null = null;
+  for (const point of sweep.points) {
+    const measured = measure(point);
+    if (measured === null) continue;
+    if (best === null || measured < best.measured - 1e-12) best = { value: point.value, measured };
+  }
+  return best?.value ?? null;
 }

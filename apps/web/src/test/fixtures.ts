@@ -3,8 +3,10 @@
  * the same schemas the application uses.
  */
 import {
+  AccessMatrixSchema,
   AuthorizationCatalogSchema,
   AuthorizationDecisionSchema,
+  AuthorizationExplanationSchema,
   EventsResponseSchema,
   ExperimentSchema,
   IncidentReportSchema,
@@ -17,6 +19,7 @@ import {
   StreamMessageSchema,
   TopologiesResponseSchema,
   TopologySchema,
+  TrialSchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
   WorkspaceDiffSchema,
@@ -39,6 +42,13 @@ function sample<T>(name: string, schema: z.ZodType<T>): T {
 }
 
 export const topology = () => sample('topology', TopologySchema);
+/** The orders database taken out of service, tried on the platform at rest. */
+export const trial = () => sample('trial', TrialSchema);
+/** Bob refunding an order above the support limit, taken policy by policy. */
+export const explanation = () =>
+  sample('authorization-explanation', AuthorizationExplanationSchema);
+/** Every request of the bundled catalogue, with a fresh MFA assertion in the context. */
+export const accessMatrix = () => sample('access-matrix', AccessMatrixSchema);
 export const topologies = () => sample('topologies', TopologiesResponseSchema);
 export const scenarios = () => sample('scenarios', ScenariosResponseSchema);
 export const incidents = () => sample('incidents', IncidentsResponseSchema);

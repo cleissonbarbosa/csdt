@@ -30,6 +30,10 @@ export const queryKeys = {
   providers: ['providers'] as const,
   catalog: ['authorization', 'catalog'] as const,
   decisions: ['authorization', 'decisions'] as const,
+  /** What Cedar says of a request, or of all of them, under the policies in force. */
+  asked: ['authorization', 'asked'] as const,
+  explanation: (request: unknown) => ['authorization', 'asked', 'explanation', request] as const,
+  matrix: (question: unknown) => ['authorization', 'asked', 'matrix', question] as const,
   workspace: ['workspace'] as const,
 };
 
@@ -45,6 +49,7 @@ export function invalidateWorkspaceQueries(): void {
     queryKeys.topologies,
     queryKeys.catalog,
     queryKeys.decisions,
+    queryKeys.asked,
     queryKeys.workspace,
   ]) {
     void queryClient.invalidateQueries({ queryKey: key });

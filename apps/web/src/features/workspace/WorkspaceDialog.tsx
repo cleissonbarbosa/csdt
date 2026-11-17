@@ -203,7 +203,9 @@ function Import() {
       <p className="mt-1 text-xs leading-relaxed text-ink-dim">
         A topology, scenarios, recordings, Cedar policies, entities, a catalogue, a whole workspace
         folder, or a file saved from here. Each kind of file you add replaces that part of{' '}
-        {HOST.started}; the rest stays.
+        {HOST.started}; the rest stays. A Compose file (<span className="code">.yml</span>) is read
+        as a topology: its services and what each depends on are taken from it, and its traffic and
+        latencies, which it does not state, are defaults.
       </p>
 
       <div
@@ -239,7 +241,7 @@ function Import() {
           type="file"
           multiple
           hidden
-          accept=".json,.cedar,.cedarschema"
+          accept=".json,.cedar,.cedarschema,.yml,.yaml"
           aria-label="Files to import"
           data-testid="workspace-files"
           onChange={(event) => {

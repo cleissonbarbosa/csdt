@@ -1104,3 +1104,126 @@ test('uploaded policies are compared with the ones in use before anything is app
     'bundled',
   );
 });
+
+test('a denial is taken policy by policy, everyone is asked at once, and edited policies change the answers', async ({
+  page,
+}) => {
+  await openApp(page);
+  await fromMenu(page, 'trace');
+  const form = page.getByTestId('authz-form');
+  await form.getByTestId('authz-principal').selectOption('User::"bob"');
+  await form.getByTestId('authz-action').selectOption('Action::"refundOrder"');
+  await form.getByTestId('authz-resource').selectOption('Order::"acme-ord-9000"');
+  await page.getByTestId('authz-evaluate').click();
+
+  // Nothing permits a refund this large and Cedar names no policy. Put to
+  // the request one by one, the permit that came closest is the refund limit.
+  const card = page.getByTestId('decision-card');
+  await expect(card).toHaveAttribute('data-decision', 'deny');
+  await expect(card.getByTestId('policy-closest')).toContainText(
+    'support-refund-limit is about this request, but its condition does not hold',
+  );
+  await expect(card.getByTestId('standing-support-refund-limit')).toHaveAttribute(
+    'data-standing',
+    'near',
+  );
+  // Asking that recorded nothing more: one decision is on the timeline.
+  await expect(page.getByTestId('recent-decisions').getByRole('listitem')).toHaveCount(1);
+
+  // Every request of the catalogue, asked of the same engine.
+  await page.getByTestId('open-matrix').click();
+  const matrix = page.getByTestId('access-matrix');
+  await expect(matrix.getByTestId('matrix-summary')).toHaveText('Cedar allows 20 of 84 requests.');
+  // Bob, refunding: one order of three.
+  const refunds = matrix.getByTestId('matrix-cell-1-1');
+  await expect(refunds).toHaveText('1 of 3');
+  await refunds.click();
+  await expect(matrix.getByTestId('matrix-answer')).toHaveCount(3);
+  // With a policy switched off the same requests are asked again, and what moved is counted.
+  await matrix.getByText(/Policies in force: 9 of 9/).click();
+  await matrix.getByRole('switch', { name: /^forbid-suspended/ }).click();
+  await expect(matrix.getByTestId('matrix-summary')).toContainText(
+    'differ from all policies in force',
+  );
+  await matrix.getByRole('switch', { name: /^forbid-suspended/ }).click();
+  await expect(matrix.getByTestId('matrix-summary')).toHaveText('Cedar allows 20 of 84 requests.');
+
+  // The policies are edited in the page: the limit is raised tenfold. The
+  // engine checks the text and applies it only when asked.
+  await matrix.getByTestId('matrix-edit-policies').click();
+  const editor = page.getByTestId('policy-editor');
+  const text = editor.getByTestId('policy-text');
+  const before = await text.inputValue();
+  expect(before).toContain('resource.amount <= 500');
+  await text.fill(before.replace('permit(principal', 'permitt(principal'));
+  await expect(editor.getByTestId('policy-check')).toContainText('Not valid.');
+  await expect(editor.getByTestId('policy-apply')).toBeDisabled();
+  await text.fill(before.replace('resource.amount <= 500', 'resource.amount <= 5000'));
+  await expect(editor.getByTestId('policy-check')).toContainText('Cedar accepts them: 9 policies.');
+  await editor.getByTestId('policy-apply').click();
+
+  // Back at the matrix, under the policies now in force: one more answer is yes.
+  await expect(page.getByTestId('matrix-summary')).toHaveText('Cedar allows 21 of 84 requests.');
+  await expect(page.getByTestId('matrix-cell-1-1')).toHaveText('2 of 3');
+});
+
+test('a fault is tried on a timeline of its own before it is placed', async ({ page }) => {
+  await openApp(page);
+  await page.goto('/?arrangement=regions&select=node%3Ause-orders-db');
+  await waitForScene(page, SERVICES);
+  const faults = page.getByTestId('node-inspector').getByTestId('faults');
+  await faults.getByText('Faults').click();
+  await faults.getByTestId('fault-try').selectOption('down');
+
+  // What the engine recorded with the store out of reach, in order.
+  const trial = faults.getByTestId('fault-trial');
+  await expect(trial).toContainText('Tried, not placed: unreachable');
+  await expect(trial).toHaveAttribute('data-affected', '12');
+  await expect(trial.getByTestId('trial-affected').getByRole('listitem').first()).toContainText(
+    'Orders DB',
+  );
+  await expect(trial.getByTestId('trial-errors')).toContainText('up to 5.22%');
+  // The platform in use is as it was: nothing placed, all normal, and still
+  // nothing on its timeline, which is why the timeline is not on screen.
+  const status = page.getByTestId('platform-status');
+  await expect(status).toHaveAttribute('data-level', 'healthy');
+  await expect(status).toHaveAttribute('data-faults', '0');
+  await expect(page.getByTestId('timeline')).toHaveCount(0);
+  // What it reached is kept in front in the viewer's colour; nothing takes a signal's.
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(5);
+
+  // Placing it is placing the fault that was tried.
+  await trial.getByTestId('trial-place').click();
+  await expect(status).toHaveAttribute('data-faults', '1');
+  await expect(faults.getByTestId('fault-trial')).toHaveCount(0);
+});
+
+test('a link offers a challenge, and a service says what it is exposed to', async ({ page }) => {
+  await openApp(page);
+  await page.goto('/?challenge=region-dark');
+  const guide = page.getByTestId('guide');
+  // Offered first, and not started: the simulation is still at rest.
+  await expect(guide.getByTestId('guide-item-region-dark')).toHaveAttribute('data-invited', 'true');
+  await expect(guide.getByRole('listitem').first()).toContainText('Find the region that went dark');
+  await expect(guide.getByTestId('guide-progress')).toHaveText('0 of 6 solved');
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '0');
+  await page.getByTestId('guide-close').click();
+
+  // Requests for an order end at the orders service: its card follows its
+  // connections out and back, and counts what Cedar answers about orders.
+  await page.goto('/?arrangement=regions&select=node%3Ause-orders');
+  await waitForScene(page, SERVICES);
+  const exposure = page.getByTestId('node-inspector').getByTestId('node-exposure');
+  await exposure.getByText('Exposure').click();
+  await expect(exposure.getByTestId('exposure-reaches')).toContainText(/It reaches \d+ services/);
+  await expect(exposure.getByTestId('exposure-way-in')).toContainText(
+    'The shortest way in from outside, 3 connections',
+  );
+  await expect(exposure.getByTestId('exposure-guarded')).toContainText(
+    /Of the \d+ the catalogue describes, Cedar allows \d+/,
+  );
+  await exposure.getByTestId('exposure-show').click();
+  await expect(exposure.getByTestId('exposure-show')).toHaveAttribute('aria-pressed', 'true');
+  await exposure.getByTestId('exposure-matrix').click();
+  await expect(page.getByTestId('access-matrix')).toBeVisible();
+});

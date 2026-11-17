@@ -612,6 +612,20 @@
         "atMs": 18600
       },
       "meanErrorRate": 0.0157,
+      "objectives": [
+        {
+          "kind": "error-rate",
+          "threshold": 0.05,
+          "breachedMs": 17000,
+          "firstBreachedAtMs": 19000
+        },
+        {
+          "kind": "latency-p95",
+          "threshold": 417.0,
+          "breachedMs": 0,
+          "firstBreachedAtMs": null
+        }
+      ],
       "truncated": false
     },
     "samples": [
@@ -2427,6 +2441,20 @@
         "atMs": 19400
       },
       "meanErrorRate": 0.0,
+      "objectives": [
+        {
+          "kind": "error-rate",
+          "threshold": 0.05,
+          "breachedMs": 0,
+          "firstBreachedAtMs": null
+        },
+        {
+          "kind": "latency-p95",
+          "threshold": 417.0,
+          "breachedMs": 0,
+          "firstBreachedAtMs": null
+        }
+      ],
       "truncated": false
     },
     "samples": [

@@ -667,3 +667,27 @@ async fn import_requests_are_validated_and_bounded() {
     );
     assert_eq!(status(&state).await["origin"], "bundled");
 }
+
+#[test]
+fn a_compose_file_dropped_on_its_own_is_taken_for_a_topology() {
+    let compose = SourceFile {
+        path: "docker-compose.yml".into(),
+        text: "services:\n  web:\n    image: nginx\n    ports: ['80:80']\n    depends_on: [db]\n  db:\n    image: postgres:16\n".into(),
+    };
+    let workspace = from_files(vec![compose], bundled()).expect("a Compose file is a topology");
+    assert_eq!(workspace.replaced, ["topologies"]);
+    // With no name of its own the project goes by its file's.
+    let topology = &workspace.sources.topologies[0];
+    assert_eq!(topology.id, "docker-compose");
+    assert_eq!(topology.nodes.len(), 3);
+    // The rest of what the page opened with stays.
+    assert_eq!(workspace.sources.scenarios.len(), bundled().scenarios.len());
+
+    // Any other YAML is said to be what it is, not passed over in silence.
+    let other = SourceFile {
+        path: "values.yaml".into(),
+        text: "replicaCount: 2\n".into(),
+    };
+    let error = from_files(vec![other], bundled()).expect_err("refused");
+    assert!(error.message.contains("not a Compose file"), "{error}");
+}

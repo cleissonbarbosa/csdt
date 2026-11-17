@@ -101,9 +101,23 @@ bar (it is also in **⋯**, as **Trace a request through Cedar**).
 7. Switch off `forbid-destructive-outside-change-window` and try **Carol**
    deleting a customer.
 
+8. Look under any decision at **Policy by policy**. For Mallory's export it
+   says which policy holds; for a denial by default, where Cedar names no
+   policy, it says which permit came nearest and why it did not hold. Each
+   line is Cedar asked about that one policy.
+
 These decisions come from the `cedar-policy` engine evaluating the policies
 shown in the card. Nothing is scripted. Close the card and the path is put
 away with it.
+
+**⋯ → Who may do what** asks Cedar every request the catalogue describes and
+lays the answers out, principals down and actions across. Set the context or
+switch a policy off and the cells that changed are marked; pick a cell and
+**Trace it** to see that request cross the model. **Edit the policies** opens
+the policies in force as Cedar text: change one, read what Cedar would decide
+differently, and **Apply these policies** to come back to the matrix under
+them. **Import or export files → Return to what the server started with**
+undoes it.
 
 ## 4 · Launch an incident (90 s)
 
@@ -164,7 +178,15 @@ and press **Run both**: the engine runs the incident twice from the same
 seed, once as it is and once with six times the database's capacity placed
 21 seconds in. The dialog says exactly what changed, lays errors, latency,
 services affected and recovery side by side, and draws both runs. **Watch
-run B on the timeline** puts it there to scrub.
+run B on the timeline** puts it there to scrub. Below the form, **Run them
+all** runs the same change at several figures and charts them.
+
+To see what a fault would do before placing it, open a service, open
+**Faults** on its card and choose one under **Try one first, without placing
+it**. The card lists the services that would leave normal and when, and the
+model brings them forward. Nothing has happened on the timeline. The same
+card's **Exposure** says what the service could reach, how it is reached
+from outside and how Cedar answers the requests that end at it.
 
 ## 5c · Take it with you
 
@@ -174,9 +196,11 @@ the view. **Copy a link** carries it in the address; **Save as a file**
 carries the platform's files too when they are not the bundled ones. Opening
 either shows the session first and simulates it again only when asked.
 
-**⋯ → Guided challenges** asks three questions and checks the answers
-against the model: where a cascade begins, where a flood is stopped, how to
-make Cedar allow an export it denied.
+**⋯ → Guided challenges** asks six questions and checks the answers against
+the model: where a cascade begins, where a flood is stopped, how to make
+Cedar allow an export it denied, which rule stops a contractor, which region
+goes dark, which deletion nobody may make. Each has a link that opens the
+application on it.
 
 ## 6 · The other four incidents
 

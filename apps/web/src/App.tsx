@@ -1,8 +1,9 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { X } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
+import { embedFromSearch } from '@/app/embed';
 import { useMinWidth, useReportedHeight } from '@/app/hooks';
 import { IN_BROWSER } from '@/app/host';
 import { useAegisConnection } from '@/app/useAegisConnection';
@@ -10,7 +11,9 @@ import { useUrlView } from '@/app/urlState';
 import { usePresence } from '@/app/usePresence';
 import { useTheme } from '@/app/useTheme';
 import { Button, IconButton } from '@/components/ui/Button';
+import { AccessMatrixDialog } from '@/features/authorization/AccessMatrixDialog';
 import { AuthorizationExplorer } from '@/features/authorization/AuthorizationExplorer';
+import { PolicyEditorDialog } from '@/features/authorization/PolicyEditorDialog';
 import { CommandPalette } from '@/features/command/CommandPalette';
 import { ExperimentDialog } from '@/features/experiments/ExperimentDialog';
 import { Explorer } from '@/features/explorer/Explorer';
@@ -29,6 +32,7 @@ import { TopologyTable } from '@/features/scene/TopologyTable';
 import { SettingsDialog } from '@/features/settings/SettingsDialog';
 import { WorkspaceDialog } from '@/features/workspace/WorkspaceDialog';
 import { Timeline, useTimelineHeight, useTimelineVisible } from '@/features/timeline/Timeline';
+import { EmbedBar } from '@/features/topnav/EmbedBar';
 import { TopNav } from '@/features/topnav/TopNav';
 import { sceneHandle } from '@/graphics/handle';
 import {
@@ -269,11 +273,30 @@ function Unreachable({ message }: { message: string }) {
   );
 }
 
+/**
+ * An embed that names a scenario has it running. Only where the engine is
+ * this page's own: on a server the simulation is shared, and an address
+ * must not start an incident in it. Once, and not over one already running.
+ */
+function useEmbeddedScenario(scenarioId: string | null): void {
+  const ready = useTelemetry((state) => state.topology !== null && state.snapshot !== null);
+  const started = useRef(false);
+  useEffect(() => {
+    if (!IN_BROWSER || scenarioId === null || !ready || started.current) return;
+    started.current = true;
+    if (useTelemetry.getState().snapshot?.incident == null) void actions.startScenario(scenarioId);
+  }, [scenarioId, ready]);
+}
+
 export function App() {
   useAegisConnection();
   useUrlView();
   useShortcuts();
   const theme = useTheme();
+  // Read once: an address that changes under the page does not turn it into
+  // an embed, or out of one.
+  const embed = useMemo(() => embedFromSearch(window.location.search), []);
+  useEmbeddedScenario(embed?.scenarioId ?? null);
 
   const viewMode = useUi((state) => state.viewMode);
   const explorerOpen = useUi((state) => state.explorerOpen);
@@ -390,7 +413,7 @@ export function App() {
       >
         Skip to the topology
       </a>
-      <TopNav />
+      {embed === null && <TopNav />}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <main
@@ -518,7 +541,12 @@ export function App() {
           </div>
         </Sheet>
 
-        <Orientation bottom={GUTTER + foot} onHeight={setOrientation} />
+        {/* An embed has no bar and is nobody's first visit to the application. */}
+        {embed === null ? (
+          <Orientation bottom={GUTTER + foot} onHeight={setOrientation} />
+        ) : (
+          <EmbedBar />
+        )}
         <GuideCard
           left={guideAlongFoot ? GUTTER : left + GUTTER}
           bottom={GUTTER + foot}
@@ -532,6 +560,8 @@ export function App() {
       <SettingsDialog />
       <WorkspaceDialog />
       <ExperimentDialog />
+      <AccessMatrixDialog />
+      <PolicyEditorDialog />
       <SessionDialog />
       <ScenarioEditor />
       <HelpDialog />

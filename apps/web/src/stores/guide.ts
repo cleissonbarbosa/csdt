@@ -32,8 +32,14 @@ export interface GuideState {
   /** The challenge under way. */
   activeId: string | null;
   feedback: Feedback | null;
+  /** The challenge a link asked for: offered first, and started by the viewer. */
+  invitedId: string | null;
 
   setOriented: () => void;
+  /** Opens the guide on the challenge a link named. Nothing is started. */
+  invite: (id: string) => void;
+  /** Forgets which challenges were solved. */
+  forget: () => void;
   setOpen: (open: boolean) => void;
   begin: (id: string) => void;
   /** Back to the list of challenges. */
@@ -49,8 +55,11 @@ export const useGuide = create<GuideState>()(
       open: false,
       activeId: null,
       feedback: null,
+      invitedId: null,
 
       setOriented: () => set({ oriented: true }),
+      invite: (invitedId) => set({ invitedId, open: true, oriented: true }),
+      forget: () => set({ completed: [] }),
       // Closing the card ends the challenge; opening it also counts as
       // having found one's way in.
       setOpen: (open) =>

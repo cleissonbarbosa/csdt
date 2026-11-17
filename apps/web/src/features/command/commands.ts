@@ -105,6 +105,20 @@ export function buildCommands(context: CommandContext): Command[] {
       run: () => act.openPanel('authorization'),
     },
     {
+      id: 'matrix',
+      group: 'Actions',
+      title: 'See who may do what',
+      hint: 'Cedar',
+      run: () => act.openPanel('matrix'),
+    },
+    {
+      id: 'policies',
+      group: 'Actions',
+      title: 'Edit the Cedar policies',
+      hint: 'Cedar',
+      run: () => act.openPanel('policies'),
+    },
+    {
       id: 'experiment',
       group: 'Actions',
       title: 'Compare an intervention',

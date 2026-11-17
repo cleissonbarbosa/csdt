@@ -23,6 +23,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    // The static site's service worker: plain script, the worker's globals.
+    files: ['src/engine/offline.sw.js'],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     // Playwright scripts: Node code with callbacks that run inside the page.
     files: ['scripts/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },

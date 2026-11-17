@@ -473,6 +473,9 @@ export class SceneController {
   private labelAlign: [number, number] = [0, 0.5];
   /** Whether the stage is taller than wide, which the overview is seen differently on. */
   private upright = false;
+  /** See `setReached`. */
+  private reached = new Uint8Array(0);
+  private reachedAny = false;
   /** The size of the stage the shot and the names were last taken for. */
   private stageWidth = 0;
   private stageHeight = 0;
@@ -678,6 +681,8 @@ export class SceneController {
       this.edgeDrawFrom = new Float32Array(m).fill(1);
       this.hasSnapshot = false;
       this.selectedNode = this.selectedEdge = this.hoveredNode = -1;
+      this.reached = new Uint8Array(n);
+      this.reachedAny = false;
       this.trace = null;
       this.userMoved = false;
       topology.nodes.forEach((node, i) => {
@@ -1285,13 +1290,34 @@ export class SceneController {
    * which connections are inked, and which pieces and connections form the
    * neighbourhood that stays in front while the rest recedes.
    */
+  /**
+   * The pieces a question of the viewer's reached, to be kept in front with
+   * what is selected while the rest recedes: the services a fault that was
+   * tried, not placed, took out of their normal state. They are an answer
+   * to the viewer, so the connections among them take the focus colour and
+   * the pieces themselves take none: on the timeline in use they are well.
+   */
+  setReached(nodeIds: readonly string[]): void {
+    const reached = new Uint8Array(this.n);
+    let any = false;
+    for (const id of nodeIds) {
+      const i = this.nodeIds.indexOf(id);
+      if (i < 0) continue;
+      reached[i] = 1;
+      any = true;
+    }
+    this.reached = reached;
+    this.reachedAny = any;
+    this.refreshHighlights();
+  }
+
   private refreshHighlights(): void {
     this.edgeHighlight.fill(0);
     this.related.fill(0);
     this.edgeRelated.fill(0);
     const tracing = this.trace !== null;
     const selecting = this.selectedNode >= 0 || this.selectedEdge >= 0;
-    this.focusActive = tracing || selecting || this.routed;
+    this.focusActive = tracing || selecting || this.routed || this.reachedAny;
     if (this.trace) {
       // A traced request is the one thing on stage: its path, and nothing else.
       for (const e of this.trace.edges) {
@@ -1324,6 +1350,15 @@ export class SceneController {
           this.edgeRelated[e] = 1;
           this.related[this.edgeSource[e]!] = 1;
           this.related[this.edgeTarget[e]!] = 1;
+        }
+      }
+    }
+    if (this.reachedAny && this.reached.length === this.n) {
+      for (let i = 0; i < this.n; i++) if (this.reached[i] === 1) this.related[i] = 1;
+      for (let e = 0; e < this.m; e++) {
+        if (this.reached[this.edgeSource[e]!] === 1 && this.reached[this.edgeTarget[e]!] === 1) {
+          this.edgeHighlight[e] = Math.max(this.edgeHighlight[e]!, 0.75);
+          this.edgeRelated[e] = 1;
         }
       }
     }

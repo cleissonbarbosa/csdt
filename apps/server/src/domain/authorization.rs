@@ -92,6 +92,68 @@ pub struct AuthorizationDecision {
     pub data_source: DataSource,
 }
 
+/// How one policy stands to one request. Both facts are Cedar's own: the
+/// policy was evaluated by itself, and once more with its conditions left
+/// out. Neither is inferred from the policy's text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyStanding {
+    pub policy_id: String,
+    pub effect: PolicyEffect,
+    /// Whether the policy's scope (who, what, on which thing) takes in the
+    /// request, whatever its conditions say.
+    pub in_scope: bool,
+    /// Whether the policy as a whole holds for the request: its scope and
+    /// its conditions.
+    pub holds: bool,
+}
+
+/// A request explained policy by policy: Cedar's decision, and how each
+/// policy in force stands to the request. Asking for one records nothing on
+/// the timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorizationExplanation {
+    pub request: AuthorizationRequest,
+    pub decision: Decision,
+    pub determining_policies: Vec<String>,
+    pub errors: Vec<String>,
+    /// Policies excluded from the evaluation on the caller's request; they
+    /// have no standing.
+    pub disabled_policies: Vec<String>,
+    pub policies: Vec<PolicyStanding>,
+    pub engine: EngineInfo,
+    pub data_source: DataSource,
+}
+
+/// One request of the access matrix and Cedar's answer to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessCell {
+    pub principal: String,
+    pub action: String,
+    pub resource: String,
+    pub decision: Decision,
+    pub determining_policies: Vec<String>,
+}
+
+/// Who may do what: every principal, action and resource of the catalogue
+/// that go together, each asked of Cedar under one context. Nothing in it
+/// is placed on the timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessMatrix {
+    pub context: serde_json::Map<String, serde_json::Value>,
+    pub disabled_policies: Vec<String>,
+    /// In the catalogue's order: by principal, then action, then resource.
+    pub cells: Vec<AccessCell>,
+    /// Said when the catalogue allows more requests than are asked at once;
+    /// then none was, and `cells` is empty.
+    pub note: Option<String>,
+    pub engine: EngineInfo,
+    pub data_source: DataSource,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PolicyInfo {

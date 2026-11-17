@@ -7,8 +7,8 @@
  * closed.
  */
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronLeft, X } from 'lucide-react';
-import { useState } from 'react';
+import { Check, ChevronLeft, Link2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { actions } from '@/app/actions';
 import { useReportedHeight } from '@/app/hooks';
@@ -22,6 +22,51 @@ import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
 import { challengeById, CHALLENGES, type Challenge, type Evidence } from './challenges';
+
+/** The parameter of an address that names a challenge to offer. */
+export const CHALLENGE_PARAM = 'challenge';
+
+/** The address that opens the guide on one challenge, on this same page. */
+export function challengeLink(id: string, location: Pick<Location, 'origin' | 'pathname'>): string {
+  return `${location.origin}${location.pathname}?${CHALLENGE_PARAM}=${encodeURIComponent(id)}`;
+}
+
+/**
+ * A link may name a challenge. The guide then opens with that one offered
+ * first. It is not started: starting one resets the simulation, which is a
+ * thing for the viewer to do, not for an address.
+ */
+function useInvitation(): void {
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get(CHALLENGE_PARAM);
+    if (asked !== null && challengeById(asked)) useGuide.getState().invite(asked);
+  }, []);
+}
+
+/** Copies the link to a challenge, and says so for a moment. */
+function CopyLink({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 text-[11px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-ink hover:decoration-ink"
+      onClick={() => {
+        void navigator.clipboard
+          ?.writeText(challengeLink(id, window.location))
+          .then(() => setCopied(true))
+          .catch(() => undefined);
+      }}
+      data-testid="guide-copy-link"
+    >
+      <Link2 size={12} aria-hidden /> {copied ? 'Link copied' : 'Copy a link to this challenge'}
+    </button>
+  );
+}
 
 const TAG: Record<'observed' | 'cedar', { label: string; hint: string }> = {
   observed: {
@@ -190,6 +235,9 @@ function Active({ challenge }: { challenge: Challenge }) {
         )}
       </div>
       {feedback && <FeedbackBlock feedback={feedback} />}
+      <p className="mt-3">
+        <CopyLink id={challenge.id} />
+      </p>
     </div>
   );
 }
@@ -197,7 +245,13 @@ function Active({ challenge }: { challenge: Challenge }) {
 function List() {
   const evidence = useEvidence();
   const completed = useGuide((state) => state.completed);
+  const invitedId = useGuide((state) => state.invitedId);
   const [starting, setStarting] = useState<string | null>(null);
+  const solvedCount = CHALLENGES.filter((challenge) => completed.includes(challenge.id)).length;
+  // The one a link asked for comes first; the rest keep their order.
+  const ordered = [...CHALLENGES].sort(
+    (a, b) => Number(b.id === invitedId) - Number(a.id === invitedId),
+  );
   return (
     <div data-testid="guide-list">
       <h3 className="text-sm font-bold text-ink">Guided challenges</h3>
@@ -205,12 +259,36 @@ function List() {
         Each asks one question about the platform. Your answer is checked against the model itself:
         the record of the incident, or Cedar&apos;s own decision.
       </p>
+      <p className="mt-1.5 text-[11px] text-ink" data-testid="guide-progress">
+        {solvedCount} of {CHALLENGES.length} solved
+        {solvedCount > 0 && (
+          <>
+            .{' '}
+            <button
+              type="button"
+              className="text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-ink hover:decoration-ink"
+              onClick={() => useGuide.getState().forget()}
+              data-testid="guide-forget"
+            >
+              Start over
+            </button>
+          </>
+        )}
+      </p>
       <ul className="mt-2 divide-y divide-line">
-        {CHALLENGES.map((challenge) => {
+        {ordered.map((challenge) => {
           const reason = challenge.unavailable({ ...evidence, report: null });
           const solved = completed.includes(challenge.id);
           return (
-            <li key={challenge.id} className="py-2.5">
+            <li
+              key={challenge.id}
+              className="py-2.5"
+              data-testid={`guide-item-${challenge.id}`}
+              data-invited={challenge.id === invitedId}
+            >
+              {challenge.id === invitedId && (
+                <p className="caption mb-0.5">The one you were sent</p>
+              )}
               <div className="flex items-start justify-between gap-2">
                 <h4 className="min-w-0 text-xs font-bold text-ink">
                   {challenge.title}
@@ -261,6 +339,7 @@ export function GuideCard({
   alongFoot: boolean;
   onHeight: (height: number) => void;
 }) {
+  useInvitation();
   const open = useGuide((state) => state.open);
   const challenge = useGuide((state) => challengeById(state.activeId));
   const element = useReportedHeight<HTMLElement>(open, onHeight);

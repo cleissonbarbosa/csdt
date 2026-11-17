@@ -1,0 +1,766 @@
+{
+  "context": {
+    "mfa": true
+  },
+  "disabledPolicies": [],
+  "cells": [
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "finance-view-ledger"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "finance-export-ledger-mfa"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"alice\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "support-refund-limit"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "support-view-customers"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"bob\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant",
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant",
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"carol\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"erin\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window",
+        "forbid-suspended"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant",
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "admin-own-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"dave\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "allow",
+      "determiningPolicies": [
+        "tenant-view-orders"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-1001\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"acme-ord-9000\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"refundOrder\"",
+      "resource": "Order::\"globex-ord-5001\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"acme-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"exportLedger\"",
+      "resource": "Ledger::\"globex-ledger-2026\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"viewCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": []
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"acme-cust-77\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-cross-tenant",
+        "forbid-destructive-outside-change-window"
+      ]
+    },
+    {
+      "principal": "User::\"mallory\"",
+      "action": "Action::\"deleteCustomer\"",
+      "resource": "Customer::\"globex-cust-12\"",
+      "decision": "deny",
+      "determiningPolicies": [
+        "forbid-destructive-outside-change-window"
+      ]
+    }
+  ],
+  "note": null,
+  "engine": {
+    "kind": "embedded-cedar",
+    "version": "4.14.1"
+  },
+  "dataSource": "synthetic"
+}

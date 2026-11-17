@@ -28,6 +28,9 @@ export default defineConfig({
     viewport: { width: 1600, height: 900 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // The site registers a worker that keeps its files. These tests are of
+    // the site as it is fetched; the one that is of the worker allows it.
+    serviceWorkers: 'block',
   },
   projects: [
     {

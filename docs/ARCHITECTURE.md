@@ -152,6 +152,24 @@ pure and deterministic while every outcome stays genuine:
 On-demand evaluations from the Authorization Explorer go to the engine
 directly and are recorded on the timeline as commands.
 
+Two more questions go to the engine and are recorded nowhere
+(`application/access.rs`):
+
+- **One request, policy by policy.** Cedar names the policies that decided,
+  and for a denial by default it names none: a permit that was about the
+  request and did not hold leaves no trace in its answer. So each policy in
+  force is put to the request by itself, twice: as it is, and with its
+  conditions left out (`CedarEngine::standings`). The first says whether the
+  policy holds; the second, whether its scope takes the request in at all.
+  A forbid is turned into a permit for the asking, since a forbid alone
+  allows nothing either way. The twins are made from Cedar's own JSON form
+  of the policy, where scope and conditions are kept apart; nothing is
+  parsed or judged by hand, and a test holds the standings of every
+  catalogued request to the decision Cedar gave for it.
+- **Every request the catalogue describes**, under one context and with any
+  policies switched off: the access matrix. It is the same enumeration the
+  policy comparison uses, bounded the same way (20 000 requests).
+
 ### Sources and the workspace
 
 Everything above is built from one value, `application::Sources`: topology
@@ -246,6 +264,18 @@ none holds the cause is `unattributed`: the report does not choose one.
 Everything of one tick is applied before any of it is explained, since
 within a tick the model has already carried a failure back to its callers.
 
+A report also says how long each of the platform's two objectives was not
+met: no more than 5% of client requests failing, and a p95 latency no more
+than two and a half times what it is at rest. They are the thresholds the
+engine's own detection rules alert on (`ERROR_OBJECTIVE`,
+`LATENCY_OBJECTIVE_FACTOR`), not a service-level agreement of anybody's, and
+the time is the incident's samples counted, one a second.
+
+A fault can be tried before it is placed (`experiment::trial`): the platform
+at rest is simulated twice from the server's seed on timelines of its own,
+once with the fault, and the services that left normal with it and not
+without it are listed in the order the engine recorded them.
+
 The report covers the whole record of the incident wherever the cursor is,
 so it is the same during a replay. The interface uses it three ways: to
 explain a phase or an event while an incident runs, as the summary of an
@@ -271,10 +301,13 @@ are mirrored in `packages/contracts`.
 | `POST /demo/playback/control`                          | play, pause, step, seek, speed, replay, live |
 | `POST /demo/faults/inject` · `/clear`                  | place or lift a fault by hand                |
 | `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                     |
+| `POST /demo/authorization/explain`                     | one request, policy by policy; not recorded  |
+| `POST /demo/authorization/matrix`                      | every request of the catalogue; not recorded |
 | `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                       |
 | `POST /demo/topology/select` · `/demo/recordings/load` | switch context                               |
 | `GET /session` · `POST /demo/session/load`             | the timeline as what reproduces it           |
 | `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed    |
+| `POST /demo/experiments/trial`                         | one fault on the platform at rest            |
 | `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
 | `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
 | `POST /demo/workspace/diff`                            | what Cedar would decide differently          |

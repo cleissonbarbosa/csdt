@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
-use crate::domain::{DataSource, IncidentReport, MetricSample, SCHEMA_VERSION};
+use crate::domain::{DataSource, EventKind, Health, IncidentReport, MetricSample, SCHEMA_VERSION};
 use crate::incidents::recordings::{RecordedCommand, Recording};
 use crate::incidents::spec::MAX_DURATION_MS;
 use crate::incidents::{resolve_fault, Effect, ResolvedScenario};
@@ -186,6 +186,194 @@ pub fn run(
         intervention,
         baseline,
         variant,
+    })
+}
+
+/// How long a fault is held in a trial, after it is placed.
+pub const TRIAL_MS: u64 = 60_000;
+
+/// One service a trial reached: when it first left its normal state, counted
+/// from the moment the fault was placed, what it became then, and the worst
+/// it was at any time after.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialEffect {
+    pub node_id: String,
+    pub at_ms: u64,
+    pub health: Health,
+    pub worst: Health,
+}
+
+/// Two of the platform's figures at one moment of a trial, or at their worst.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialFigures {
+    pub error_rate: f64,
+    pub p95_latency_ms: f64,
+}
+
+/// What one fault does to the platform at rest, tried on timelines of its
+/// own: the same quiet run twice from one seed, the second time with the
+/// fault placed. Nothing in it is estimated. A service is listed because
+/// the engine recorded it leaving its normal state in the run with the
+/// fault and did not in the run without, and the figures are its samples.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Trial {
+    pub schema_version: &'static str,
+    pub data_source: DataSource,
+    pub topology_id: String,
+    pub seed: u64,
+    /// The fault, with `at_ms` on the trial's own clock.
+    pub fault: Intervention,
+    pub duration_ms: u64,
+    /// In the order they first left normal; the faulted services among them.
+    pub affected: Vec<TrialEffect>,
+    /// The platform just before the fault was placed.
+    pub before: TrialFigures,
+    /// The worst each figure got afterwards.
+    pub peak: TrialFigures,
+    /// What reproduces the run with the fault.
+    pub recording: Recording,
+}
+
+fn health_named(details: &serde_json::Value, field: &str) -> Option<Health> {
+    serde_json::from_value(details.get(field)?.clone()).ok()
+}
+
+fn rank(health: Health) -> u8 {
+    match health {
+        Health::Healthy => 0,
+        Health::Degraded => 1,
+        Health::Critical => 2,
+        Health::Down => 3,
+    }
+}
+
+/// The services that left their normal state on a timeline, from `since`.
+fn left_normal(timeline: &Timeline, since: u64) -> Vec<TrialEffect> {
+    let mut effects: Vec<TrialEffect> = Vec::new();
+    for event in timeline.events() {
+        if event.kind != EventKind::HealthTransition || event.virtual_time_ms < since {
+            continue;
+        }
+        let (Some(node_id), Some(to)) =
+            (event.node_ids.first(), health_named(&event.details, "to"))
+        else {
+            continue;
+        };
+        match effects.iter_mut().find(|effect| &effect.node_id == node_id) {
+            Some(effect) => {
+                if rank(to) > rank(effect.worst) {
+                    effect.worst = to;
+                }
+            }
+            None if to != Health::Healthy => effects.push(TrialEffect {
+                node_id: node_id.clone(),
+                at_ms: event.virtual_time_ms - since,
+                health: to,
+                worst: to,
+            }),
+            None => {}
+        }
+    }
+    effects
+}
+
+/// Tries one fault on the platform at rest. See [`Trial`].
+pub fn trial(
+    world: &World,
+    decisions: &Arc<DecisionTable>,
+    seed: u64,
+    effect: Effect,
+    ramp_ms: u64,
+) -> Result<Trial, String> {
+    let targets = resolve_fault(&world.topo, &effect)?;
+    let topology_id = world.topo.spec.id.clone();
+    let duration_ms = LEAD_IN_MS + TRIAL_MS;
+    let recording = |id: &str, name: String, commands: Vec<RecordedCommand>| Recording {
+        id: id.to_string(),
+        name,
+        description: format!("Trial of one fault on {topology_id} at rest, with seed {seed}."),
+        topology_id: topology_id.clone(),
+        seed,
+        duration_ms,
+        commands,
+    };
+    let keys: Vec<ChannelKey> = targets.iter().map(|target| target.0).collect();
+    let fault = Intervention {
+        description: effect.describe(),
+        node_ids: touched(&world.topo, &keys)
+            .into_iter()
+            .map(|node| world.topo.node_id(node).to_string())
+            .collect(),
+        at_ms: LEAD_IN_MS,
+        ramp_ms,
+        effect: effect.clone(),
+    };
+    let run = |recording: &Recording| {
+        Timeline::from_recording(
+            Arc::clone(&world.topo),
+            Arc::clone(&world.scenarios),
+            Arc::clone(decisions),
+            recording,
+        )
+    };
+    let quiet = run(&recording(
+        "trial-at-rest",
+        "The platform at rest".to_string(),
+        Vec::new(),
+    ));
+    let tried = recording(
+        "trial",
+        format!("The platform at rest, with {}", fault.description),
+        vec![RecordedCommand {
+            at_ms: LEAD_IN_MS,
+            command: Command::InjectFault { effect, ramp_ms },
+        }],
+    );
+    let timeline = run(&tried);
+
+    // What also happens with nothing placed is not the fault's doing.
+    let anyway: Vec<String> = left_normal(&quiet, LEAD_IN_MS)
+        .into_iter()
+        .map(|effect| effect.node_id)
+        .collect();
+    let affected: Vec<TrialEffect> = left_normal(&timeline, LEAD_IN_MS)
+        .into_iter()
+        .filter(|effect| !anyway.contains(&effect.node_id))
+        .collect();
+
+    let samples = timeline.samples();
+    let figures = |sample: &MetricSample| TrialFigures {
+        error_rate: sample.error_rate,
+        p95_latency_ms: sample.p95_latency_ms,
+    };
+    let before = samples
+        .iter()
+        .rev()
+        .find(|sample| sample.virtual_time_ms <= LEAD_IN_MS)
+        .or(samples.first())
+        .map(figures)
+        .ok_or("the trial recorded no samples")?;
+    let peak = samples
+        .iter()
+        .filter(|sample| sample.virtual_time_ms > LEAD_IN_MS)
+        .fold(before, |peak, sample| TrialFigures {
+            error_rate: peak.error_rate.max(sample.error_rate),
+            p95_latency_ms: peak.p95_latency_ms.max(sample.p95_latency_ms),
+        });
+    Ok(Trial {
+        schema_version: SCHEMA_VERSION,
+        data_source: world.topo.spec.data_source,
+        topology_id,
+        seed,
+        fault,
+        duration_ms,
+        affected,
+        before,
+        peak,
+        recording: tried,
     })
 }
 

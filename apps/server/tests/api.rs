@@ -677,6 +677,195 @@ async fn authorization_evaluate_rejects_malformed_input() {
 }
 
 #[tokio::test]
+async fn a_request_is_explained_policy_by_policy_and_nothing_is_recorded() {
+    let state = state();
+    advance(&state, 1);
+    let explained = post(
+        &state,
+        &path("/demo/authorization/explain"),
+        json!({
+            "principal": "User::\"bob\"",
+            "action": "Action::\"refundOrder\"",
+            "resource": "Order::\"acme-ord-9000\"",
+        }),
+    )
+    .await;
+    assert_eq!(explained.status, StatusCode::OK);
+    let body = &explained.body;
+    assert_eq!(body["decision"], "deny");
+    assert_eq!(body["determiningPolicies"], json!([]));
+    assert_eq!(body["engine"]["kind"], "embedded-cedar");
+    assert_eq!(body["dataSource"], "synthetic");
+    let standing = |id: &str| {
+        body["policies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["policyId"] == id)
+            .unwrap_or_else(|| panic!("no standing for {id}"))
+            .clone()
+    };
+    // The permit that was about this request, and why it is not the answer.
+    let refund = standing("support-refund-limit");
+    assert_eq!(refund["effect"], "permit");
+    assert_eq!(refund["inScope"], true);
+    assert_eq!(refund["holds"], false);
+    assert_eq!(standing("admin-own-tenant")["inScope"], false);
+    assert_eq!(body["policies"].as_array().unwrap().len(), 9);
+
+    // A policy that is switched off has no standing.
+    let without = post(
+        &state,
+        &path("/demo/authorization/explain"),
+        json!({
+            "principal": "User::\"bob\"",
+            "action": "Action::\"refundOrder\"",
+            "resource": "Order::\"acme-ord-9000\"",
+            "disabledPolicies": ["support-refund-limit"],
+        }),
+    )
+    .await;
+    assert_eq!(without.body["policies"].as_array().unwrap().len(), 8);
+    assert_eq!(
+        without.body["disabledPolicies"],
+        json!(["support-refund-limit"])
+    );
+
+    // An explanation is a question, not an event: nothing is on the timeline.
+    assert_eq!(
+        get(&state, &path("/demo/authorization/decisions"))
+            .await
+            .body,
+        json!([])
+    );
+    let events = get(&state, &path("/events?limit=1000")).await;
+    assert!(events.body["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|event| event["details"]["origin"] != "explorer"));
+
+    for body in [
+        json!({ "principal": "alice", "action": "Action::\"viewOrder\"", "resource": "Order::\"acme-ord-1001\"" }),
+        json!({ "principal": "User::\"bob\"", "action": "Action::\"refundOrder\"", "resource": "Order::\"acme-ord-9000\"", "disabledPolicies": ["no-such-policy"] }),
+        json!({ "principal": "User::\"bob\"", "action": "Action::\"refundOrder\"", "resource": "Order::\"acme-ord-9000\"", "engine": "embedded" }),
+    ] {
+        let reply = post(&state, &path("/demo/authorization/explain"), body.clone()).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{body}");
+    }
+}
+
+#[tokio::test]
+async fn the_access_matrix_asks_cedar_every_request_of_the_catalogue() {
+    let state = state();
+    advance(&state, 1);
+    let catalog = get(&state, &path("/demo/authorization/catalog")).await.body;
+    let count = |key: &str| catalog[key].as_array().unwrap().len();
+
+    let matrix = post(&state, &path("/demo/authorization/matrix"), json!({})).await;
+    assert_eq!(matrix.status, StatusCode::OK);
+    let cells = matrix.body["cells"].as_array().unwrap();
+    assert_eq!(matrix.body["note"], Value::Null);
+    assert_eq!(matrix.body["dataSource"], "synthetic");
+    // Every principal with every action, on each resource of the action's type.
+    let per_principal: usize = catalog["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|action| {
+            catalog["resources"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|resource| resource["resourceType"] == action["resourceType"])
+                .count()
+        })
+        .sum();
+    assert_eq!(cells.len(), count("principals") * per_principal);
+
+    let cell = |principal: &str, action: &str, resource: &str, cells: &[Value]| {
+        cells
+            .iter()
+            .find(|c| {
+                c["principal"] == principal && c["action"] == action && c["resource"] == resource
+            })
+            .unwrap_or_else(|| panic!("no cell for {principal} {action} {resource}"))
+            .clone()
+    };
+    // Each cell is what an evaluation of the same request gives.
+    let ask = cell(
+        "User::\"alice\"",
+        "Action::\"exportLedger\"",
+        "Ledger::\"acme-ledger-2026\"",
+        cells,
+    );
+    assert_eq!(ask["decision"], "deny");
+    let asked = post(
+        &state,
+        &path("/demo/authorization/evaluate"),
+        json!({
+            "principal": "User::\"alice\"",
+            "action": "Action::\"exportLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+        }),
+    )
+    .await;
+    assert_eq!(asked.body["decision"], ask["decision"]);
+    assert_eq!(
+        asked.body["determiningPolicies"],
+        ask["determiningPolicies"]
+    );
+
+    // The context is part of the question: with a fresh MFA assertion the
+    // same cell is allowed, by the policy that asks for one.
+    let with_mfa = post(
+        &state,
+        &path("/demo/authorization/matrix"),
+        json!({ "context": { "mfa": true } }),
+    )
+    .await;
+    let ask = cell(
+        "User::\"alice\"",
+        "Action::\"exportLedger\"",
+        "Ledger::\"acme-ledger-2026\"",
+        with_mfa.body["cells"].as_array().unwrap(),
+    );
+    assert_eq!(ask["decision"], "allow");
+    assert_eq!(
+        ask["determiningPolicies"],
+        json!(["finance-export-ledger-mfa"])
+    );
+
+    // So is the set of policies in force.
+    let without = post(
+        &state,
+        &path("/demo/authorization/matrix"),
+        json!({ "context": { "mfa": true }, "disabledPolicies": ["finance-export-ledger-mfa"] }),
+    )
+    .await;
+    let ask = cell(
+        "User::\"alice\"",
+        "Action::\"exportLedger\"",
+        "Ledger::\"acme-ledger-2026\"",
+        without.body["cells"].as_array().unwrap(),
+    );
+    assert_eq!(ask["decision"], "deny");
+
+    // Only the one evaluation that was asked for is on the timeline.
+    let decisions = get(&state, &path("/demo/authorization/decisions")).await;
+    assert_eq!(decisions.body.as_array().unwrap().len(), 1);
+
+    for body in [
+        json!({ "disabledPolicies": ["no-such-policy"] }),
+        json!({ "context": { "blob": "y".repeat(5000) } }),
+        json!({ "unexpected": true }),
+    ] {
+        let reply = post(&state, &path("/demo/authorization/matrix"), body.clone()).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{body}");
+    }
+}
+
+#[tokio::test]
 async fn events_can_be_paged_and_filtered() {
     let state = state();
     post(
@@ -846,4 +1035,74 @@ async fn cors_admits_configured_origins_only() {
         .headers
         .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
         .is_none());
+}
+
+#[tokio::test]
+async fn a_fault_is_tried_on_a_timeline_of_its_own_before_it_is_placed() {
+    let state = state();
+    advance(&state, 5);
+    let before = get(&state, &path("/events?limit=1000")).await.body;
+    let clock = get(&state, &path("/health")).await.body["playback"].clone();
+
+    let trial = post(
+        &state,
+        &path("/demo/experiments/trial"),
+        json!({ "effect": { "type": "down", "nodes": "node:use-orders-db" } }),
+    )
+    .await;
+    assert_eq!(trial.status, StatusCode::OK);
+    let body = &trial.body;
+    assert_eq!(body["dataSource"], "synthetic");
+    assert_eq!(body["topologyId"], "helios-commerce");
+    assert_eq!(body["fault"]["nodeIds"], json!(["use-orders-db"]));
+    let affected = body["affected"].as_array().unwrap();
+    // The faulted service is the first to leave normal, and it is down.
+    assert_eq!(affected[0]["nodeId"], "use-orders-db");
+    assert_eq!(affected[0]["worst"], "down");
+    // What calls it follows: the orders service reads and writes this store.
+    let ids: Vec<&str> = affected
+        .iter()
+        .map(|effect| effect["nodeId"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&"use-orders"), "{ids:?}");
+    assert!(affected.len() > 2, "{ids:?}");
+    // Listed in the order they left normal.
+    let times: Vec<u64> = affected
+        .iter()
+        .map(|effect| effect["atMs"].as_u64().unwrap())
+        .collect();
+    assert!(times.windows(2).all(|pair| pair[0] <= pair[1]), "{times:?}");
+    assert!(
+        body["peak"]["errorRate"].as_f64().unwrap() > body["before"]["errorRate"].as_f64().unwrap()
+    );
+    // What reproduces it is a seed and one command, and states no outcome.
+    assert_eq!(body["recording"]["commands"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        body["recording"]["commands"][0]["command"]["type"],
+        "injectFault"
+    );
+
+    // The same trial again is the same trial: the engine is deterministic.
+    let again = post(
+        &state,
+        &path("/demo/experiments/trial"),
+        json!({ "effect": { "type": "down", "nodes": "node:use-orders-db" } }),
+    )
+    .await;
+    assert_eq!(again.body, trial.body);
+
+    // The timeline in use was not touched: same events, same clock, no fault.
+    assert_eq!(get(&state, &path("/events?limit=1000")).await.body, before);
+    assert_eq!(get(&state, &path("/health")).await.body["playback"], clock);
+
+    // A fault that cannot be placed cannot be tried either.
+    for body in [
+        json!({ "effect": { "type": "down", "nodes": "node:no-such-service" } }),
+        json!({ "effect": { "type": "latency", "nodes": "node:use-orders-db", "factor": -1.0 } }),
+        json!({ "effect": { "type": "down", "nodes": "node:use-orders-db" }, "rampMs": 10_000_000 }),
+        json!({ "effect": { "type": "down", "nodes": "node:use-orders-db" }, "scenarioId": "ddos-surge" }),
+    ] {
+        let reply = post(&state, &path("/demo/experiments/trial"), body.clone()).await;
+        assert!(reply.status.is_client_error(), "{body}: {}", reply.status);
+    }
 }

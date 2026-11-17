@@ -1,0 +1,11 @@
+{
+  "name": "AEGIS · Cloud Security Digital Twin",
+  "short_name": "AEGIS",
+  "description": "A fictional cloud platform, simulated, to take apart: follow a request, run an incident, ask Cedar who may do what. Everything shown is synthetic.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#F5F4F0",
+  "theme_color": "#F5F4F0",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
