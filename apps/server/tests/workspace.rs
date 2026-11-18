@@ -169,13 +169,9 @@ fn the_repository_fixtures_are_laid_out_as_a_workspace() {
     assert_eq!(loaded.sources.recordings, bundled.recordings);
     assert_eq!(loaded.sources.policies, bundled.policies);
     assert_eq!(loaded.sources.catalog, bundled.catalog);
-    assert!(
-        loaded
-            .ignored
-            .iter()
-            .any(|path| path.ends_with("integrations")),
-        "what is not part of the layout is reported, not read"
-    );
+    // Nothing else lives there. That a stray file is reported, not read, is
+    // `an_empty_workspace_changes_nothing`'s case.
+    assert!(loaded.ignored.is_empty(), "{:?}", loaded.ignored);
     Assets::build(loaded.sources).expect("builds");
 }
 
