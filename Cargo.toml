@@ -5,7 +5,7 @@ members = ["apps/server", "apps/wasm"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 rust-version = "1.85"
 repository = "https://github.com/cleissonbarbosa/csdt"
 

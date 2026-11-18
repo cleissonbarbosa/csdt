@@ -18,7 +18,7 @@ on the screen is a problem.
 ![Rust](https://img.shields.io/badge/Rust-stable-4F545A?logo=rust&logoColor=white)
 ![WebGPU](https://img.shields.io/badge/WebGPU-TSL-4F545A)
 ![Cedar](https://img.shields.io/badge/Cedar-4.14-4F545A)
-![License](https://img.shields.io/badge/license-MIT-4F545A)
+![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-4F545A)
 
 <img src="docs/assets/demo.gif" width="860" alt="A DDoS surge seen in the overview: suspicious traffic pours through the edge router into the API gateways, lamps light under the kinds of service it reaches, and edge filtering engages" />
 
@@ -619,4 +619,4 @@ scripts             Screenshot and benchmark runners
 
 ## License
 
-[MIT](LICENSE) © Cleisson Barbosa
+[GNU AFFERO GENERAL PUBLIC LICENSE](LICENSE) © Cleisson Barbosa
