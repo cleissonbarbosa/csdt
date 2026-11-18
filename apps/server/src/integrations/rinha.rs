@@ -27,7 +27,7 @@ use crate::domain::{
 
 use super::guard::{validate_target, Target};
 pub use super::settings::RinhaConfig;
-use super::{sanitize, ConnectOutcome, ProviderError, TelemetryProvider};
+use super::{sanitize, ProviderError, TelemetryProvider};
 
 pub const PROVIDER_ID: &str = "rinha-backend";
 const REPOSITORY: &str = "https://github.com/cleissonbarbosa/rinha-backend-2026";
@@ -204,7 +204,7 @@ impl TelemetryProvider for RinhaProbeProvider {
         }
     }
 
-    async fn connect(&self) -> Result<ConnectOutcome, ProviderError> {
+    async fn connect(&self) -> Result<(), ProviderError> {
         let (target, interval) = self.configured()?.clone();
         let url = target.url("/ready");
         {
@@ -242,7 +242,7 @@ impl TelemetryProvider for RinhaProbeProvider {
         lock(&self.state).task = Some(task.abort_handle());
 
         match failure {
-            None => Ok(ConnectOutcome::default()),
+            None => Ok(()),
             Some(error) => Err(error),
         }
     }

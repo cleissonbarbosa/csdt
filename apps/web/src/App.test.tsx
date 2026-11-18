@@ -1214,7 +1214,14 @@ describe('platform files', () => {
 });
 
 describe('integrations and settings', () => {
-  it('lists providers with honest states and imports a fixture on request', async () => {
+  it('lists the remaining providers and can disconnect a live adapter', async () => {
+    const providers = fixtures.providers();
+    api.providers.mockResolvedValue(
+      providers.map((provider) =>
+        provider.id === 'rinha-backend' ? { ...provider, state: 'connected' } : provider,
+      ),
+    );
+    api.disconnectProvider.mockResolvedValue(providers);
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByTestId('open-integrations'));
@@ -1228,11 +1235,11 @@ describe('integrations and settings', () => {
       'https://github.com/cleissonbarbosa/cedar-agent',
     );
 
-    const scanner = within(dialog).getByTestId('provider-network-scanner');
-    expect(scanner).toHaveTextContent('Recording');
-    api.disconnectProvider.mockResolvedValue(fixtures.providers());
-    await user.click(within(scanner).getByRole('button', { name: 'Forget import' }));
-    expect(api.disconnectProvider).toHaveBeenCalledWith('network-scanner');
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(dialog).getByTestId('provider-demo-simulation')).toBeInTheDocument();
+    const rinha = within(dialog).getByTestId('provider-rinha-backend');
+    await user.click(within(rinha).getByRole('button', { name: 'Disconnect' }));
+    expect(api.disconnectProvider).toHaveBeenCalledWith('rinha-backend');
   });
 
   it('persists settings and applies reduced motion', async () => {
@@ -2018,7 +2025,7 @@ describe('sessions', () => {
     expect(contents).toHaveTextContent('0:08 starts Credential Stuffing');
     expect(contents).toHaveTextContent('0:30 places a fault by hand (latency)');
     expect(within(dialog).getByTestId('session-omitted')).toHaveTextContent(
-      '2 authorization decisions evaluated by hand and 2 imports from an integration',
+      'This session omits 2 authorization decisions evaluated by hand.',
     );
   });
 

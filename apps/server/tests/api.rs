@@ -168,6 +168,7 @@ async fn providers_are_listed_with_honest_provenance_and_nothing_is_connected() 
     let state = state();
     let reply = get(&state, &path("/providers")).await;
     let providers = reply.body.as_array().unwrap();
+    assert_eq!(providers.len(), 3);
     let by_id = |id: &str| providers.iter().find(|p| p["id"] == id).unwrap();
 
     let demo = by_id("demo-simulation");
@@ -186,16 +187,6 @@ async fn providers_are_listed_with_honest_provenance_and_nothing_is_connected() 
             .unwrap()
             .starts_with("https://github.com/cleissonbarbosa/"));
     }
-    for id in ["network-scanner", "security-alerts"] {
-        let fixture = by_id(id);
-        assert_eq!(fixture["kind"], "fixture");
-        assert_eq!(fixture["state"], "available");
-        assert_eq!(
-            fixture["dataSource"], "recording",
-            "{id} is never labelled live"
-        );
-    }
-
     // Live adapters cannot be connected unless the server was configured.
     let refused = post(&state, &path("/providers/cedar-agent/connect"), json!({})).await;
     assert_eq!(refused.status, StatusCode::CONFLICT);
@@ -205,76 +196,20 @@ async fn providers_are_listed_with_honest_provenance_and_nothing_is_connected() 
 }
 
 #[tokio::test]
-async fn importing_a_fixture_places_labelled_events_on_the_timeline() {
+async fn retired_providers_cannot_be_connected_or_disconnected() {
     let state = state();
-    advance(&state, 1);
-    let reply = post(
-        &state,
-        &path("/providers/security-alerts/connect"),
-        json!({}),
-    )
-    .await;
-    assert_eq!(reply.status, StatusCode::OK);
-    let status = reply
-        .body
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["id"] == "security-alerts")
-        .unwrap();
-    assert_eq!(status["state"], "imported");
-    advance(&state, 1);
-
-    let events = get(
-        &state,
-        &path("/events?nodeId=use-gateway&minSeverity=critical"),
-    )
-    .await;
-    let advisories: Vec<&Value> = events.body["events"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["kind"] == "cve-advisory")
-        .collect();
-    assert_eq!(advisories.len(), 1);
-    assert_eq!(advisories[0]["dataSource"], "recording");
-    assert!(advisories[0]["title"]
-        .as_str()
-        .unwrap()
-        .starts_with("CVE-2099-"));
-    assert_eq!(advisories[0]["details"]["payload"]["fictional"], true);
-
-    let scan = post(
-        &state,
-        &path("/providers/network-scanner/connect"),
-        json!({}),
-    )
-    .await;
-    assert_eq!(scan.status, StatusCode::OK);
-    advance(&state, 1);
-    let all = get(&state, &path("/events?limit=1000")).await;
-    let findings = all.body["events"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|e| e["kind"] == "scan-finding")
-        .count();
-    assert_eq!(findings, 3);
-
-    let off = post(
-        &state,
-        &path("/providers/network-scanner/disconnect"),
-        json!({}),
-    )
-    .await;
-    let status = off
-        .body
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["id"] == "network-scanner")
-        .unwrap();
-    assert_eq!(status["state"], "available");
+    for id in ["network-scanner", "security-alerts"] {
+        for action in ["connect", "disconnect"] {
+            let reply = post(
+                &state,
+                &path(&format!("/providers/{id}/{action}")),
+                json!({}),
+            )
+            .await;
+            assert_eq!(reply.status, StatusCode::NOT_FOUND);
+            assert_eq!(reply.body["error"]["code"], "not_found");
+        }
+    }
 }
 
 #[tokio::test]

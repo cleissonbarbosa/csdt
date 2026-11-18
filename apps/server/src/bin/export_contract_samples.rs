@@ -166,9 +166,6 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
-    for provider in ["network-scanner", "security-alerts"] {
-        post_dynamic(&state, &format!("/providers/{provider}/connect")).await?;
-    }
     // A fault placed by hand, so the samples below show one in force.
     post(
         "/demo/faults/inject",
@@ -384,10 +381,6 @@ fn tiny_workspace() -> Vec<Value> {
         json!({ "path": "topologies/front-desk.json", "text": topology.to_string() }),
         json!({ "path": "scenarios/01-slow-door.json", "text": scenario.to_string() }),
     ]
-}
-
-async fn post_dynamic(state: &AppState, path: &str) -> Result<Value, AnyError> {
-    call(state, Method::POST, path, Some(json!({}))).await
 }
 
 #[tokio::main(flavor = "current_thread")]

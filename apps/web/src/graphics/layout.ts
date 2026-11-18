@@ -37,7 +37,9 @@
  * plates stand one after another in the direction requests travel, so depth
  * into the picture is distance along the path and nothing else.
  */
-import type { InfrastructureNode, ServiceType, Topology } from '@aegis/contracts';
+import type { ServiceType } from '@aegis/contracts';
+
+import type { SceneNode, SceneTopology } from './sceneData';
 
 export type LayoutMode = 'layers' | 'regions' | 'dependencies';
 
@@ -215,7 +217,7 @@ const TYPE_SCALE: Record<ServiceType, number> = {
 };
 
 interface Indexed {
-  node: InfrastructureNode;
+  node: SceneNode;
   index: number;
 }
 
@@ -253,7 +255,7 @@ function split(members: Indexed[], cap: number): Indexed[][] {
 }
 
 /** For every node, the nodes it shares a connection with. */
-function neighboursOf(topology: Topology): number[][] {
+function neighboursOf(topology: SceneTopology): number[][] {
   const index = new Map(topology.nodes.map((node, i) => [node.id, i]));
   const lists: number[][] = topology.nodes.map(() => []);
   for (const edge of topology.edges) {
@@ -409,7 +411,7 @@ function enclose(positions: Float32Array, extra: number): { center: Vec3; radius
 }
 
 /** The nodes of each region, and a way to stand one of them on a surface. */
-function stage(topology: Topology) {
+function stage(topology: SceneTopology) {
   const n = topology.nodes.length;
   const positions = new Float32Array(n * 3);
   const scales = new Float32Array(n);
@@ -443,7 +445,7 @@ function edgeCast(members: Indexed[]) {
   return { core, monitors, rest };
 }
 
-function layoutRegions(topology: Topology): Arrangement {
+function layoutRegions(topology: SceneTopology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   const links = neighboursOf(topology);
 
@@ -596,7 +598,7 @@ interface LanePlan {
   depth: number;
 }
 
-function layoutDependencies(topology: Topology): Arrangement {
+function layoutDependencies(topology: SceneTopology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   const links = neighboursOf(topology);
   const n = topology.nodes.length;
@@ -795,7 +797,7 @@ function layoutDependencies(topology: Topology): Arrangement {
  * column stand side by side across the path. A plate is as deep as what
  * stands on it, like any other, and all of them are centred on the path.
  */
-function layoutLayers(topology: Topology): Arrangement {
+function layoutLayers(topology: SceneTopology): Arrangement {
   const { positions, scales, ground, put, byRegion } = stage(topology);
   for (let i = 0; i < scales.length; i++) scales[i] = layerScale(scales[i]!);
   const links = neighboursOf(topology);
@@ -909,7 +911,7 @@ type Arrangement = Omit<SceneLayout, 'facing'>;
  * calls when nothing calls it. Callers are taken in the order of their ids,
  * so the answer does not depend on the order the topology lists them in.
  */
-function facingOf(topology: Topology, positions: Float32Array): Float32Array {
+function facingOf(topology: SceneTopology, positions: Float32Array): Float32Array {
   const n = topology.nodes.length;
   const facing = new Float32Array(n).fill(Number.NaN);
   const index = new Map(topology.nodes.map((node, i) => [node.id, i]));
@@ -957,7 +959,7 @@ function facingOf(topology: Topology, positions: Float32Array): Float32Array {
   return facing;
 }
 
-export function computeLayout(topology: Topology, mode: LayoutMode): SceneLayout {
+export function computeLayout(topology: SceneTopology, mode: LayoutMode): SceneLayout {
   const layout =
     mode === 'layers'
       ? layoutLayers(topology)

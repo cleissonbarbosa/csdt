@@ -235,9 +235,6 @@ describe('the engine built for the browser', () => {
       'access-matrix',
       post('/demo/authorization/matrix', { context: { mfa: true } }).body,
     );
-    for (const provider of ['network-scanner', 'security-alerts']) {
-      post(`/providers/${provider}/connect`, {});
-    }
     post('/demo/faults/inject', {
       effect: { type: 'latency', nodes: 'node:use-search', factor: 3.0 },
       rampMs: 1000,
@@ -345,13 +342,11 @@ describe('the engine built for the browser', () => {
     );
   });
 
-  it('lists the providers that need no network, and only those', () => {
-    // The server also lists its two live adapters; the engine has no network
-    // to reach them through, and does not offer what it cannot do.
+  it('lists only the built-in simulation as a provider', () => {
     const expected = (sample('providers') as { kind: string }[]).filter(
-      (provider) => provider.kind !== 'live-adapter',
+      (provider) => provider.kind === 'simulation',
     );
-    expect(expected).toHaveLength(3);
+    expect(expected).toHaveLength(1);
     expect(differences(produced.get('providers')!, expected as Json)).toEqual([]);
   });
 
@@ -393,7 +388,7 @@ describe('every route, in the module', () => {
         engine.advance(200, clock);
       }
     };
-    const calls: [method: 'GET' | 'POST', path: string, body?: unknown][] = [
+    const calls: [method: 'GET' | 'POST', path: string, body?: unknown, status?: number][] = [
       ['GET', '/health'],
       ['GET', '/topology'],
       ['GET', '/topologies'],
@@ -455,8 +450,8 @@ describe('every route, in the module', () => {
       ],
       ['POST', '/demo/faults/clear', { effect: { type: 'down', nodes: 'node:use-search' } }],
       ['POST', '/demo/faults/clear', {}],
-      ['POST', '/providers/network-scanner/connect', {}],
-      ['POST', '/providers/network-scanner/disconnect', {}],
+      ['POST', '/providers/demo-simulation/connect', {}],
+      ['POST', '/providers/demo-simulation/disconnect', {}, 409],
       ['POST', '/demo/recordings/load', { recordingId: 'black-friday-flood' }],
       [
         'POST',
@@ -492,14 +487,14 @@ describe('every route, in the module', () => {
       ['POST', '/demo/scenarios/reset', { scope: 'simulation' }],
       ['POST', '/demo/workspace/reset', {}],
     ];
-    for (const [method, path, body] of calls) {
+    for (const [method, path, body, status = 200] of calls) {
       const answer = engine.request(
         method,
         `/api/v1${path}`,
         body === undefined ? undefined : JSON.stringify(body),
         clock,
       );
-      expect(answer.status, `${method} ${path}: ${answer.body}`).toBe(200);
+      expect(answer.status, `${method} ${path}: ${answer.body}`).toBe(status);
       expect(() => JSON.parse(answer.body) as unknown).not.toThrow();
       run(10);
     }

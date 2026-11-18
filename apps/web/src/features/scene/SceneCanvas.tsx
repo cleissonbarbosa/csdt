@@ -60,7 +60,7 @@ export interface SceneRuntime {
   quality: QualityLevel;
 }
 
-function sceneOptions(theme: ThemeName): SceneOptions {
+export function sceneOptions(theme: ThemeName): SceneOptions {
   const settings = useSettings.getState();
   return {
     theme,
@@ -71,12 +71,15 @@ function sceneOptions(theme: ThemeName): SceneOptions {
   };
 }
 
-interface BridgeProps {
+export interface CanvasBridgeProps {
   backend: Backend;
   pieces: PieceSet;
+  onQuality: (level: QualityLevel) => void;
+}
+
+interface BridgeProps extends CanvasBridgeProps {
   theme: ThemeName;
   tooltip: HTMLElement | null;
-  onQuality: (level: QualityLevel) => void;
 }
 
 function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps) {
@@ -306,14 +309,13 @@ class SceneBoundary extends Component<BoundaryProps, { failed: boolean }> {
   }
 }
 
-interface SceneCanvasProps {
-  theme: ThemeName;
-  tooltip: HTMLElement | null;
+interface TopologyCanvasProps {
+  renderBridge: (props: CanvasBridgeProps) => ReactNode;
   onRuntime: (runtime: SceneRuntime) => void;
   onUnavailable: (reason: string) => void;
 }
 
-export function SceneCanvas({ theme, tooltip, onRuntime, onUnavailable }: SceneCanvasProps) {
+export function TopologyCanvas({ renderBridge, onRuntime, onUnavailable }: TopologyCanvasProps) {
   const preference = useSettings((state) => state.renderer);
   const [backend, setBackend] = useState<Backend | null>(null);
   const [quality, setQuality] = useState<QualityLevel>('high');
@@ -375,16 +377,22 @@ export function SceneCanvas({ theme, tooltip, onRuntime, onUnavailable }: SceneC
         aria-label={t('Interactive 3D view of the infrastructure topology')}
         role="img"
       >
-        {backend && pieces && (
-          <SceneBridge
-            backend={backend}
-            pieces={pieces}
-            theme={theme}
-            tooltip={tooltip}
-            onQuality={setQuality}
-          />
-        )}
+        {backend && pieces && renderBridge({ backend, pieces, onQuality: setQuality })}
       </Canvas>
     </SceneBoundary>
+  );
+}
+
+interface SceneCanvasProps extends Omit<TopologyCanvasProps, 'renderBridge'> {
+  theme: ThemeName;
+  tooltip: HTMLElement | null;
+}
+
+export function SceneCanvas({ theme, tooltip, ...props }: SceneCanvasProps) {
+  return (
+    <TopologyCanvas
+      {...props}
+      renderBridge={(bridge) => <SceneBridge {...bridge} theme={theme} tooltip={tooltip} />}
+    />
   );
 }

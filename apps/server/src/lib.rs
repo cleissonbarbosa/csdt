@@ -7,7 +7,7 @@
 //!   and the declarative incident scenarios. No I/O.
 //! * [`authorization`] — embedded Cedar policy decision point.
 //! * [`integrations`] — adapters for explicitly configured local instances of
-//!   public projects, and fixture parsers.
+//!   public projects.
 //! * [`application`] — use cases; owns the single mutable timeline.
 //! * [`workspace`] — reads an operator's own topologies, scenarios and
 //!   policies from a directory, once, at start-up.

@@ -445,9 +445,8 @@ own traffic: an attack, a probe, one principal's requests.
 `events` are announced `delayMs` after their phase begins, with a `severity`,
 a `title`, an optional `message` and the `nodes` they concern. `kind` is
 `alert`, `auth-failure`, `mitigation` or `reroute`. The other kinds on the
-timeline (a health change, an authorization decision, an imported advisory)
-are produced by the engine or by an importer and cannot be written by a
-scenario.
+timeline, such as a health change or an authorization decision, are reserved
+for the engine.
 
 ## Recording
 
@@ -493,9 +492,8 @@ was being looked at and, when the platform is not the bundled one, its files.
 `GET /api/v1/session` writes the recording and `POST
 /api/v1/demo/session/load` takes `{ "recording": …, "cursorMs": … }` back. It
 is held to the rules above, with two differences: it may hold up to 512
-commands, and it may hold none (time simply passed). Decisions asked for by
-hand and imports from an integration are left out, and the answer says how
-many. A comparison of an intervention (`POST
+commands, and it may hold none (time simply passed). The export omits
+on-demand Cedar decisions and counts them. A comparison of an intervention (`POST
 /api/v1/demo/experiments/compare`) returns its two runs as recordings too.
 
 ## Cedar

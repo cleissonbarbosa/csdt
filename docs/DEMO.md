@@ -240,8 +240,7 @@ identically every time.
 
 ## 9 · Connected Mode (optional)
 
-Open **Integrations** (the note in the top bar that says the data is simulated). The two fixture providers can be imported right away:
-their events appear on the timeline labelled _Recording_.
+Open **Integrations** from the note in the top bar that says the data is simulated.
 
 To evaluate with a real [`cedar-agent`](https://github.com/cleissonbarbosa/cedar-agent):
 

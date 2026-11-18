@@ -37,14 +37,13 @@ import {
   type AuthorizationDecision,
   type Relationship,
   type ServiceType,
-  type TelemetrySnapshot,
-  type Topology,
 } from '@aegis/contracts';
 import CameraControls from 'camera-controls';
 import * as THREE from 'three/webgpu';
 
 import { SCENE_PALETTE, type ScenePalette, type ThemeName } from '@/lib/palette';
 
+import type { SceneFrame, SceneTopology } from './sceneData';
 import { LabelLayer, loadLabelFonts, type LabelColours, type LabelTone } from './labelLayer';
 import {
   bezierPoint,
@@ -369,7 +368,7 @@ export class SceneController {
   private viewKey = '';
 
   // Topology-bound state -----------------------------------------------------
-  private topology: Topology | null = null;
+  private topology: SceneTopology | null = null;
   private layout: SceneLayout | null = null;
   private layoutMode: LayoutMode = 'regions';
   /** What to write beside each piece, when it is not the node's own name. */
@@ -625,7 +624,11 @@ export class SceneController {
    * `labels`, when given, is what to write beside each node instead of its
    * name: the overview's pieces stand for several services and say how many.
    */
-  setTopology(topology: Topology, mode: LayoutMode, labels: readonly string[] | null = null): void {
+  setTopology(
+    topology: SceneTopology,
+    mode: LayoutMode,
+    labels: readonly string[] | null = null,
+  ): void {
     const first = this.topology === null;
     const changed = this.topology?.id !== topology.id || this.n !== topology.nodes.length;
     // The same services in another arrangement: they walk there.
@@ -815,7 +818,7 @@ export class SceneController {
     });
   }
 
-  private buildNodes(topology: Topology): void {
+  private buildNodes(topology: SceneTopology): void {
     const material = this.track(createPieceMaterial(this.theme, this.mechanisms));
     const perType = SERVICE_TYPES.map(() => [] as number[]);
     this.nodeTypeIndex = new Uint8Array(this.n);
@@ -1006,7 +1009,7 @@ export class SceneController {
     this.world.add(mesh);
   }
 
-  private async buildLabels(topology: Topology, layout: SceneLayout): Promise<void> {
+  private async buildLabels(topology: SceneTopology, layout: SceneLayout): Promise<void> {
     await loadLabelFonts();
     // The topology may have been replaced while fonts were loading.
     if (this.disposed || this.layout !== layout) return;
@@ -1132,7 +1135,7 @@ export class SceneController {
   // Inputs from the application
   // ---------------------------------------------------------------------------
 
-  applySnapshot(snapshot: TelemetrySnapshot): void {
+  applySnapshot(snapshot: SceneFrame): void {
     if (snapshot.nodes.health.length !== this.n || snapshot.edges.trafficRps.length !== this.m) {
       return;
     }
@@ -1383,7 +1386,7 @@ export class SceneController {
    * draws itself once both of its ends are in place, and its traffic follows.
    */
   private beginAssembly(
-    topology: Topology,
+    topology: SceneTopology,
     layout: SceneLayout,
     relaid: boolean,
     walkFrom: Float32Array | null,
@@ -1684,6 +1687,22 @@ export class SceneController {
       height * 0.3,
       height - this.insets.top - this.insets.bottom - margin * 2,
     );
+    // Labels have a fixed screen size. When their offsets alone take most
+    // of the frame, stepping back cannot make enough room for the model.
+    // Frame the geometry and let the label layer place the names that fit.
+    let labelLeft = 0;
+    let labelRight = 0;
+    let labelBottom = 0;
+    let labelTop = 0;
+    for (const name of names) {
+      labelLeft = Math.min(labelLeft, (name.hang[0] - 0.5) * name.width);
+      labelRight = Math.max(labelRight, (name.hang[0] + 0.5) * name.width);
+      labelBottom = Math.min(labelBottom, (name.hang[1] - 0.5) * name.height);
+      labelTop = Math.max(labelTop, (name.hang[1] + 0.5) * name.height);
+    }
+    if (labelRight - labelLeft > freeW * 0.8 || labelTop - labelBottom > freeH * 0.8) {
+      names.length = 0;
+    }
     // Pixels a length of one covers at distance one.
     const lens = height / (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
 

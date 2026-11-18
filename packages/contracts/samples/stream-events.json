@@ -2,37 +2,97 @@
   "type": "events",
   "data": [
     {
-      "seq": 41,
-      "id": "evt-41",
+      "seq": 34,
+      "id": "evt-34",
       "tick": 151,
       "virtualTimeMs": 30200,
-      "severity": "info",
-      "kind": "cve-advisory",
-      "title": "CVE-2099-10004 · unscored",
-      "message": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
+      "severity": "warning",
+      "kind": "authz-decision",
+      "title": "Deny · User::\"mallory\" → Action::\"exportLedger\"",
+      "message": "Evaluated on demand against Ledger::\"acme-ledger-2026\".",
       "nodeIds": [
-        "use-assets",
-        "euw-assets"
+        "partner-api",
+        "edge-router",
+        "use-gateway",
+        "use-auth",
+        "use-cedar"
       ],
       "edgeIds": [],
       "incidentId": null,
-      "dataSource": "recording",
+      "dataSource": "synthetic",
       "details": {
-        "providerId": "security-alerts",
-        "payload": {
-          "advisory": {
-            "id": "CVE-2099-10004",
-            "published": "2026-01-10T15:20:00.000",
-            "description": "FICTIONAL ADVISORY. Verbose error pages in the fictional Helios Media Assets service disclose internal bucket names.",
-            "baseScore": null
+        "origin": "explorer",
+        "decision": {
+          "id": "dec-2",
+          "virtualTimeMs": 30000,
+          "request": {
+            "principal": "User::\"mallory\"",
+            "action": "Action::\"exportLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": {}
           },
-          "fictional": true
+          "decision": "deny",
+          "determiningPolicies": [
+            "forbid-cross-tenant"
+          ],
+          "errors": [],
+          "engine": {
+            "kind": "embedded-cedar",
+            "version": "4.14.1"
+          },
+          "evaluationMicros": 0,
+          "path": [
+            {
+              "nodeId": "partner-api",
+              "kind": "client",
+              "reached": true
+            },
+            {
+              "nodeId": "edge-router",
+              "kind": "edge",
+              "reached": true
+            },
+            {
+              "nodeId": "use-gateway",
+              "kind": "gateway",
+              "reached": true
+            },
+            {
+              "nodeId": "use-auth",
+              "kind": "authentication",
+              "reached": true
+            },
+            {
+              "nodeId": "use-cedar",
+              "kind": "authorization",
+              "reached": true
+            },
+            {
+              "nodeId": "use-ledger",
+              "kind": "resource",
+              "reached": false
+            },
+            {
+              "nodeId": "use-ledger-db",
+              "kind": "resource",
+              "reached": false
+            }
+          ],
+          "hops": [
+            "partner-api->edge-router",
+            "edge-router->use-gateway",
+            "use-gateway->use-auth",
+            "use-gateway->use-cedar"
+          ],
+          "blockedAt": "use-cedar",
+          "disabledPolicies": [],
+          "dataSource": "synthetic"
         }
       }
     },
     {
-      "seq": 42,
-      "id": "evt-42",
+      "seq": 35,
+      "id": "evt-35",
       "tick": 151,
       "virtualTimeMs": 30200,
       "severity": "notice",
@@ -55,8 +115,8 @@
       }
     },
     {
-      "seq": 43,
-      "id": "evt-43",
+      "seq": 36,
+      "id": "evt-36",
       "tick": 156,
       "virtualTimeMs": 31200,
       "severity": "warning",
@@ -90,8 +150,8 @@
       }
     },
     {
-      "seq": 44,
-      "id": "evt-44",
+      "seq": 37,
+      "id": "evt-37",
       "tick": 157,
       "virtualTimeMs": 31400,
       "severity": "warning",
@@ -113,8 +173,8 @@
       }
     },
     {
-      "seq": 45,
-      "id": "evt-45",
+      "seq": 38,
+      "id": "evt-38",
       "tick": 160,
       "virtualTimeMs": 32000,
       "severity": "info",

@@ -6,7 +6,7 @@
     "dataSource": "synthetic",
     "tick": 160,
     "virtualTimeMs": 32000,
-    "seq": 45,
+    "seq": 38,
     "global": {
       "rps": 3498.4,
       "avgLatencyMs": 160.2,

@@ -209,15 +209,12 @@ function Save() {
       )}
       {omitted.length > 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-dim" data-testid="session-omitted">
-          {t(
-            'Not carried: {items}. A session never states an outcome: Cedar and the importers have to give those again.',
-            {
-              items:
-                omitted.length === 2
-                  ? t('{first} and {second}', { first: omitted[0]!, second: omitted[1]! })
-                  : omitted[0]!,
-            },
-          )}
+          {t('This session omits {items}.', {
+            items:
+              omitted.length === 2
+                ? t('{first} and {second}', { first: omitted[0]!, second: omitted[1]! })
+                : omitted[0]!,
+          })}
         </p>
       )}
       {!exported.reproducible && (

@@ -26,7 +26,7 @@ flowchart LR
     Sim[simulation<br/>engine · timeline]
     Inc[incidents<br/>scenarios · recordings]
     Authz[authorization<br/>cedar-policy]
-    Int[integrations<br/>adapters · fixtures]
+    Int[integrations<br/>live adapters]
     Dom[(domain<br/>contracts)]
     API --> App
     App --> Sim
@@ -51,7 +51,7 @@ apps/
     simulation/      model, channels, engine (pure step), timeline, rng
     incidents/       declarative scenarios and prerecorded incidents
     authorization/   embedded Cedar policy decision point
-    integrations/    live adapters, fixture parsers, target guard
+    integrations/    live adapters, target guard
     application/     use cases; owns the single mutable timeline
     workspace.rs     reads an operator's own files from a directory at start-up
     api/             Axum routes, WebSocket, rate limiting, errors
@@ -65,7 +65,7 @@ apps/
     components/ui/   buttons, badges, dialog, fields, sparkline
 packages/contracts/  zod schemas + samples exported by the server
 fixtures/            the bundled topology, scenarios, recordings and Cedar
-                     files, laid out as a workspace; integration fixtures
+                     files, laid out as a workspace
 examples/            a small workspace to copy from
 ```
 
@@ -338,16 +338,16 @@ engine. Only what needs an operating system is left out of that build: the
 socket, the scheduler task, rate limiting, the HTTP client and the two live
 adapters.
 
-|                 | Server                                  | In the browser                                        |
-| --------------- | --------------------------------------- | ----------------------------------------------------- |
-| A request       | HTTP to `/api/v1`                       | a function call into the module, same path and body   |
-| The stream      | WebSocket                               | what each call hands back, delivered as socket events |
-| Time            | a 50 ms task and the operating system   | the worker's timer; the clock is an argument          |
-| Simulation      | one, shared by every viewer             | one per tab, gone on reload                           |
-| Integrations    | fixtures, and live adapters on loopback | fixtures only; live adapters are not listed           |
-| Cedar           | embedded, or a connected `cedar-agent`  | embedded                                              |
-| Evaluation time | measured                                | not measured, and shown as such                       |
-| Workspace       | start-up directory, or import           | import, held in the tab                               |
+|                 | Server                                   | In the browser                                        |
+| --------------- | ---------------------------------------- | ----------------------------------------------------- |
+| A request       | HTTP to `/api/v1`                        | a function call into the module, same path and body   |
+| The stream      | WebSocket                                | what each call hands back, delivered as socket events |
+| Time            | a 50 ms task and the operating system    | the worker's timer; the clock is an argument          |
+| Simulation      | one, shared by every viewer              | one per tab, gone on reload                           |
+| Providers       | simulation and live adapters on loopback | built-in simulation                                   |
+| Cedar           | embedded, or a connected `cedar-agent`   | embedded                                              |
+| Evaluation time | measured                                 | not measured, and shown as such                       |
+| Workspace       | start-up directory, or import            | import, held in the tab                               |
 
 **The boundary.** The module imports nothing from its host, so it can do
 nothing but compute. The page writes text into a buffer the module owns,

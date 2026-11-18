@@ -1,13 +1,10 @@
 //! Adapters for the public personal projects AEGIS can work with.
 //!
-//! Every adapter implements [`TelemetryProvider`]. Three kinds exist and are
-//! never presented as one another:
+//! Each provider implements [`TelemetryProvider`]:
 //!
 //! * the built-in simulation (always on, `DataSource::Synthetic`);
 //! * live adapters that talk to an explicitly configured local instance
-//!   (`DataSource::Live`), only after the operator opts in;
-//! * fixture adapters that parse a bundled file in a public project's format
-//!   (`DataSource::Recording`).
+//!   (`DataSource::Live`), only after the operator opts in.
 //!
 //! See `docs/INTEGRATIONS.md` for what was verified in each repository.
 
@@ -18,10 +15,8 @@ pub mod cedar_agent;
 pub mod cedar_agent;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod guard;
-pub mod network_scanner;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rinha;
-pub mod security_alerts;
 pub mod settings;
 
 use std::sync::Arc;
@@ -31,15 +26,11 @@ use async_trait::async_trait;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::authorization::PolicyDocument;
-use crate::domain::{
-    DataSource, ImportedEvent, IntegrationKind, IntegrationState, IntegrationStatus,
-};
+use crate::domain::{DataSource, IntegrationKind, IntegrationState, IntegrationStatus};
 
 pub use cedar_agent::CedarAgentProvider;
-pub use network_scanner::NetworkScannerFixtureProvider;
 #[cfg(not(target_arch = "wasm32"))]
 pub use rinha::RinhaProbeProvider;
-pub use security_alerts::SecurityAlertFixtureProvider;
 pub use settings::{CedarAgentConfig, IntegrationConfig, RinhaConfig};
 
 /// Timeout applied to every outbound integration request.
@@ -63,21 +54,14 @@ pub enum ProviderError {
     Unknown(String),
 }
 
-/// What connecting a provider contributed to the timeline.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ConnectOutcome {
-    pub events: Vec<ImportedEvent>,
-}
-
 #[async_trait]
 pub trait TelemetryProvider: Send + Sync {
     fn id(&self) -> &'static str;
 
     async fn status(&self) -> IntegrationStatus;
 
-    /// Opt in. Live adapters open their connection; fixture adapters parse
-    /// their file and return the events to import.
-    async fn connect(&self) -> Result<ConnectOutcome, ProviderError>;
+    /// Opt in to the provider.
+    async fn connect(&self) -> Result<(), ProviderError>;
 
     async fn disconnect(&self) -> Result<(), ProviderError>;
 }
@@ -161,8 +145,8 @@ impl TelemetryProvider for DemoSimulationProvider {
         }
     }
 
-    async fn connect(&self) -> Result<ConnectOutcome, ProviderError> {
-        Ok(ConnectOutcome::default())
+    async fn connect(&self) -> Result<(), ProviderError> {
+        Ok(())
     }
 
     async fn disconnect(&self) -> Result<(), ProviderError> {
@@ -203,8 +187,6 @@ impl ProviderRegistry {
                 &config.allowed_hosts,
                 client,
             )),
-            Arc::new(NetworkScannerFixtureProvider::default()),
-            Arc::new(SecurityAlertFixtureProvider::default()),
         ];
         Ok(Self {
             providers,
@@ -212,16 +194,10 @@ impl ProviderRegistry {
         })
     }
 
-    /// The providers that need no network: the simulation itself and the two
-    /// fixture parsers. This is all the in-browser engine has; the live
-    /// adapters are not listed there, because nothing could connect them.
+    /// The in-browser engine offers the built-in simulation.
     pub fn offline() -> Self {
         Self {
-            providers: vec![
-                Arc::new(DemoSimulationProvider),
-                Arc::new(NetworkScannerFixtureProvider::default()),
-                Arc::new(SecurityAlertFixtureProvider::default()),
-            ],
+            providers: vec![Arc::new(DemoSimulationProvider)],
             #[cfg(target_arch = "wasm32")]
             cedar_agent: Arc::new(CedarAgentProvider),
             #[cfg(not(target_arch = "wasm32"))]

@@ -8,7 +8,7 @@ contributes.
 | Label       | Meaning                                                   |
 | ----------- | --------------------------------------------------------- |
 | `synthetic` | Produced by the AEGIS simulation engine.                  |
-| `recording` | Parsed from a bundled fixture file. Never labelled live.  |
+| `recording` | Read from a recording.                                    |
 | `live`      | Measured from an explicitly connected **local** instance. |
 
 The label travels with the data (`dataSource` on topologies, events, decisions
@@ -34,8 +34,6 @@ were written from scratch against the interfaces described below.
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | [`cedar-agent`](https://github.com/cleissonbarbosa/cedar-agent)                                                                                       | HTTP API: policy store, data store, `is_authorized`      | **Live adapter**, verified against a locally built agent |
 | [`rinha-backend-2026`](https://github.com/cleissonbarbosa/rinha-backend-2026) / [`-rust`](https://github.com/cleissonbarbosa/rinha-backend-2026-rust) | `GET /ready`, `POST /fraud-score` behind a load balancer | **Live adapter**, read-only readiness probe              |
-| [`network-scanner`](https://github.com/cleissonbarbosa/network-scanner)                                                                               | CLI that writes a text `scan_report.txt`                 | **Fixture adapter** for the report format                |
-| [`telegram-security-bot`](https://github.com/cleissonbarbosa/telegram-security-bot)                                                                   | Telegram client over the public NVD CVE API              | **Fixture adapter** for the data shape it consumes       |
 | [`ferrousDB`](https://github.com/cleissonbarbosa/ferrousDB)                                                                                           | Rust library, REPL and desktop GUI                       | **Not integrated** (see below)                           |
 
 Other public repositories in the account (interpreters, editor configuration,
@@ -131,48 +129,6 @@ instance: the stack needs a multi-gigabyte reference dataset at build time.
 **Limitations.** Availability and probe latency only. The probe figures appear
 in the Integrations panel; they are not merged into the 3D topology.
 
-## network-scanner — fixture adapter
-
-`apps/server/src/integrations/network_scanner.rs`
-
-**Verified interface** (`app/Main.hs`, `app/Scanner.hs`,
-`app/OSFingerprint.hs`): a command-line tool with a hard-coded target
-(`127.0.0.1`) that writes:
-
-```text
-Scan report generated at: <timestamp>
-
-Port <n> is open (<service>)
-No connection to port <n>
-
-OS Fingerprint based on TTL (<ttl>): <guess>
-```
-
-**Decision.** A strict parser for that format plus a bundled,
-**hand-authored** report (`fixtures/integrations/network-scanner/`). Importing
-it places the findings on the timeline as `recording` events. Any line the
-scanner could not have produced is a parse error.
-
-AEGIS never runs the scanner and never opens a socket to scan anything.
-
-## telegram-security-bot — fixture adapter
-
-`apps/server/src/integrations/security_alerts.rs`
-
-**Verified interface.** The bot exposes no service: it is a Telegram client
-that queries the public NVD CVE API 2.0. Its handler
-(`src/commands/handlers/recent_vulnerabilities.py`) reads `cve.id`,
-`cve.descriptions[]` and `cve.metrics.cvssMetricV31[0].cvssData.baseScore`.
-
-**Decision.** What can honestly be reused is the _shape of the data it
-consumes_. The adapter parses those same fields from a bundled document in the
-NVD response shape (`fixtures/integrations/security-alerts/nvd-recent.json`).
-Every advisory in it is fictional (`CVE-2099-*`, invented products,
-`*.invalid` URLs). A sidecar file maps each advisory to nodes of the synthetic
-topology. Severity follows the CVSS v3.1 qualitative bands.
-
-AEGIS never contacts NVD or Telegram.
-
 ## ferrousDB — not integrated
 
 An educational storage engine (its README says not to use it in production)
@@ -212,10 +168,12 @@ Enforced in `apps/server/src/integrations/guard.rs` and `mod.rs`, with tests:
 ## The static site
 
 The application built around the engine in WebAssembly (`pnpm build:static`)
-has no network to reach an adapter through. It lists the built-in simulation
-and the two fixture adapters, whose files are embedded in the module, and
-does not list `cedar-agent` or `rinha-backend`: the code that would contact
-them is not in that build.
+lists the built-in simulation as its sole provider. The `cedar-agent` and
+`rinha-backend` adapters run on the AEGIS server.
+
+The [cloud incident replay](CLOUD-REPLAY.md) also works on the static site.
+A local CLI exports a CloudWatch capture. The browser opens the resulting
+file independently of the engine and its integration adapters.
 
 ## Adding a provider
 

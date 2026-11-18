@@ -207,9 +207,7 @@ pub async fn provider_connect(
 ) -> ApiResult<Vec<IntegrationStatus>> {
     let Path(id) = id?;
     check_id("provider id", &id)?;
-    let provider = state.providers.get(&id)?;
-    let outcome = provider.connect().await?;
-    state.service.import_events(provider.id(), outcome.events);
+    state.providers.get(&id)?.connect().await?;
     Ok(Json(state.providers.statuses().await))
 }
 

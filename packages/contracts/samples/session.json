@@ -32,7 +32,7 @@
   "cursorMs": 32000,
   "omitted": {
     "decisions": 2,
-    "importedEvents": 2
+    "importedEvents": 0
   },
   "reproducible": true,
   "note": null,

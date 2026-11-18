@@ -11,6 +11,7 @@ import core from './core';
 import experiments from './experiments';
 import guide from './guide';
 import inspector from './inspector';
+import replay from './replay';
 import scenarios from './scenarios';
 import workspace from './workspace';
 
@@ -24,6 +25,7 @@ export const PARTS = {
   guide,
   experiments,
   workspace,
+  replay,
 } as const;
 
 export const PT_BR = {
@@ -36,4 +38,5 @@ export const PT_BR = {
   ...guide,
   ...experiments,
   ...workspace,
+  ...replay,
 } as const;

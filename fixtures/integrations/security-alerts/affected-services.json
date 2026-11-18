@@ -1,6 +1,0 @@
-{
-  "CVE-2099-10001": ["use-gateway", "euw-gateway", "aps-gateway"],
-  "CVE-2099-10002": ["use-auth", "euw-auth", "aps-auth"],
-  "CVE-2099-10003": ["use-orders-db"],
-  "CVE-2099-10004": ["use-assets", "euw-assets"]
-}

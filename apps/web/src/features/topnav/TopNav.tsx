@@ -436,6 +436,12 @@ export function TopNav() {
               onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
             },
             {
+              id: 'cloud-replay',
+              label: t('Cloud incident replay'),
+              icon: <History size={14} />,
+              href: '?replay',
+            },
+            {
               id: 'view',
               label: viewMode === 'scene' ? t('Table view') : t('3D model'),
               hint: 'T',

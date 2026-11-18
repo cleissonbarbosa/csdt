@@ -8,10 +8,9 @@ use crate::authorization::validate_request;
 use crate::clock::Instant;
 use crate::domain::{
     AuthorizationDecision, AuthorizationRequest, AuthzError, DataSource, Decision, EngineInfo,
-    ImportedEvent, Incident, IncidentReport, MetricsReport, PathStage, PathStageKind,
-    PlaybackState, PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario,
-    SecurityEvent, Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS,
-    SCHEMA_VERSION,
+    Incident, IncidentReport, MetricsReport, PathStage, PathStageKind, PlaybackState,
+    PlaybackStatus, PolicyDecision, PolicyDecisionPoint, RecordingSummary, Scenario, SecurityEvent,
+    Severity, TelemetrySnapshot, Topology, TopologySummary, PLAYBACK_SPEEDS, SCHEMA_VERSION,
 };
 use crate::incidents::recordings::Recording;
 use crate::incidents::{resolve_fault, Effect};
@@ -653,30 +652,6 @@ impl SimulationService {
             ramp_ms,
         )
         .map_err(ServiceError::InvalidExperiment)
-    }
-
-    /// Places fixture-derived events on the timeline at the cursor.
-    pub fn import_events(&self, provider_id: &str, events: Vec<ImportedEvent>) {
-        if events.is_empty() {
-            return;
-        }
-        let mut rt = self.lock();
-        // Keep only node references that exist on the active topology.
-        let topo = Arc::clone(rt.timeline.topology());
-        let events = events
-            .into_iter()
-            .map(|mut event| {
-                event.node_ids.retain(|id| topo.node(id).is_some());
-                event
-            })
-            .collect();
-        let branched = rt.timeline.issue(Command::ImportEvents {
-            provider_id: provider_id.to_string(),
-            events,
-        });
-        if branched {
-            self.broadcast_timeline(&mut rt, TimelineReason::Branch);
-        }
     }
 
     // -- authorization ------------------------------------------------------

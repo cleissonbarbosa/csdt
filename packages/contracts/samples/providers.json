@@ -50,59 +50,5 @@
     ],
     "metrics": [],
     "lastError": null
-  },
-  {
-    "id": "network-scanner",
-    "name": "Network Scanner",
-    "kind": "fixture",
-    "state": "imported",
-    "dataSource": "recording",
-    "description": "Parses a bundled, hand-authored report in the scanner's text format and places its findings on the timeline. AEGIS never runs a scan.",
-    "repository": "https://github.com/cleissonbarbosa/network-scanner",
-    "verifiedInterface": "scan_report.txt text format",
-    "endpoint": null,
-    "capabilities": [
-      "scan findings"
-    ],
-    "metrics": [
-      {
-        "label": "Ports in report",
-        "value": "13"
-      },
-      {
-        "label": "Open",
-        "value": "80, 8080"
-      },
-      {
-        "label": "OS guess",
-        "value": "Linux/Unix"
-      }
-    ],
-    "lastError": null
-  },
-  {
-    "id": "security-alerts",
-    "name": "Security Advisories",
-    "kind": "fixture",
-    "state": "imported",
-    "dataSource": "recording",
-    "description": "Parses a bundled document in the NVD CVE 2.0 shape the bot consumes and shows the advisories on affected services. All advisories are fictional; NVD is never contacted.",
-    "repository": "https://github.com/cleissonbarbosa/telegram-security-bot",
-    "verifiedInterface": "NVD CVE API 2.0 fields: cve.id, descriptions, cvssMetricV31.baseScore",
-    "endpoint": null,
-    "capabilities": [
-      "vulnerability advisories"
-    ],
-    "metrics": [
-      {
-        "label": "Advisories",
-        "value": "4"
-      },
-      {
-        "label": "Highest CVSS",
-        "value": "9.8"
-      }
-    ],
-    "lastError": null
   }
 ]

@@ -163,10 +163,10 @@ export default {
     'Arquivos importados desde que este servidor iniciou. Ficam na memória dele e somem quando ele reinicia.',
   'Back to the files this page opened with.': 'De volta aos arquivos com que esta página abriu.',
   'Back to the files the server started with.': 'De volta aos arquivos com que o servidor iniciou.',
-  'This page runs the simulation in the browser and connects to nothing. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server. Fixtures are files parsed in the format of a public project; importing them contacts nothing.':
-    'Esta página roda a simulação no navegador e não se conecta a nada. Os adaptadores ao vivo (um cedar-agent local, um alvo de teste de carga) precisam do servidor do AEGIS. Os arquivos de exemplo são lidos no formato de um projeto público; importá-los não contata nada.',
-  'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects. Fixtures are local files parsed in the format of a public project; importing them contacts nothing.':
-    'Os adaptadores ao vivo só aceitam alvos de loopback (ou hosts liberados explicitamente no servidor), usam tempos limite curtos e nunca seguem redirecionamentos. Os arquivos de exemplo são arquivos locais lidos no formato de um projeto público; importá-los não contata nada.',
+  'This page runs the simulation in the browser. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server.':
+    'Esta página roda a simulação no navegador. Os adaptadores ao vivo (um cedar-agent local, um alvo de teste de carga) precisam do servidor do AEGIS.',
+  'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects.':
+    'Os adaptadores ao vivo só aceitam alvos de loopback (ou hosts liberados explicitamente no servidor), usam tempos limite curtos e nunca seguem redirecionamentos.',
   'Evaluating with a local cedar-agent needs the AEGIS server. This page has the embedded engine only.':
     'Avaliar com um cedar-agent local precisa do servidor do AEGIS. Esta página tem só o motor embutido.',
   'Connect a local cedar-agent under Integrations to evaluate with it instead.':

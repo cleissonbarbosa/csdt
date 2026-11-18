@@ -69,7 +69,7 @@ pub enum Command {
     RecordDecision {
         decision: Box<AuthorizationDecision>,
     },
-    /// Events imported from a fixture-backed provider.
+    /// Legacy events imported from a fixture-backed provider.
     #[serde(rename_all = "camelCase")]
     #[schemars(skip)]
     ImportEvents {

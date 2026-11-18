@@ -33,7 +33,7 @@ use crate::domain::{
 
 use super::guard::{validate_target, Target};
 pub use super::settings::CedarAgentConfig;
-use super::{read_limited, sanitize, ConnectOutcome, ProviderError, TelemetryProvider};
+use super::{read_limited, sanitize, ProviderError, TelemetryProvider};
 
 pub const PROVIDER_ID: &str = "cedar-agent";
 const REPOSITORY: &str = "https://github.com/cleissonbarbosa/cedar-agent";
@@ -407,11 +407,11 @@ impl TelemetryProvider for CedarAgentProvider {
         }
     }
 
-    async fn connect(&self) -> Result<ConnectOutcome, ProviderError> {
+    async fn connect(&self) -> Result<(), ProviderError> {
         self.configured()?;
         self.state().state = Some(IntegrationState::Connecting);
         match self.try_connect().await {
-            Ok(()) => Ok(ConnectOutcome::default()),
+            Ok(()) => Ok(()),
             Err(error) => {
                 self.fail(&error);
                 Err(error)

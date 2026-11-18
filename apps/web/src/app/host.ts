@@ -29,7 +29,7 @@ export const HOST = IN_BROWSER
       ),
       backToStart: t('Back to the files this page opened with.'),
       adapters: t(
-        'This page runs the simulation in the browser and connects to nothing. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server. Fixtures are files parsed in the format of a public project; importing them contacts nothing.',
+        'This page runs the simulation in the browser. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server.',
       ),
       agent: t(
         'Evaluating with a local cedar-agent needs the AEGIS server. This page has the embedded engine only.',
@@ -47,7 +47,7 @@ export const HOST = IN_BROWSER
       ),
       backToStart: t('Back to the files the server started with.'),
       adapters: t(
-        'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects. Fixtures are local files parsed in the format of a public project; importing them contacts nothing.',
+        'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects.',
       ),
       agent: t('Connect a local cedar-agent under Integrations to evaluate with it instead.'),
     };

@@ -298,6 +298,14 @@ at all. It can also be shown inside another page: `?embed=1` leaves out the
 bar and says in one line what this is, and `&scenario=ddos-surge` starts an
 incident in it.
 
+**Cloud incident replay**
+
+Open **More → Cloud incident replay** to scrub the public Google Cloud
+outage of 12 June 2025, or load a capture from an AWS application. The
+capture uses observed CloudWatch topology and metrics in a separate
+timeline. The static viewer reads the file in the tab. See
+[Cloud incident replay](docs/CLOUD-REPLAY.md) for the local exporter.
+
 **Signals with their range**
 
 Traffic, latency, error rate and saturation, each drawn on a scale with its
@@ -429,7 +437,7 @@ flowchart LR
 | `simulation`         | Flow-propagation model, effect channels, the pure `step` function, the timeline. |
 | `incidents`          | Scenario definitions and prerecorded incidents, as data.                         |
 | `authorization`      | Embedded Cedar policy decision point.                                            |
-| `integrations`       | Adapters for local instances and fixture parsers, behind a target guard.         |
+| `integrations`       | Adapters for local instances, behind a target guard.                             |
 | `application`        | Use cases; owns the single mutable timeline.                                     |
 | `workspace`          | Reads an operator's topologies, scenarios and policies from a directory, once.   |
 | `api`                | HTTP and WebSocket shell: validation, limits, error mapping.                     |
@@ -469,12 +477,10 @@ projects by the same author, each built against an interface that was read in
 the repository and tested. Details and limitations:
 [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
-| Project                                                                           | Kind         | What AEGIS does with it                                                                 | Verified how                                                                                 |
-| --------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [cedar-agent](https://github.com/cleissonbarbosa/cedar-agent)                     | Live adapter | Evaluates Authorization Explorer requests with a local agent (`POST /v1/is_authorized`) | Against a locally built agent: decisions match the embedded engine for all 15 request shapes |
-| [rinha-backend-2026](https://github.com/cleissonbarbosa/rinha-backend-2026)       | Live adapter | Read-only `GET /ready` probes; reports only what it measures                            | Against an in-process double of the interface; not run against a live stack                  |
-| [network-scanner](https://github.com/cleissonbarbosa/network-scanner)             | Fixture      | Parses a report in the scanner's text format onto the timeline                          | Parser tests on the format read from the source; AEGIS never scans                           |
-| [telegram-security-bot](https://github.com/cleissonbarbosa/telegram-security-bot) | Fixture      | Parses advisories in the NVD shape the bot consumes; all fictional                      | Parser tests; AEGIS never contacts NVD or Telegram                                           |
+| Project                                                                     | Kind         | What AEGIS does with it                                                                 | Verified how                                                                                 |
+| --------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [cedar-agent](https://github.com/cleissonbarbosa/cedar-agent)               | Live adapter | Evaluates Authorization Explorer requests with a local agent (`POST /v1/is_authorized`) | Against a locally built agent: decisions match the embedded engine for all 15 request shapes |
+| [rinha-backend-2026](https://github.com/cleissonbarbosa/rinha-backend-2026) | Live adapter | Read-only `GET /ready` probes; reports only what it measures                            | Against an in-process double of the interface; not run against a live stack                  |
 
 Not integrated: [ferrousDB](https://github.com/cleissonbarbosa/ferrousDB) (no
 network interface to adapt to) and OpenTelemetry (no inspected project exports
@@ -598,7 +604,7 @@ apps/wasm           The engine for the browser: the server's routes behind a
 apps/web            React client (graphics · features · stores · providers · engine)
 packages/contracts  Shared contract: zod schemas + samples exported by the server
 fixtures            The bundled topology, scenarios, recordings and Cedar files, laid
-                    out as a workspace; fixtures for the integrations
+                    out as a workspace
 examples            A small workspace to copy from
 docs                Design, architecture, integrations, security, performance, demo
 scripts             Screenshot and benchmark runners

@@ -349,8 +349,7 @@ export default {
   'the overview': 'a visão geral',
   'This platform is not the bundled one, so the file carries its files too. A link cannot.':
     'Esta plataforma não é a incluída, então o arquivo leva também os arquivos dela. Um link não pode.',
-  'Not carried: {items}. A session never states an outcome: Cedar and the importers have to give those again.':
-    'Fica de fora: {items}. Uma sessão nunca afirma um resultado: o Cedar e os importadores precisam fornecê-los de novo.',
+  'This session omits {items}.': 'Esta sessão deixa de fora {items}.',
   '{n} authorization decision evaluated by hand': '{n} decisão de autorização avaliada à mão',
   '{n} authorization decisions evaluated by hand': '{n} decisões de autorização avaliadas à mão',
   '{n} import from an integration': '{n} importação de uma integração',

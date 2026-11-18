@@ -154,7 +154,7 @@ domain`.
   definitions run on both bundled topologies; a scenario may also name a node
   by id. A recording is a seed plus a command list.
 - `authorization`: the embedded `cedar-policy` decision point.
-- `integrations`: opt-in adapters and fixture parsers. Every outbound target
+- `integrations`: opt-in adapters for local instances. Every outbound target
   goes through `guard.rs`.
 - `workspace`: sorts files into the parts of a workspace, checks each and
   lays them over a set of sources. `workspace/compose.rs` reads a Compose

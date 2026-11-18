@@ -606,10 +606,7 @@ mod tests {
             .iter()
             .map(|provider| provider["id"].as_str().unwrap())
             .collect();
-        assert_eq!(
-            ids,
-            ["demo-simulation", "network-scanner", "security-alerts"]
-        );
+        assert_eq!(ids, ["demo-simulation"]);
     }
 
     #[test]

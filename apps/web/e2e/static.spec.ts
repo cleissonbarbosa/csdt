@@ -185,13 +185,14 @@ test('a platform is imported into the tab, and a reload returns to the bundled o
   expect(errors).toEqual([]);
 });
 
-test('the page offers the fixtures and says what only the server can do', async ({ page }) => {
+test('the page lists the built-in simulation and explains how to use live adapters', async ({
+  page,
+}) => {
   await openStatic(page);
   await page.getByTestId('open-integrations').click();
   const dialog = page.getByRole('dialog', { name: 'Integrations' });
-  // The simulation and the two fixture parsers; no adapter that needs a network.
-  await expect(dialog.getByRole('listitem')).toHaveCount(3);
-  await expect(dialog).not.toContainText('Live adapter');
+  await expect(dialog.getByRole('listitem')).toHaveCount(1);
+  await expect(dialog.getByTestId('provider-demo-simulation')).toBeVisible();
   await expect(dialog.getByTestId('integrations-note')).toContainText('need the AEGIS server');
 });
 
@@ -313,5 +314,94 @@ test('the interface speaks Portuguese when asked, and English again when told', 
   await dialog.getByRole('radio', { name: 'English' }).click();
   await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
   expect(await page.evaluate(() => document.documentElement.lang)).toBe('en');
+  expect(errors).toEqual([]);
+});
+
+test('replays a public outage and a local cloud capture without the simulation engine', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await openStatic(page);
+  const opened = context.waitForEvent('page');
+  await fromMenu(page, 'cloud-replay');
+  const replay = await opened;
+  const errors = collectErrors(replay);
+  const requests = collectRequests(replay);
+  // Reload the shareable URL so requests are observed from the first file.
+  await replay.goto(baseURL + '?replay');
+  await expect(replay.getByRole('heading', { name: /Google Cloud outage/ })).toBeVisible();
+  await waitForScene(replay, 12);
+  expect((await frameSummary(replay)).drawn).toBeGreaterThan(10);
+  await replay.getByRole('button', { name: /Service Control starts failing/ }).click();
+  await expect(replay.getByTestId('replay-time')).toHaveAttribute(
+    'datetime',
+    '2025-06-12T17:49:00.000Z',
+  );
+  await expect.poll(async () => (await frameSummary(replay)).chromatic).toBeGreaterThan(10);
+  const inspector = replay.getByRole('combobox', { name: 'Service or connection' });
+  await inspector.selectOption('control-iowa');
+  await expect(replay.getByTestId('replay-evidence')).toContainText('Impact reported');
+  await replay.getByRole('button', { name: /Core API serving recovered/ }).click();
+  await inspector.selectOption('control-iowa');
+  await expect(replay.getByTestId('replay-evidence')).toContainText('Recovery reported');
+
+  const start = Date.UTC(2025, 5, 12, 18);
+  const at = start + 60_000;
+  const payload = {
+    kind: 'aegis-cloud-replay',
+    version: 1,
+    title: 'CloudWatch replay test',
+    source: { kind: 'cloudwatch', label: 'CloudWatch test fixture' },
+    window: { startMs: start, endMs: start + 180_000 },
+    periodMs: 60_000,
+    regions: [{ id: 'us-east-1', name: 'us-east-1' }],
+    nodes: [
+      {
+        id: 'checkout',
+        name: 'Checkout',
+        region: 'us-east-1',
+        type: 'microservice',
+        buckets: [{ atMs: at, requests: 40, faults: 10, p95Ms: 450 }],
+      },
+      { id: 'payment', name: 'Payment', region: 'us-east-1', type: 'microservice' },
+    ],
+    edges: [
+      { source: 'checkout', target: 'payment', buckets: [{ atMs: at, requests: 20, faults: 5 }] },
+      { source: 'payment', target: 'checkout' },
+    ],
+  };
+  const file = replay.getByTestId('replay-file');
+  await file.setInputFiles({
+    name: 'capture.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(payload)),
+  });
+  await expect(replay.getByRole('heading', { name: payload.title })).toBeVisible();
+  await waitForScene(replay, 2);
+  expect(await replay.evaluate(() => window.__aegis?.stats().edges)).toBe(2);
+  await inspector.selectOption('checkout->payment');
+  await expect(replay.getByTestId('replay-evidence')).toContainText('No data');
+  await replay.getByRole('button', { name: 'Go to first sample with faults' }).click();
+  await expect(replay.getByTestId('replay-evidence')).toContainText('25.0%');
+  await replay.getByRole('radio', { name: 'Table view' }).click();
+  await expect(replay.getByRole('row', { name: /Checkout.*Faults observed/ })).toBeVisible();
+  await file.setInputFiles({
+    name: 'bad.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{}'),
+  });
+  await expect(replay.getByRole('alert')).toContainText('valid cloud replay capture');
+  await expect(replay.getByRole('heading', { name: payload.title })).toBeVisible();
+  await replay.getByRole('button', { name: 'Open public replay' }).click();
+  await expect(replay.getByRole('heading', { name: /Google Cloud outage/ })).toBeVisible();
+  // Long region names cannot push the geometry out of the frame on a phone.
+  await replay.setViewportSize({ width: 390, height: 844 });
+  await waitForScene(replay, 12);
+  await expect.poll(async () => (await frameSummary(replay)).drawn).toBeGreaterThan(10);
+  expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
+  expect(
+    requests.filter((url) => url.endsWith('.wasm') || new URL(url).pathname.includes('/api/')),
+  ).toEqual([]);
   expect(errors).toEqual([]);
 });

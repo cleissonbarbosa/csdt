@@ -1,6 +1,10 @@
 # Security model
 
-AEGIS is a simulator. It observes nothing real and can change nothing real.
+The AEGIS simulator runs on synthetic data and can change nothing in an
+external system. The browser also has a [cloud incident replay](CLOUD-REPLAY.md)
+that reads captures from disk. Observed data is collected separately by an
+operator's read-only CLI export. The replay does not send the file to a
+server or grant the simulator access to it.
 This document states the boundaries that make that true and how each one is
 enforced.
 
@@ -9,7 +13,7 @@ enforced.
 | Boundary                                      | How it is enforced                                                                                                                        |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | **No real attacks.**                          | Scenarios are declarative data that change numbers inside the simulation engine. The `simulation` and `incidents` modules perform no I/O. |
-| **No network scanning.**                      | The network-scanner integration is a parser for a bundled text file. No code in AEGIS opens a socket to probe a host or port.             |
+| **No network scanning.**                      | The adapters contact the configured local services at fixed HTTP endpoints.                                                               |
 | **No infrastructure changes.**                | There are no cloud SDKs or credentials in the dependency tree.                                                                            |
 | **No outbound connections by default.**       | Demo Mode makes none. Integrations must be configured on the server _and_ switched on by the operator.                                    |
 | **No remote targets.**                        | Live adapters accept loopback targets only, unless a host is explicitly allow-listed.                                                     |
@@ -17,9 +21,8 @@ enforced.
 
 ## Data
 
-All bundled platform data is synthetic: services, metrics, incidents,
-principals, policies and advisories. Advisories use the reserved-looking `CVE-2099-*` range
-and `*.invalid` URLs so they cannot be mistaken for real ones.
+All bundled simulation data is synthetic, including services, metrics,
+incidents, principals and policies.
 
 Every piece of data carries a provenance label (`synthetic`, `recording`,
 `live`) from the server to the pixel. A fixture is never labelled live.
@@ -86,9 +89,8 @@ Whichever way it arrives, a workspace is held to this:
   because its figures are computed whatever platform it describes. A scenario
   may only announce alerts, authentication failures, mitigations and reroutes;
   a recording, and a session, may only start and stop scenarios and place
-  and lift faults. An authorization decision, an
-  advisory or a scan finding cannot be written into a file: they come from
-  Cedar or from an importer.
+  and lift faults. Authorization decisions come from Cedar, and imported
+  event kinds remain reserved in the v1 format.
 - **Cedar still decides.** Policies from a workspace are parsed and evaluated
   by `cedar-policy`. A flow is stopped at the authorizer only if Cedar denied
   its request.
@@ -116,11 +118,10 @@ takes an outcome, and what each can make the server do is bounded.
   It is held to what a recording file is held to: it may start and stop
   scenarios and place and lift faults, with figures in range, on services
   and connections the topology has. A decision or an imported event in it is
-  refused; those are left out, and counted, when a session is written, and
-  can only come from Cedar or from an importer. At most 512 commands, 30
-  virtual minutes and 256 KiB, simulated off the async workers. Loading one
-  replaces the timeline for everyone connected, as loading a bundled
-  recording does.
+  refused. Session exports omit and count on-demand decisions. At most 512
+  commands, 30 virtual minutes and 256 KiB, simulated off the async workers.
+  Loading one replaces the timeline for everyone connected, as loading a
+  bundled recording does.
 - **A comparison touches nothing.** `POST /demo/experiments/compare`
   simulates one scenario twice on timelines of its own, bounded the same
   way, and answers with both. The timeline in use is not changed.
