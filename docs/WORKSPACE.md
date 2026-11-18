@@ -11,7 +11,9 @@ recompiled either way.
 What it shows is still a simulation. A topology file describes a platform; the
 load, latency, failures and authorization traffic on it are computed by the
 engine and labelled `synthetic`, whatever the platform is. Nothing in a
-workspace makes AEGIS observe a real system.
+workspace makes AEGIS observe a real system. An [incident
+capture](CAPTURES.md), which shows a real incident, is not part of a
+workspace: the browser reads it itself and never sends it to the server.
 
 ## Start from a copy
 
@@ -469,8 +471,9 @@ re-simulates it, identically every time.
 ```
 
 It may only start and stop scenarios, on a topology and with scenarios the
-workspace has, and a command takes no field beyond the ones shown. The timeline's other commands record an authorization decision
-or an imported event; a file is not allowed to put either there by saying so.
+workspace has, and a command takes no field beyond the ones shown. Of the
+timeline's other commands, one records an authorization decision; a file is
+not allowed to put one there by saying so.
 
 A recording may also place and lift faults by hand: one effect, written as
 in a scenario phase, outside any scenario. Effects on a scenario's own flow
@@ -630,7 +633,7 @@ aegis-server diff-workspace ./main-policies ./branch-policies --exit-code
   the engine, and the `simulation` and `incidents` modules still perform no
   I/O.
 - It cannot label anything `live` or `recording`, state a Cedar decision, or
-  place an event that an engine or an importer did not produce.
+  place an event the engine did not produce.
 
 How each of these is enforced is in [SECURITY.md](SECURITY.md).
 

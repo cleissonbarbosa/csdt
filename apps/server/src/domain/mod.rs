@@ -57,7 +57,10 @@ pub fn is_valid_id(id: &str) -> bool {
 pub enum DataSource {
     /// Produced by the internal simulation engine.
     Synthetic,
-    /// Imported from a prerecorded or hand-authored fixture file.
+    /// Not produced by the simulation: an incident capture the browser
+    /// reads from a file, either measurements a system recorded or a
+    /// provider's report transcribed by hand. The server never emits it,
+    /// and a workspace topology may not claim it.
     Recording,
     /// Measured from an explicitly connected local instance.
     Live,

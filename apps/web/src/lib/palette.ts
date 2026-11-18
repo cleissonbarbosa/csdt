@@ -7,6 +7,7 @@ import type {
   Severity,
 } from '@aegis/contracts';
 
+import type { Condition, TypeSource } from '@/features/capture/capture';
 import { t } from '@/i18n';
 
 /**
@@ -219,14 +220,88 @@ export const RELATIONSHIP_LABEL: Record<Relationship, string> = {
 
 export const DATA_SOURCE_LABEL: Record<DataSource, string> = {
   synthetic: t('Synthetic'),
-  recording: t('Recording'),
+  // An incident capture: never the simulation's "recording" of an incident.
+  recording: t('Capture'),
   live: t('Live'),
 };
 
 export const DATA_SOURCE_HINT: Record<DataSource, string> = {
   synthetic: t('Produced by the built-in simulation engine.'),
-  recording: t('Imported from a bundled fixture file.'),
+  recording: t(
+    "Not produced by the simulation: an incident capture read in this browser from a file, either a real system's measurements or a provider's report transcribed by hand.",
+  ),
   live: t('Measured from an explicitly connected local instance.'),
+};
+
+/**
+ * What an incident capture says of a service at a moment, in words. A
+ * measured state is the simulation's error level applied to one sample; a
+ * stated one is the provider's own word. A state the source does not give
+ * is said as such: it is never called normal.
+ */
+export const CAPTURE_STATE_LABEL: Record<Condition, string> = {
+  unknown: t('No data'),
+  normal: t('Normal'),
+  degraded: t('Degraded'),
+  critical: t('Critical'),
+  'not-stated': t('Not stated at this time'),
+  affected: t('Reported affected'),
+  recovering: t('Reported recovering'),
+  recovered: t('Reported recovered'),
+};
+
+/**
+ * A state that is not given although the source has a sample at that
+ * moment: the sample holds no error count, or no request count, to take an
+ * error rate from. It is said as what was not measured, because "No data"
+ * beside the figures that were measured would deny them.
+ */
+export const CAPTURE_UNMEASURED_LABEL = t('Error rate not measured');
+
+/**
+ * What a capture says of a service or a connection at a moment, in words,
+ * given whether the source has a sample of it then: an unknown state with a
+ * sample is an error rate not measured, one without is no data.
+ */
+export function captureStateLabel(condition: Condition, sampled = false): string {
+  return condition === 'unknown' && sampled
+    ? CAPTURE_UNMEASURED_LABEL
+    : CAPTURE_STATE_LABEL[condition];
+}
+
+/**
+ * The shape each is drawn with: the glyph of the health its level is drawn
+ * as (none for normal), or `unknown`, the dashed ring of a state that is not
+ * given, as the scene draws it under the piece.
+ */
+export const CAPTURE_STATE_GLYPH: Record<Condition, Health | 'unknown'> = {
+  unknown: 'unknown',
+  normal: 'healthy',
+  degraded: 'degraded',
+  critical: 'critical',
+  'not-stated': 'unknown',
+  affected: 'critical',
+  recovering: 'degraded',
+  recovered: 'healthy',
+};
+
+/** Its colour: a signal only where the level is past normal; ink otherwise, fainter when not given. */
+export const CAPTURE_STATE_COLOR: Record<Condition, string> = {
+  unknown: COLOR.inkFaint,
+  normal: COLOR.inkDim,
+  degraded: COLOR.warning,
+  critical: COLOR.critical,
+  'not-stated': COLOR.inkFaint,
+  affected: COLOR.critical,
+  recovering: COLOR.warning,
+  recovered: COLOR.inkDim,
+};
+
+/** Where a captured service's kind comes from, as its card says it. */
+export const TYPE_SOURCE_HINT: Record<TypeSource, string> = {
+  source: t('Kind mapped from the resource type the source reported'),
+  declared: t('Kind declared by the operator'),
+  assumed: t('Kind assumed: the source does not say'),
 };
 
 /**

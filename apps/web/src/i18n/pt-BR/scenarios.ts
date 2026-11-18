@@ -18,8 +18,6 @@ export default {
   Mitigation: 'Mitigação',
   Reroute: 'Redirecionamento',
   Alert: 'Alerta',
-  'Cve Advisory': 'Aviso de CVE',
-  'Scan Finding': 'Achado de varredura',
   System: 'Sistema',
 
   // The incident running now.

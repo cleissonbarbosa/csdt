@@ -5,9 +5,8 @@
 //! same three things a recording file holds. A session is the timeline in
 //! use in that form, to be saved, sent to someone and loaded again.
 //!
-//! What a recording may not carry is left out and counted: a decision or an
-//! imported event has to come from an engine or an importer, never from a
-//! file that says so.
+//! What a recording may not carry is left out and counted: a decision has
+//! to come from Cedar, never from a file that says so.
 
 use serde::Serialize;
 
@@ -21,8 +20,6 @@ use crate::simulation::{Command, Timeline, TICK_MS};
 pub struct Omitted {
     /// Authorization decisions evaluated on demand.
     pub decisions: usize,
-    /// Batches of events imported from an integration.
-    pub imported_events: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -50,7 +47,6 @@ pub fn export(timeline: &Timeline, workspace_origin: WorkspaceOrigin) -> Session
     for (tick, command) in timeline.commands() {
         match command {
             Command::RecordDecision { .. } => omitted.decisions += 1,
-            Command::ImportEvents { .. } => omitted.imported_events += 1,
             command => commands.push(RecordedCommand {
                 at_ms: tick * TICK_MS,
                 command: command.clone(),

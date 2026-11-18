@@ -2,9 +2,11 @@ import type { DataSource, Health } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
+  ArrowLeft,
   Box,
   CircleHelp,
   Ellipsis,
+  FileClock,
   Flag,
   FolderOpen,
   GitCompareArrows,
@@ -18,20 +20,27 @@ import {
   Share2,
   Table2,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
+import { leaveCapture, openCapture } from '@/app/captureUrl';
 import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { HealthGlyph } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import { Menu } from '@/components/ui/Menu';
+import { BUNDLED } from '@/features/capture/bundled';
+import { isReport } from '@/features/capture/capture';
+import { provenanceOf } from '@/features/capture/CaptureCard';
+import { CaptureStatus } from '@/features/capture/CaptureStatus';
 import { Deviations } from '@/features/hud/Hud';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatClock } from '@/lib/format';
 import { COLOR, DATA_SOURCE_HINT, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
+import { selectOpen, useCapture } from '@/stores/capture';
 import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -190,15 +199,20 @@ function ConnectionHealth() {
 }
 
 /**
- * Where the data comes from, in a word, on every screen: this is a
- * simulation. It is also the way to the integrations that could add to it.
- */ /** What the bar says the figures are, by where they come from. */
+ * What the bar says the figures are, by where they come from. A recording
+ * is an incident capture, which is never simulated: the simulation never
+ * produces one, and its own chip takes this one's place while one is open.
+ */
 const SIMULATED_FROM: Record<DataSource, string> = {
   synthetic: t('Simulated, synthetic data'),
-  recording: t('Simulated, recording data'),
+  recording: t('Captured, not simulated'),
   live: t('Simulated, live data'),
 };
 
+/**
+ * Where the data comes from, in a word, on every screen: this is a
+ * simulation. It is also the way to the integrations that could add to it.
+ */
 function Provenance() {
   const topology = useTelemetry((state) => state.topology);
   const { data: providers } = useQuery({
@@ -291,11 +305,38 @@ function followIncident(incidentId: string): void {
 }
 
 /**
+ * The bar itself: the name of the application, then whatever the mode it is
+ * in puts after it. On a narrow screen the controls drop to a second row, so
+ * the sentence that says how things are keeps its place.
+ */
+function Bar({ children }: { children: ReactNode }) {
+  return (
+    <header className="relative z-30 flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 border-b border-line bg-plate px-3">
+      <div className="flex items-center gap-2 text-ink">
+        <Logo />
+        <h1 className="text-sm font-bold">AEGIS</h1>
+      </div>
+      <span aria-hidden className="h-4 w-px bg-line-strong max-md:hidden" />
+      {children}
+    </header>
+  );
+}
+
+/** The menu's way to an incident capture, in either mode. */
+const openCaptures = () => useUi.getState().setPanel('capture');
+
+/**
  * The bar: what this is, how it is, and the things to do first: find
  * something, ask Cedar, follow an incident. The rest of the application is
- * one step away, in the menu at its end and in the model itself.
+ * one step away, in the menu at its end and in the model itself. While an
+ * incident capture is open the bar is the capture's instead.
  */
 export function TopNav() {
+  const captured = useCapture(selectOpen);
+  return captured ? <CaptureNav /> : <SimulationNav />;
+}
+
+function SimulationNav() {
   const viewMode = useUi((state) => state.viewMode);
   const incidentsOpen = useUi((state) => state.explorerOpen && state.leftTab === 'incidents');
   const timelineOpen = useUi((state) => state.timelineOpen);
@@ -307,14 +348,7 @@ export function TopNav() {
   });
 
   return (
-    // On a narrow screen the controls drop to a second row, so the sentence
-    // that says how the platform is keeps its place.
-    <header className="relative z-30 flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 border-b border-line bg-plate px-3">
-      <div className="flex items-center gap-2 text-ink">
-        <Logo />
-        <h1 className="text-sm font-bold">AEGIS</h1>
-      </div>
-      <span aria-hidden className="h-4 w-px bg-line-strong max-md:hidden" />
+    <Bar>
       <div className="hidden md:block">
         <TopologyPicker />
       </div>
@@ -436,12 +470,6 @@ export function TopNav() {
               onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
             },
             {
-              id: 'cloud-replay',
-              label: t('Cloud incident replay'),
-              icon: <History size={14} />,
-              href: '?replay',
-            },
-            {
               id: 'view',
               label: viewMode === 'scene' ? t('Table view') : t('3D model'),
               hint: 'T',
@@ -462,6 +490,14 @@ export function TopNav() {
               onSelect: () => useUi.getState().setPanel('workspace'),
             },
             {
+              // A real incident, read in this tab: not the simulation's
+              // timeline, so not its clock either.
+              id: 'capture',
+              label: t('Open an incident capture'),
+              icon: <FileClock size={14} />,
+              onSelect: openCaptures,
+            },
+            {
               id: 'settings',
               label: t('Settings'),
               icon: <Settings size={14} />,
@@ -477,6 +513,172 @@ export function TopNav() {
           ]}
         />
       </div>
-    </header>
+    </Bar>
+  );
+}
+
+/** What the picker calls a capture read from a file. */
+const FROM_FILE = 'file';
+
+/**
+ * The captures there are to choose from, in the place where the simulation
+ * chooses its environment: the ones that come with AEGIS, and the file that
+ * is open, if one is. Another file is opened from the menu's dialog.
+ */
+function CapturePicker() {
+  const id = useCapture((state) => state.id);
+  const fileName = useCapture((state) => state.fileName);
+  return (
+    <Select
+      label={t('Incident capture')}
+      hideLabel
+      quiet
+      value={id ?? FROM_FILE}
+      onChange={(event) => {
+        const next = event.target.value;
+        // One that cannot be opened leaves the open one where it is, and
+        // says why in a notice (`useCaptureFailures` in `App.tsx`).
+        if (next !== FROM_FILE) void openCapture(next);
+      }}
+      // A capture's title is shown as written, whole: the picker is as wide
+      // as it, and the sentence beside it gives way first.
+      fit
+      className="max-w-[24rem]"
+      data-testid="capture-picker"
+    >
+      {BUNDLED.map((entry) => (
+        <option key={entry.id} value={entry.id}>
+          {entry.title}
+        </option>
+      ))}
+      {id === null && fileName !== null && <option value={FROM_FILE}>{fileName}</option>}
+    </Select>
+  );
+}
+
+/**
+ * Where a capture's figures come from, in the place of the simulation's
+ * provenance: captured, or from the provider's report, and never simulated.
+ * It is the way to what the capture is (its source, window and notes).
+ * Where the picker is not on the bar (a phone or a tablet, short of room
+ * for a title whole), it carries the capture's title.
+ */
+function CaptureChip() {
+  const capture = useCapture((state) => state.capture);
+  const open = useCapture((state) => state.detailsOpen);
+  if (!capture) return null;
+  const long = provenanceOf(capture);
+  const short = isReport(capture) ? t('Reported') : t('Captured');
+  return (
+    <button
+      type="button"
+      onClick={() => useCapture.getState().setDetails(!open)}
+      aria-expanded={open}
+      aria-label={t('{provenance}: {title}. Show what the capture is.', {
+        provenance: long,
+        title: capture.title,
+      })}
+      title={t('{provenance}: {title}. Show what the capture is.', {
+        provenance: long,
+        title: capture.title,
+      })}
+      data-testid="capture-chip"
+      data-mode="capture"
+      data-kind={capture.source.kind}
+      className="inline-flex h-7 min-w-0 items-center gap-2 rounded-control bg-sunken px-2.5 text-[11px] text-ink-dim transition-colors hover:text-ink"
+    >
+      {/* A mark, not a lamp: it has no state to show. */}
+      <span aria-hidden className="size-1.5 shrink-0 rounded-full border border-current" />
+      <span className="max-2xl:hidden">{long}</span>
+      <span className="shrink-0 2xl:hidden">{short}</span>
+      <span className="min-w-0 max-w-[8rem] truncate text-ink xl:hidden">{capture.title}</span>
+    </button>
+  );
+}
+
+/**
+ * The bar while an incident capture is open. It says what the capture says
+ * at the cursor and where it comes from, and leads to its services and
+ * events and back to the simulation. Nothing on it belongs to the
+ * simulation, which goes on untouched behind it: no instruments, no stream,
+ * no search, no Cedar, no incidents.
+ */
+function CaptureNav() {
+  const viewMode = useUi((state) => state.viewMode);
+  const listOpen = useCapture((state) => state.listOpen);
+  return (
+    <Bar>
+      {/* Where there is room for a title whole; below that the chip carries it. */}
+      <div className="hidden shrink-0 xl:block">
+        <CapturePicker />
+      </div>
+      <div className="flex min-w-0 flex-[1_1_11rem] items-center gap-5">
+        <CaptureStatus />
+      </div>
+
+      <div className="ml-auto flex h-12 min-w-0 items-center gap-2">
+        <CaptureChip />
+        <Button
+          icon={<List size={13} aria-hidden />}
+          aria-expanded={listOpen}
+          aria-label={t('Services and events')}
+          onClick={() => useCapture.getState().setList(!listOpen)}
+          data-testid="capture-list"
+          className="max-lg:w-8 max-lg:px-0"
+        >
+          <span className="max-lg:hidden">{t('Services and events')}</span>
+        </Button>
+        <Button
+          variant="primary"
+          icon={<ArrowLeft size={13} aria-hidden />}
+          aria-label={t('Back to the simulation')}
+          onClick={leaveCapture}
+          data-testid="capture-back"
+        >
+          <span className="max-sm:hidden">{t('Back to the simulation')}</span>
+          <span className="sm:hidden">{t('Back')}</span>
+        </Button>
+        <Menu
+          label={t('More')}
+          testId="open-menu"
+          icon={<Ellipsis size={17} />}
+          items={[
+            {
+              id: 'view',
+              label: viewMode === 'scene' ? t('Table view') : t('3D model'),
+              hint: 'T',
+              icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
+              onSelect: () =>
+                useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+            },
+            {
+              id: 'capture',
+              label: t('Open another capture'),
+              icon: <FileClock size={14} />,
+              onSelect: openCaptures,
+            },
+            {
+              id: 'settings',
+              label: t('Settings'),
+              icon: <Settings size={14} />,
+              onSelect: () => useUi.getState().setPanel('settings'),
+            },
+            {
+              id: 'help',
+              label: t('Help and legend'),
+              hint: '?',
+              icon: <CircleHelp size={14} />,
+              onSelect: () => useUi.getState().setPanel('help'),
+            },
+            {
+              id: 'back',
+              label: t('Back to the simulation'),
+              icon: <ArrowLeft size={14} />,
+              onSelect: leaveCapture,
+            },
+          ]}
+        />
+      </div>
+    </Bar>
   );
 }

@@ -4,12 +4,14 @@ import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { actions } from '@/app/actions';
+import { embedFromSearch } from '@/app/embed';
 import { showRegion } from '@/app/navigate';
 import { queryKeys } from '@/app/queryClient';
 import { sceneHandle } from '@/graphics/handle';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { api } from '@/providers/api';
+import { selectOpen, useCapture } from '@/stores/capture';
 import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
 import { useSettings, useUi } from '@/stores/ui';
@@ -20,15 +22,21 @@ import { buildCommands, searchCommands, type Command } from './commands';
  * One box to reach anything by name: a service, a region, a scenario, an
  * action. Opened with Ctrl or ⌘ and K. It exists so that the rest of the
  * interface does not have to show every control all the time.
+ *
+ * Everything it reaches is the simulation's, so it is not there while an
+ * incident capture is open.
  */
 export function CommandPalette() {
-  const open = useUi((state) => state.commandOpen);
+  const captured = useCapture(selectOpen);
+  const open = useUi((state) => state.commandOpen) && !captured;
   const setOpen = useUi((state) => state.setCommandOpen);
   const topology = useTelemetry((state) => state.topology);
   const playing = useTelemetry((state) => state.playback?.status === 'playing');
   const viewMode = useUi((state) => state.viewMode);
   const layoutMode = useUi((state) => state.layoutMode);
   const { data: scenarios } = useQuery({ queryKey: queryKeys.scenarios, queryFn: api.scenarios });
+  // Read once, as the page reads it (`App.tsx`).
+  const [embedded] = useState(() => embedFromSearch(window.location.search) !== null);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
 
@@ -40,6 +48,7 @@ export function CommandPalette() {
         playing,
         viewMode,
         layoutMode,
+        embedded,
         do: {
           selectService: (id) => {
             useUi.getState().selectNode(id);
@@ -63,7 +72,7 @@ export function CommandPalette() {
           },
         },
       }),
-    [topology, scenarios, playing, viewMode, layoutMode],
+    [topology, scenarios, playing, viewMode, layoutMode, embedded],
   );
   const results = useMemo(() => searchCommands(commands, query), [commands, query]);
 

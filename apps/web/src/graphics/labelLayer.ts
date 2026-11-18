@@ -37,6 +37,15 @@ export interface LabelColours {
 /** How a name is drawn: 0 quiet, 1 in full ink, 2 in the alarm colour. */
 export type LabelTone = 0 | 1 | 2;
 
+/** How far in from each edge of the view something lies over it, in CSS pixels. */
+export interface Insets {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+const NO_INSETS: Insets = { left: 0, right: 0, top: 0, bottom: 0 };
+
 const FAMILY = '"B612", system-ui, sans-serif';
 /** Font size and line height on screen, in CSS pixels, by style. */
 const TYPE: Record<LabelStyle, { weight: number; size: number; height: number }> = {
@@ -228,7 +237,10 @@ export class LabelLayer {
   /**
    * Places and draws the names for a view of `width` by `height` CSS pixels.
    * `dt` is the time since the last frame in seconds; with `instant` (reduced
-   * motion) a name is there or not, with nothing in between.
+   * motion) a name is there or not, with nothing in between. `covered` is
+   * how far in from each edge the interface lies over the view (its cards
+   * and timeline): a name is shown only where it can be read whole, clear of
+   * them and of the edges.
    */
   draw(
     width: number,
@@ -236,6 +248,7 @@ export class LabelLayer {
     dt: number,
     instant: boolean,
     colours: LabelColours | null,
+    covered: Insets = NO_INSETS,
   ): void {
     const count = this.specs.length;
     if (count === 0 || !colours) {
@@ -262,7 +275,12 @@ export class LabelLayer {
         });
       }
     }
-    const placed = placeLabels(candidates, { width, height });
+    const placed = placeLabels(candidates, {
+      left: covered.left,
+      top: covered.top,
+      right: width - covered.right,
+      bottom: height - covered.bottom,
+    });
     this.placedLast.fill(0);
     for (const i of placed) this.placedLast[i] = 1;
 

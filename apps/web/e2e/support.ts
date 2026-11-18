@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Settings that make the scene deterministic: no camera drift, no easing. */
@@ -138,6 +138,85 @@ export async function waitForScene(page: Page, nodes = KINDS): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => drawn()));
       }),
   );
+}
+
+/** The incident captures that ship with the application, by the id `?capture=` names. */
+export const GOOGLE = 'google-cloud-2025-06-12';
+export const BOUTIQUE = 'online-boutique-rcaeval';
+
+/** One sample of a capture file, as the file writes it. */
+export interface CaptureSample {
+  atMs: number;
+  requests?: number;
+  faults?: number;
+  p95Ms?: number;
+  memoryBytes?: number;
+}
+
+/** What a test reads of a capture file: the parts the page draws and names. */
+export interface CaptureFile {
+  title: string;
+  source: { kind: string };
+  window: { startMs: number; endMs: number };
+  periodMs?: number;
+  regions: { id: string; name: string }[];
+  nodes: { id: string; name: string; region: string; buckets?: CaptureSample[] }[];
+  edges: { source: string; target: string }[];
+  events?: { atMs: number; title: string; nodes?: string[]; state?: string }[];
+}
+
+/** A bundled capture as its own file has it: the file the build carries. */
+export function captureFile(id: string): CaptureFile {
+  const path = join(process.cwd(), 'src/features/capture', `${id}.json`);
+  return JSON.parse(readFileSync(path, 'utf8')) as CaptureFile;
+}
+
+/**
+ * Waits until the capture is what the page shows: the capture's bar, and the
+ * capture's model drawn, with as many pieces and connections as its file
+ * has and no name on it but the ones the file wrote (a capture of twelve
+ * services has as many pieces as the simulation's overview, so the count
+ * alone cannot tell the two apart).
+ */
+export async function waitForCapture(page: Page, capture: CaptureFile): Promise<void> {
+  await expect(page.getByTestId('capture-status')).toBeVisible();
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute('data-mode', 'capture');
+  await waitForScene(page, capture.nodes.length);
+  const written = new Set([
+    ...capture.nodes.map((node) => node.name),
+    ...capture.regions.map((region) => region.name),
+  ]);
+  await expect
+    .poll(async () => {
+      const edges = await page.evaluate(() => window.__aegis?.stats().edges ?? -1);
+      const names = await namesOnModel(page);
+      return (
+        edges === capture.edges.length &&
+        names.length > 0 &&
+        names.every((name) => written.has(name))
+      );
+    })
+    .toBe(true);
+}
+
+/**
+ * Opens a bundled incident capture by its link, as someone following one
+ * would: the page loads on the capture, with the simulation started behind
+ * it. Nothing is reset: on the server suite a test that needs the shared
+ * simulation at its baseline calls `openApp` first.
+ */
+export async function openCapture(
+  page: Page,
+  id: string,
+  options: OpenOptions = {},
+): Promise<CaptureFile> {
+  const capture = captureFile(id);
+  await applySettings(page, options);
+  // Relative to the base URL: the root on the server suite, a path below it
+  // on the static site.
+  await page.goto(`./?capture=${id}`);
+  await waitForCapture(page, capture);
+  return capture;
 }
 
 /** Leaves the overview for an arrangement that shows every service. */

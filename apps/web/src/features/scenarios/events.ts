@@ -13,8 +13,6 @@ export const EVENT_KIND_LABEL: Record<EventKind, string> = {
   mitigation: t('Mitigation'),
   reroute: t('Reroute'),
   alert: t('Alert'),
-  'cve-advisory': t('Cve Advisory'),
-  'scan-finding': t('Scan Finding'),
   system: t('System'),
 };
 

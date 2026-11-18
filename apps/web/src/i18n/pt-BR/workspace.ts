@@ -126,12 +126,10 @@ export default {
   Unavailable: 'Indisponível',
   'Built-in simulation': 'Simulação embutida',
   'Live adapter': 'Adaptador ao vivo',
-  Fixture: 'Arquivo de exemplo',
   'Not configured': 'Não configurado',
   Available: 'Disponível',
   Connecting: 'Conectando',
   Connected: 'Conectado',
-  Imported: 'Importado',
   Repository: 'Repositório',
   '(opens in a new tab)': '(abre em uma nova aba)',
   'Verified interface': 'Interface verificada',
@@ -141,9 +139,7 @@ export default {
   'Set AEGIS_RINHA_URL on the server (for example http://127.0.0.1:9999) and restart it.':
     'Defina AEGIS_RINHA_URL no servidor (por exemplo, http://127.0.0.1:9999) e reinicie-o.',
   'Not configured on the server.': 'Não configurado no servidor.',
-  'Forget import': 'Esquecer a importação',
   Disconnect: 'Desconectar',
   'Working…': 'Trabalhando…',
-  'Import onto timeline': 'Importar para a linha do tempo',
   Connect: 'Conectar',
 } as const satisfies Record<string, string>;

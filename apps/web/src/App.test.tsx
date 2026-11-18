@@ -252,6 +252,8 @@ describe('panels on demand', () => {
     expect(screen.queryByTestId('hud')).not.toBeInTheDocument();
   });
 
+  // Every service in the list and the platform's figures: about 2.7 s on its
+  // own, and past the default 5 s when the whole suite shares the machine.
   it('brings the explorer and the overview when they are asked for', async () => {
     const user = userEvent.setup();
     renderApp();
@@ -266,7 +268,7 @@ describe('panels on demand', () => {
       expect(screen.queryByTestId('overview')).not.toBeInTheDocument();
       expect(screen.queryByTestId('explorer')).not.toBeInTheDocument();
     });
-  });
+  }, 15_000);
 
   it('says which moment it speaks of while the cursor is in the history', () => {
     const past = fixtures.snapshot();
@@ -1277,7 +1279,13 @@ describe('integrations and settings', () => {
     await user.keyboard('?');
     const dialog = await screen.findByRole('dialog', { name: 'Help and legend' });
     expect(dialog).toHaveTextContent('A lighthouse above the edge; its lamp sweeps round');
-    expect(dialog).toHaveTextContent('no real system is observed, scanned or attacked');
+    expect(dialog).toHaveTextContent('no real system is scanned or attacked');
+    // What is not simulated is said whole: a connected instance's figures,
+    // and an incident capture.
+    expect(dialog).not.toHaveTextContent('observed');
+    expect(dialog).toHaveTextContent(
+      'Apart from what a connected local instance reports (labelled Live), an incident capture is the one exception',
+    );
   });
 });
 

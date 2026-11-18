@@ -25,7 +25,8 @@ export const PACE_MAX = 2.4;
 export function paceOf(throughput: number, reference: number): number {
   if (!(throughput > 0) || !(reference > 0)) return 0;
   const share = throughput / reference;
-  if (share < IDLE) return 0;
+  // Not a number (two infinities) is no pace: the mechanism must not carry it.
+  if (!(share >= IDLE)) return 0;
   return Math.min(PACE_MAX, Math.max(PACE_MIN, Math.sqrt(share)));
 }
 

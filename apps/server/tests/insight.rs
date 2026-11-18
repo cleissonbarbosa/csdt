@@ -491,10 +491,7 @@ async fn a_session_reproduces_the_timeline_it_was_saved_from() {
     assert!(session["note"].is_null());
     assert_eq!(session["workspaceOrigin"], "bundled");
     assert_eq!(session["cursorMs"], 32_000);
-    assert_eq!(
-        session["omitted"],
-        json!({ "decisions": 0, "importedEvents": 0 })
-    );
+    assert_eq!(session["omitted"], json!({ "decisions": 0 }));
     let recording = &session["recording"];
     assert_eq!(recording["topologyId"], "helios-commerce");
     assert_eq!(recording["durationMs"], 32_000);
@@ -659,12 +656,13 @@ async fn a_session_cannot_put_an_outcome_on_the_timeline() {
             "invalid_session",
         ),
         (
+            // No such command exists: the body does not parse.
             session(
                 json!([{ "atMs": 0, "command": { "type": "importEvents", "providerId": "x", "events": [] } }]),
                 "helios-commerce",
             ),
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "invalid_session",
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
         ),
         (
             session(json!([]), "nowhere"),

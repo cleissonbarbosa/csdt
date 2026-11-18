@@ -282,6 +282,35 @@ scenario of your own** under the scenarios: name it, give each phase its
 effects (by role, region or service) and the events it announces, and the
 engine says whether it accepts the file and where it can run.
 
+## 11 · A real incident (optional)
+
+Open **⋯ → Open an incident capture** and choose **Google Cloud outage · 12
+June 2025**. The bar and the model become the capture's: the simulation goes
+on behind it, and the chip on the right says _Reported_ (_From the
+provider's report, not simulated_ on a wide screen). The model is by region,
+and every piece stands upright on a dashed ring: the report has not stated
+anything about any of them yet, and unknown is not normal.
+
+Press **Play**, or <kbd>Space</kbd>. At 17:49 UTC the products the report
+names turn red and the sentence in the bar counts them; recoveries are
+amber, then neutral. Pieces do not work, because a report measures nothing.
+**Services and events** lists the report's updates, each with the time in
+UTC, how far into the capture it is and the update it rests on; choose one
+to go to it. Select a piece for what the report says of it and where its
+kind comes from (here, always assumed).
+
+**Online Boutique · RCAEval**, in the bar's picker (on a screen at least
+1280 pixels wide) or in **⋯ → Open another capture**, is a measured one: ten
+minutes of a benchmark, the pieces whose calls were counted working at
+their own measured pace. A card shows each figure with its course over the
+capture; requests, p95 and memory have no normal range, because the source
+states none. It has no error counts, so no service in it is coloured, and
+every service it measures reads _Error rate not measured_.
+
+**Back to the simulation** returns to the simulation as you left it. A
+capture of your own, written from CloudWatch or from Tempo and Prometheus, is
+opened from the same dialog; see [CAPTURES.md](CAPTURES.md).
+
 ## Reproducing the screenshots
 
 Every image in `docs/assets` comes from the running application:

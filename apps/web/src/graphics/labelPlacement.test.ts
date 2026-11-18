@@ -62,6 +62,37 @@ describe('placing names', () => {
     expect(shown).toEqual([1]);
   });
 
+  it('never shows part of a name: one the edge of the picture would cut is left out', () => {
+    // A heading hung off a plate at the left edge, one at the right, one
+    // above the top and one under the foot: each is partly on the screen.
+    const cut = [
+      candidate(0, -60, 100, 9),
+      candidate(1, 760, 100, 9),
+      candidate(2, 300, -8, 9),
+      candidate(3, 300, 590, 9),
+    ];
+    expect(placeLabels([...cut, candidate(4, 300, 300, 1)], SCREEN)).toEqual([4]);
+    // Whole, at the very edges, a name is shown.
+    const whole = [candidate(0, 0, 100), candidate(1, 720, 100), candidate(2, 300, 0)];
+    expect(placeLabels(whole, SCREEN).sort()).toEqual([0, 1, 2]);
+  });
+
+  it('leaves out a name that a card over the picture would cut, and gives it no room', () => {
+    // A list on the left up to 312 px, a card on the right from 470 px, a
+    // timeline over the foot: the names are read between them.
+    const free = { left: 312, top: 28, right: 470, bottom: 520 };
+    const under = candidate(0, 280, 100, 9); // half under the list
+    const covered = candidate(1, 100, 200, 9); // wholly under it
+    const beside = candidate(2, 320, 100, 1); // where the one under the list would lie
+    const below = candidate(3, 340, 510, 9); // half under the timeline
+    expect(placeLabels([under, covered, beside, below], free)).toEqual([2]);
+  });
+
+  it('shows the name in hand even where it is cut', () => {
+    const shown = placeLabels([candidate(0, 760, 100, 1, true), candidate(1, 10, 10)], SCREEN);
+    expect(shown).toEqual([0, 1]);
+  });
+
   it('is the same answer for the same view', () => {
     const crowd = Array.from({ length: 30 }, (_, i) =>
       candidate(i, (i * 53) % 300, (i * 29) % 120, i % 4),

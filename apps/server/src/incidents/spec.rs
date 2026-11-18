@@ -507,8 +507,8 @@ impl ScenarioDef {
             if event.title.trim().is_empty() {
                 return Err("an event has no title".into());
             }
-            // Every other kind is produced by the engine or by an importer
-            // and carries a payload a scenario cannot supply.
+            // Every other kind is produced by the engine and carries a
+            // payload a scenario cannot supply.
             if !matches!(
                 event.kind,
                 EventKind::Alert
@@ -671,20 +671,21 @@ mod tests {
 
     #[test]
     fn a_scenario_cannot_announce_engine_events() {
-        for kind in [
-            "authz-decision",
-            "cve-advisory",
-            "incident-resolved",
-            "system",
-        ] {
+        let announcing = |kind: &str| {
             let mut def = minimal();
             def["phases"][0]["events"] = serde_json::json!([
                 { "delayMs": 0, "severity": "info", "kind": kind, "title": "Forged" }
             ]);
+            parse(def)
+        };
+        for kind in ["authz-decision", "incident-resolved", "system"] {
             assert!(
-                parse(def).unwrap_err().contains("may only announce"),
+                announcing(kind).unwrap_err().contains("may only announce"),
                 "{kind}"
             );
         }
+        // A kind the retired fixture importers produced is no kind at all.
+        let error = announcing("cve-advisory").unwrap_err();
+        assert!(error.contains("unknown variant `cve-advisory`"), "{error}");
     }
 }

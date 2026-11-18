@@ -868,14 +868,18 @@ fn a_recording_can_only_replay_what_the_workspace_has() {
     let error = build(&unknown).expect_err("refused").to_string();
     assert!(error.contains("unknown scenario `ddos-surge`"), "{error}");
 
-    // A file cannot put an event on the timeline by claiming an importer did.
+    // A file cannot put an event on the timeline by claiming an importer
+    // did: no such command exists.
     let forged = workspace_with(&recording(
         "corner-shop",
         json!({ "type": "importEvents", "providerId": "nvd", "events": [] }),
     ));
     let error = load_error(&forged);
     assert!(error.path.ends_with("recordings/night-shift.json"));
-    assert!(error.message.contains("may only contain"), "{error}");
+    assert!(
+        error.message.contains("unknown variant `importEvents`"),
+        "{error}"
+    );
 }
 
 // ---------------------------------------------------------------------------

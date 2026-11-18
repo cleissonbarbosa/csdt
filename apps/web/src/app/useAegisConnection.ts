@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { t } from '@/i18n';
 import { api, ApiError } from '@/providers/api';
 import { DemoSimulationProvider } from '@/providers/demoProvider';
+import { useCapture } from '@/stores/capture';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -71,16 +72,56 @@ export function growsReport(event: SecurityEvent): boolean {
   return event.kind.startsWith('incident-') || event.kind === 'health-transition';
 }
 
+/** The most notices held while a capture is open: as many as are shown at once. */
+const MAX_HELD = 4;
+/** Incidents that ended while a capture was open, announced when it closes. */
+let held: SecurityEvent[] = [];
+let stopWaiting: (() => void) | null = null;
+
+function offerSummary(event: SecurityEvent, incidentId: string): void {
+  useNotices.getState().push('info', t('{title}. Its summary is ready.', { title: event.title }), {
+    label: t('Open the summary'),
+    run: () => useUi.getState().inspectIncident(incidentId),
+  });
+}
+
+function releaseHeld(): void {
+  stopWaiting?.();
+  stopWaiting = null;
+  const events = held;
+  held = [];
+  for (const event of events) if (event.incidentId !== null) offerSummary(event, event.incidentId);
+}
+
+/**
+ * Lets go of what was held without saying it: the timeline it was read off
+ * has been replaced, and the incident may not be on the new one.
+ */
+export function forgetHeld(): void {
+  stopWaiting?.();
+  stopWaiting = null;
+  held = [];
+}
+
 /**
  * Offers the summary of an incident as it ends. The event is the engine's;
  * the summary it leads to is read from the same timeline.
+ *
+ * While an incident capture is open the offer is held, and made when the
+ * capture closes: its action opens the simulation's incidents, which have
+ * no place over a capture, and a notice of the simulation over a capture
+ * would read as part of it.
  */
 export function announceResolved(event: SecurityEvent): void {
   const incidentId = event.incidentId;
   if (event.kind !== 'incident-resolved' || incidentId === null) return;
-  useNotices.getState().push('info', t('{title}. Its summary is ready.', { title: event.title }), {
-    label: t('Open the summary'),
-    run: () => useUi.getState().inspectIncident(incidentId),
+  if (useCapture.getState().capture === null) {
+    offerSummary(event, incidentId);
+    return;
+  }
+  held = [...held, event].slice(-MAX_HELD);
+  stopWaiting ??= useCapture.subscribe((state) => {
+    if (state.capture === null) releaseHeld();
   });
 }
 
@@ -152,8 +193,12 @@ export function useAegisConnection(): void {
           state.forgetIncident();
           queryClient.removeQueries({ queryKey: queryKeys.reports });
           // A branch keeps what came before it; anything else starts over,
-          // and a summary that was being read is of a timeline that is gone.
-          if (reason !== 'branch') useUi.getState().inspectIncident(null);
+          // and a summary that was being read is of a timeline that is gone,
+          // as is one held back while a capture is open.
+          if (reason !== 'branch') {
+            useUi.getState().inspectIncident(null);
+            forgetHeld();
+          }
         }
         const reload =
           reason === 'topology' || reason === 'recording' || replaced

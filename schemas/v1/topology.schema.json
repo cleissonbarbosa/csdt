@@ -76,7 +76,7 @@
           "const": "synthetic"
         },
         {
-          "description": "Imported from a prerecorded or hand-authored fixture file.",
+          "description": "Not produced by the simulation: an incident capture the browser\nreads from a file, either measurements a system recorded or a\nprovider's report transcribed by hand. The server never emits it,\nand a workspace topology may not claim it.",
           "type": "string",
           "const": "recording"
         },

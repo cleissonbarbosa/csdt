@@ -43,7 +43,16 @@ import * as THREE from 'three/webgpu';
 
 import { SCENE_PALETTE, type ScenePalette, type ThemeName } from '@/lib/palette';
 
-import type { SceneFrame, SceneTopology } from './sceneData';
+import {
+  aimPiece,
+  groundMarkOf,
+  UNKNOWN,
+  unknownRingTone,
+  unknownTone,
+  type PieceAim,
+  type SceneFrame,
+  type SceneTopology,
+} from './sceneData';
 import { LabelLayer, loadLabelFonts, type LabelColours, type LabelTone } from './labelLayer';
 import {
   bezierPoint,
@@ -139,6 +148,8 @@ export interface SceneStats {
   /** Names on screen, and what placing and drawing them costs a frame (smoothed). */
   names: number;
   namesMs: number;
+  /** Pieces drawn as unknown: services whose state the data does not give. */
+  unknown: number;
 }
 
 const EDGE_SEGMENTS = 20;
@@ -206,8 +217,7 @@ const BEADS_TIME = 0.6;
 const WIND = 1.6;
 /** How fast a mechanism passes from one state's manner to the next, in states per second. */
 const MANNER_RATE = 3;
-/** How far the pieces outside a selection's neighbourhood recede. */
-const FOCUS_DIM = 0.48;
+/** How far the connections outside a selection's neighbourhood recede (pieces: `FOCUS_DIM`). */
 const EDGE_FOCUS_DIM = 0.26;
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -242,6 +252,10 @@ interface Tones {
   focus: Vec3;
   /** Piece colour by health code: healthy, degraded, critical, down. */
   piece: [Vec3, Vec3, Vec3, Vec3];
+  /** Piece colour where the state is unknown: neither normal nor any state. */
+  unknown: Vec3;
+  /** The dashed ring under a piece whose state is unknown: without hue. */
+  unknownRing: Vec3;
   /** Lamp colour under a piece, by health code. */
   lamp: [Vec3, Vec3, Vec3, Vec3];
   /** Connection colour by security status code; `null` keeps the track tone. */
@@ -259,6 +273,8 @@ function tonesOf(palette: ScenePalette): Tones {
     track: hex(palette.track),
     focus: hex(palette.focus),
     piece: [hex(palette.piece), warning, critical, hex(palette.ghost)],
+    unknown: unknownTone(hex(palette.piece), hex(palette.plate)),
+    unknownRing: unknownRingTone(hex(palette.track), hex(palette.inkDim)),
     // A piece that is down gets a quiet mark, not a light: it is off.
     lamp: [ink, warning, critical, hex(palette.track)],
     // secure, authorized, throttled, denied, suspicious
@@ -389,6 +405,19 @@ export class SceneController {
 
   // Targets (from snapshots and UI) and displayed values ----------------------
   private health = new Uint8Array(0);
+  /** 0 where the data does not give a service's state: it is drawn as unknown. */
+  private known = new Uint8Array(0);
+  /** 0 where a service's traffic was not measured: its part rests as modelled. */
+  private measured = new Uint8Array(0);
+  /** What the piece being updated is aimed at; reused, so a frame allocates nothing. */
+  private readonly pieceAim: PieceAim = {
+    tone: 0,
+    focus: 1,
+    manner: 0,
+    lamp: 0,
+    open: 0,
+    alarm: 0,
+  };
   private visibilityTarget = new Float32Array(0);
   private visibility = new Float32Array(0);
   private impacted = new Uint8Array(0);
@@ -648,6 +677,8 @@ export class SceneController {
 
     if (changed) {
       this.health = new Uint8Array(n);
+      this.known = new Uint8Array(n).fill(1);
+      this.measured = new Uint8Array(n).fill(1);
       this.visibilityTarget = new Float32Array(n).fill(1);
       this.visibility = new Float32Array(n).fill(1);
       this.impacted = new Uint8Array(n);
@@ -849,7 +880,10 @@ export class SceneController {
     });
   }
 
-  /** Contact shadows, status lamps and the selection ring; stems for raised pieces. */
+  /**
+   * Contact shadows, status lamps, the dashed ring of an unknown state and
+   * the selection ring; stems for raised pieces.
+   */
   private buildGroundMarks(layout: SceneLayout): void {
     const geometry = this.track(instancedQuad(this.n, true));
     this.ringAttr = {
@@ -1139,12 +1173,17 @@ export class SceneController {
     if (snapshot.nodes.health.length !== this.n || snapshot.edges.trafficRps.length !== this.m) {
       return;
     }
+    const { known, measured } = snapshot.nodes;
     for (let i = 0; i < this.n; i++) {
       const next = snapshot.nodes.health[i]!;
       // A node that just turned critical or went down sends out a shockwave.
       if (this.hasSnapshot && next >= 2 && next > this.health[i]!) this.shockAt[i] = this.time;
       this.health[i] = next;
       this.throughput[i] = snapshot.nodes.throughputRps[i] ?? 0;
+      this.known[i] = known && known[i] === 0 ? 0 : 1;
+      this.measured[i] = measured && measured[i] === 0 ? 0 : 1;
+      // A model laid out where nothing is known is drawn so from the start.
+      if (!this.hasSnapshot && this.known[i] === 0) this.tint.set(this.tones.unknown, i * 3);
     }
     for (let e = 0; e < this.m; e++) {
       this.edgeTraffic[e] = snapshot.edges.trafficRps[e]!;
@@ -2182,23 +2221,35 @@ export class SceneController {
       const batch = this.batches[this.nodeTypeIndex[i]!];
       if (!batch) continue;
       const slot = this.nodeSlot[i]!;
-      const code = this.health[i]!;
+      const known = this.known[i] === 1;
+      // A state the data does not give is no state: neither normal nor any other.
+      const code = known ? this.health[i]! : 0;
       const selected = i === this.selectedNode;
       const hovered = i === this.hoveredNode;
       const impacted = this.impacted[i] === 1;
+      const look = aimPiece(
+        this.pieceAim,
+        code,
+        known,
+        this.partial[i] === 1,
+        impacted,
+        this.focusActive,
+        this.related[i] === 1,
+      );
 
       // A healthy piece is neutral; only a deviation gives it a colour. A
       // piece that stands for several services takes it when all of them
       // deviate; when only some do, its lamp says so and the piece does not.
-      const target = tones.piece[this.partial[i] === 1 ? 0 : code]!;
+      // One whose state is unknown takes a tone of its own, nearer the plate.
+      const target = look.tone === UNKNOWN ? tones.unknown : tones.piece[look.tone]!;
       for (let k = 0; k < 3; k++) {
         this.tint[i * 3 + k]! += (target[k]! - this.tint[i * 3 + k]!) * ease;
       }
       this.visibility[i]! += (this.visibilityTarget[i]! - this.visibility[i]!) * ease;
       // With something selected, its neighbourhood stays in front and the
-      // rest recedes. A piece that is not in its normal state never does.
-      const inFocus = !this.focusActive || this.related[i] === 1 || code > 0 || impacted;
-      this.focus[i]! += ((inFocus ? 1 : FOCUS_DIM) - this.focus[i]!) * ease;
+      // rest recedes. A piece that is not in its normal state never does,
+      // nor one whose state is unknown.
+      this.focus[i]! += (look.focus - this.focus[i]!) * ease;
       const visible = this.visibility[i]!;
       const present = visible * this.focus[i]!;
       this.emphasis[i]! += ((selected ? 1 : hovered ? 0.5 : 0) - this.emphasis[i]!) * quick;
@@ -2240,17 +2291,19 @@ export class SceneController {
       }
       // The part of a piece that works runs at the pace of its service's
       // traffic. It starts once the piece stands on its plate, takes up a
-      // new pace gradually, and winds down when nothing passes.
+      // new pace gradually, and winds down when nothing passes. Where the
+      // traffic was not measured it rests as it was modelled, as with
+      // motion off: stillness there would claim that nothing passed.
+      const measured = this.measured[i] === 1;
       const pace =
-        motion && standing ? paceOf(this.throughput[i]!, this.throughputReference[i]!) : 0;
+        motion && standing && measured
+          ? paceOf(this.throughput[i]!, this.throughputReference[i]!)
+          : 0;
       this.pace[i]! += (pace - this.pace[i]!) * wind;
       this.work[i] = (this.work[i]! + step * this.pace[i]!) % WORK_CYCLE;
-      // How it runs follows the service's state. A piece that stands for
-      // several services, only some of them unwell, still works, but not
-      // evenly: it hesitates, whatever state the worst of them is in.
-      const state = this.partial[i] === 1 ? Math.min(code, 1) : code;
+      // How it runs follows the service's state (`aimPiece`).
       const turn = motion ? step * MANNER_RATE : Infinity;
-      this.manner[i]! += Math.max(-turn, Math.min(turn, state - this.manner[i]!));
+      this.manner[i]! += Math.max(-turn, Math.min(turn, look.manner - this.manner[i]!));
       // A piece that has just failed is jolted, once.
       const age = this.time - this.shockAt[i]!;
       if (motion && age >= 0 && age < 0.7)
@@ -2272,13 +2325,26 @@ export class SceneController {
       // still stood the way it was modelled.
       batch.turn.setXY(slot, Math.cos(this.yaw[i]!), Math.sin(this.yaw[i]!));
       // With motion off every mechanism rests as it was modelled.
-      batch.fx.setXYZW(slot, motion ? this.work[i]! : -1, this.manner[i]!, present, size);
+      batch.fx.setXYZW(
+        slot,
+        motion && measured ? this.work[i]! : -1,
+        this.manner[i]!,
+        present,
+        size,
+      );
       shown[i * 4] = x;
       shown[i * 4 + 1] = y;
       shown[i * 4 + 2] = z;
       shown[i * 4 + 3] = size;
 
-      const lamp = code > 0 ? tones.lamp[code]! : impacted ? tones.warning : tones.ink;
+      // One whose state is unknown has no lamp: a dashed ring without hue.
+      const lamp = look.open
+        ? tones.unknownRing
+        : code > 0
+          ? tones.lamp[code]!
+          : impacted
+            ? tones.warning
+            : tones.ink;
       ring.pos.setXYZ(i, x, floor + 0.035, z);
       ring.color.setXYZ(i, lamp[0], lamp[1], lamp[2]);
       const ringed = selected || hovered ? Math.min(1, emphasis * 2) : 0;
@@ -2286,7 +2352,7 @@ export class SceneController {
         i,
         // The contact shadow tightens as the piece leaves the plate.
         base * 0.95 * clamp01(arrived) * (1 - 0.45 * clamp01(airborne) + emphasis * 0.06),
-        (code > 0 ? 1 : impacted ? 0.7 : 0) * present,
+        groundMarkOf(look, present),
         motion ? this.shockAt[i]! : -100,
         (selected ? 1 : 0.45) * ringed,
       );
@@ -2298,7 +2364,7 @@ export class SceneController {
         this.labelRing[i] = ringed;
         // What matters more is named first: a failing service, then one an
         // incident has reached, then the rest.
-        this.labelAlarm[i] = code === 2 ? 3 : code > 0 ? 2 : impacted ? 1 : 0;
+        this.labelAlarm[i] = look.alarm;
       }
     }
     for (const batch of this.batches) {
@@ -2396,7 +2462,8 @@ export class SceneController {
         false,
       );
     });
-    layer.draw(width, height, step, !motion, this.labelColours);
+    // A name is read where nothing of the interface lies over it.
+    layer.draw(width, height, step, !motion, this.labelColours, this.insetsShown);
   }
 
   /** The supports under raised pieces follow them. */
@@ -2729,6 +2796,7 @@ export class SceneController {
       textures: this.renderer.info.memory.textures,
       names: this.labelLayer.drawn,
       namesMs: this.namesMs,
+      unknown: this.known.reduce((count, known) => count + (known === 0 ? 1 : 0), 0),
     };
   }
 

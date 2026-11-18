@@ -29,9 +29,11 @@ Recorded from the running application. <a href="docs/assets/demo.mp4">Full clip 
 
 ---
 
-> **Everything you see is synthetic.** AEGIS simulates a fictional platform. It
-> observes no real system, scans no network and attacks nothing. See the
-> [security model](docs/SECURITY.md).
+> **The simulation is synthetic.** AEGIS simulates a fictional platform; it
+> scans no network and attacks nothing. An incident capture shows a real
+> incident as a provider reported it or a system recorded it, read in your
+> browser, labelled as not simulated, and never mixed into the simulation.
+> See the [security model](docs/SECURITY.md).
 
 ## What it is
 
@@ -100,8 +102,10 @@ in [docs/DESIGN.md](docs/DESIGN.md).
 - Light and night themes with the same rules. Names keep one size on screen,
   like the names on a map, and appear as you get closer. They are drawn at
   the display's own resolution whatever the scene's is, and never across
-  each other: where there is not room for all of them the more important
-  come first, and the rest return when you move in or select their piece.
+  each other; one that a card or the edge of the picture would cut is left
+  out, unless it is the one you selected or point at. Where there is not
+  room for all of them the more important come first, and the rest return
+  when you move in or select their piece.
 
 **Quiet until asked**
 
@@ -298,21 +302,30 @@ at all. It can also be shown inside another page: `?embed=1` leaves out the
 bar and says in one line what this is, and `&scenario=ddos-surge` starts an
 incident in it.
 
-**Cloud incident replay**
+**Real incidents, captured**
 
-Open **More → Cloud incident replay** to scrub the public Google Cloud
-outage of 12 June 2025, or load a capture from an AWS application. The
-capture uses observed CloudWatch topology and metrics in a separate
-timeline. The static viewer reads the file in the tab. See
-[Cloud incident replay](docs/CLOUD-REPLAY.md) for the local exporter.
+**⋯ → Open an incident capture** shows a real incident in the same model, in
+place of the simulation: Google Cloud's outage of 12 June 2025, transcribed
+by hand from its public report, ten minutes of the RCAEval Online Boutique
+benchmark, or a file of your own written from CloudWatch Application Signals
+or from Tempo and Prometheus by the scripts in `scripts/`. It is read in the
+tab, labelled as not simulated (_Captured_, or _From the provider's report_
+for a report), and never reaches the server or the simulation's timeline. A
+service whose state the source does not give is drawn as unknown, upright
+on a dashed ring, never as normal; on measurements a colour is the
+simulation's own error levels applied to each sample, and the card says so.
+The simulation goes on behind it, and **Back to the
+simulation** returns to it as it was. A bundled capture has a link of its
+own (`?capture=google-cloud-2025-06-12`). See
+[docs/CAPTURES.md](docs/CAPTURES.md).
 
 **Signals with their range**
 
 Traffic, latency, error rate and saturation, each drawn on a scale with its
 normal band, all computed from the simulation state of the same tick. They
 live in the platform overview; in the top bar a signal appears only while it
-is outside its range. Every figure says whether it is _synthetic_,
-_recorded_ or _live_.
+is outside its range. Every figure says whether it is _synthetic_, from a
+_capture_ or _live_.
 
 <table>
   <tr>
@@ -483,8 +496,11 @@ the repository and tested. Details and limitations:
 | [rinha-backend-2026](https://github.com/cleissonbarbosa/rinha-backend-2026) | Live adapter | Read-only `GET /ready` probes; reports only what it measures                            | Against an in-process double of the interface; not run against a live stack                  |
 
 Not integrated: [ferrousDB](https://github.com/cleissonbarbosa/ferrousDB) (no
-network interface to adapt to) and OpenTelemetry (no inspected project exports
-it). Neither is faked.
+network interface to adapt to). The incident capture exporters, for
+CloudWatch Application Signals and for Tempo and Prometheus, are not
+integrations either: they are scripts an operator runs with their own
+credentials, and AEGIS never runs them
+([docs/CAPTURES.md](docs/CAPTURES.md#writing-one)).
 
 ## Performance
 
@@ -527,8 +543,9 @@ Method, raw data and caveats: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 - **Offline by default.** Demo Mode opens no outbound connection. Integrations
   need server configuration _and_ an explicit click, and accept loopback
   targets only.
-- **Provenance everywhere.** Synthetic, recorded and live data are labelled
-  from the server to the pixel.
+- **Provenance everywhere.** Synthetic, captured and live data are labelled
+  from where they are produced to the pixel. An incident capture is read in
+  the browser and never sent to the server.
 - **Your files are data.** A workspace is read from one directory before the
   server listens, or imported through the interface: checked first, held in
   memory, never written to disk and undone with a click. Either way a
@@ -547,31 +564,38 @@ access control. Full detail in [docs/SECURITY.md](docs/SECURITY.md).
 
 ```bash
 cargo test --workspace      # engine, timeline, Cedar, API, stream, adapters, workspaces, diff
-pnpm test                   # contracts, stores, layout, stream client, interface
+pnpm test                   # contracts, stores, layout, stream client, interface, captures
+python3 -B -m unittest discover -s scripts -p 'test_*.py'   # the capture scripts
 pnpm e2e                    # Playwright against the real stack
 pnpm engine:build           # the engine as WebAssembly, for the two below
 pnpm test:engine            # the module against the server's own output
 pnpm e2e:static             # Playwright against the static site, no server
 ```
 
-| Suite       | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rust        |   223 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, incident reports and what each line of one rests on, comparing an intervention, sessions, the boundary of the engine built for the browser, a request explained policy by policy and the access matrix, a fault tried before it is placed, how long the objectives were not met, Compose files read as topologies and the two bounds on their YAML                                                                                                                                                                                                                                                                                                                                                                         |
-| Contracts   |    71 | Every zod schema against samples exported by the server binary; what a report, a comparison and a session may and may not carry; the published JSON Schemas against the bundled files and the examples; an explanation, an access matrix and a trial                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Web         |   455 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, placing names without overlap, stores, stream client, event folding, command search, stale Cedar results, report wording, scenario files, challenges, session links, interface, the engine's client and transport, policy standings, the access matrix, policies as Cedar text, exposure, the same change at several figures, objectives, embedding, every interface text written as a phrase and every phrase translated with its placeholders                                                                                                                                                                                                                                                                                                                                                                                      |
-| End to end  |    29 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, a fault placed by hand, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, the first visit, a stale Cedar result and two side by side, the playback bar on a phone, the bar and a challenge on a phone, the overview upright on a phone and in the picture under a card, names that never overlap, an incident explained and summarised, an intervention compared, a session saved and brought back, the address following the view, a scenario written in the editor, a guided challenge, policies compared before they are applied, a denial taken policy by policy with the access matrix and policies edited in the page, a fault tried before it is placed, a challenge opened from a link and a service's exposure, no-GPU fallback |
-| Engine      |    35 | The built WebAssembly module, loaded in Node: 30 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Static site |     9 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, what it shows when the engine cannot load, and an incident compared with an intervention and read back, and opening again with no network on the files the browser kept, and the interface in Portuguese and back in English                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Suite       | Tests | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust        |   214 | Flow model, determinism and replay, scenarios and their file format, Cedar decisions, REST and WebSocket behaviour, limits, integration adapters, workspaces, importing them and comparing them, incident reports and what each line of one rests on, comparing an intervention, sessions, the boundary of the engine built for the browser, a request explained policy by policy and the access matrix, a fault tried before it is placed, how long the objectives were not met, Compose files read as topologies and the two bounds on their YAML                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Contracts   |    71 | Every zod schema against samples exported by the server binary; what a report, a comparison and a session may and may not carry; the published JSON Schemas against the bundled files and the examples; an explanation, an access matrix and a trial                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Web         |   671 | Layout, the overview and its arithmetic, palette rules, the piece file, quality tiers, placing names without overlap, stores, stream client, event folding, command search, stale Cedar results, report wording, scenario files, challenges, session links, interface, the engine's client and transport, policy standings, the access matrix, policies as Cedar text, exposure, the same change at several figures, objectives, embedding, every interface text written as a phrase and every phrase translated with its placeholders, the keyboard given back when a dialog closes, and incident captures: reading a capture file and refusing one it cannot read, what is known and unknown at each moment, the state of each service at each update of Google's report, the error levels held to the engine's own, a piece whose state is unknown, the address with Back and Forward, the capture's bar, list, card, details, table and top-bar sentence, and the shell in capture mode acting on nothing of the simulation                         |
+| Scripts     |    47 | The two incident capture exporters (CloudWatch Application Signals; Tempo and Prometheus) on fakes, so neither the AWS CLI nor any backend is reached: kinds mapped, assumed and declared, their list against the topology schema's, CloudTrail lookups scoped to each resource and the window, Prometheus gaps, a token only over https or to a loopback host and no redirect followed; and the RCAEval rebuild on a synthetic archive, with the committed Online Boutique capture held to the fields and shape the script gives it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| End to end  |    30 | Load, the overview and every service, select a kind and open a service, start an incident, pause, rewind, reset, Cedar trace, a fault placed by hand, filters, table view and command palette, scene controls, theme, stress topology, importing a platform, the first visit, a stale Cedar result and two side by side, the playback bar on a phone, the bar and a challenge on a phone, the overview upright on a phone and in the picture under a card, names that never overlap, an incident explained and summarised, an intervention compared, a session saved and brought back, the address following the view, a scenario written in the editor, a guided challenge, policies compared before they are applied, a denial taken policy by policy with the access matrix and policies edited in the page, a fault tried before it is placed, a challenge opened from a link and a service's exposure, an incident capture opened in place that asks the server for nothing but reads and leaves its simulation running untouched, no-GPU fallback |
+| Engine      |    35 | The built WebAssembly module, loaded in Node: 30 contract samples reproduced value for value, the event replay, the provider list, every route called, and an empty import section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Static site |    19 | The static build in a browser with no server: only its own files requested and its policy never violated, an incident, a Cedar trace, importing a platform, the integrations it offers, what it shows when the engine cannot load, an incident compared with an intervention and read back, opening again with no network on the files the browser kept, the interface in Portuguese and back in English, and incident captures: opened in place from the menu and followed by Back and Forward, reached by a link and kept by a reload and by the table view, a file read in the tab and one that is not a capture refused, the simulation going on behind one without reaching its model, a capture on a phone, and one opened with no engine                                                                                                                                                                                                                                                                                                         |
 
-All 822 pass locally. The end-to-end suite runs the real server and a production
+All 1087 pass locally. The end-to-end suite runs the real server and a production
 build; nothing is mocked. It also reads the rendered frame back and checks the
 design's central rule: no hue on screen while the platform is healthy and
 nothing is selected, hue with a selection or a traced request, and hue once an
-incident is under way. The same suite passes on a real GPU through WebGPU (28
-tests; the fallback test does not apply there). The last two suites need the
-engine module (`pnpm engine:build`) and run in their own CI job. One more Rust
-test compares the embedded engine with a real `cedar-agent` binary and is
-skipped unless `AEGIS_TEST_CEDAR_AGENT_BIN` is set.
+incident is under way. The static suite holds a capture to the same rule: no
+hue at the start of Google's report, and hue once the report states an impact.
+The same end-to-end suite passes on a real GPU through WebGPU (29 tests; the
+fallback test does not apply there). The Engine and Static site suites need the
+engine module (`pnpm engine:build`) and run in their own CI job; the Scripts
+suite needs only Python 3's standard library and runs in the web job. One of
+the Rust tests compares the embedded engine with a real `cedar-agent` binary:
+unless `AEGIS_TEST_CEDAR_AGENT_BIN` is set it returns at once and counts as
+passed. Two more, a trace table and an engine micro-benchmark, are not in the
+count: they run only when asked for with `-- --ignored`.
 
 ## Releases
 
@@ -606,13 +630,13 @@ packages/contracts  Shared contract: zod schemas + samples exported by the serve
 fixtures            The bundled topology, scenarios, recordings and Cedar files, laid
                     out as a workspace
 examples            A small workspace to copy from
-docs                Design, architecture, integrations, security, performance, demo
-scripts             Screenshot and benchmark runners
+docs                Design, architecture, integrations, captures, security, performance, demo
+scripts             Screenshot and benchmark runners, the incident capture scripts
 ```
 
 ## Roadmap
 
-- Generic OpenTelemetry provider (OTLP traces → topology and edge metrics).
+- Direct OTLP ingestion for streaming topology updates.
 - Merge live probe data into the scene as its own clearly-labelled region.
 - A topology editor in the interface, and injected flows in the scenario
   editor (both are files today, read from a [workspace](docs/WORKSPACE.md)).

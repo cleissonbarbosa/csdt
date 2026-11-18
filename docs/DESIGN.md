@@ -311,9 +311,13 @@ phone at the lowest quality tier as anywhere. And no two are printed across
 each other. When there is not room for all of them the more important are
 placed first: the piece in hand, a service that is failing, the places, then
 the rest from the nearest. The overview's headings are written in full where
-they fit and cut to their numbers together where they would touch. A name
-that was left out comes back when the camera moves in, or when its piece is
-pointed at or selected.
+they fit and cut to their numbers together where they would touch. Nor is
+a name printed in part: one that would not lie wholly inside the free part
+of the stage, clear of its edges and of whatever the interface lays over it
+(a sheet, a card, the scene's toolbar, the timeline or a capture's bar), is
+left out as one that would lie across another is; only the selected and
+the pointed-at piece are named even so. A name that was left out comes back
+when the camera moves in, or when its piece is pointed at or selected.
 
 _The overview_ is four low plates, one per layer, left to right in the order
 a request crosses them and numbered in that order. Within a layer its steps
@@ -399,6 +403,111 @@ In the table view, which is laid out by region, a name alone is a service
 of that table's region, and a call that leaves the region says where it
 goes: the edge router calls "API Gateway, US East · Primary; API Gateway,
 EU West; API Gateway, AP Southeast", not one name three times.
+
+## An incident capture
+
+An incident capture ([CAPTURES.md](CAPTURES.md)) is a real incident, as a
+provider reported it or a system recorded it, read in the browser from a
+file: apart from what a connected local instance reports, the one thing on
+screen that is not simulated. It is a mode of the same interface, not a page
+of its own. The bar, the stage, the sheets and the
+timeline's place at the foot are the capture's for as long as it is open,
+and the simulation's come back as they were when it closes. Everything above
+holds for it, with the differences this section gives and the reasons for
+them.
+
+**It opens on the detail.** A capture is drawn in the arrangement by region
+only, as a plate per region with its pieces in lines by kind, with no hub
+and no direction of travel, and the arrangement switch is not offered. A
+capture has no overview. Its kinds are mostly assumed, and an overview made
+from them would state a structure the source never gave; a capture is a set
+of measurements or statements, not a topology the model computes from.
+
+**Unknown is not normal.** Where the source does not give a service's state
+at the cursor, the piece is not drawn as a healthy one. It stands upright, a
+shade fainter than a piece in its normal state and never as faint as one
+that recedes, on a dashed ring without hue, and it never recedes: like a
+deviating piece, it is not something a selection may push back. The ring is
+the cue that holds in both themes; in the light one a piece is so near the
+colour of its plate that the shade alone could not tell (rule 7). Nothing
+else on the ground is dashed. In words it is _No data_ where there is no
+sample, _Error rate not measured_ where a sample holds no error count, or no
+request count, to take a rate from (saying "no data" beside the figures
+that were measured would deny them), and _Not stated at this time_ in a
+provider's report. The bar's sentence never counts an unknown service among
+those whose state is known.
+
+**Its colour is the simulation's levels, said as such.** A measured state is
+the error level at which the simulation calls a service degraded or
+critical, applied to each sample as it was measured; latency and memory
+colour nothing. The card and the details say so: "Coloured by the error
+rates at which the simulation calls a service degraded (4%) or critical
+(20%), applied to each sample as measured, without the simulation's
+smoothing or delay. The source sets no threshold." A report is read with
+"Reported impact is drawn as critical and a reported recovery as degraded;
+the report does not grade how severe the impact was." Neither ever shows a
+service as down. A measured capture that counts no errors anywhere colours
+nothing, and the card and the details say so in place of the sentence
+above: "This capture has no error counts, so no service in it is coloured."
+
+**A capture has no normal range for requests, errors, p95 and memory.** It
+is the one stated exception to rule 6. The simulation knows what each of its
+services carries at rest; a capture's source states no normal for any of
+them, and a range made from the capture itself would be the incident taking
+itself for its baseline. So those figures take no band and no colour, and
+the card says why in place of a range: "No normal range: the source states
+none. Lowest–highest in this capture: a–b." The error rate keeps a band, the
+simulation's, and is labelled as the simulation's threshold.
+
+**A report states no traffic, and its pieces rest.** A provider's report
+holds statements, not measurements, so no piece of it works: each rests as
+it was modelled, as with reduced motion, and the details card says that they
+rest because nothing was measured, not because nothing passed. A resting
+part has no manner to show, so on the model a report's affected and
+recovering pieces differ by their colour alone; the hover card, the list,
+the card, the table and the bar's marks give each state a shape of its own.
+In a measured capture a piece works at its sample's pace against its own
+median over the capture (for a service idle in most periods, the median of
+the periods in which it carried requests), stands still where its sample's
+rate is under 2% of that, and rests as modelled wherever there is no request
+count to take a pace from.
+
+**Its bar is always there.** The capture's bar stands in the timeline's
+place for as long as the capture is open, because a capture is time to look
+at. Its clock is the capture's: the UTC date and time, and how far into the
+capture that is (on a phone, the day and month and the time alone). Its
+marks keep their shape when the strip is pressed flat, so they are told
+apart without hue: a sample past the levels is a tick hanging from the top,
+short at degraded and tall at critical; an event is a mark of its own size
+laid over the strip, a square for reported impact, a triangle for a recovery
+under way, a disc for a recovery and a short stroke for an update that
+states no condition. Events at one moment, or a few pixels apart, are set
+side by side around it where the strip has room, so that each keeps its
+shape, and the ticks are at most one per column of pixels, each the worst
+level of the samples in it. There is no line of traffic: a capture's
+services are measured separately, and summing them would count one call
+several times over.
+
+**Its sentence does not blink.** The top bar's sentence gives the capture's
+counts at the cursor, prefixed by the time only ("At 17:49 UTC: …"; the
+date is on the bar's clock). It is faint ink while nothing is past the
+levels, affected or recovering, and bold in the colour and glyph of the
+worst state otherwise. It never blinks: the blink is the simulation's
+unacknowledged alarm, and nothing in a capture is waiting to be
+acknowledged.
+
+**Words.** It is an _incident capture_ (_captura de incidente_). A recorded
+incident is the simulation's, and so is its re-simulated history, its
+replay; a capture is never called recorded (_gravado_) nor a replay
+(_Rever_). Its figures are _Captured, not simulated_ or _From the
+provider's report, not simulated_, never "live" and never "observed", and
+its thresholds are never called objectives: an objective is the engine's
+alert threshold. A file's `faults` are shown as _errors_, the simulation's
+word for the quantity, because in AEGIS a fault is placed by hand; the text
+a capture's source wrote may use "fault" in its own sense ("Benchmark fault
+injected") and is shown as written, as are its names, its events and its
+notes. In Portuguese the same few words: _captura_, _relatório do
+provedor_, _sem dados_, _não informado_.
 
 ## Tokens
 
@@ -560,7 +669,18 @@ Text is set in sentence case throughout.
 - **Receding is not hiding.** With something selected or followed, the
   pieces outside its neighbourhood fade toward the plate. A piece that is
   not in its normal state never does: a selection must not be able to cover
-  an alarm.
+  an alarm. Nor does a piece of a capture whose state is unknown, which is
+  not a normal state either.
+- **A capture opens on the detail.** With no overview, a capture shows every
+  service at once from the start, which is what the overview exists to
+  spare the viewer. It is bounded at 384 services, the plates keep a
+  capture's regions apart, and an overview made of kinds the source mostly
+  never gave would be worse than none.
+- **Unknown costs a shade.** A piece whose state is not given is drawn a
+  little fainter than a normal one, so at a glance it can read as quieter
+  than normal rather than as not known. The dashed ring under it, and the
+  words wherever it is named (_No data_, _Error rate not measured_, _Not
+  stated at this time_), say what it is.
 - **Everything but the model costs a click.** The four signals, the list of
   services and the timeline are one action from the screen instead of on it.
   The sentence in the top bar, and any reading out of range, are what stay.
@@ -591,11 +711,17 @@ canvas has the display's resolution while the scene's is lower, that on a
 phone every playback control stays inside the screen, that the request
 tracer is on the bar there too, and that a challenge's card never lies
 over the panel it is answered in, on a phone or on a tablet with a panel on
-each side.
+each side. The static site's suite (`apps/web/e2e/static.spec.ts`) holds an
+incident capture to the first rule: at the start of the Google capture,
+where the report has stated nothing, no sampled pixel has a hue while the
+simulation's incident runs on behind it, and hue appears once services are
+reported affected at 17:49 UTC.
 Unit tests hold the
 palette to its own rules
-(`apps/web/src/lib/palette.test.ts`) and the overview to its arithmetic
-(`apps/web/src/lib/overview.test.ts`).
+(`apps/web/src/lib/palette.test.ts`), the overview to its arithmetic
+(`apps/web/src/lib/overview.test.ts`), a capture's unknown piece and its
+ring to the palette in both themes (`apps/web/src/graphics/sceneData.test.ts`)
+and a capture's levels to the engine's (`apps/web/src/lib/thresholds.test.ts`).
 
 ## References
 

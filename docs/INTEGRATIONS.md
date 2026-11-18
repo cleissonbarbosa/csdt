@@ -5,11 +5,11 @@ simulation built into the server. Integrations are optional adapters for
 public personal projects, and each one states plainly what kind of data it
 contributes.
 
-| Label       | Meaning                                                   |
-| ----------- | --------------------------------------------------------- |
-| `synthetic` | Produced by the AEGIS simulation engine.                  |
-| `recording` | Read from a recording.                                    |
-| `live`      | Measured from an explicitly connected **local** instance. |
+| Label       | Meaning                                                                                                                                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `synthetic` | Produced by the AEGIS simulation engine.                                                                                                                                                                              |
+| `recording` | Not produced by the simulation: an incident capture read in the browser (measurements a system recorded, or a provider's report transcribed by hand). Never labelled live; never placed on the simulation's timeline. |
+| `live`      | Measured from an explicitly connected **local** instance.                                                                                                                                                             |
 
 The label travels with the data (`dataSource` on topologies, events, decisions
 and provider statuses) and is rendered next to it in the interface.
@@ -138,11 +138,16 @@ server. Databases in the demo topology are therefore plain synthetic nodes.
 Forcing a connection here would add an integration to the count without adding
 anything a visitor could verify.
 
-## OpenTelemetry
+## OpenTelemetry and cloud telemetry
 
-There is no `OpenTelemetryProvider`. None of the inspected projects exports
-OTLP, and AEGIS only implements providers backed by an interface that was
-actually verified. It is on the roadmap as a generic adapter.
+There is no OpenTelemetry or cloud provider among the integrations: the
+server reads no trace, metric or cloud API. A real incident can still be
+looked at as an [incident capture](CAPTURES.md), a file the browser reads
+itself. The capture exporters in `scripts/` (CloudWatch Application
+Signals, and Tempo with Prometheus) are not integrations: they are run by
+an operator, with the operator's own access, and nothing in AEGIS runs or
+calls them. Their commands, what they read and what they write are in
+[CAPTURES.md](CAPTURES.md#writing-one).
 
 ---
 
@@ -171,9 +176,8 @@ The application built around the engine in WebAssembly (`pnpm build:static`)
 lists the built-in simulation as its sole provider. The `cedar-agent` and
 `rinha-backend` adapters run on the AEGIS server.
 
-The [cloud incident replay](CLOUD-REPLAY.md) also works on the static site.
-A local CLI exports a CloudWatch capture. The browser opens the resulting
-file independently of the engine and its integration adapters.
+An [incident capture](CAPTURES.md) opens on the static site as it does on a
+server: the browser reads it without the engine, and it is not a provider.
 
 ## Adding a provider
 

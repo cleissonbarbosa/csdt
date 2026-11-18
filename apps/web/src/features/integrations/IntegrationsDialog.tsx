@@ -22,14 +22,12 @@ const STATE: Record<IntegrationState, { label: string; color?: string; quiet?: b
   available: { label: t('Available') },
   connecting: { label: t('Connecting'), color: COLOR.warning },
   connected: { label: t('Connected') },
-  imported: { label: t('Imported') },
   error: { label: t('Error'), color: COLOR.critical },
 };
 
 const KIND: Record<IntegrationStatus['kind'], string> = {
   simulation: t('Built-in simulation'),
   'live-adapter': t('Live adapter'),
-  fixture: t('Fixture'),
 };
 
 const SETUP_HINT: Record<string, string> = {
@@ -49,11 +47,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
     await actions.setProvider(provider.id, connect);
     setBusy(false);
   };
-  const fixture = provider.kind === 'fixture';
-  const on =
-    provider.state === 'connected' ||
-    provider.state === 'imported' ||
-    provider.state === 'connecting';
+  const on = provider.state === 'connected' || provider.state === 'connecting';
   return (
     <li
       className="rounded-control border border-line p-3"
@@ -135,7 +129,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
         <div className="mt-3 flex gap-1.5">
           {on ? (
             <Button size="sm" disabled={busy} onClick={() => void run(false)}>
-              {fixture ? t('Forget import') : t('Disconnect')}
+              {t('Disconnect')}
             </Button>
           ) : (
             <Button
@@ -145,7 +139,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
               onClick={() => void run(true)}
               data-testid={`provider-connect-${provider.id}`}
             >
-              {busy ? t('Working…') : fixture ? t('Import onto timeline') : t('Connect')}
+              {busy ? t('Working…') : t('Connect')}
             </Button>
           )}
         </div>

@@ -5,8 +5,10 @@
  * none. So every frame the names are placed in order of importance, and one
  * that would lie over a name already placed is left out: it comes back when
  * the camera moves in and the two part, or when its piece is selected or
- * pointed at. Pure functions of boxes on the screen, with no randomness and
- * no iteration to convergence, so the same view always shows the same names.
+ * pointed at. A name cut by the edge of the picture, or by a card laid over
+ * it, is none either, and is left out the same way. Pure functions of boxes
+ * on the screen, with no randomness and no iteration to convergence, so the
+ * same view always shows the same names.
  */
 
 export interface LabelBox {
@@ -36,16 +38,41 @@ export function overlaps(a: LabelBox, b: LabelBox, gap = 0): boolean {
 }
 
 /**
+ * The part of the picture a name can be read in: the screen, less what the
+ * interface lays over it (a card, the timeline).
+ */
+export type LabelBounds = { width: number; height: number } | LabelBox;
+
+function frameOf(bounds: LabelBounds): LabelBox {
+  return 'width' in bounds
+    ? { left: 0, top: 0, right: bounds.width, bottom: bounds.height }
+    : bounds;
+}
+
+/** Whether a box lies wholly inside another. */
+export function inside(box: LabelBox, frame: LabelBox): boolean {
+  return (
+    box.left >= frame.left &&
+    box.top >= frame.top &&
+    box.right <= frame.right &&
+    box.bottom <= frame.bottom
+  );
+}
+
+/**
  * The ids of the candidates that are shown, most important first. Pinned
- * candidates always are. Among equals the earlier candidate wins, so the
- * caller's order (what was shown last frame first) decides, and two names of
- * the same weight do not take turns as the camera drifts.
+ * candidates always are. Any other name is shown only where it lies wholly
+ * inside `bounds`: one that the edge or a card would cut is left out, as one
+ * that would lie across another is. Among equals the earlier candidate wins,
+ * so the caller's order (what was shown last frame first) decides, and two
+ * names of the same weight do not take turns as the camera drifts.
  */
 export function placeLabels(
   candidates: readonly LabelCandidate[],
-  bounds: { width: number; height: number },
+  bounds: LabelBounds,
   gap = 3,
 ): number[] {
+  const frame = frameOf(bounds);
   const order = candidates
     .map((candidate, index) => ({ candidate, index }))
     .sort(
@@ -59,10 +86,19 @@ export function placeLabels(
   for (const { candidate } of order) {
     const { box } = candidate;
     // A name wholly off the screen takes no room and is not drawn.
-    if (box.right < 0 || box.bottom < 0 || box.left > bounds.width || box.top > bounds.height) {
+    if (
+      box.right < frame.left ||
+      box.bottom < frame.top ||
+      box.left > frame.right ||
+      box.top > frame.bottom
+    ) {
       continue;
     }
-    if (!candidate.pinned && placed.some((other) => overlaps(box, other, gap))) continue;
+    if (!candidate.pinned) {
+      // Part of a name is no name: one the edge or a card would cut is left out.
+      if (!inside(box, frame)) continue;
+      if (placed.some((other) => overlaps(box, other, gap))) continue;
+    }
     placed.push(box);
     shown.push(candidate.id);
   }

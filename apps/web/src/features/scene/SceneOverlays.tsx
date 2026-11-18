@@ -4,11 +4,13 @@ import { Maximize2, RotateCcw } from 'lucide-react';
 import { HealthBadge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Field';
+import { CaptureHover } from '@/features/capture/CaptureHover';
 import { sceneHandle } from '@/graphics/handle';
 import { t } from '@/i18n';
 import { formatMs, formatRate } from '@/lib/format';
 import { overviewOf, projectSnapshot } from '@/lib/overview';
 import { SERVICE_TYPE } from '@/lib/palette';
+import { selectOpen, useCapture } from '@/stores/capture';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { filtersActive, useUi, type LayoutMode } from '@/stores/ui';
@@ -20,24 +22,31 @@ const LAYOUTS: { value: LayoutMode; label: string }[] = [
   { value: 'dependencies', label: t('Dependencies') },
 ];
 
-/** Camera and layout controls floating over the scene. */
+/**
+ * Camera and layout controls floating over the scene. An incident capture
+ * is drawn by region only and has no filters, so while one is open the
+ * toolbar keeps the camera's two controls.
+ */
 export function SceneToolbar() {
   const layoutMode = useUi((state) => state.layoutMode);
   const filters = useUi((state) => state.filters);
+  const captured = useCapture(selectOpen);
   return (
     <div
       className="panel flex items-center gap-1.5 p-1"
       role="toolbar"
       aria-label={t('Scene controls')}
     >
-      <Segmented
-        label={t('Topology layout')}
-        size="sm"
-        value={layoutMode}
-        options={LAYOUTS}
-        testId="layout"
-        onChange={(mode) => useUi.getState().setLayoutMode(mode)}
-      />
+      {!captured && (
+        <Segmented
+          label={t('Topology layout')}
+          size="sm"
+          value={layoutMode}
+          options={LAYOUTS}
+          testId="layout"
+          onChange={(mode) => useUi.getState().setLayoutMode(mode)}
+        />
+      )}
       <IconButton
         label={t('Frame everything')}
         size="sm"
@@ -54,7 +63,7 @@ export function SceneToolbar() {
       >
         <RotateCcw size={13} />
       </IconButton>
-      {filtersActive(filters) && (
+      {!captured && filtersActive(filters) && (
         <Button size="sm" variant="ghost" onClick={() => useUi.getState().clearFilters()}>
           {t('Clear filters')}
         </Button>
@@ -63,8 +72,16 @@ export function SceneToolbar() {
   );
 }
 
-/** Contents of the tooltip the scene anchors to the piece being pointed at. */
+/**
+ * Contents of the tooltip the scene anchors to the piece being pointed at:
+ * the simulation's service, or a captured one while a capture is open.
+ */
 export function HoverCard() {
+  const captured = useCapture(selectOpen);
+  return captured ? <CaptureHover /> : <SimulationHoverCard />;
+}
+
+function SimulationHoverCard() {
   const hoveredId = useUi((state) => state.hoveredNodeId);
   const layers = useUi((state) => state.layoutMode === 'layers');
   const source = useTelemetry((state) => state.topology);

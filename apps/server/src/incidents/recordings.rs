@@ -50,9 +50,9 @@ pub struct Recording {
 
 impl Recording {
     /// Checks a recording on its own. A recording may start and stop
-    /// scenarios and place and lift faults: the other commands put a
-    /// decision or an imported event on the timeline, and those have to come
-    /// from an engine or an importer, never from a file that merely says so.
+    /// scenarios and place and lift faults: the other command puts a
+    /// decision on the timeline, and a decision has to come from Cedar,
+    /// never from a file that merely says so.
     pub fn validate(&self) -> Result<(), String> {
         self.check(1, MAX_LIST)
     }
@@ -105,7 +105,7 @@ impl Recording {
                         check_fault(effect)?;
                     }
                 }
-                Command::RecordDecision { .. } | Command::ImportEvents { .. } => {
+                Command::RecordDecision { .. } => {
                     return Err(
                         "a recording may only contain `startScenario`, `abortScenario`, `injectFault` and `clearFaults` commands"
                             .into(),
@@ -172,6 +172,36 @@ pub fn bundled() -> Result<Vec<Recording>, serde_json::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{
+        AuthorizationDecision, AuthorizationRequest, DataSource, Decision, EngineInfo, EngineKind,
+    };
+
+    /// A decision no engine made, as a file would have to state it.
+    fn forged_decision() -> AuthorizationDecision {
+        AuthorizationDecision {
+            id: "dec-1".into(),
+            virtual_time_ms: 0,
+            request: AuthorizationRequest {
+                principal: "User::\"anyone\"".into(),
+                action: "Action::\"read\"".into(),
+                resource: "Resource::\"anything\"".into(),
+                context: serde_json::Map::new(),
+            },
+            decision: Decision::Allow,
+            determining_policies: Vec::new(),
+            errors: Vec::new(),
+            engine: EngineInfo {
+                kind: EngineKind::EmbeddedCedar,
+                version: None,
+            },
+            evaluation_micros: 0,
+            path: Vec::new(),
+            hops: Vec::new(),
+            blocked_at: None,
+            disabled_policies: Vec::new(),
+            data_source: DataSource::Synthetic,
+        }
+    }
 
     #[test]
     fn bundled_recordings_parse_and_only_start_scenarios() {
@@ -193,13 +223,14 @@ mod tests {
     }
 
     #[test]
-    fn a_recording_cannot_carry_a_decision_or_an_imported_event() {
+    fn a_recording_cannot_carry_a_decision() {
         let mut recording = bundled().expect("fixtures parse").remove(0);
-        recording.commands[0].command = Command::ImportEvents {
-            provider_id: "anything".into(),
-            events: Vec::new(),
+        recording.commands[0].command = Command::RecordDecision {
+            decision: Box::new(forged_decision()),
         };
         let error = recording.validate().unwrap_err();
+        assert!(error.contains("may only contain"), "{error}");
+        let error = recording.validate_session().unwrap_err();
         assert!(error.contains("may only contain"), "{error}");
 
         let forged: Result<Recording, _> = serde_json::from_value(serde_json::json!({

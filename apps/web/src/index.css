@@ -298,6 +298,11 @@
     .timeline-track .timeline-ends {
       opacity: 1;
     }
+    /* Here the times at the ends are in the row of the marks laid over the
+       strip: one with a mark in its place stands aside. */
+    .timeline-track .timeline-ends[data-crowded='true'] {
+      opacity: 0;
+    }
   }
 
   /* A quiet label next to the thing it names. */

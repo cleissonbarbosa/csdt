@@ -28,6 +28,12 @@ export interface CommandContext {
   playing: boolean;
   viewMode: 'scene' | 'table';
   layoutMode: LayoutMode;
+  /**
+   * Whether the page is shown inside another one (`?embed=1`). An embed
+   * reaches no incident capture: it has no bar to say what one is, nor a
+   * way back from it.
+   */
+  embedded?: boolean;
   /** The effects commands have, supplied by the application. */
   do: {
     selectService: (id: string) => void;
@@ -166,6 +172,17 @@ export function buildCommands(context: CommandContext): Command[] {
       hint: t('topology, scenarios, Cedar policies'),
       run: () => act.openPanel('workspace'),
     },
+    ...(context.embedded
+      ? []
+      : [
+          {
+            id: 'capture',
+            group: 'Actions' as const,
+            title: t('Open an incident capture'),
+            hint: t('a real incident, not simulated'),
+            run: () => act.openPanel('capture'),
+          },
+        ]),
     {
       id: 'settings',
       group: 'Actions',

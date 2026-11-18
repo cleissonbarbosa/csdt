@@ -40,11 +40,8 @@ pub enum EventKind {
     Reroute,
     /// An alert raised by the threat-detection rules.
     Alert,
-    /// A vulnerability advisory imported from a fixture.
-    CveAdvisory,
-    /// A port-scan finding imported from a fixture.
-    ScanFinding,
-    /// Operator or system action (reset, timeline branch, import…).
+    /// An operator's action outside any scenario (a fault placed or lifted
+    /// by hand), or a scenario that could not start on the active topology.
     System,
 }
 
@@ -67,19 +64,5 @@ pub struct SecurityEvent {
     pub data_source: DataSource,
     /// Kind-specific structured payload.
     #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
-    pub details: serde_json::Value,
-}
-
-/// An event prepared outside the simulation (fixture import) that the engine
-/// stamps with sequence number and time when it is applied.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedEvent {
-    pub severity: Severity,
-    pub kind: EventKind,
-    pub title: String,
-    pub message: String,
-    pub node_ids: Vec<String>,
-    pub data_source: DataSource,
     pub details: serde_json::Value,
 }

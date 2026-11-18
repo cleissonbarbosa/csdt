@@ -59,10 +59,11 @@ export default {
 
   // Where data comes from.
   Synthetic: 'Sintético',
-  Recording: 'Gravação',
+  Capture: 'Captura',
   Live: 'Ao vivo',
   'Produced by the built-in simulation engine.': 'Produzido pelo motor de simulação embutido.',
-  'Imported from a bundled fixture file.': 'Importado de um arquivo de exemplo incluído.',
+  "Not produced by the simulation: an incident capture read in this browser from a file, either a real system's measurements or a provider's report transcribed by hand.":
+    'Não produzido pela simulação: uma captura de incidente lida neste navegador a partir de um arquivo, sejam medições de um sistema real ou o relatório de um provedor transcrito à mão.',
   'Measured from an explicitly connected local instance.':
     'Medido de uma instância local conectada explicitamente.',
   'Produced by the simulation engine, which runs in this tab.':

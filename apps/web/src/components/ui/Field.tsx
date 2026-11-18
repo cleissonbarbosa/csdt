@@ -42,12 +42,19 @@ export function Select({
   children,
   hideLabel,
   quiet,
+  fit,
   ...rest
 }: SelectHTMLAttributes<HTMLSelectElement> & {
   label: string;
   hideLabel?: boolean;
   /** Without a box until it is pointed at: for a choice that reads as text. */
   quiet?: boolean;
+  /**
+   * As wide as what it shows, so a name written elsewhere (a capture's
+   * title) is never cut: the chosen option where the browser can size to
+   * it, the widest otherwise. The wrapper's `className` bounds it.
+   */
+  fit?: boolean;
   children: ReactNode;
 }) {
   const id = useId();
@@ -59,7 +66,8 @@ export function Select({
       <select
         id={id}
         className={cn(
-          'h-8 w-full min-w-0 rounded-control border px-2 text-xs text-ink transition-colors',
+          'h-8 min-w-0 rounded-control border px-2 text-xs text-ink transition-colors',
+          fit ? 'field-sizing-content max-w-full' : 'w-full',
           quiet
             ? 'border-transparent bg-transparent hover:border-line hover:bg-paper'
             : 'border-line-strong bg-paper hover:border-ink-faint',

@@ -6,17 +6,25 @@
  * nothing is requested but its own files, that it runs under the policy it
  * ships with, and that it says so when the engine cannot start.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
+  BOUTIQUE,
+  captureFile,
+  type CaptureFile,
   clockSeconds,
   collectErrors,
   exampleWorkspace,
   frameSummary,
   fromMenu,
+  GOOGLE,
   KINDS,
+  namesOnModel,
+  openCapture,
   openStatic,
+  overlappingNames,
   setSpeed,
+  waitForCapture,
   waitForScene,
 } from './support';
 
@@ -317,41 +325,222 @@ test('the interface speaks Portuguese when asked, and English again when told', 
   expect(errors).toEqual([]);
 });
 
-test('replays a public outage and a local cloud capture without the simulation engine', async ({
+/*
+ * Incident captures. A capture is a real incident read in the tab from a
+ * file, drawn on the same stage in place of the simulation, which goes on
+ * behind it untouched. These tests hold it to that: it opens in place and
+ * in the history, it is drawn from its file and from nothing else, and the
+ * model takes a hue only where the capture states one.
+ */
+
+/** What the simulation shows once a capture has been left: its own bar and its own model. */
+async function backOnTheSimulation(page: Page): Promise<void> {
+  await expect(page.getByTestId('capture-status')).toHaveCount(0);
+  await expect(page.getByTestId('platform-status')).toBeVisible();
+  await expect(page.locator('[data-testid="timeline"][data-mode="capture"]')).toHaveCount(0);
+  await waitForScene(page, KINDS);
+  // Twelve kinds of service are twelve pieces, as many as the Google
+  // capture has: what tells them apart is that the simulation states every
+  // service's state and names its layers.
+  await expect.poll(() => page.evaluate(() => window.__aegis?.stats().unknown)).toBe(0);
+  await expect.poll(() => namesOnModel(page)).toEqual(expect.arrayContaining(['01 Entry']));
+}
+
+/** What the scene says it draws, in the figures that tell one model from another. */
+function drawn(page: Page) {
+  return page.evaluate(() => {
+    const stats = window.__aegis!.stats();
+    const names = window.__aegis!.labels().map((name) => name.text);
+    return { nodes: stats.nodes, edges: stats.edges, unknown: stats.unknown, names: names.sort() };
+  });
+}
+
+/** A rectangle of the page, in CSS pixels. */
+interface Area {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** The names drawn on the model, each with its box on the page. */
+async function namesOnPage(page: Page): Promise<(Area & { text: string })[]> {
+  const stage = (await page
+    .getByRole('img', { name: /Interactive 3D view|Vista 3D interativa/ })
+    .boundingBox())!;
+  const names = await page.evaluate(() => window.__aegis!.labels());
+  return names.map((name) => ({
+    text: name.text,
+    left: stage.x + name.left,
+    right: stage.x + name.right,
+    top: stage.y + name.top,
+    bottom: stage.y + name.bottom,
+  }));
+}
+
+/**
+ * The names not drawn wholly inside an area of the page. A pixel is allowed
+ * for rounding: a cut name was a hundred and more off the screen.
+ */
+async function namesOutside(page: Page, area: Area): Promise<string[]> {
+  return (await namesOnPage(page))
+    .filter(
+      (name) =>
+        name.left < area.left - 1 ||
+        name.right > area.right + 1 ||
+        name.top < area.top - 1 ||
+        name.bottom > area.bottom + 1,
+    )
+    .map((name) => name.text);
+}
+
+/**
+ * The names drawn, even in part, under any of these parts of the page, but
+ * those in hand (the selection's), which are drawn wherever they fall.
+ */
+async function namesUnder(page: Page, parts: Locator[], held: string[]): Promise<string[]> {
+  const boxes = await Promise.all(parts.map((part) => part.boundingBox()));
+  return (await namesOnPage(page))
+    .filter((name) => !held.includes(name.text))
+    .filter((name) =>
+      boxes.some(
+        (box) =>
+          box !== null &&
+          name.left < box.x + box.width - 1 &&
+          box.x < name.right - 1 &&
+          name.top < box.y + box.height - 1 &&
+          box.y < name.bottom - 1,
+      ),
+    )
+    .map((name) => name.text);
+}
+
+/** The sample of a capture's service that holds a moment, as the file writes it. */
+function sampleAt(capture: CaptureFile, id: string, atMs: number) {
+  const period = capture.periodMs!;
+  const node = capture.nodes.find((candidate) => candidate.id === id)!;
+  return node.buckets?.find((sample) => sample.atMs <= atMs && atMs < sample.atMs + period);
+}
+
+/** How many of a capture's services have a sample that holds a moment. */
+function measuredAt(capture: CaptureFile, atMs: number): number {
+  return capture.nodes.filter((node) => sampleAt(capture, node.id, atMs) !== undefined).length;
+}
+
+/** The brightness of the stage's background, from the frame drawn. */
+async function brightness(page: Page): Promise<number> {
+  const { background } = await frameSummary(page);
+  return background[0] + background[1] + background[2];
+}
+
+test('an incident capture opens in place from the menu, and Back and Forward follow it', async ({
   page,
-  context,
+}) => {
+  const errors = collectErrors(page);
+  const google = captureFile(GOOGLE);
+  await openStatic(page);
+  await waitForScene(page);
+  // The simulation's panels are where the viewer left them on return.
+  await fromMenu(page, 'services');
+  await expect(page.getByTestId('explorer-count')).toHaveText('51 of 51 services');
+  const entries = await page.evaluate(() => window.history.length);
+
+  await fromMenu(page, 'capture');
+  const dialog = page.getByRole('dialog', { name: 'Open an incident capture' });
+  await expect(dialog.getByTestId(`capture-open-${GOOGLE}`)).toContainText(google.title);
+  await expect(dialog.getByTestId(`capture-open-${BOUTIQUE}`)).toContainText(
+    captureFile(BOUTIQUE).title,
+  );
+  await dialog.getByTestId(`capture-open-${GOOGLE}`).click();
+  await expect(dialog).toHaveCount(0);
+
+  // On the same page: the address names it and the history has one entry more.
+  await expect(page).toHaveURL(new RegExp(`/aegis/\\?capture=${GOOGLE}$`));
+  expect(await page.evaluate(() => window.history.length)).toBe(entries + 1);
+  await waitForCapture(page, google);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute('data-kind', 'provider-report');
+  // The capture's bar in the timeline's place, and none of the simulation's parts.
+  await expect(page.getByTestId('timeline')).toHaveCount(1);
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-mode', 'capture');
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-status', 'paused');
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    new Date(google.window.startMs).toISOString(),
+  );
+  for (const id of ['platform-status', 'explore-incident', 'open-tracer', 'explorer']) {
+    await expect(page.getByTestId(id)).toHaveCount(0);
+  }
+  // The keyboard is on the capture's clock.
+  await expect(page.getByTestId('capture-toggle')).toBeFocused();
+
+  // Back is the simulation, as it was; Forward the capture again.
+  await page.goBack();
+  await expect(page).not.toHaveURL(/capture=/);
+  await backOnTheSimulation(page);
+  await expect(page.getByTestId('explorer-count')).toHaveText('51 of 51 services');
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${GOOGLE}$`));
+  await waitForCapture(page, google);
+  await page.goBack();
+  await backOnTheSimulation(page);
+  expect(errors).toEqual([]);
+});
+
+test('a capture is reached by its link, and kept by a reload and by the table view', async ({
+  page,
   baseURL,
 }) => {
+  const errors = collectErrors(page);
+  const requests = collectRequests(page);
+  const google = await openCapture(page, GOOGLE);
+  const entries = await page.evaluate(() => window.history.length);
+  // Everything the page fetched with a capture open from its first file:
+  // its own files, the engine (which starts behind the capture) once, and
+  // nothing else.
+  expect(requests.length).toBeGreaterThan(5);
+  expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
+  expect(requests.filter((url) => new URL(url).pathname.includes('/api/'))).toEqual([]);
+  expect(requests.filter((url) => url.endsWith('.wasm'))).toHaveLength(1);
+
+  await page.reload();
+  await waitForCapture(page, google);
+  // The table and back: the capture's table, then its model again.
+  await page.keyboard.press('t');
+  const table = page.getByTestId('capture-table');
+  await expect(table).toBeVisible();
+  await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toHaveCount(0);
+  for (const node of google.nodes) {
+    await expect(table.getByTestId(`capture-table-service-${node.id}`)).toContainText(node.name);
+  }
+  await expect(table.getByTestId('capture-table-state-iam')).toHaveText('Not stated at this time');
+  await expect(page.getByTestId('topology-table')).toHaveCount(0);
+  await page.keyboard.press('t');
+  await waitForCapture(page, google);
+  expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
+  expect(requests.filter((url) => new URL(url).pathname.includes('/api/'))).toEqual([]);
+
+  // Leaving an arrival rewrites its entry rather than adding one.
+  await page.getByTestId('capture-back').click();
+  await expect(page).not.toHaveURL(/capture=/);
+  expect(await page.evaluate(() => window.history.length)).toBe(entries);
+  await backOnTheSimulation(page);
+  expect(errors).toEqual([]);
+});
+
+test('a capture file is read in the tab, and one that is not a capture is refused', async ({
+  page,
+  baseURL,
+}) => {
+  const errors = collectErrors(page);
   await openStatic(page);
-  const opened = context.waitForEvent('page');
-  await fromMenu(page, 'cloud-replay');
-  const replay = await opened;
-  const errors = collectErrors(replay);
-  const requests = collectRequests(replay);
-  // Reload the shareable URL so requests are observed from the first file.
-  await replay.goto(baseURL + '?replay');
-  await expect(replay.getByRole('heading', { name: /Google Cloud outage/ })).toBeVisible();
-  await waitForScene(replay, 12);
-  expect((await frameSummary(replay)).drawn).toBeGreaterThan(10);
-  await replay.getByRole('button', { name: /Service Control starts failing/ }).click();
-  await expect(replay.getByTestId('replay-time')).toHaveAttribute(
-    'datetime',
-    '2025-06-12T17:49:00.000Z',
-  );
-  await expect.poll(async () => (await frameSummary(replay)).chromatic).toBeGreaterThan(10);
-  const inspector = replay.getByRole('combobox', { name: 'Service or connection' });
-  await inspector.selectOption('control-iowa');
-  await expect(replay.getByTestId('replay-evidence')).toContainText('Impact reported');
-  await replay.getByRole('button', { name: /Core API serving recovered/ }).click();
-  await inspector.selectOption('control-iowa');
-  await expect(replay.getByTestId('replay-evidence')).toContainText('Recovery reported');
+  await waitForScene(page);
 
   const start = Date.UTC(2025, 5, 12, 18);
   const at = start + 60_000;
   const payload = {
-    kind: 'aegis-cloud-replay',
+    kind: 'aegis-incident-capture',
     version: 1,
-    title: 'CloudWatch replay test',
+    title: 'Checkout capture test',
     source: { kind: 'cloudwatch', label: 'CloudWatch test fixture' },
     window: { startMs: start, endMs: start + 180_000 },
     periodMs: 60_000,
@@ -371,37 +560,527 @@ test('replays a public outage and a local cloud capture without the simulation e
       { source: 'payment', target: 'checkout' },
     ],
   };
-  const file = replay.getByTestId('replay-file');
-  await file.setInputFiles({
-    name: 'capture.json',
+  await fromMenu(page, 'capture');
+  const dialog = page.getByRole('dialog', { name: 'Open an incident capture' });
+  await dialog.getByTestId('capture-file').setInputFiles({
+    name: 'checkout.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(payload)),
   });
-  await expect(replay.getByRole('heading', { name: payload.title })).toBeVisible();
-  await waitForScene(replay, 2);
-  expect(await replay.evaluate(() => window.__aegis?.stats().edges)).toBe(2);
-  await inspector.selectOption('checkout->payment');
-  await expect(replay.getByTestId('replay-evidence')).toContainText('No data');
-  await replay.getByRole('button', { name: 'Go to first sample with faults' }).click();
-  await expect(replay.getByTestId('replay-evidence')).toContainText('25.0%');
-  await replay.getByRole('radio', { name: 'Table view' }).click();
-  await expect(replay.getByRole('row', { name: /Checkout.*Faults observed/ })).toBeVisible();
-  await file.setInputFiles({
+  await expect(dialog).toHaveCount(0);
+  // A file cannot be reached by a link, so the address does not name it.
+  await expect(page).toHaveURL(baseURL!);
+  await waitForCapture(page, payload);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute('data-kind', 'cloudwatch');
+  await expect(page.getByTestId('capture-picker')).toHaveValue('file');
+  await expect(page.getByTestId('capture-picker')).toContainText('checkout.json');
+
+  // A connection with no sample at the window's start has no data there.
+  await page.getByTestId('capture-list').click();
+  await page.getByTestId('capture-connection-checkout->payment').click();
+  const card = page.getByTestId('capture-card');
+  await expect(
+    page.getByRole('complementary', { name: 'Connection in the capture' }),
+  ).toBeVisible();
+  await expect(card).toHaveAttribute('data-kind', 'edge');
+  await expect(card.getByTestId('capture-card-state')).toContainText('No data');
+  // One sampling period on, it has one: 5 errors in 20 requests.
+  await page.getByRole('slider', { name: 'Timeline position' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    new Date(at).toISOString(),
+  );
+  await expect(card.getByTestId('capture-figure-errorRate')).toContainText('25.0%');
+  await expect(card.getByTestId('capture-card-state')).toContainText('Critical');
+  await page.locator('#main').focus();
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('capture-table-state-checkout')).toHaveText('Critical');
+  await expect(page.getByTestId('capture-table-state-payment')).toHaveText('No data');
+  await page.keyboard.press('t');
+  await waitForCapture(page, payload);
+
+  // A file that is not a capture is refused where it was offered, and
+  // what was open stays open.
+  await fromMenu(page, 'capture');
+  await dialog.getByTestId('capture-file').setInputFiles({
     name: 'bad.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{}'),
   });
-  await expect(replay.getByRole('alert')).toContainText('valid cloud replay capture');
-  await expect(replay.getByRole('heading', { name: payload.title })).toBeVisible();
-  await replay.getByRole('button', { name: 'Open public replay' }).click();
-  await expect(replay.getByRole('heading', { name: /Google Cloud outage/ })).toBeVisible();
-  // Long region names cannot push the geometry out of the frame on a phone.
-  await replay.setViewportSize({ width: 390, height: 844 });
-  await waitForScene(replay, 12);
-  await expect.poll(async () => (await frameSummary(replay)).drawn).toBeGreaterThan(10);
-  expect(requests.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
-  expect(
-    requests.filter((url) => url.endsWith('.wasm') || new URL(url).pathname.includes('/api/')),
-  ).toEqual([]);
+  await expect(dialog.getByTestId('capture-problem')).toHaveText(
+    '“bad.json” could not be opened. The file is not an incident capture this version can read.',
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute('data-kind', 'cloudwatch');
+  await waitForCapture(page, payload);
+
+  await page.getByTestId('capture-back').click();
+  await backOnTheSimulation(page);
   expect(errors).toEqual([]);
+});
+
+test('the simulation goes on behind a capture and never reaches its model, which takes a hue only where the capture states one', async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(120_000);
+  const requests = collectRequests(page);
+  const google = captureFile(GOOGLE);
+  await openStatic(page);
+  await waitForScene(page);
+  // An incident in the simulation, so it has hue to give the model.
+  await setSpeed(page, 4);
+  await page.getByTestId('explore-incident').click();
+  await page.getByTestId('scenario-start-ddos-surge').click();
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '1');
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(20);
+  const clock = await clockSeconds(page);
+
+  await fromMenu(page, 'capture');
+  const asked = requests.length;
+  await page.getByTestId(`capture-open-${GOOGLE}`).click();
+  await waitForCapture(page, google);
+  // The pointer leaves the model, so nothing is pointed at.
+  await page.mouse.move(4, 4);
+
+  // The start of the window: the report has stated nothing yet, so every
+  // service is drawn unknown and nothing on the model has a hue.
+  await expect(page.getByTestId('capture-status')).toHaveAttribute('data-level', '0');
+  await expect(page.getByTestId('capture-status')).toContainText(
+    '12 services, none stated yet in the report',
+  );
+  await expect.poll(() => page.evaluate(() => window.__aegis!.stats().unknown)).toBe(12);
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBe(0);
+  // For seconds on end, while the simulation's incident runs on behind it,
+  // the scene draws the capture and nothing of the simulation.
+  const still = await drawn(page);
+  expect(still).toMatchObject({ nodes: 12, edges: google.edges.length, unknown: 12 });
+  for (let i = 0; i < 8; i++) {
+    await page.waitForTimeout(500);
+    expect(await drawn(page)).toEqual(still);
+    expect((await frameSummary(page)).chromatic).toBe(0);
+  }
+
+  // At 17:49 UTC six services are reported affected: there, and only there,
+  // the model takes a hue.
+  await page.getByTestId('capture-status').click();
+  await page
+    .getByTestId('capture-events')
+    .getByRole('button', { name: /Service Control starts failing/ })
+    .click();
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    '2025-06-12T17:49:00.000Z',
+  );
+  await expect(page.getByTestId('capture-status')).toHaveAttribute('data-level', '2');
+  await expect(page.getByTestId('capture-status')).toContainText(
+    '6 services reported affected; 6 not stated',
+  );
+  await expect.poll(() => page.evaluate(() => window.__aegis!.stats().unknown)).toBe(6);
+  await expect.poll(async () => (await frameSummary(page)).chromatic).toBeGreaterThan(10);
+
+  // While it was open the page fetched its own files and no engine, API or other origin.
+  const meanwhile = requests.slice(asked);
+  expect(meanwhile.filter((url) => !url.startsWith(baseURL!))).toEqual([]);
+  expect(meanwhile.filter((url) => new URL(url).pathname.includes('/api/'))).toEqual([]);
+  expect(meanwhile.filter((url) => url.endsWith('.wasm'))).toEqual([]);
+  expect(requests.filter((url) => url.endsWith('.wasm'))).toHaveLength(1);
+
+  // The simulation went on meanwhile, and its model is drawn again.
+  await page.getByTestId('capture-back').click();
+  await expect(page.getByTestId('capture-status')).toHaveCount(0);
+  await expect(page.getByTestId('platform-status')).toBeVisible();
+  await waitForScene(page, KINDS);
+  await expect.poll(() => clockSeconds(page)).toBeGreaterThan(clock + 10);
+});
+
+test('on a phone a capture keeps its names apart and its model in the picture', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const google = await openCapture(page, GOOGLE);
+  const canvas = page.getByRole('img', { name: /Interactive 3D view/ });
+
+  await expect.poll(() => overlappingNames(page)).toBe(0);
+  await expect.poll(async () => (await frameSummary(page)).drawn).toBeGreaterThan(10);
+  // Every piece is drawn within the screen's width, under the top bar and
+  // above the capture's bar.
+  const box = (await canvas.boundingBox())!;
+  const top = (await page.getByRole('banner').boundingBox())!;
+  const foot = (await page.getByTestId('timeline').boundingBox())!.y;
+  const pieces = await page.evaluate(
+    (ids) => ids.map((id) => window.__aegis!.projectNode(id)),
+    google.nodes.map((node) => node.id),
+  );
+  const xs: number[] = [];
+  for (const [i, point] of pieces.entries()) {
+    const name = google.nodes[i]!.name;
+    expect(point, name).not.toBeNull();
+    const x = box.x + point!.x;
+    const y = box.y + point!.y;
+    expect(x, name).toBeGreaterThan(0);
+    expect(x, name).toBeLessThan(390);
+    expect(y, name).toBeGreaterThan(top.y + top.height);
+    expect(y, name).toBeLessThan(foot);
+    xs.push(x);
+  }
+  // The region names are long for a phone. They are not allowed to push
+  // the model back until it is a speck: it still spans much of the width.
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(390 * 0.4);
+  // Nor is one drawn cut: a name the screen's edge, the top bar or the
+  // capture's bar would cut is left out, and every name shown is whole.
+  const picture = {
+    left: Math.max(0, box.x),
+    right: Math.min(390, box.x + box.width),
+    top: Math.max(box.y, top.y + top.height),
+    bottom: foot,
+  };
+  await expect.poll(async () => (await namesOnModel(page)).length).toBeGreaterThan(0);
+  for (let i = 0; i < 4; i++) {
+    expect(await namesOutside(page, picture)).toEqual([]);
+    await page.waitForTimeout(250);
+  }
+  // The bar fits the phone: nothing makes the page scroll sideways.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(page.getByTestId('capture-back')).toBeVisible();
+  await expect(page.getByTestId('capture-chip')).toContainText(google.title);
+});
+
+test('one capture leads to another, by the picker and by the menu, and Back still leads to the simulation', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const google = captureFile(GOOGLE);
+  const boutique = captureFile(BOUTIQUE);
+  await openStatic(page);
+  await waitForScene(page);
+  const entries = await page.evaluate(() => window.history.length);
+  const picker = page.getByTestId('capture-picker');
+  const entriesNow = () => page.evaluate(() => window.history.length);
+
+  await fromMenu(page, 'capture');
+  await page.getByTestId(`capture-open-${GOOGLE}`).click();
+  await waitForCapture(page, google);
+  await expect(picker).toHaveValue(GOOGLE);
+  expect(await entriesNow()).toBe(entries + 1);
+
+  // The picker opens the other one in the same entry: the simulation stays
+  // one step back.
+  await picker.selectOption(BOUTIQUE);
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${BOUTIQUE}$`));
+  await waitForCapture(page, boutique);
+  await expect(picker).toHaveValue(BOUTIQUE);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute(
+    'data-kind',
+    'prometheus-recording',
+  );
+  expect(await entriesNow()).toBe(entries + 1);
+
+  // So does the menu's "Open another capture".
+  await page.getByTestId('open-menu').click();
+  await expect(page.getByTestId('menu-capture')).toContainText('Open another capture');
+  await page.getByTestId('menu-capture').click();
+  const dialog = page.getByRole('dialog', { name: 'Open an incident capture' });
+  await expect(dialog.getByTestId(`capture-open-${BOUTIQUE}`)).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  await dialog.getByTestId(`capture-open-${GOOGLE}`).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${GOOGLE}$`));
+  await waitForCapture(page, google);
+  await expect(picker).toHaveValue(GOOGLE);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute('data-kind', 'provider-report');
+  expect(await entriesNow()).toBe(entries + 1);
+
+  // Back is the simulation whichever capture was shown last, and Forward
+  // that capture; after a switch made there, the same again.
+  await page.goBack();
+  await expect(page).not.toHaveURL(/capture=/);
+  await backOnTheSimulation(page);
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${GOOGLE}$`));
+  await waitForCapture(page, google);
+  await picker.selectOption(BOUTIQUE);
+  await waitForCapture(page, boutique);
+  await page.goBack();
+  await backOnTheSimulation(page);
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${BOUTIQUE}$`));
+  await waitForCapture(page, boutique);
+  await expect(picker).toHaveValue(BOUTIQUE);
+  expect(await entriesNow()).toBe(entries + 1);
+  expect(errors).toEqual([]);
+});
+
+test('the Online Boutique capture shows each measure as its file has it, and colours nothing it counted no errors for', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const boutique = await openCapture(page, BOUTIQUE);
+  const events = boutique.events!;
+  await page.mouse.move(4, 4);
+  await expect(page.getByTestId('capture-chip')).toHaveAttribute(
+    'data-kind',
+    'prometheus-recording',
+  );
+  await expect(page.getByTestId('capture-chip')).toContainText('Captured, not simulated');
+
+  // No sample in the file counts an error, and none has no requests: no
+  // service's state is given at any moment, and nothing takes a hue.
+  const samples = boutique.nodes.flatMap((node) => node.buckets ?? []);
+  expect(samples.some((sample) => sample.faults !== undefined)).toBe(false);
+  expect(samples.some((sample) => sample.requests === 0)).toBe(false);
+  const status = page.getByTestId('capture-status');
+  const atRest = async (atMs: number) => {
+    await expect(status).toHaveAttribute('data-level', '0');
+    await expect(status).toContainText(
+      `${measuredAt(boutique, atMs)} services measured; error counts are not in this capture`,
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.__aegis!.stats().unknown))
+      .toBe(boutique.nodes.length);
+    await expect.poll(async () => (await frameSummary(page)).drawn).toBeGreaterThan(10);
+    expect((await frameSummary(page)).chromatic).toBe(0);
+  };
+  await atRest(boutique.window.startMs);
+
+  // The injection names no service: the cursor moves and nothing is selected.
+  await status.click();
+  const list = page.getByRole('complementary', { name: 'Services and events' });
+  const injection = events.find((event) => event.title === 'Benchmark fault injected')!;
+  await list
+    .getByTestId('capture-events')
+    .getByRole('button', { name: new RegExp(injection.title) })
+    .click();
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    new Date(injection.atMs).toISOString(),
+  );
+  await expect(page.getByRole('complementary', { name: 'Service in the capture' })).toHaveCount(0);
+  await atRest(injection.atMs);
+
+  // The memory peak names checkoutservice, which it brings forward.
+  const peak = events.find((event) => event.title === 'Checkout memory peak after injection')!;
+  expect(peak.nodes).toEqual(['checkoutservice']);
+  await list
+    .getByTestId('capture-events')
+    .getByRole('button', { name: new RegExp(peak.title) })
+    .click();
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    new Date(peak.atMs).toISOString(),
+  );
+  const sheet = page.getByRole('complementary', { name: 'Service in the capture' });
+  const card = sheet.getByTestId('capture-card');
+  await expect(card).toHaveAttribute('data-id', 'checkoutservice');
+  await expect(card.getByTestId('capture-card-title')).toHaveText('checkoutservice');
+  await expect(card).toContainText('Microservice in Location not supplied');
+  await expect(card.getByTestId('capture-type-source')).toHaveText(
+    'Kind assumed: the source does not say',
+  );
+  await expect(card.getByTestId('capture-card-state')).toHaveText('Error rate not measured');
+
+  // The sample at the cursor, as the file has it, and the figures written from it.
+  const sample = sampleAt(boutique, 'checkoutservice', peak.atMs)!;
+  expect(sample).toEqual({
+    atMs: sample.atMs,
+    memoryBytes: 16_846_848,
+    requests: 17,
+    p95Ms: 1031.376,
+  });
+  await expect(card).toContainText(
+    `Sample from ${new Date(sample.atMs).toISOString().slice(11, 19)} UTC`,
+  );
+  const figure = (measure: string) => card.getByTestId(`capture-figure-${measure}`).locator('dd');
+  await expect(figure('requests').first()).toHaveText(/^17\s*in 30 s$/);
+  await expect(figure('errors').first()).toHaveText('Not measured');
+  await expect(figure('errorRate').first()).toHaveText('Not measured');
+  await expect(figure('p95Ms').first()).toHaveText('1.03 s');
+  await expect(figure('memoryBytes').first()).toHaveText('16.1 MiB');
+  // Only the error rate has a normal range, the simulation's; the others say
+  // the lowest and highest the file has for the service, incident included.
+  const checkout = boutique.nodes.find((node) => node.id === 'checkoutservice')!.buckets!;
+  const span = (values: number[]) => [Math.min(...values), Math.max(...values)];
+  expect(span(checkout.map((point) => point.requests!))).toEqual([8, 24]);
+  expect(span(checkout.map((point) => point.p95Ms!))).toEqual([408.461, 1726.934]);
+  expect(span(checkout.map((point) => point.memoryBytes!))).toEqual([11_628_544, 16_846_848]);
+  const range = 'No normal range: the source states none. Lowest–highest in this capture:';
+  await expect(figure('requests').last()).toHaveText(`${range} 8–24.`);
+  await expect(figure('p95Ms').last()).toHaveText(`${range} 408 ms–1.73 s.`);
+  await expect(figure('memoryBytes').last()).toHaveText(`${range} 11.1 MiB–16.1 MiB.`);
+  await expect(figure('errors').last()).toHaveText('Not measured in this capture.');
+  await expect(figure('errorRate').last()).toHaveText('Normal below 4% (simulation threshold)');
+  await expect(card.getByTestId('capture-colour-note')).toHaveText(
+    'This capture has no error counts, so no service in it is coloured.',
+  );
+  // What the source counts as an error is not said where it counted none.
+  await expect(card).not.toContainText('Errors are as the source counted them');
+  await expect(card.getByTestId('capture-card-events')).toContainText(peak.title);
+  const calls = boutique.edges.filter((edge) => edge.source === 'checkoutservice');
+  const callers = boutique.edges.filter((edge) => edge.target === 'checkoutservice');
+  await expect(card.getByTestId('capture-calls').locator('summary')).toContainText(
+    String(calls.length),
+  );
+  for (const edge of callers) {
+    await expect(card.getByTestId('capture-callers')).toContainText(edge.source);
+  }
+
+  // With the list and the card open, no name but the selection's lies under either.
+  await page.mouse.move(4, 4);
+  await expect.poll(() => namesUnder(page, [list, sheet], ['checkoutservice'])).toEqual([]);
+  expect((await namesOnModel(page)).length).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('a capture speaks Portuguese with the interface, and keeps the words its file wrote', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const google = captureFile(GOOGLE);
+  await openStatic(page, { language: 'pt-BR' });
+  await waitForScene(page, KINDS);
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe('pt-BR');
+
+  await fromMenu(page, 'capture');
+  const dialog = page.getByRole('dialog', { name: 'Abrir uma captura de incidente' });
+  await expect(dialog).toContainText('Capturas que vêm com o AEGIS');
+  const entry = dialog.getByTestId(`capture-open-${GOOGLE}`);
+  // The title is the file's; the window around it is the interface's.
+  await expect(entry).toContainText(google.title);
+  await expect(entry).toContainText(/De .+ a .+, UTC/);
+  await entry.click();
+  await waitForCapture(page, google);
+
+  const status = page.getByTestId('capture-status');
+  await expect(status).toContainText('Às 17:45 UTC');
+  await expect(status).toContainText('12 serviços, nenhum informado ainda no relatório');
+  const chip = page.getByTestId('capture-chip');
+  await expect(chip).toContainText('Do relatório do provedor, não simulado');
+  await expect(chip).toHaveAttribute(
+    'aria-label',
+    `Do relatório do provedor, não simulado: ${google.title}. Mostrar o que é a captura.`,
+  );
+  const back = page.getByTestId('capture-back');
+  await expect(back).toHaveAccessibleName('Voltar à simulação');
+  await expect(back.getByText('Voltar à simulação', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('capture-list')).toHaveAccessibleName('Serviços e eventos');
+  await expect(page.getByTestId('capture-toggle')).toHaveText('Reproduzir');
+  await expect(page.getByTestId('capture-offset')).toHaveText('+0:00 desde o início da captura');
+  await expect(page.getByRole('radiogroup', { name: 'Velocidade de reprodução' })).toBeVisible();
+
+  // The list and a card in Portuguese; the names in them as the file wrote them.
+  await page.getByTestId('capture-list').click();
+  const list = page.getByRole('complementary', { name: 'Serviços e eventos' });
+  await expect(list.getByTestId('capture-tab-services')).toHaveText('Serviços');
+  const iam = list.getByTestId('capture-service-iam');
+  await expect(iam).toContainText('Cloud IAM');
+  await expect(iam).toContainText('Não informado neste momento');
+  await iam.click();
+  const sheet = page.getByRole('complementary', { name: 'Serviço na captura' });
+  const card = sheet.getByTestId('capture-card');
+  await expect(card.getByTestId('capture-card-title')).toHaveText('Cloud IAM');
+  await expect(card.getByTestId('capture-card-state')).toHaveText('Não informado neste momento');
+  await expect(card.getByTestId('capture-type-source')).toHaveText(
+    'Tipo presumido: a fonte não diz',
+  );
+  await expect(card.getByTestId('capture-colour-note')).toHaveText(
+    'O impacto relatado é desenhado como crítico e uma recuperação relatada como degradada; o relatório não classifica a gravidade do impacto.',
+  );
+
+  // An event's title is the file's, in English; what it does to the
+  // sentence and the card is said in Portuguese.
+  await list.getByTestId('capture-tab-events').click();
+  await expect(list.getByTestId('capture-tab-events')).toHaveText('Eventos');
+  await list
+    .getByTestId('capture-events')
+    .getByRole('button', { name: /Service Control starts failing/ })
+    .click();
+  await expect(page.getByTestId('capture-time')).toHaveAttribute(
+    'datetime',
+    '2025-06-12T17:49:00.000Z',
+  );
+  await expect(status).toHaveAttribute('data-level', '2');
+  await expect(status).toContainText('Às 17:49 UTC');
+  await expect(status).toContainText('6 serviços relatados como afetados; 6 sem informação');
+  await expect(card.getByTestId('capture-card-state')).toHaveText('Relatado como afetado');
+  await expect(page.getByTestId('capture-offset')).toHaveText('+4:00 desde o início da captura');
+
+  // The names on the model are the file's, whole, and none lies under a sheet.
+  await page.mouse.move(4, 4);
+  await expect.poll(() => namesUnder(page, [list, sheet], ['Cloud IAM'])).toEqual([]);
+  await expect.poll(() => overlappingNames(page)).toBe(0);
+
+  // The table, in Portuguese, with the regions as the file names them.
+  await page.locator('#main').focus();
+  await page.keyboard.press('t');
+  const table = page.getByTestId('capture-table');
+  await expect(table).toBeVisible();
+  await expect(table.getByTestId('capture-table-state-iam')).toHaveText('Relatado como afetado');
+  await expect(table.getByTestId('capture-table-state-dataflow')).toHaveText(
+    'Não informado neste momento',
+  );
+  for (const region of google.regions) {
+    await expect(table.getByTestId(`capture-table-region-${region.id}`)).toContainText(region.name);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('a capture at rest has no hue in the light theme, nor at night', async ({ page }) => {
+  const google = await openCapture(page, GOOGLE);
+  await page.mouse.move(4, 4);
+  const html = page.locator('html');
+  const atRest = async () => {
+    await expect(page.getByTestId('capture-status')).toHaveAttribute('data-level', '0');
+    await expect
+      .poll(() => page.evaluate(() => window.__aegis!.stats().unknown))
+      .toBe(google.nodes.length);
+    await expect.poll(async () => (await frameSummary(page)).drawn).toBeGreaterThan(10);
+    expect((await frameSummary(page)).chromatic).toBe(0);
+  };
+  const setTheme = async (name: 'Light' | 'Night') => {
+    await fromMenu(page, 'settings');
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await dialog.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name }).click();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  };
+
+  // The suite's browser asks for a light scheme, and the theme follows it.
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect.poll(() => brightness(page)).toBeGreaterThan(600);
+  await atRest();
+
+  // The capture's own menu changes the theme, and the capture stays.
+  await setTheme('Night');
+  await expect(html).toHaveAttribute('data-theme', 'night');
+  await expect.poll(() => brightness(page)).toBeLessThan(140);
+  await waitForCapture(page, google);
+  await atRest();
+
+  // The light theme chosen, not followed: the same.
+  await setTheme('Light');
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect.poll(() => brightness(page)).toBeGreaterThan(600);
+  await waitForCapture(page, google);
+  await atRest();
+});
+
+test('a capture needs no engine, and leaves nothing behind when the engine is not there', async ({
+  page,
+}) => {
+  await page.route('**/*.wasm', (route) => route.abort());
+  const google = await openCapture(page, GOOGLE);
+  expect(await page.evaluate(() => window.__aegis!.stats().unknown)).toBe(google.nodes.length);
+  // The simulation's failure is not laid over the capture.
+  await expect(page.getByTestId('engine-stopped')).toHaveCount(0);
+  await page.getByTestId('capture-back').click();
+  await expect(page.getByTestId('engine-stopped')).toBeVisible();
+  // Nothing of the capture stays drawn under it: there is no model at all.
+  await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toHaveCount(0);
+  await expect(page.getByTestId('platform-status')).toHaveCount(0);
+  await expect(page.getByTestId('timeline')).toHaveCount(0);
+  await expect(page.getByTestId('capture-chip')).toHaveCount(0);
 });

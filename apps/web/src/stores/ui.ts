@@ -51,7 +51,9 @@ export type PanelId =
   /** Who may do what: every request of the catalogue, asked of Cedar. */
   | 'matrix'
   /** Editing the Cedar policies in the page. */
-  | 'policies';
+  | 'policies'
+  /** Choosing an incident capture to open, bundled or from a file. */
+  | 'capture';
 export type LeftTab = 'explorer' | 'incidents';
 
 export interface Filters {

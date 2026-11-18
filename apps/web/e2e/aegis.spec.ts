@@ -2,11 +2,13 @@ import { expect, test } from '@playwright/test';
 
 import {
   API,
+  captureFile,
   clockSeconds,
   collectErrors,
   exampleWorkspace,
   frameSummary,
   fromMenu,
+  GOOGLE,
   KINDS,
   namesOnModel,
   openApp,
@@ -17,6 +19,7 @@ import {
   SERVICES,
   setSpeed,
   showEveryService,
+  waitForCapture,
   waitForScene,
 } from './support';
 
@@ -1226,4 +1229,90 @@ test('a link offers a challenge, and a service says what it is exposed to', asyn
   await expect(exposure.getByTestId('exposure-show')).toHaveAttribute('aria-pressed', 'true');
   await exposure.getByTestId('exposure-matrix').click();
   await expect(page.getByTestId('access-matrix')).toBeVisible();
+});
+
+test('an incident capture opens in place and leaves the server’s simulation untouched', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  // What the page asks of the server, and sends it over the stream, while
+  // the capture is open.
+  let open = false;
+  const asked: string[] = [];
+  const sent: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (open && url.pathname.startsWith('/api/')) asked.push(`${request.method()} ${url.pathname}`);
+  });
+  page.on('websocket', (socket) => {
+    socket.on('framesent', (frame) => {
+      if (open) sent.push(String(frame.payload));
+    });
+  });
+  const commands = async () =>
+    (
+      (await (await page.request.get(`${API}/session`)).json()) as {
+        recording: { commands: unknown[] };
+      }
+    ).recording.commands;
+  const tick = async () =>
+    ((await (await page.request.get(`${API}/health`)).json()) as { tick: number }).tick;
+
+  await openApp(page);
+  await waitForScene(page);
+  const google = captureFile(GOOGLE);
+  const timeline = await commands();
+  const before = await tick();
+
+  open = true;
+  await fromMenu(page, 'capture');
+  await page.getByTestId(`capture-open-${GOOGLE}`).click();
+  await expect(page).toHaveURL(new RegExp(`\\?capture=${GOOGLE}$`));
+  await waitForCapture(page, google);
+  await expect(page.getByTestId('platform-status')).toHaveCount(0);
+  await expect(page.getByTestId('connection-health')).toHaveCount(0);
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-mode', 'capture');
+  await expect.poll(() => page.evaluate(() => window.__aegis!.stats().unknown)).toBe(12);
+
+  // What would act on the simulation acts on the capture here: Space plays
+  // and pauses its clock, T shows its table, a service is selected in it.
+  await expect(page.getByTestId('capture-toggle')).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-status', 'playing');
+  await page.keyboard.press('Space');
+  await expect(page.getByTestId('timeline')).toHaveAttribute('data-status', 'paused');
+  await page.locator('#main').focus();
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('capture-table')).toBeVisible();
+  await page.keyboard.press('t');
+  await waitForCapture(page, google);
+  await page.getByTestId('capture-list').click();
+  await page.getByTestId('capture-service-iam').click();
+  const card = page.getByRole('complementary', { name: 'Service in the capture' });
+  await expect(card.getByTestId('capture-card')).toHaveAttribute('data-id', 'iam');
+  await expect(card.getByTestId('capture-card-title')).toHaveText('Cloud IAM');
+  await expect(page.getByTestId('inspector')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+
+  await page.getByTestId('capture-back').click();
+  await expect(page).not.toHaveURL(/capture=/);
+  await expect(page.getByTestId('capture-status')).toHaveCount(0);
+  await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
+  await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
+  await waitForScene(page, KINDS);
+  open = false;
+
+  // The capture asked the server for nothing that changes it, and the
+  // stream carried nothing but the client's pings and requests to catch up.
+  expect(asked.filter((request) => !request.startsWith('GET '))).toEqual([]);
+  expect(
+    sent
+      .map((payload) => (JSON.parse(payload) as { type: string }).type)
+      .filter((type) => type !== 'ping' && type !== 'resync'),
+  ).toEqual([]);
+  // Its timeline holds the commands it held, and it went on playing.
+  expect(await commands()).toEqual(timeline);
+  expect(await tick()).toBeGreaterThan(before);
+  expect(errors).toEqual([]);
 });

@@ -284,8 +284,8 @@ export default {
   'A pawn; its head lifts as it asks': 'Um peão; sua cabeça se ergue quando ele pede',
   "The part of a piece that moves runs at the pace of its service's traffic: faster under a surge, slower as traffic thins, and still when nothing passes.":
     'A parte de uma peça que se move anda no ritmo do tráfego do seu serviço: mais rápida num pico, mais lenta quando o tráfego diminui, e parada quando nada passa.',
-  'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is observed, scanned or attacked.':
-    'O AEGIS é uma simulação. A plataforma, suas métricas e todos os incidentes são sintéticos e determinísticos; nenhum sistema real é observado, escaneado ou atacado.',
+  'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is scanned or attacked.':
+    'O AEGIS é uma simulação. A plataforma, suas métricas e todos os incidentes são sintéticos e determinísticos; nenhum sistema real é escaneado ou atacado.',
 
   // The command palette. A title and its hint are what a search matches.
   'Go to a service or run a command': 'Ir para um serviço ou executar um comando',
@@ -352,9 +352,6 @@ export default {
   'This session omits {items}.': 'Esta sessão deixa de fora {items}.',
   '{n} authorization decision evaluated by hand': '{n} decisão de autorização avaliada à mão',
   '{n} authorization decisions evaluated by hand': '{n} decisões de autorização avaliadas à mão',
-  '{n} import from an integration': '{n} importação de uma integração',
-  '{n} imports from an integration': '{n} importações de uma integração',
-  '{first} and {second}': '{first} e {second}',
   'This timeline cannot be reproduced from a session: {reason}.':
     'Esta linha do tempo não pode ser reproduzida a partir de uma sessão: {reason}.',
   'part of it is missing': 'falta uma parte dela',

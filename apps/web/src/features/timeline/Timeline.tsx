@@ -1,7 +1,13 @@
-import { PLAYBACK_SPEEDS, type Incident, type PlaybackSpeed } from '@aegis/contracts';
+import {
+  PLAYBACK_SPEEDS,
+  type Incident,
+  type MetricSample,
+  type PlaybackSpeed,
+  type SecurityEvent,
+} from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLast, History, Pause, Play, SkipForward, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 import { actions } from '@/app/actions';
 import { useMinWidth } from '@/app/hooks';
@@ -16,56 +22,110 @@ import { api } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
+import { Track, TRACK_HEIGHT } from './Track';
+
 const SPEED_OPTIONS = PLAYBACK_SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }));
-/** Height of the open track; closed, it is the same drawing pressed flat. */
-const TRACK_HEIGHT = 60;
 /** Seeks issued while dragging are spaced at least this far apart. */
 const SEEK_INTERVAL_MS = 110;
 
-function useWidth(): [React.RefCallback<HTMLElement>, number] {
-  const [width, setWidth] = useState(600);
-  const observer = useRef<ResizeObserver | null>(null);
-  const ref = useCallback((element: HTMLElement | null) => {
-    observer.current?.disconnect();
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    observer.current = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(120, entry.contentRect.width));
-    });
-    observer.current.observe(element);
-    setWidth(Math.max(120, element.clientWidth));
-  }, []);
-  useEffect(() => () => observer.current?.disconnect(), []);
-  return [ref, width];
-}
-
-interface TrackProps {
+interface SimulationTrackProps {
   incidents: Incident[];
 }
 
 /**
- * The scrubber: traffic history, incident bands, event marks and the playhead.
- *
- * At rest it is a strip a few pixels tall: enough to see where the cursor is
- * and where the incidents were. Reaching for it (pointer, keyboard focus or a
- * drag) opens it upward into the full chart. The drawing is the same in both
- * states, scaled, so it grows rather than being swapped.
+ * The simulation's history on the scrubber: traffic, incident bands and
+ * event marks, with the playhead at the simulation's cursor. A drag previews
+ * where it is going and asks the server to seek at most every
+ * `SEEK_INTERVAL_MS`; End goes to the simulation's now.
  */
-function Track({ incidents }: TrackProps) {
+function SimulationTrack({ incidents }: SimulationTrackProps) {
   const playback = useTelemetry((state) => state.playback);
   const history = useTelemetry((state) => state.history);
   const events = useTelemetry((state) => state.events);
-  const [ref, width] = useWidth();
-  const dragging = useRef(false);
   const lastSeek = useRef(0);
   const pending = useRef<number | null>(null);
-  const [preview, setPreview] = useState<number | null>(null);
-  const [held, setHeld] = useState(false);
 
   const start = playback?.windowStartMs ?? 0;
   const head = Math.max(playback?.headTimeMs ?? 0, start + 1000);
-  const span = head - start;
-  const xOf = useCallback((ms: number) => ((ms - start) / span) * width, [start, span, width]);
 
+  const marks = useMemo(
+    () =>
+      events.filter(
+        (event) =>
+          (event.severity === 'warning' || event.severity === 'critical') &&
+          event.kind !== 'health-transition' &&
+          event.virtualTimeMs >= start,
+      ),
+    [events, start],
+  );
+
+  const seek = useCallback((toMs: number, force: boolean) => {
+    const now = performance.now();
+    if (!force && now - lastSeek.current < SEEK_INTERVAL_MS) {
+      pending.current = toMs;
+      return;
+    }
+    lastSeek.current = now;
+    pending.current = null;
+    void actions.control({ action: 'seek', toMs: Math.round(toMs) });
+  }, []);
+
+  if (!playback) {
+    return <div className="h-[18px] flex-1 max-sm:order-last max-sm:basis-full" />;
+  }
+
+  return (
+    <Track
+      startMs={start}
+      endMs={head}
+      cursorMs={playback.virtualTimeMs}
+      formatTime={formatClock}
+      valueText={(cursor) =>
+        t('{cursor} of {head}', { cursor: formatClock(cursor), head: formatClock(head) })
+      }
+      steps={{ small: 5_000, large: 30_000 }}
+      onSeek={(toMs, phase) => {
+        if (phase === 'move') seek(toMs, false);
+        // Let go of, the track seeks to where the drag last asked for.
+        else if (phase === 'end') seek(pending.current ?? toMs, true);
+        else seek(toMs, true);
+      }}
+      // The end of the track is the simulation's now.
+      onEnd={() => void actions.control({ action: 'live' })}
+    >
+      {(xOf) => (
+        <SimulationLayers
+          incidents={incidents}
+          history={history}
+          marks={marks}
+          start={start}
+          head={head}
+          cursorMs={playback.virtualTimeMs}
+          xOf={xOf}
+        />
+      )}
+    </Track>
+  );
+}
+
+/** Incident bands, the traffic and error lines, and the marks of what went wrong. */
+function SimulationLayers({
+  incidents,
+  history,
+  marks,
+  start,
+  head,
+  cursorMs,
+  xOf,
+}: {
+  incidents: Incident[];
+  history: MetricSample[];
+  marks: SecurityEvent[];
+  start: number;
+  head: number;
+  cursorMs: number;
+  xOf: (ms: number) => number;
+}) {
   const paths = useMemo(() => {
     const samples = history.filter((s) => s.virtualTimeMs >= start && s.virtualTimeMs <= head);
     if (samples.length < 2) return null;
@@ -102,184 +162,66 @@ function Track({ incidents }: TrackProps) {
     return { traffic, errors, peak };
   }, [history, start, head, xOf]);
 
-  const marks = useMemo(
-    () =>
-      events.filter(
-        (event) =>
-          (event.severity === 'warning' || event.severity === 'critical') &&
-          event.kind !== 'health-transition' &&
-          event.virtualTimeMs >= start,
-      ),
-    [events, start],
-  );
-
-  const seek = useCallback((toMs: number, force: boolean) => {
-    const now = performance.now();
-    if (!force && now - lastSeek.current < SEEK_INTERVAL_MS) {
-      pending.current = toMs;
-      return;
-    }
-    lastSeek.current = now;
-    pending.current = null;
-    void actions.control({ action: 'seek', toMs: Math.round(toMs) });
-  }, []);
-
-  const timeAt = (clientX: number, element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return start + ratio * span;
-  };
-
-  if (!playback) {
-    return <div ref={ref} className="h-[18px] flex-1 max-sm:order-last max-sm:basis-full" />;
-  }
-  const cursor = preview ?? playback.virtualTimeMs;
-  const step = (delta: number) =>
-    seek(Math.min(head, Math.max(start, playback.virtualTimeMs + delta)), true);
-
   return (
-    // The slot keeps the strip's place in the bar; the track is anchored to
-    // its bottom edge and grows out of it.
-    <div
-      ref={ref}
-      className="timeline-slot relative h-[18px] min-w-24 flex-1 py-0 max-sm:order-last max-sm:h-7 max-sm:basis-full"
-    >
-      <div
-        role="slider"
-        tabIndex={0}
-        aria-label={t('Timeline position')}
-        aria-orientation="horizontal"
-        aria-valuemin={Math.round(start / 1000)}
-        aria-valuemax={Math.round(head / 1000)}
-        aria-valuenow={Math.round(cursor / 1000)}
-        aria-valuetext={t('{cursor} of {head}', {
-          cursor: formatClock(cursor),
-          head: formatClock(head),
-        })}
-        data-testid="timeline-track"
-        data-dragging={held}
-        className="timeline-track absolute inset-x-0 bottom-0 cursor-ew-resize touch-none select-none overflow-hidden rounded-control border border-line bg-sunken"
-        onPointerDown={(event) => {
-          dragging.current = true;
-          setHeld(true);
-          event.currentTarget.setPointerCapture(event.pointerId);
-          const at = timeAt(event.clientX, event.currentTarget);
-          setPreview(at);
-          seek(at, true);
-        }}
-        onPointerMove={(event) => {
-          if (!dragging.current) return;
-          const at = timeAt(event.clientX, event.currentTarget);
-          setPreview(at);
-          seek(at, false);
-        }}
-        onPointerUp={(event) => {
-          if (!dragging.current) return;
-          dragging.current = false;
-          setHeld(false);
-          seek(pending.current ?? timeAt(event.clientX, event.currentTarget), true);
-          setPreview(null);
-        }}
-        onPointerCancel={() => {
-          dragging.current = false;
-          setHeld(false);
-          setPreview(null);
-        }}
-        onKeyDown={(event) => {
-          const big = event.shiftKey ? 30_000 : 5_000;
-          if (event.key === 'ArrowLeft') step(-big);
-          else if (event.key === 'ArrowRight') step(big);
-          else if (event.key === 'Home') seek(start, true);
-          // The end of the track is the simulation's now.
-          else if (event.key === 'End') void actions.control({ action: 'live' });
-          else return;
-          event.preventDefault();
-        }}
-      >
-        <svg
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${width} ${TRACK_HEIGHT}`}
-          preserveAspectRatio="none"
-          aria-hidden
-          className="absolute inset-0"
-        >
-          {incidents.map((incident) => {
-            const from = Math.max(start, incident.startedAtMs);
-            const to = Math.min(head, incident.resolvedAtMs ?? head);
-            if (to <= start) return null;
-            return (
-              <g key={incident.id}>
-                <rect
-                  x={xOf(from)}
-                  y={0}
-                  width={Math.max(2, xOf(to) - xOf(from))}
-                  height={TRACK_HEIGHT}
-                  fill={COLOR.critical}
-                  opacity={incident.status === 'resolved' ? 0.08 : 0.16}
-                />
-                <rect
-                  x={xOf(from)}
-                  y={0}
-                  width={1.5}
-                  height={TRACK_HEIGHT}
-                  fill={COLOR.critical}
-                  opacity={0.75}
-                />
-              </g>
-            );
-          })}
-          {paths && (
-            <>
-              <polyline
-                points={paths.traffic}
-                fill="none"
-                stroke={COLOR.inkDim}
-                strokeWidth={1.2}
-                vectorEffect="non-scaling-stroke"
-              />
-              {paths.errors.map((points, i) => (
-                <polyline
-                  key={i}
-                  points={points}
-                  fill="none"
-                  stroke={COLOR.critical}
-                  strokeWidth={1.4}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </>
-          )}
-          {marks.map((event) => (
+    <>
+      {incidents.map((incident) => {
+        const from = Math.max(start, incident.startedAtMs);
+        const to = Math.min(head, incident.resolvedAtMs ?? head);
+        if (to <= start) return null;
+        return (
+          <g key={incident.id}>
             <rect
-              key={event.seq}
-              x={xOf(event.virtualTimeMs) - 0.75}
+              x={xOf(from)}
+              y={0}
+              width={Math.max(2, xOf(to) - xOf(from))}
+              height={TRACK_HEIGHT}
+              fill={COLOR.critical}
+              opacity={incident.status === 'resolved' ? 0.08 : 0.16}
+            />
+            <rect
+              x={xOf(from)}
               y={0}
               width={1.5}
-              height={event.severity === 'critical' ? 14 : 9}
-              fill={SEVERITY_COLOR[event.severity]}
-              opacity={event.virtualTimeMs > playback.virtualTimeMs ? 0.4 : 1}
+              height={TRACK_HEIGHT}
+              fill={COLOR.critical}
+              opacity={0.75}
+            />
+          </g>
+        );
+      })}
+      {paths && (
+        <>
+          <polyline
+            points={paths.traffic}
+            fill="none"
+            stroke={COLOR.inkDim}
+            strokeWidth={1.2}
+            vectorEffect="non-scaling-stroke"
+          />
+          {paths.errors.map((points, i) => (
+            <polyline
+              key={i}
+              points={points}
+              fill="none"
+              stroke={COLOR.critical}
+              strokeWidth={1.4}
+              vectorEffect="non-scaling-stroke"
             />
           ))}
-          {/* What lies beyond the cursor is the recorded future while replaying. */}
-          <rect
-            x={xOf(cursor)}
-            y={0}
-            width={Math.max(0, width - xOf(cursor))}
-            height={TRACK_HEIGHT}
-            fill={COLOR.plate}
-            opacity={0.6}
-          />
-          <rect x={xOf(cursor) - 1} y={0} width={2} height={TRACK_HEIGHT} fill={COLOR.ink} />
-        </svg>
-        <span className="timeline-ends numeric pointer-events-none absolute bottom-0.5 left-1.5 text-[10px] text-ink-faint">
-          {formatClock(start)}
-        </span>
-        <span className="timeline-ends numeric pointer-events-none absolute bottom-0.5 right-1.5 text-[10px] text-ink-faint">
-          {formatClock(head)}
-        </span>
-      </div>
-    </div>
+        </>
+      )}
+      {marks.map((event) => (
+        <rect
+          key={event.seq}
+          x={xOf(event.virtualTimeMs) - 0.75}
+          y={0}
+          width={1.5}
+          height={event.severity === 'critical' ? 14 : 9}
+          fill={SEVERITY_COLOR[event.severity]}
+          opacity={event.virtualTimeMs > cursorMs ? 0.4 : 1}
+        />
+      ))}
+    </>
   );
 }
 
@@ -407,7 +349,9 @@ export function Timeline() {
           icon={playing ? <Pause size={13} aria-hidden /> : <Play size={13} aria-hidden />}
           onClick={() => void actions.control({ action: playing ? 'pause' : 'play' })}
           data-testid="playback-toggle"
-          className="w-[72px]"
+          // As wide as its word needs, never so narrow that the word pushes
+          // the icon out (as "Reproduzir" did).
+          className="min-w-[72px]"
         >
           {playing ? t('Pause') : t('Play')}
         </Button>
@@ -455,7 +399,7 @@ export function Timeline() {
         </p>
       </div>
 
-      <Track incidents={incidents ?? []} />
+      <SimulationTrack incidents={incidents ?? []} />
 
       <div className="flex shrink-0 items-center gap-1">
         <Button

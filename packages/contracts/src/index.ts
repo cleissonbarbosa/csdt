@@ -459,8 +459,6 @@ export const EventKindSchema = z.enum([
   'mitigation',
   'reroute',
   'alert',
-  'cve-advisory',
-  'scan-finding',
   'system',
 ]);
 export type EventKind = z.infer<typeof EventKindSchema>;
@@ -749,7 +747,7 @@ export const SessionExportSchema = z.object({
   recording: RecordingSchema,
   cursorMs: count,
   /** Commands a session may not carry, counted. */
-  omitted: z.object({ decisions: count, importedEvents: count }),
+  omitted: z.object({ decisions: count }),
   /** False when loading the recording would not give this history back. */
   reproducible: z.boolean(),
   note: z.string().nullable(),
@@ -1001,7 +999,6 @@ export const IntegrationStateSchema = z.enum([
   'available',
   'connecting',
   'connected',
-  'imported',
   'error',
 ]);
 export type IntegrationState = z.infer<typeof IntegrationStateSchema>;
@@ -1009,7 +1006,7 @@ export type IntegrationState = z.infer<typeof IntegrationStateSchema>;
 export const IntegrationStatusSchema = z.object({
   id: z.string(),
   name: z.string(),
-  kind: z.enum(['simulation', 'live-adapter', 'fixture']),
+  kind: z.enum(['simulation', 'live-adapter']),
   state: IntegrationStateSchema,
   dataSource: DataSourceSchema,
   description: z.string(),

@@ -14,6 +14,7 @@
  */
 import {
   abs,
+  atan,
   attribute,
   cameraPosition,
   cross,
@@ -57,6 +58,7 @@ import * as THREE from 'three/webgpu';
 import { BEAD_SHAPE_ID, type ScenePalette } from '@/lib/palette';
 
 import { MOTION } from './pieces';
+import { FILTERED_PRESENCE } from './sceneData';
 
 /**
  * TSL nodes are composed dynamically; the generated typings cannot follow a
@@ -387,8 +389,9 @@ export function createPieceMaterial(
   const light = float(0.6).add(key.mul(0.36)).add(sky.mul(0.1));
   const occlusion = mix(float(0.4), float(1), attribute('aAo', 'float'));
   const lit = surface.mul(light).mul(occlusion);
-  // Filtered-out pieces recede into the plate instead of going dark.
-  material.colorNode = mix(theme.plate, lit, mix(float(0.14), float(1), visibility));
+  // Filtered-out pieces recede into the plate instead of going dark. The
+  // tone of an unknown state is set against this (`sceneData.ts`).
+  material.colorNode = mix(theme.plate, lit, mix(float(FILTERED_PRESENCE), float(1), visibility));
   return material;
 }
 
@@ -617,6 +620,11 @@ export function createParticleMaterial(
  * Instance: `aPos`, `aColor` (lamp colour),
  *           `aRing` = (radius, lamp, change time, selected).
  */
+/** How many dashes the ring of an unknown state is broken into. */
+const UNKNOWN_DASHES = 8;
+/** A dash is where the sine is above −sin(π/10): three fifths of each period. */
+const UNKNOWN_DASH_SHIFT = Math.sin(Math.PI / 10);
+
 export function createGroundMaterial(theme: SceneTheme): THREE.MeshBasicNodeMaterial {
   const material = blended(new THREE.MeshBasicNodeMaterial());
   material.side = THREE.DoubleSide;
@@ -632,9 +640,18 @@ export function createGroundMaterial(theme: SceneTheme): THREE.MeshBasicNodeMate
   const shadow = oneMinus(smoothstep(0.18, 0.74, d));
   let layer: Layer = { rgb: theme.shadow.mul(0), alpha: float(0) };
   layer = over(layer, theme.shadow, shadow.mul(shadow).mul(theme.shadowOpacity));
+  // `aRing.y` is the lamp's strength, or, negative, that of the dashed ring
+  // of a state the data does not give (`groundMarkOf`).
+  const lamp = max(ring.y, float(0));
+  const unknown = max(ring.y.negate(), float(0));
   // Lamp: a tinted disc with a firm edge, only when there is a state to show.
-  layer = over(layer, lampColor, coverage(d.sub(0.62)).mul(0.2).mul(ring.y));
-  layer = over(layer, lampColor, band(0.62, 0.018).mul(ring.y));
+  layer = over(layer, lampColor, coverage(d.sub(0.62)).mul(0.2).mul(lamp));
+  layer = over(layer, lampColor, band(0.62, 0.018).mul(lamp));
+  // No state given: the lamp's rim alone, open and broken into dashes, in a
+  // colour without hue. Nothing else on the ground is dashed.
+  const around = atan(uv().y.sub(0.5), uv().x.sub(0.5));
+  const dashes = coverage(sin(around.mul(UNKNOWN_DASHES)).add(UNKNOWN_DASH_SHIFT).negate());
+  layer = over(layer, lampColor, band(0.62, 0.024).mul(dashes).mul(unknown));
   // A change of state sends one ring outward, once.
   const age = time.sub(ring.z);
   const alive = step(0, age).mul(oneMinus(smoothstep(0, 1.1, age)));

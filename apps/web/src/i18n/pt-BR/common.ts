@@ -17,12 +17,21 @@
  *   objective · objetivo         exposure · exposição      intervention · intervenção
  *   tenant · locatário           role · função             workspace · espaço de trabalho
  *   trial · experimento          normal range · faixa normal  n/a · n/d
+ *   capture · captura            provider report · relatório do provedor
+ *   no data · sem dados          not stated · não informado
  *
  * The plural of principal is "principais", as in "6 principais, 6 ações".
  *
  * Health is saudável, degradado, crítico, fora do ar; a platform is "normal"
  * or "fora do normal". A fault is "aplicada à mão". Cedar allows and denies:
  * Permitido, Negado; a policy permits or forbids: Permite, Proíbe.
+ *
+ * An incident capture ("captura de incidente") is a real incident read in
+ * the browser, from a provider's report or a system's measurements. It is
+ * never a "gravação" nor "gravado": those stay the simulation's (a recorded
+ * incident, its recorded history). Nor is it "Rever", the simulation's
+ * re-simulated history. After a count, "not stated" is "sem informação",
+ * which needs no agreement with the count.
  *
  * The rules of `docs/DESIGN.md` hold in every language. Simulated time is
  * never "ao vivo": the cursor is at the "agora da simulação" or in its

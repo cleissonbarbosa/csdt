@@ -19,6 +19,18 @@ describe('the pace of a mechanism', () => {
     expect(paceOf(480, 0)).toBe(0);
   });
 
+  it('is a number whatever it is given, so a mechanism never carries one that is not', () => {
+    for (const [throughput, reference] of [
+      [Infinity, Infinity],
+      [Infinity, 480],
+      [480, Infinity],
+      [Math.fround(1e300), Math.fround(1e300)],
+    ] as const) {
+      expect(Number.isNaN(paceOf(throughput, reference)), `${throughput}/${reference}`).toBe(false);
+    }
+    expect(paceOf(Infinity, Infinity)).toBe(0);
+  });
+
   it('follows the traffic, within what still reads as running', () => {
     expect(paceOf(960, 480)).toBeGreaterThan(paceOf(480, 480));
     expect(paceOf(240, 480)).toBeLessThan(paceOf(480, 480));

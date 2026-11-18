@@ -38,7 +38,7 @@ export default {
   'Focus camera on this service': 'Focar a câmera neste serviço',
   'Clear selection': 'Limpar a seleção',
   'Synthetic data': 'Dados sintéticos',
-  'Recording data': 'Dados de gravação',
+  'Capture data': 'Dados de captura',
   'Live data': 'Dados ao vivo',
   Throughput: 'Vazão',
   'Throughput over the last 90 seconds': 'Vazão nos últimos 90 segundos',

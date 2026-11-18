@@ -7,8 +7,10 @@ deterministic Rust simulation with real Cedar policy decisions
 (`apps/server`), a React + Three.js WebGPU client (`apps/web`) and the JSON
 contract between them (`packages/contracts`). The same engine also builds as
 a WebAssembly module (`apps/wasm`) so the client can run as a static site
-with no server. Everything it shows is
-synthetic. Docs and code comments are written in English.
+with no server. Everything the simulation shows is synthetic; an incident
+capture (a file the browser reads itself, `features/capture/`) is not, and is
+labelled as not simulated (`recording`, in the contract's provenance
+vocabulary). Docs and code comments are written in English.
 
 ## Toolchain
 
@@ -19,6 +21,8 @@ synthetic. Docs and code comments are written in English.
 - `pnpm install` once. Nothing needs credentials, tokens or a `.env`.
 - The static site also needs the `wasm32-unknown-unknown` target:
   `rustup target add wasm32-unknown-unknown`.
+- Python 3 runs the incident capture scripts in `scripts/` and their tests,
+  with the standard library only.
 
 ## Commands
 
@@ -68,6 +72,7 @@ pnpm format:check     # pnpm format to fix
 pnpm typecheck
 pnpm lint
 pnpm test             # Vitest: contracts + web
+python3 -B -m unittest discover -s scripts -p 'test_*.py'   # the capture scripts; standard library only
 pnpm build
 pnpm e2e              # Playwright against the real stack
 # The static site (its own CI job; needs the wasm32 target):
@@ -88,6 +93,7 @@ pnpm --filter @aegis/contracts test
 pnpm --filter @aegis/web exec playwright test -g "part of the title" --project chromium
 cargo test -p aegis-wasm <name_substring>                        # the engine's boundary, natively
 pnpm --filter @aegis/web exec playwright test --config playwright.static.config.ts -g "part of the title"
+python3 -B scripts/test_export_otel_capture.py -k token          # one Python test file, narrowed by name
 ```
 
 End-to-end notes:
@@ -109,6 +115,15 @@ End-to-end notes:
   for the frame after a topology is handed over; read a position or a draw
   count only after it, or a fast machine reads the new arrangement from the
   old shot.
+- An incident capture is opened by its link with `openCapture(page, id)`
+  (`GOOGLE`, `BOUTIQUE` in `e2e/support.ts`): it applies the settings, goes
+  to `./?capture=<id>` and calls `waitForCapture`, which waits for the
+  capture's bar and for its file's count of pieces and connections, and
+  checks that every name on the model is one the file wrote. The names are
+  needed because the Google capture has twelve services, as many pieces as
+  the overview, so the count alone cannot tell the two apart. It resets
+  nothing: a server test that needs the shared simulation at its baseline
+  calls `openApp` first.
 
 Diagnostics that are not part of the normal test run:
 
@@ -196,8 +211,9 @@ Things that are easy to break:
   at the authorizer only if Cedar denied its request shape in
   `DecisionTable::build`. A new request shape goes into
   `fixtures/cedar/catalog.json`. A file cannot state an outcome either:
-  `spec.rs` refuses the event kinds, and `recordings.rs` the commands, that
-  would put a decision or an imported event on the timeline.
+  `spec.rs` refuses the event kinds, and `recordings.rs` the command, that
+  would put a decision or an event of the engine's own on the timeline. An
+  incident capture never reaches the timeline at all.
 - **A report says what kind of statement each line is.**
   `simulation/report.rs` reads an incident back from events, metric samples,
   the topology and the resolved scenario; it steps nothing and estimates
@@ -231,8 +247,8 @@ Things that are easy to break:
   (`MAX_YAML_DEPTH`, `MAX_YAML_VALUES`), and no YAML may reach the parser
   any other way. Without the first, one request ends the process.
 - **A session, like a recording, cannot state an outcome.**
-  `Recording::validate_session` refuses `recordDecision` and `importEvents`,
-  and `session::export` leaves them out and counts them. An experiment
+  `Recording::validate_session` refuses `recordDecision`, and
+  `session::export` leaves decisions out and counts them. An experiment
   (`application/experiment.rs`) never touches the timeline in use: both runs
   are `Timeline::from_recording` on timelines of their own, from the
   service's seed.
@@ -242,8 +258,11 @@ Things that are easy to break:
   `service.assets()` at the moment of use, and anything prepared outside the
   lock (a recording's timeline) checks that the assets are still the same
   before it is put in place. The cedar-agent adapter's sync store is updated
-  with every swap. The browser never decides what a file is: classification
-  is `workspace::from_files`, on the server.
+  with every swap. The browser never decides what a workspace file is:
+  classification is `workspace::from_files`, on the server. An incident
+  capture is the one file the browser reads itself
+  (`features/capture/capture.ts`); it never reaches the server, a workspace
+  or the simulation's timeline.
 - **The library also builds for the browser.** `aegis-server` compiles for
   `wasm32-unknown-unknown` and `apps/wasm` serves `api::offline_router` from
   it. There, `std::time::Instant::now()`, threads, sockets and a Tokio
@@ -352,13 +371,18 @@ everything drawn inside it and is fed through store subscriptions set up in
   canvas laid over it, at the display's resolution whatever the scene's is;
   `SceneController.drawLabels` hands it every name's anchor, presence and
   rank each frame, and `graphics/labelPlacement.ts` (pure, tested) leaves
-  out a name that would lie across a more important one. Do not put text
+  out a name that would lie across a more important one, or that would not
+  lie wholly inside the free part of the stage: `LabelLayer.draw` is given
+  the scene's insets (the sheets, a card, the toolbar strip, the timeline),
+  so a name half under a card or past an edge is left out, not cut. Only the
+  selected and the pointed-at name are drawn regardless. Do not put text
   back into the WebGL pass, and do not show two names over each other: an
   E2E test reads `window.__aegis.labels()` and fails on an overlap.
-- `captureFrame` reads the canvas's own drawing buffer on WebGL 2 and an
-  output render target on WebGPU. The second path, used on WebGL 2, left the
-  renderer presenting nothing once the arrangement was switched after a
-  capture; do not route WebGL 2 through it again.
+- `captureFrame` (pixel read-back, nothing to do with an incident capture,
+  whose frame is `frameAt`) reads the canvas's own drawing buffer on WebGL 2
+  and an output render target on WebGPU. The second path, used on WebGL 2,
+  left the renderer presenting nothing once the arrangement was switched
+  after a read-back; do not route WebGL 2 through it again.
 - The model has two levels. The application opens on the **overview**
   (`layoutMode: 'layers'`): the platform reduced to one piece per kind of
   service, in the four layers a request crosses. `lib/overview.ts` derives
@@ -424,11 +448,95 @@ exposure). `SceneController.setReached` treats it as a selection's path is
 treated; it is the viewer's blue, never a state colour, because nothing has
 happened to those services.
 
-The address carries three things besides the view: `?challenge=<id>` opens
+The address carries four things besides the view: `?challenge=<id>` opens
 the guide on one challenge (`features/guide/GuideCard.tsx`), `?embed=1`
-leaves out the bar (`app/embed.ts`, `features/topnav/EmbedBar.tsx`), and
-with it `&scenario=<id>` starts an incident, on the static site only: on a
-server the simulation is shared and an address must start nothing.
+leaves out the bar (`app/embed.ts`, `features/topnav/EmbedBar.tsx`), with
+it `&scenario=<id>` starts an incident, on the static site only: on a
+server the simulation is shared and an address must start nothing; and
+`?capture=<id>` opens a bundled incident capture (`app/captureUrl.ts`), on
+either host because it only looks. It is read once, when the page loads,
+and adds no history entry; an id that names no bundled capture is ignored.
+An embed reaches no capture at all: it does not read the parameter,
+`openCapture` and `openCaptureFile` refuse there, Back and Forward show the
+simulation, the palette has no capture command and `CaptureDialog` never
+opens.
+
+An **incident capture** (`features/capture/`, `docs/CAPTURES.md`) is a real
+incident, as a provider reported it or a system recorded it, read by the
+browser itself from a file (two are bundled, loaded only when opened). It
+is a mode of the same shell, not a page of its own: while
+`useCapture.capture` is set, `App.tsx` and `TopNav.tsx` show the capture's
+parts (`CaptureBar` in the timeline's place, `CaptureList` and
+`CaptureCard`/`CaptureDetails` in the two sheets, `CaptureTable` for the
+table view, a bar of its own) and the simulation's slide away untouched,
+to come back as they were. Things that are easy to break:
+
+- **The store owns the capture and its clock.** `stores/capture.ts` holds the
+  file, the cursor, the selection and the sheets; `play()` ticks every
+  200 ms and moves the cursor by `speed` × 200 ms of capture time (speeds
+  10×, 60×, 600×, 3600×). Components read derived values (`selectStep`,
+  `selectEventCount`, `useMoment` in `present.tsx`) that change only where
+  what is shown changes; only the bar's clock and playhead follow `atMs`.
+  Nothing of a capture enters `useTelemetry` or `useUi.selection`, and
+  nothing in capture mode calls `actions.*` or an `api` mutation
+  (`features/capture/shell.test.tsx` checks a whole session).
+- **Open and leave only through `app/captureUrl.ts`.** The interface calls
+  `openCapture`, `openCaptureFile` and `leaveCapture`, which mark
+  `history.state` (`aegisCapture`, `aegisCaptureBase`) so Back, Forward and
+  "Back to the simulation" agree; calling the store's `openBundled`,
+  `openFile` or `close` directly breaks them. `followCaptureAddress()` is
+  called once, in `main.tsx`. A file is never put in the address.
+- **The keyboard moves only where what held it went away.**
+  `useFocusAcrossModes` and `useFocusAfterCaptureSheets` in `App.tsx` act
+  only when the element last focused is gone or inert: a mode change puts
+  the focus on Play or `#main`, a sheet put away gives it back to what opens
+  that sheet, and a page arrived at by a link keeps it on nothing.
+  `features/capture/shell.test.tsx` holds each case.
+- **The reading is pure and in one place.** `features/capture/capture.ts`
+  validates the file (`readCapture`, which refuses rather than repairs) and
+  says what it states at a moment (`nodeReadings`, `readingOf`, `frameAt`,
+  `statusAt`, `stepAt`). Components use these and decide nothing
+  themselves: a sample holds only its own period, a state is known only
+  where a sample counts requests and errors (or no requests at all), a
+  report's service only through a stated event, and unknown is never
+  normal. The bar's sentence never counts an unknown service as known.
+- **One scene bridge, one guard.** `SceneBridge` in
+  `features/scene/SceneCanvas.tsx` asks `captured()` everywhere: while it
+  holds, `applyCapture()` hands the controller the capture's topology in
+  the `regions` arrangement (a capture has no overview) and clears the
+  route, trace, reach, filters and partial groups; the telemetry and ui
+  subscriptions return early; selection and hover go to `useCapture`;
+  `summary()` is null. Closing calls `applyAll()`. Mounting takes either
+  path, so a reload with `?capture=`, `T` and a renderer change keep the
+  capture drawn. Do not add a second canvas or bridge for it.
+- **Unknown is drawn, never left normal.** `SceneFrame.nodes` carries
+  `known` and `measured` columns; `aimPiece` (`graphics/sceneData.ts`)
+  stands an unknown piece upright a shade fainter (`UNKNOWN_TONE`), never
+  receding, on a dashed ring without hue (`groundMarkOf`: a negative
+  `aRing.y`, read by `createGroundMaterial`), and a piece whose traffic was
+  not measured rests as modelled. No attribute or draw call was added, and
+  `sceneData.test.ts` holds the tones to the real palette in both themes.
+  `window.__aegis.stats().unknown` counts unknown pieces, and `projectNode`
+  takes capture ids while one is open.
+- **Its levels are the engine's.** `lib/thresholds.ts` (`ERROR_DEGRADED`
+  0.04, `ERROR_CRITICAL` 0.2) copies the error levels of the engine's node
+  `classify`, not `ERROR_OBJECTIVE`; `thresholds.test.ts` reads
+  `engine.rs` and fails when they part. Change both together. Latency and
+  memory never colour a capture.
+- **A capture's topology id is never its title:** `capture:<id>`, or
+  `capture:file:<SHA-256 of the bytes>`. `SceneController` takes an equal id
+  and node count for the same model and keeps its arrays.
+- **Words.** It is an _incident capture_ (pt-BR _captura de incidente_, in
+  the glossary of `pt-BR/common.ts`), never a "replay" (the simulation's
+  re-simulated history) nor "recorded"/"gravado" (the simulation's recorded
+  incidents). `DataSource` `recording` is labelled "Capture" and the chip
+  says "Captured, not simulated" or "From the provider's report, not
+  simulated". A file's `faults` are shown as errors; its thresholds are
+  never objectives; nothing in it is "live" or "observed". Times are UTC
+  with the offset into the capture. What the file wrote is shown as
+  written; the copies of a bundled capture's title and source in
+  `bundled.ts` are marked `not-interface-text` and held equal to the file by
+  `bundled.test.ts`.
 
 The static build also writes a service worker and a link preview
 (`vite.config.ts`: `offline()` from `src/engine/offline.sw.js`,
@@ -462,7 +570,7 @@ ways, or one nothing uses any more.
   `pt-BR/common.ts` is the vocabulary every part keeps to, and the rules of
   "Words" in `docs/DESIGN.md` hold in both languages.
 - The tests are written against English and ask for it: Playwright's
-  `locale`, the `language` in `e2e/support.ts`, and the capture and
+  `locale`, the `language` in `e2e/support.ts`, and the screenshot and
   benchmark scripts. A test of the Portuguese interface sets it itself.
 
 `window.__aegis` (`stats`, `projectNode`, `captureFrame`, `labels`) is the handle the
@@ -519,6 +627,16 @@ against. Read it before touching anything visual. In short:
    viewer has taken it. All of it respects reduced motion, which the E2E
    suite runs with and which leaves every mechanism as it was modelled.
 
+An incident capture keeps to these, with the exceptions `docs/DESIGN.md`
+states for it ("An incident capture"): it has no overview and opens on the
+detail, its bar is on screen for as long as it is open, and requests,
+errors, p95 and memory carry no normal range because the source states none
+(the error rate is read against the simulation's levels). A service whose
+state the source does not give is drawn as unknown, never as normal. A
+report's pieces rest, so on the model its affected and recovering pieces
+differ by colour alone; the hover card, list, card, table and bar give each
+state a shape.
+
 Words are part of the design (`docs/DESIGN.md`, "Words"). Simulated time is
 never called "live": the cursor is at the _simulation's now_ or in its
 _history_, and either may be _paused_ (`describePlayback` in
@@ -553,20 +671,31 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   `./scripts/benchmark.sh`, with the raw output committed under `docs/assets/`.
   Images in `docs/assets/` come from `./scripts/capture-docs.sh` against the
   running app. Both need `cargo build --release -p aegis-server && pnpm build`
-  and Google Chrome; the capture also uses ffmpeg. Do not hand-edit numbers or
-  describe something unmeasured as measured.
+  and Google Chrome; the screenshot run also uses ffmpeg. Do not hand-edit
+  numbers or describe something unmeasured as measured. A bundled capture
+  states nothing its source does not: each state of a provider report names
+  the update it rests on, and measured values come only from an exporter or
+  rebuild script, never from a hand edit.
 - **Provenance is always labelled.** Data is `synthetic`, `recording` or
-  `live` from the server to the pixel, and a fixture is never labelled live.
-  A topology from a workspace must be `synthetic`: its figures are computed,
-  whatever platform it describes.
+  `live` from where it is produced to the pixel. `recording` means an
+  incident capture, read in the browser and labelled as not simulated
+  ("Captured, not simulated"); nothing the simulation produces is labelled
+  `recording` or `live`. A topology from a workspace must be `synthetic`:
+  its figures are computed, whatever platform it describes.
 - **Simulation only** (`docs/SECURITY.md`). `simulation` and `incidents`
   perform no I/O; files are read by `workspace::load` alone, at start-up, and
-  the import route is handed file contents, never a path to open. No real attacks, scans, cloud SDKs or credentials. No
+  the import route is handed file contents, never a path to open. No real
+  attacks or scans; the server, the engine and the page hold no cloud SDK or
+  cloud credential. The capture exporters in `scripts/` are operator tools that
+  read with the operator's own credentials; nothing in AEGIS runs them. No
   outbound connection by default: integrations need server configuration and
   an explicit click, and accept loopback targets only unless allow-listed.
 - **Integrations** adapt only public repositories owned by `cleissonbarbosa`,
   read without authentication, and copy no source from them
-  (`docs/INTEGRATIONS.md`).
+  (`docs/INTEGRATIONS.md`). The capture exporters are not integrations.
+  Bundled captures are third-party public material (Google Cloud's public
+  incident report; aggregates of the RCAEval 0.2.0 release), each naming its
+  source.
 - **The browser makes no third-party requests.** Fonts are bundled and the
   build inlines no assets, which is what lets the deployed CSP stay at
   `'self'`. The static site makes no request at all beyond its own files,
@@ -594,5 +723,6 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
 
 `docs/ARCHITECTURE.md` (model, API table, stream protocol),
 `docs/WORKSPACE.md` (the file formats an operator writes), `docs/DESIGN.md`,
-`docs/SECURITY.md`, `docs/INTEGRATIONS.md`, `docs/PERFORMANCE.md`,
+`docs/SECURITY.md`, `docs/INTEGRATIONS.md`, `docs/CAPTURES.md` (incident
+captures: reading rules, format, exporters), `docs/PERFORMANCE.md`,
 `docs/DEMO.md`.

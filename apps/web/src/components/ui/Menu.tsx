@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 
-export type MenuItem = {
+export interface MenuItem {
   id: string;
   label: string;
   /** The key that does the same thing, shown beside the label. */
@@ -11,7 +11,8 @@ export type MenuItem = {
   icon?: ReactNode;
   /** For an item that switches something on and off. */
   checked?: boolean;
-} & ({ href: string; onSelect?: never } | { href?: never; onSelect: () => void });
+  onSelect: () => void;
+}
 
 /**
  * A button that opens a short list of things to do. It holds what is used
@@ -91,35 +92,27 @@ export function Menu({
           aria-label={label}
           className="panel floating absolute right-0 top-[calc(100%+6px)] z-40 min-w-56 animate-rise p-1"
         >
-          {items.map((item) => {
-            const Item = item.href ? 'a' : 'button';
-            return (
-              <Item
-                key={item.id}
-                type={item.href ? undefined : 'button'}
-                href={item.href}
-                target={item.href ? '_blank' : undefined}
-                rel={item.href ? 'noopener' : undefined}
-                role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-                aria-checked={item.checked}
-                onClick={() => {
-                  setOpen(false);
-                  item.onSelect?.();
-                }}
-                data-testid={`menu-${item.id}`}
-                className="flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left text-xs text-ink hover:bg-raised focus-visible:bg-raised"
-              >
-                <span className="flex w-4 shrink-0 justify-center text-ink-dim" aria-hidden>
-                  {item.icon}
-                </span>
-                <span className="min-w-0 flex-1">{item.label}</span>
-                {item.checked && (
-                  <span className="text-[11px] text-ink-faint">{t('On#state')}</span>
-                )}
-                {item.hint && <kbd className="code text-[10px] text-ink-faint">{item.hint}</kbd>}
-              </Item>
-            );
-          })}
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+              aria-checked={item.checked}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              data-testid={`menu-${item.id}`}
+              className="flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left text-xs text-ink hover:bg-raised focus-visible:bg-raised"
+            >
+              <span className="flex w-4 shrink-0 justify-center text-ink-dim" aria-hidden>
+                {item.icon}
+              </span>
+              <span className="min-w-0 flex-1">{item.label}</span>
+              {item.checked && <span className="text-[11px] text-ink-faint">{t('On#state')}</span>}
+              {item.hint && <kbd className="code text-[10px] text-ink-faint">{item.hint}</kbd>}
+            </button>
+          ))}
         </div>
       )}
     </div>

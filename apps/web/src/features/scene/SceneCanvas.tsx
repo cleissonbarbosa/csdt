@@ -10,6 +10,13 @@
  * (the selection, an incident's route, a traced request) is translated to
  * the kind it belongs to on the way in, and back on the way out. The
  * controller itself draws a topology and does not know which it was given.
+ *
+ * While an incident capture is open (`stores/capture.ts`) the bridge hands
+ * the controller the capture instead, and nothing of the simulation reaches
+ * the scene: its stream, its selection and its filters wait, and are laid
+ * over the model again when the capture is closed. What the viewer selects
+ * or points at in a capture goes to the capture's store, never to the
+ * simulation's.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -25,6 +32,7 @@ import {
   type SceneOptions,
   type SceneStats,
 } from '@/graphics/SceneController';
+import { frameAt, stepAt } from '@/features/capture/capture';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
 import { t } from '@/i18n';
 import {
@@ -37,6 +45,7 @@ import {
   type Overview,
 } from '@/lib/overview';
 import type { ThemeName } from '@/lib/palette';
+import { useCapture } from '@/stores/capture';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
@@ -60,7 +69,7 @@ export interface SceneRuntime {
   quality: QualityLevel;
 }
 
-export function sceneOptions(theme: ThemeName): SceneOptions {
+function sceneOptions(theme: ThemeName): SceneOptions {
   const settings = useSettings.getState();
   return {
     theme,
@@ -71,15 +80,12 @@ export function sceneOptions(theme: ThemeName): SceneOptions {
   };
 }
 
-export interface CanvasBridgeProps {
+interface BridgeProps {
   backend: Backend;
   pieces: PieceSet;
-  onQuality: (level: QualityLevel) => void;
-}
-
-interface BridgeProps extends CanvasBridgeProps {
   theme: ThemeName;
   tooltip: HTMLElement | null;
+  onQuality: (level: QualityLevel) => void;
 }
 
 function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps) {
@@ -93,6 +99,8 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
   themeRef.current = theme;
 
   useEffect(() => {
+    /** Whether an incident capture is open: then it, not the simulation, is drawn. */
+    const captured = () => useCapture.getState().capture !== null;
     const instance = new SceneController(
       gl,
       scene,
@@ -100,11 +108,15 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       gl.domElement,
       backend,
       {
-        onHover: (id) => useUi.getState().setHovered(id),
+        onHover: (id) => {
+          if (captured()) useCapture.getState().hover(id);
+          else useUi.getState().setHovered(id);
+        },
         // In the overview a piece is a kind of service, and only pieces can
         // be selected there: a connection between two kinds is a summary.
         onSelect: (selection) => {
-          if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
+          if (captured()) useCapture.getState().select(selection);
+          else if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
           else if (selection?.kind === 'node') {
             useUi.getState().select({ kind: 'group', id: selection.id });
           } else useUi.getState().select(null);
@@ -118,8 +130,9 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
     controller.current = instance;
     sceneHandle.current = instance;
 
-    /** The overview being shown, or null in the detailed arrangements. */
+    /** The overview being shown, or null in the detailed arrangements and in a capture. */
     const summary = (): Overview | null => {
+      if (captured()) return null;
       const { topology } = useTelemetry.getState();
       return topology && useUi.getState().layoutMode === 'layers' ? overviewOf(topology) : null;
     };
@@ -211,13 +224,13 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
           : decision,
       );
     };
-    /** Hands the scene a topology and everything that is read against it. */
     /** The services a trial reached, at the level being shown. */
     const applyReach = () => {
       const reach = useUi.getState().reach ?? [];
       const overview = summary();
       instance.setReached(overview ? projectNodeIds(overview, reach) : reach);
     };
+    /** Hands the scene the simulation's topology and everything that is read against it. */
     const applyAll = () => {
       applyTopology();
       applySnapshot();
@@ -227,10 +240,55 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       if (useUi.getState().tracedDecision) applyTrace();
     };
 
-    applyAll();
+    /** The stretch of the capture last drawn (`stepAt`): the frame changes only with it. */
+    let drawnStep = -1;
+    const applyCaptureFrame = () => {
+      const { capture, atMs } = useCapture.getState();
+      if (!capture) return;
+      drawnStep = stepAt(capture, atMs);
+      instance.applySnapshot(frameAt(capture, atMs));
+    };
+    /**
+     * Hands the scene the open capture, in the arrangement by region, and
+     * clears everything the simulation had laid over the model: a capture
+     * has no incident route, traced request, reach, filter or overview.
+     */
+    const applyCapture = () => {
+      const { capture, topology, selection, hovered } = useCapture.getState();
+      if (!capture || !topology) return;
+      instance.setTopology(topology, 'regions');
+      applyCaptureFrame();
+      instance.setSelection(selection);
+      instance.setHoveredNode(hovered);
+      instance.clearTrace();
+      instance.setRoute([], []);
+      instance.setImpacted([]);
+      instance.setReached([]);
+      instance.setVisibility(null);
+      instance.setPartial(null);
+    };
+
+    if (captured()) applyCapture();
+    else applyAll();
 
     const unsubscribe = [
+      useCapture.subscribe((state, previous) => {
+        if (state.capture !== previous.capture || state.topology !== previous.topology) {
+          // Opened, replaced by another, or closed: the simulation comes back.
+          if (state.capture) applyCapture();
+          else applyAll();
+          return;
+        }
+        if (!state.capture) return;
+        if (state.atMs !== previous.atMs && stepAt(state.capture, state.atMs) !== drawnStep) {
+          applyCaptureFrame();
+        }
+        if (state.selection !== previous.selection) instance.setSelection(state.selection);
+        if (state.hovered !== previous.hovered) instance.setHoveredNode(state.hovered);
+      }),
       useTelemetry.subscribe((state, previous) => {
+        // The stream goes on behind a capture; it is drawn again on closing it.
+        if (captured()) return;
         if (state.topology && state.topology !== previous.topology) applyAll();
         if (state.snapshot && state.snapshot !== previous.snapshot) {
           applySnapshot();
@@ -240,6 +298,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
         }
       }),
       useUi.subscribe((state, previous) => {
+        if (captured()) return;
         if (state.layoutMode !== previous.layoutMode) {
           // Between the two detailed arrangements the pieces walk; to and
           // from the overview the model is a different one, and is rebuilt.
@@ -309,13 +368,14 @@ class SceneBoundary extends Component<BoundaryProps, { failed: boolean }> {
   }
 }
 
-interface TopologyCanvasProps {
-  renderBridge: (props: CanvasBridgeProps) => ReactNode;
+interface SceneCanvasProps {
+  theme: ThemeName;
+  tooltip: HTMLElement | null;
   onRuntime: (runtime: SceneRuntime) => void;
   onUnavailable: (reason: string) => void;
 }
 
-export function TopologyCanvas({ renderBridge, onRuntime, onUnavailable }: TopologyCanvasProps) {
+export function SceneCanvas({ theme, tooltip, onRuntime, onUnavailable }: SceneCanvasProps) {
   const preference = useSettings((state) => state.renderer);
   const [backend, setBackend] = useState<Backend | null>(null);
   const [quality, setQuality] = useState<QualityLevel>('high');
@@ -377,22 +437,16 @@ export function TopologyCanvas({ renderBridge, onRuntime, onUnavailable }: Topol
         aria-label={t('Interactive 3D view of the infrastructure topology')}
         role="img"
       >
-        {backend && pieces && renderBridge({ backend, pieces, onQuality: setQuality })}
+        {backend && pieces && (
+          <SceneBridge
+            backend={backend}
+            pieces={pieces}
+            theme={theme}
+            tooltip={tooltip}
+            onQuality={setQuality}
+          />
+        )}
       </Canvas>
     </SceneBoundary>
-  );
-}
-
-interface SceneCanvasProps extends Omit<TopologyCanvasProps, 'renderBridge'> {
-  theme: ThemeName;
-  tooltip: HTMLElement | null;
-}
-
-export function SceneCanvas({ theme, tooltip, ...props }: SceneCanvasProps) {
-  return (
-    <TopologyCanvas
-      {...props}
-      renderBridge={(bridge) => <SceneBridge {...bridge} theme={theme} tooltip={tooltip} />}
-    />
   );
 }

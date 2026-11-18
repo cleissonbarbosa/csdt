@@ -1,0 +1,2218 @@
+{
+  "kind": "aegis-incident-capture",
+  "version": 1,
+  "title": "Online Boutique · RCAEval · 15 January 2024",
+  "source": {
+    "kind": "prometheus-recording",
+    "label": "RCAEval · Prometheus / Jaeger",
+    "url": "https://github.com/phamquiluan/RCAEval/releases/tag/0.2.0"
+  },
+  "window": {
+    "startMs": 1705354266000,
+    "endMs": 1705354866000
+  },
+  "periodMs": 30000,
+  "regions": [
+    {
+      "id": "benchmark",
+      "name": "Location not supplied"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "adservice",
+      "name": "adservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 111681536
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 111689728
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 111689728
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 111693824
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 111706112
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 111706112
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 111722496
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 111730688
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 111718400
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 111718400
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 111632384
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 111624192
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 111742976
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 111644672
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 111640576
+        }
+      ]
+    },
+    {
+      "id": "cartservice",
+      "name": "cartservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 43581440
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 43556864
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 43556864
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 43507712
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 43577344
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 43573248
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 43520000
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 43585536
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 43585536
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 43540480
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 43528192
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 43581440
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 43581440
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 43507712
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 43536384
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 43532288
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 43524096
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 43548672
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 43520000
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 43593728
+        }
+      ]
+    },
+    {
+      "id": "checkoutservice",
+      "name": "checkoutservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 11853824,
+          "requests": 13,
+          "p95Ms": 410.933
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 11628544,
+          "requests": 18,
+          "p95Ms": 1004.49
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 11710464,
+          "requests": 11,
+          "p95Ms": 1120.89
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 11907072,
+          "requests": 14,
+          "p95Ms": 1026.817
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 11964416,
+          "requests": 16,
+          "p95Ms": 408.461
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 11968512,
+          "requests": 13,
+          "p95Ms": 1014.009
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 12001280,
+          "requests": 13,
+          "p95Ms": 1115.128
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 12001280,
+          "requests": 17,
+          "p95Ms": 708.588
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 11661312,
+          "requests": 11,
+          "p95Ms": 617.151
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 11923456,
+          "requests": 19,
+          "p95Ms": 919.035
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 16424960,
+          "requests": 14,
+          "p95Ms": 839.895
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 16539648,
+          "requests": 24,
+          "p95Ms": 700.326
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 16846848,
+          "requests": 17,
+          "p95Ms": 1031.376
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 16846848,
+          "requests": 18,
+          "p95Ms": 735.563
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 15917056,
+          "requests": 20,
+          "p95Ms": 706.629
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 16048128,
+          "requests": 17,
+          "p95Ms": 728.249
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 16084992,
+          "requests": 8,
+          "p95Ms": 531.218
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 16371712,
+          "requests": 11,
+          "p95Ms": 1726.934
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 16371712,
+          "requests": 13,
+          "p95Ms": 823.921
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 16297984,
+          "requests": 14,
+          "p95Ms": 835.097
+        }
+      ]
+    },
+    {
+      "id": "currencyservice",
+      "name": "currencyservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 40079360,
+          "requests": 1134,
+          "p95Ms": 0.181
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 40136704,
+          "requests": 1166,
+          "p95Ms": 0.175
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 40288256,
+          "requests": 1099,
+          "p95Ms": 0.202
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 40304640,
+          "requests": 1110,
+          "p95Ms": 0.187
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 40796160,
+          "requests": 1213,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 40996864,
+          "requests": 1180,
+          "p95Ms": 0.17
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 40738816,
+          "requests": 1138,
+          "p95Ms": 0.185
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 40796160,
+          "requests": 1206,
+          "p95Ms": 0.192
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 40796160,
+          "requests": 1044,
+          "p95Ms": 0.181
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 40837120,
+          "requests": 1104,
+          "p95Ms": 0.183
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 40837120,
+          "requests": 1238,
+          "p95Ms": 0.171
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 41017344,
+          "requests": 1149,
+          "p95Ms": 0.178
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 41205760,
+          "requests": 1029,
+          "p95Ms": 0.191
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 41439232,
+          "requests": 1154,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 40988672,
+          "requests": 1168,
+          "p95Ms": 0.173
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 40685568,
+          "requests": 1186,
+          "p95Ms": 0.178
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 40685568,
+          "requests": 1086,
+          "p95Ms": 0.176
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 40214528,
+          "requests": 1086,
+          "p95Ms": 0.176
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 40222720,
+          "requests": 1196,
+          "p95Ms": 0.18
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 40222720,
+          "requests": 1228,
+          "p95Ms": 0.171
+        }
+      ]
+    },
+    {
+      "id": "emailservice",
+      "name": "emailservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 43212800,
+          "requests": 13,
+          "p95Ms": 0.435
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 43208704,
+          "requests": 18,
+          "p95Ms": 0.784
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 43212800,
+          "requests": 11,
+          "p95Ms": 0.374
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 43216896,
+          "requests": 14,
+          "p95Ms": 0.826
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 43212800,
+          "requests": 16,
+          "p95Ms": 0.743
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 43212800,
+          "requests": 13,
+          "p95Ms": 0.323
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 43212800,
+          "requests": 13,
+          "p95Ms": 0.495
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 43220992,
+          "requests": 17,
+          "p95Ms": 0.311
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 43220992,
+          "requests": 11,
+          "p95Ms": 0.976
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 43220992,
+          "requests": 19,
+          "p95Ms": 0.994
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 43220992,
+          "requests": 14,
+          "p95Ms": 0.581
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 43225088,
+          "requests": 24,
+          "p95Ms": 0.734
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 43220992,
+          "requests": 15,
+          "p95Ms": 1.221
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 43220992,
+          "requests": 19,
+          "p95Ms": 0.592
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 43220992,
+          "requests": 20,
+          "p95Ms": 0.569
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 43229184,
+          "requests": 18,
+          "p95Ms": 1.351
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 43229184,
+          "requests": 8,
+          "p95Ms": 0.324
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 43233280,
+          "requests": 11,
+          "p95Ms": 0.547
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 43229184,
+          "requests": 13,
+          "p95Ms": 0.726
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 43229184,
+          "requests": 13,
+          "p95Ms": 0.862
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "name": "frontend",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 16375808
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 16551936
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 16642048
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 16318464
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 16404480
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 17047552
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 17047552
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 16478208
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 16637952
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 16678912
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 16678912
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 16601088
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 16297984
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 16965632
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 16965632
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 16605184
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 16519168
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 16519168
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 16637952
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 16637952
+        }
+      ]
+    },
+    {
+      "id": "paymentservice",
+      "name": "paymentservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 38916096,
+          "requests": 13,
+          "p95Ms": 2.909
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 38916096,
+          "requests": 18,
+          "p95Ms": 1.124
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 38871040,
+          "requests": 11,
+          "p95Ms": 0.514
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 38883328,
+          "requests": 14,
+          "p95Ms": 6.349
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 38600704,
+          "requests": 16,
+          "p95Ms": 0.991
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 38866944,
+          "requests": 13,
+          "p95Ms": 0.27
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 38866944,
+          "requests": 13,
+          "p95Ms": 0.321
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 38653952,
+          "requests": 17,
+          "p95Ms": 1.12
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 38989824,
+          "requests": 11,
+          "p95Ms": 2.311
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 38989824,
+          "requests": 19,
+          "p95Ms": 0.333
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 38957056,
+          "requests": 14,
+          "p95Ms": 1.427
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 39055360,
+          "requests": 24,
+          "p95Ms": 0.681
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 39055360,
+          "requests": 16,
+          "p95Ms": 0.9
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 38637568,
+          "requests": 18,
+          "p95Ms": 0.674
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 38637568,
+          "requests": 20,
+          "p95Ms": 0.373
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 38780928,
+          "requests": 18,
+          "p95Ms": 1.447
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 38957056,
+          "requests": 8,
+          "p95Ms": 1.183
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 38359040,
+          "requests": 11,
+          "p95Ms": 0.237
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 38797312,
+          "requests": 13,
+          "p95Ms": 2.898
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 39014400,
+          "requests": 13,
+          "p95Ms": 0.944
+        }
+      ]
+    },
+    {
+      "id": "productcatalogservice",
+      "name": "productcatalogservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 10440704,
+          "requests": 1959,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 10088448,
+          "requests": 2083,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 11100160,
+          "requests": 2286,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 10354688,
+          "requests": 1872,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 10416128,
+          "requests": 2080,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 10600448,
+          "requests": 2144,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 10600448,
+          "requests": 2006,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 10452992,
+          "requests": 2342,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 10592256,
+          "requests": 1991,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 10346496,
+          "requests": 2059,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 10244096,
+          "requests": 1917,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 10305536,
+          "requests": 2187,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 10436608,
+          "requests": 1987,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 10588160,
+          "requests": 2196,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 10588160,
+          "requests": 2145,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 10207232,
+          "requests": 2118,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 10309632,
+          "requests": 1991,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 10321920,
+          "requests": 1972,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 10289152,
+          "requests": 1913,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 10416128,
+          "requests": 2190,
+          "p95Ms": 0.024
+        }
+      ]
+    },
+    {
+      "id": "recommendationservice",
+      "name": "recommendationservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 45060096,
+          "requests": 261,
+          "p95Ms": 5.028
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 45056000,
+          "requests": 274,
+          "p95Ms": 5.507
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 45056000,
+          "requests": 301,
+          "p95Ms": 6.05
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 45088768,
+          "requests": 242,
+          "p95Ms": 5.451
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 44974080,
+          "requests": 274,
+          "p95Ms": 5.576
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 44998656,
+          "requests": 281,
+          "p95Ms": 5.123
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 44998656,
+          "requests": 259,
+          "p95Ms": 5.413
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 45006848,
+          "requests": 303,
+          "p95Ms": 5.498
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 45006848,
+          "requests": 262,
+          "p95Ms": 5.267
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 44998656,
+          "requests": 269,
+          "p95Ms": 5.328
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 44998656,
+          "requests": 247,
+          "p95Ms": 4.94
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 44990464,
+          "requests": 291,
+          "p95Ms": 5.328
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 44990464,
+          "requests": 265,
+          "p95Ms": 5.477
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 45002752,
+          "requests": 291,
+          "p95Ms": 5.585
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 45019136,
+          "requests": 285,
+          "p95Ms": 5.112
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 45019136,
+          "requests": 280,
+          "p95Ms": 5.864
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 45019136,
+          "requests": 264,
+          "p95Ms": 5.394
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 45027328,
+          "requests": 258,
+          "p95Ms": 5.452
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 45027328,
+          "requests": 246,
+          "p95Ms": 5.246
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 45023232,
+          "requests": 283,
+          "p95Ms": 5.757
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "name": "redis",
+      "region": "benchmark",
+      "type": "database",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 3018752
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 3018752
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 3145728
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 3145728
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 3014656
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 3141632
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 3141632
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 3137536
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 3010560
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 3010560
+        }
+      ]
+    },
+    {
+      "id": "shippingservice",
+      "name": "shippingservice",
+      "region": "benchmark",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "memoryBytes": 8900608
+        },
+        {
+          "atMs": 1705354296000,
+          "memoryBytes": 8900608
+        },
+        {
+          "atMs": 1705354326000,
+          "memoryBytes": 8720384
+        },
+        {
+          "atMs": 1705354356000,
+          "memoryBytes": 8790016
+        },
+        {
+          "atMs": 1705354386000,
+          "memoryBytes": 8798208
+        },
+        {
+          "atMs": 1705354416000,
+          "memoryBytes": 8892416
+        },
+        {
+          "atMs": 1705354446000,
+          "memoryBytes": 8904704
+        },
+        {
+          "atMs": 1705354476000,
+          "memoryBytes": 8904704
+        },
+        {
+          "atMs": 1705354506000,
+          "memoryBytes": 8896512
+        },
+        {
+          "atMs": 1705354536000,
+          "memoryBytes": 8896512
+        },
+        {
+          "atMs": 1705354566000,
+          "memoryBytes": 8896512
+        },
+        {
+          "atMs": 1705354596000,
+          "memoryBytes": 8892416
+        },
+        {
+          "atMs": 1705354626000,
+          "memoryBytes": 8777728
+        },
+        {
+          "atMs": 1705354656000,
+          "memoryBytes": 8777728
+        },
+        {
+          "atMs": 1705354686000,
+          "memoryBytes": 8953856
+        },
+        {
+          "atMs": 1705354716000,
+          "memoryBytes": 8830976
+        },
+        {
+          "atMs": 1705354746000,
+          "memoryBytes": 9121792
+        },
+        {
+          "atMs": 1705354776000,
+          "memoryBytes": 9121792
+        },
+        {
+          "atMs": 1705354806000,
+          "memoryBytes": 8908800
+        },
+        {
+          "atMs": 1705354836000,
+          "memoryBytes": 8953856
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "checkoutservice",
+      "target": "currencyservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 42,
+          "p95Ms": 0.357
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 59,
+          "p95Ms": 0.171
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 31,
+          "p95Ms": 0.19
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 47,
+          "p95Ms": 0.196
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 41,
+          "p95Ms": 0.167
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 48,
+          "p95Ms": 0.144
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 46,
+          "p95Ms": 0.186
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 61,
+          "p95Ms": 0.277
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 46,
+          "p95Ms": 0.166
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 62,
+          "p95Ms": 0.155
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 63,
+          "p95Ms": 0.205
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 64,
+          "p95Ms": 0.179
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 49,
+          "p95Ms": 0.455
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 57,
+          "p95Ms": 0.187
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 67,
+          "p95Ms": 0.173
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 45,
+          "p95Ms": 0.23
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 23,
+          "p95Ms": 0.144
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 37,
+          "p95Ms": 0.776
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 39,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 52,
+          "p95Ms": 0.231
+        }
+      ]
+    },
+    {
+      "source": "checkoutservice",
+      "target": "emailservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 13,
+          "p95Ms": 0.435
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 18,
+          "p95Ms": 0.784
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 11,
+          "p95Ms": 0.374
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 14,
+          "p95Ms": 0.826
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 16,
+          "p95Ms": 0.743
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 13,
+          "p95Ms": 0.323
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 13,
+          "p95Ms": 0.495
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 17,
+          "p95Ms": 0.311
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 11,
+          "p95Ms": 0.976
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 19,
+          "p95Ms": 0.994
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 14,
+          "p95Ms": 0.581
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 24,
+          "p95Ms": 0.734
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 15,
+          "p95Ms": 1.221
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 19,
+          "p95Ms": 0.592
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 20,
+          "p95Ms": 0.569
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 18,
+          "p95Ms": 1.351
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 8,
+          "p95Ms": 0.324
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 11,
+          "p95Ms": 0.547
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 13,
+          "p95Ms": 0.726
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 13,
+          "p95Ms": 0.862
+        }
+      ]
+    },
+    {
+      "source": "checkoutservice",
+      "target": "paymentservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 13,
+          "p95Ms": 2.909
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 18,
+          "p95Ms": 1.124
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 11,
+          "p95Ms": 0.514
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 14,
+          "p95Ms": 6.349
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 16,
+          "p95Ms": 0.991
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 13,
+          "p95Ms": 0.27
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 13,
+          "p95Ms": 0.321
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 17,
+          "p95Ms": 1.12
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 11,
+          "p95Ms": 2.311
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 19,
+          "p95Ms": 0.333
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 14,
+          "p95Ms": 1.427
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 24,
+          "p95Ms": 0.681
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 16,
+          "p95Ms": 0.9
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 18,
+          "p95Ms": 0.674
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 20,
+          "p95Ms": 0.373
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 18,
+          "p95Ms": 1.447
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 8,
+          "p95Ms": 1.183
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 11,
+          "p95Ms": 0.237
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 13,
+          "p95Ms": 2.898
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 13,
+          "p95Ms": 0.944
+        }
+      ]
+    },
+    {
+      "source": "checkoutservice",
+      "target": "productcatalogservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 29,
+          "p95Ms": 0.018
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 41,
+          "p95Ms": 0.033
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 20,
+          "p95Ms": 0.016
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 33,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 25,
+          "p95Ms": 0.02
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 36,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 33,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 44,
+          "p95Ms": 0.031
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 35,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 43,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 49,
+          "p95Ms": 0.03
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 40,
+          "p95Ms": 0.039
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 33,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 40,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 46,
+          "p95Ms": 0.035
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 27,
+          "p95Ms": 0.018
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 15,
+          "p95Ms": 0.019
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 26,
+          "p95Ms": 0.016
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 26,
+          "p95Ms": 0.045
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 40,
+          "p95Ms": 0.022
+        }
+      ]
+    },
+    {
+      "source": "frontend",
+      "target": "checkoutservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 13,
+          "p95Ms": 410.933
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 18,
+          "p95Ms": 1004.49
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 11,
+          "p95Ms": 1120.89
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 14,
+          "p95Ms": 1026.817
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 16,
+          "p95Ms": 408.461
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 13,
+          "p95Ms": 1014.009
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 13,
+          "p95Ms": 1115.128
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 17,
+          "p95Ms": 708.588
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 11,
+          "p95Ms": 617.151
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 19,
+          "p95Ms": 919.035
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 14,
+          "p95Ms": 839.895
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 24,
+          "p95Ms": 700.326
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 17,
+          "p95Ms": 1031.376
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 18,
+          "p95Ms": 735.563
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 20,
+          "p95Ms": 706.629
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 17,
+          "p95Ms": 728.249
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 8,
+          "p95Ms": 531.218
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 11,
+          "p95Ms": 1726.934
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 13,
+          "p95Ms": 823.921
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 14,
+          "p95Ms": 835.097
+        }
+      ]
+    },
+    {
+      "source": "frontend",
+      "target": "currencyservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 1092,
+          "p95Ms": 0.179
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 1107,
+          "p95Ms": 0.178
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 1068,
+          "p95Ms": 0.202
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 1063,
+          "p95Ms": 0.186
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 1172,
+          "p95Ms": 0.179
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 1132,
+          "p95Ms": 0.172
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 1092,
+          "p95Ms": 0.184
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 1145,
+          "p95Ms": 0.185
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 998,
+          "p95Ms": 0.182
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 1042,
+          "p95Ms": 0.184
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 1175,
+          "p95Ms": 0.17
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 1085,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 980,
+          "p95Ms": 0.187
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 1097,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 1101,
+          "p95Ms": 0.173
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 1141,
+          "p95Ms": 0.177
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 1063,
+          "p95Ms": 0.176
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 1049,
+          "p95Ms": 0.175
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 1157,
+          "p95Ms": 0.18
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 1176,
+          "p95Ms": 0.168
+        }
+      ]
+    },
+    {
+      "source": "frontend",
+      "target": "productcatalogservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 1669,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 1768,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 1965,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 1597,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 1781,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 1827,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 1714,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 1995,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 1694,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 1747,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 1621,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 1856,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 1689,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 1865,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 1814,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 1811,
+          "p95Ms": 0.021
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 1712,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 1688,
+          "p95Ms": 0.025
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 1641,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 1867,
+          "p95Ms": 0.024
+        }
+      ]
+    },
+    {
+      "source": "frontend",
+      "target": "recommendationservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 261,
+          "p95Ms": 5.028
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 274,
+          "p95Ms": 5.507
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 301,
+          "p95Ms": 6.05
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 242,
+          "p95Ms": 5.451
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 274,
+          "p95Ms": 5.576
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 281,
+          "p95Ms": 5.123
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 259,
+          "p95Ms": 5.413
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 303,
+          "p95Ms": 5.498
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 262,
+          "p95Ms": 5.267
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 269,
+          "p95Ms": 5.328
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 247,
+          "p95Ms": 4.94
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 291,
+          "p95Ms": 5.328
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 265,
+          "p95Ms": 5.477
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 291,
+          "p95Ms": 5.585
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 285,
+          "p95Ms": 5.112
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 280,
+          "p95Ms": 5.864
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 264,
+          "p95Ms": 5.394
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 258,
+          "p95Ms": 5.452
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 246,
+          "p95Ms": 5.246
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 283,
+          "p95Ms": 5.757
+        }
+      ]
+    },
+    {
+      "source": "recommendationservice",
+      "target": "productcatalogservice",
+      "buckets": [
+        {
+          "atMs": 1705354266000,
+          "requests": 261,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354296000,
+          "requests": 274,
+          "p95Ms": 0.021
+        },
+        {
+          "atMs": 1705354326000,
+          "requests": 301,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354356000,
+          "requests": 242,
+          "p95Ms": 0.022
+        },
+        {
+          "atMs": 1705354386000,
+          "requests": 274,
+          "p95Ms": 0.031
+        },
+        {
+          "atMs": 1705354416000,
+          "requests": 281,
+          "p95Ms": 0.019
+        },
+        {
+          "atMs": 1705354446000,
+          "requests": 259,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354476000,
+          "requests": 303,
+          "p95Ms": 0.027
+        },
+        {
+          "atMs": 1705354506000,
+          "requests": 262,
+          "p95Ms": 0.03
+        },
+        {
+          "atMs": 1705354536000,
+          "requests": 269,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354566000,
+          "requests": 247,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354596000,
+          "requests": 291,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354626000,
+          "requests": 265,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354656000,
+          "requests": 291,
+          "p95Ms": 0.034
+        },
+        {
+          "atMs": 1705354686000,
+          "requests": 285,
+          "p95Ms": 0.026
+        },
+        {
+          "atMs": 1705354716000,
+          "requests": 280,
+          "p95Ms": 0.027
+        },
+        {
+          "atMs": 1705354746000,
+          "requests": 264,
+          "p95Ms": 0.024
+        },
+        {
+          "atMs": 1705354776000,
+          "requests": 258,
+          "p95Ms": 0.028
+        },
+        {
+          "atMs": 1705354806000,
+          "requests": 246,
+          "p95Ms": 0.023
+        },
+        {
+          "atMs": 1705354836000,
+          "requests": 283,
+          "p95Ms": 0.022
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "atMs": 1705354566000,
+      "title": "Benchmark fault injected",
+      "detail": "Timestamp from the published inject_time.txt. This marker identifies the intervention time only."
+    },
+    {
+      "atMs": 1705354655000,
+      "title": "Checkout memory peak after injection",
+      "detail": "First sample at the post-injection maximum in this window: 16,846,848 bytes in checkoutservice_mem.",
+      "nodes": ["checkoutservice"]
+    }
+  ],
+  "notes": [
+    "Public benchmark execution by the RCAEval authors, from the multi-source-data.zip asset of release 0.2.0. Ten minutes around the fault injection. Deployment locations were not supplied.",
+    "Each memory value is the maximum published Prometheus memory gauge in a 30-second interval.",
+    "Calls count unique cross-service child spans with a resolved parent in the published Jaeger traces. p95 is the nearest-rank percentile of these child spans' durations.",
+    "No error counts are taken from the archive, so this capture does not show whether a service was healthy.",
+    "The archive states no kind of service. Every kind here is assumed by name: redis is drawn as a database and every other service as a microservice."
+  ]
+}

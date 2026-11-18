@@ -52,7 +52,7 @@ const ALERT_WINDOW_MS = 90_000;
 /** Where a service's figures come from, said as a whole phrase in every language. */
 const SOURCE_LABEL: Record<DataSource, string> = {
   synthetic: t('Synthetic data'),
-  recording: t('Recording data'),
+  recording: t('Capture data'),
   live: t('Live data'),
 };
 

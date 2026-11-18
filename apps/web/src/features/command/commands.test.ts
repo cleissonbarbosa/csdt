@@ -29,6 +29,14 @@ function context(overrides: Partial<CommandContext> = {}): CommandContext {
 }
 
 describe('the command palette', () => {
+  it('reaches an incident capture, except inside another page', () => {
+    expect(buildCommands(context()).some((command) => command.id === 'capture')).toBe(true);
+    expect(buildCommands(context({ embedded: false })).some((c) => c.id === 'capture')).toBe(true);
+    const embedded = buildCommands(context({ embedded: true }));
+    expect(embedded.some((command) => command.id === 'capture')).toBe(false);
+    expect(searchCommands(embedded, 'capture')).toEqual([]);
+  });
+
   it('offers every service, region and available scenario', () => {
     const ctx = context();
     const commands = buildCommands(ctx);

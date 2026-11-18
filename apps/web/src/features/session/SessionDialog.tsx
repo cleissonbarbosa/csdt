@@ -182,21 +182,7 @@ function Save() {
     );
   }
   if (!exported) return <p className="mt-2 text-xs text-ink-faint">{t('Reading the timeline…')}</p>;
-  const { decisions, importedEvents } = exported.omitted;
-  const omitted = [
-    decisions > 0 &&
-      t(
-        decisions === 1
-          ? '{n} authorization decision evaluated by hand'
-          : '{n} authorization decisions evaluated by hand',
-        { n: decisions },
-      ),
-    importedEvents > 0 &&
-      t(
-        importedEvents === 1 ? '{n} import from an integration' : '{n} imports from an integration',
-        { n: importedEvents },
-      ),
-  ].filter((item) => typeof item === 'string');
+  const { decisions } = exported.omitted;
   return (
     <div data-testid="session-save" data-reproducible={exported.reproducible}>
       <Contents session={composeSession(exported, currentView())} />
@@ -207,13 +193,15 @@ function Save() {
           )}
         </p>
       )}
-      {omitted.length > 0 && (
+      {decisions > 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-dim" data-testid="session-omitted">
           {t('This session omits {items}.', {
-            items:
-              omitted.length === 2
-                ? t('{first} and {second}', { first: omitted[0]!, second: omitted[1]! })
-                : omitted[0]!,
+            items: t(
+              decisions === 1
+                ? '{n} authorization decision evaluated by hand'
+                : '{n} authorization decisions evaluated by hand',
+              { n: decisions },
+            ),
           })}
         </p>
       )}

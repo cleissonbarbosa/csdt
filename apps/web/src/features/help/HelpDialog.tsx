@@ -3,9 +3,19 @@ import type { ReactNode } from 'react';
 
 import { HealthGlyph } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
+import { UnknownGlyph } from '@/features/capture/present';
 import { t } from '@/i18n';
 import { tr } from '@/i18n/rich';
-import { COLOR, HEALTH_LABEL, SERVICE_TYPE, TRAFFIC_LEGEND, type BeadShape } from '@/lib/palette';
+import {
+  CAPTURE_STATE_LABEL,
+  CAPTURE_UNMEASURED_LABEL,
+  COLOR,
+  HEALTH_LABEL,
+  SERVICE_TYPE,
+  TRAFFIC_LEGEND,
+  type BeadShape,
+} from '@/lib/palette';
+import { selectOpen, useCapture } from '@/stores/capture';
 import { useUi } from '@/stores/ui';
 
 const SHAPES: Record<(typeof SERVICE_TYPES)[number], string> = {
@@ -35,6 +45,29 @@ const KEYS: [string, string][] = [
   ['P', t('Toggle the performance overlay')],
   ['?', t('Open this help')],
   ['← / →', t('On the timeline: step 5 s (hold Shift for 30 s)')],
+];
+
+/**
+ * The keys while an incident capture is open. Its clock is its own, it is
+ * drawn by region only, and the simulation's search and palette are not
+ * there, so those keys are left out rather than listed as doing nothing.
+ */
+const CAPTURE_KEYS: [string, string][] = [
+  [t('Space'), t('Play or pause the capture')],
+  ['R', t('Reset the camera')],
+  ['F', t('Move in on what is selected')],
+  ['Esc', t('Let go of the selection, then put the panels away')],
+  ['/', t('List the services of the capture')],
+  ['T', t('Switch between the 3D view and the table')],
+  ['P', t('Toggle the performance overlay')],
+  ['?', t('Open this help')],
+  [
+    '← / →',
+    t(
+      "On the capture's timeline: step one sampling period, or a hundredth of the window where there is none (hold Shift for ten)",
+    ),
+  ],
+  [t('Home / End'), t('The start or the end of the capture')],
 ];
 
 /** The same shapes the scene draws its traffic beads with. */
@@ -79,6 +112,8 @@ function Key({ children }: { children: string }) {
 
 export function HelpDialog() {
   const open = useUi((state) => state.openPanel === 'help');
+  const captured = useCapture(selectOpen);
+  const keys = captured ? CAPTURE_KEYS : KEYS;
   return (
     <Dialog
       open={open}
@@ -125,8 +160,8 @@ export function HelpDialog() {
           </ul>
 
           <Heading>{t('Keyboard')}</Heading>
-          <dl className="space-y-1.5">
-            {KEYS.map(([key, description]) => (
+          <dl className="space-y-1.5" data-testid="help-keys">
+            {keys.map(([key, description]) => (
               <div key={key} className="flex items-center gap-3 text-xs">
                 <dt className="w-[4.5rem] shrink-0">
                   <Key>{key}</Key>
@@ -156,6 +191,31 @@ export function HelpDialog() {
                 {health === 'down' && t('Pale piece; its part hangs crooked and still')}
               </li>
             ))}
+            {/* One drawing, three wordings: the one for no sample is the row's
+                name, and the other two are said beside it as the interface
+                says them, from the same table. */}
+            <li className="flex items-start gap-2 text-xs text-ink-dim" data-testid="help-unknown">
+              <span className="inline-flex h-4 w-3 shrink-0 items-center justify-center">
+                <UnknownGlyph />
+              </span>
+              <span className="w-16 shrink-0 leading-4 text-ink">
+                {CAPTURE_STATE_LABEL.unknown}
+              </span>
+              <span className="min-w-0 flex-1 leading-4">
+                {t(
+                  'Upright piece on a dashed ring, a shade fainter: in an incident capture, a service whose state the source does not give',
+                )}
+                <span className="caption mt-0.5 block leading-relaxed">
+                  {t(
+                    "Where a sample has no count to take an error rate from, the state reads “{unmeasured}”; in a provider's report, “{unstated}”.",
+                    {
+                      unmeasured: CAPTURE_UNMEASURED_LABEL,
+                      unstated: CAPTURE_STATE_LABEL['not-stated'],
+                    },
+                  )}
+                </span>
+              </span>
+            </li>
           </ul>
           <p className="caption mt-2 leading-relaxed">
             {t(
@@ -237,7 +297,10 @@ export function HelpDialog() {
       </div>
       <p className="caption mt-6 border-t border-line pt-3 leading-relaxed">
         {t(
-          'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is observed, scanned or attacked.',
+          'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is scanned or attacked.',
+        )}{' '}
+        {t(
+          'Apart from what a connected local instance reports (labelled Live), an incident capture is the one exception: a real incident as its source gave it, read in this browser, labelled as not simulated and never mixed into the simulation.',
         )}
       </p>
     </Dialog>

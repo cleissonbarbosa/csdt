@@ -742,17 +742,7 @@
           "const": "alert"
         },
         {
-          "description": "A vulnerability advisory imported from a fixture.",
-          "type": "string",
-          "const": "cve-advisory"
-        },
-        {
-          "description": "A port-scan finding imported from a fixture.",
-          "type": "string",
-          "const": "scan-finding"
-        },
-        {
-          "description": "Operator or system action (reset, timeline branch, import…).",
+          "description": "An operator's action outside any scenario (a fault placed or lifted\nby hand), or a scenario that could not start on the active topology.",
           "type": "string",
           "const": "system"
         }

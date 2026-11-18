@@ -190,6 +190,10 @@ export default defineConfig(({ mode }) => {
       include: ['src/**/*.test.{ts,tsx}'],
       css: false,
       restoreMocks: true,
+      // The tests that draw the whole application take a second or two alone
+      // and several times that while the full suite loads every core; the
+      // default 5 s failed them now and then on a busy machine.
+      testTimeout: 15_000,
     },
   };
 });

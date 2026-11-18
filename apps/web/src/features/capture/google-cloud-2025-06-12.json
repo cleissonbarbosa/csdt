@@ -1,0 +1,262 @@
+{
+  "kind": "aegis-incident-capture",
+  "version": 1,
+  "title": "Google Cloud outage · 12 June 2025",
+  "source": {
+    "kind": "provider-report",
+    "label": "Google Cloud Service Health",
+    "url": "https://status.cloud.google.com/incidents/ow5i3PPK96RduMcb1SsW"
+  },
+  "window": {
+    "startMs": 1749750300000,
+    "endMs": 1749778020000
+  },
+  "regions": [
+    {
+      "id": "global",
+      "name": "Global scope"
+    },
+    {
+      "id": "us-central1",
+      "name": "Iowa · us-central1"
+    },
+    {
+      "id": "europe-west1",
+      "name": "Belgium · europe-west1"
+    },
+    {
+      "id": "asia-southeast1",
+      "name": "Singapore · asia-southeast1"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "serving",
+      "name": "Google Cloud API serving",
+      "region": "global",
+      "type": "api-gateway",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "control",
+      "name": "Service Control, other regions",
+      "region": "global",
+      "type": "microservice",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "policy",
+      "name": "Service Control policy tables, other regions",
+      "region": "global",
+      "type": "database",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "iam",
+      "name": "Cloud IAM",
+      "region": "global",
+      "type": "auth-service",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "storage",
+      "name": "Cloud Storage",
+      "region": "global",
+      "type": "storage",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "run",
+      "name": "Cloud Run",
+      "region": "global",
+      "type": "serverless",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "dataflow",
+      "name": "Cloud Dataflow",
+      "region": "global",
+      "type": "microservice",
+      "typeSource": "assumed",
+      "note": "Listed among affected products; the report does not say when its impact began."
+    },
+    {
+      "id": "vertex",
+      "name": "Vertex AI Online Prediction",
+      "region": "global",
+      "type": "microservice",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "control-iowa",
+      "name": "Service Control in Iowa",
+      "region": "us-central1",
+      "type": "microservice",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "policy-iowa",
+      "name": "Spanner policy store in Iowa",
+      "region": "us-central1",
+      "type": "database",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "vertex-belgium",
+      "name": "Vertex AI in Belgium",
+      "region": "europe-west1",
+      "type": "microservice",
+      "typeSource": "assumed"
+    },
+    {
+      "id": "vertex-singapore",
+      "name": "Vertex AI in Singapore",
+      "region": "asia-southeast1",
+      "type": "microservice",
+      "typeSource": "assumed"
+    }
+  ],
+  "edges": [
+    {
+      "source": "serving",
+      "target": "control"
+    },
+    {
+      "source": "serving",
+      "target": "control-iowa"
+    },
+    {
+      "source": "control",
+      "target": "policy"
+    },
+    {
+      "source": "control-iowa",
+      "target": "policy-iowa"
+    }
+  ],
+  "notes": [
+    "Transcribed by hand from Google Cloud's public incident page: its status updates, the mini incident report and the full incident report. The products and locations shown, their connections and kinds, and the state at each update are AEGIS's reading of that text. Google states no kinds; every kind here is assumed.",
+    "A state is placed at the time its statement says it held (\"as of 17:10 PDT\"). When a statement gives no time for that product or location, the state is placed at the publication time of the update. Each event names the update it rests on. The report gives its times in PDT (UTC-7); this capture shows them in UTC.",
+    "A product is unknown until the report states its condition, and an unknown product is not a normal one. Service Control's policy tables outside us-central1 never receive a stated condition. This capture contains no request measurements.",
+    "The global scope groups the report's global entries and the Service Control deployments outside us-central1. It is not one deployment.",
+    "Cloud Dataflow is listed among the affected products in the incident's header, which gives no time. The report does not say when its impact began; it is first given a condition in the 16:13 PDT update.",
+    "The mini incident report times the start at 10:49 PDT (17:49 UTC) and the end at 13:49 PDT (20:49 UTC). The status dashboard dates the incident from 10:51 PDT (17:51 UTC), and its last update reports full recovery as of 18:18 PDT (01:18 UTC on 13 June)."
+  ],
+  "events": [
+    {
+      "atMs": 1749750300000,
+      "title": "Policy change inserted",
+      "detail": "Full incident report: at around 10:45 PDT a policy change was inserted into the regional Spanner tables that Service Control uses for policies, with unintended blank fields. The mini incident report describes an invalid automated quota update distributed globally.",
+      "nodes": ["policy"]
+    },
+    {
+      "atMs": 1749750540000,
+      "title": "Service Control starts failing",
+      "detail": "Mini incident report: incident start at 10:49 PDT. Full incident report: the blank fields sent the Service Control binaries into a crash loop, and this occurred globally. IAM, Cloud Storage and Cloud Run come from the mini report's list of affected products, which gives no time for any product.",
+      "nodes": ["serving", "control", "control-iowa", "iam", "storage", "run"],
+      "state": "affected"
+    },
+    {
+      "atMs": 1749752040000,
+      "title": "Red button ready",
+      "detail": "Full incident report: the red button was ready to roll out around 25 minutes from the start of the incident. Placed 25 minutes after the 10:49 PDT start; the report gives no clock time."
+    },
+    {
+      "atMs": 1749752940000,
+      "title": "Policy store overloaded in Iowa",
+      "detail": "Full incident report: the red-button rollout completed within 40 minutes, and in larger regions such as us-central1 the restarting Service Control tasks created a herd effect on the underlying infrastructure. Mini incident report: the quota policy database in us-central1 became overloaded, so recovery there took much longer. The report gives no time for the overload; it is placed around the end of the rollout.",
+      "nodes": ["policy-iowa"],
+      "state": "affected"
+    },
+    {
+      "atMs": 1749755340000,
+      "title": "Recovered in some locations",
+      "detail": "Status update, 12:09 PDT: mitigation is under way and the issue has recovered in some locations.",
+      "nodes": ["serving"],
+      "state": "recovering"
+    },
+    {
+      "atMs": 1749756600000,
+      "title": "Recovered outside us-central1",
+      "detail": "Status update, 12:30 PDT: all locations except us-central1 have fully recovered. The mini incident report times the mitigation outside us-central1 at 12:48 PDT.",
+      "nodes": ["control"],
+      "state": "recovered"
+    },
+    {
+      "atMs": 1749756600000,
+      "title": "Mostly recovered in us-central1",
+      "detail": "Status update, 12:30 PDT: us-central1 is mostly recovered, with no estimate for full recovery there.",
+      "nodes": ["control-iowa"],
+      "state": "recovering"
+    },
+    {
+      "atMs": 1749759360000,
+      "title": "Dependent products recovering",
+      "detail": "Status update, 13:16 PDT: the infrastructure has recovered in all regions except us-central1, and dependent products are recovering.",
+      "nodes": ["iam", "storage", "run"],
+      "state": "recovering"
+    },
+    {
+      "atMs": 1749761340000,
+      "title": "Incident end in the mini report",
+      "detail": "Mini incident report: incident end at 13:49 PDT. Full incident report: it took up to around 2 h 40 min to fully resolve in us-central1. The 14:00 PDT status update had applied a mitigation for us-central1 and multi-region us and still expected recovery there in under an hour.",
+      "nodes": ["serving", "control-iowa", "policy-iowa"],
+      "state": "recovered"
+    },
+    {
+      "atMs": 1749769980000,
+      "title": "No longer listed with residual impact",
+      "detail": "Status update, 16:13 PDT: the first update that lists the products with residual impact, and it leaves out IAM, Cloud Storage and Cloud Run. The 15:16 PDT update said most Google Cloud products were fully recovered as of 13:45 PDT, without saying which.",
+      "nodes": ["iam", "storage", "run"],
+      "state": "recovered"
+    },
+    {
+      "atMs": 1749769980000,
+      "title": "Dataflow backlog clearing",
+      "detail": "Status update, 16:13 PDT: residual impact on Cloud Dataflow, with delays as the backlog clears.",
+      "nodes": ["dataflow"],
+      "state": "recovering"
+    },
+    {
+      "atMs": 1749769980000,
+      "title": "Vertex AI errors",
+      "detail": "Status update, 16:13 PDT: residual impact on Vertex AI Online Prediction, with elevated 5xx errors for some Model Garden models.",
+      "nodes": ["vertex"],
+      "state": "affected"
+    },
+    {
+      "atMs": 1749773400000,
+      "title": "Dataflow resolved",
+      "detail": "Status update, 17:33 PDT: the issue with Cloud Dataflow is fully resolved as of 17:10 PDT.",
+      "nodes": ["dataflow"],
+      "state": "recovered"
+    },
+    {
+      "atMs": 1749774780000,
+      "title": "Vertex AI the only remaining impact",
+      "detail": "Status update, 17:33 PDT: Vertex AI Online Prediction is the only remaining impact, with an estimate of 22:00 PDT.",
+      "nodes": ["vertex"]
+    },
+    {
+      "atMs": 1749776340000,
+      "title": "Vertex AI normal outside two regions",
+      "detail": "Status update, 17:59 PDT: the Model Garden 5xx errors are fully resolved as of 17:05 PDT, and Vertex AI serving is normal in all regions except europe-west1 and asia-southeast1.",
+      "nodes": ["vertex"],
+      "state": "recovering"
+    },
+    {
+      "atMs": 1749776340000,
+      "title": "Vertex AI still affected in Belgium and Singapore",
+      "detail": "Status update, 17:59 PDT: Vertex AI serving is not yet normal in europe-west1 and asia-southeast1, with an estimate of 19:45 PDT for both.",
+      "nodes": ["vertex-belgium", "vertex-singapore"],
+      "state": "affected"
+    },
+    {
+      "atMs": 1749777480000,
+      "title": "Full recovery",
+      "detail": "Status update, 18:27 PDT: Vertex AI Online Prediction is fully recovered as of 18:18 PDT, and all services are fully recovered from the issue.",
+      "nodes": ["vertex", "vertex-belgium", "vertex-singapore"],
+      "state": "recovered"
+    }
+  ]
+}

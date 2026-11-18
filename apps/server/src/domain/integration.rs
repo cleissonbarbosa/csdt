@@ -9,8 +9,6 @@ pub enum IntegrationKind {
     Simulation,
     /// A network connection to an explicitly configured local instance.
     LiveAdapter,
-    /// A local fixture file in the format of a public project.
-    Fixture,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -24,8 +22,6 @@ pub enum IntegrationState {
     Available,
     Connecting,
     Connected,
-    /// A fixture whose contents were imported onto the timeline.
-    Imported,
     Error,
 }
 

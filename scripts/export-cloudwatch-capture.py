@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Capture an Application Signals dependency graph and CloudWatch samples."""
+"""Write an AEGIS incident capture from Application Signals and CloudWatch.
+
+Reads the dependency graph Application Signals discovered around the root
+services, CloudWatch samples for every node and connection in it, and
+optionally the write management events CloudTrail holds for named resources.
+Every call is a read, made through the AWS CLI with the operator's profile.
+"""
 
 import argparse
 import hashlib
@@ -17,6 +23,28 @@ MAX_EDGES = 2048
 MAX_EVENTS = 1500
 MAX_BYTES = 12 * 1024 * 1024
 NAMESPACE = "ApplicationSignals"
+# CloudTrail's LookupEvents answers from the last 90 days of event history.
+TRAIL_HISTORY_MS = 90 * 86_400_000
+
+# The ServiceType enum of schemas/v1/topology.schema.json, in its order. A
+# test holds this copy to the schema.
+SERVICE_TYPES = (
+    "api-gateway",
+    "auth-service",
+    "cedar-authorizer",
+    "microservice",
+    "container",
+    "serverless",
+    "message-queue",
+    "database",
+    "storage",
+    "network-gateway",
+    "security-monitor",
+    "external-client",
+)
+# Each node whose kind is not mapped from a reported resource type, nor
+# declared with --type, is assumed to be this kind.
+ASSUMED_TYPE = "microservice"
 
 RESOURCE_TYPES = {
     "AWS::ApiGateway::RestApi": "api-gateway",
@@ -31,6 +59,38 @@ RESOURCE_TYPES = {
     "AWS::SNS::Topic": "message-queue",
     "AWS::SQS::Queue": "message-queue",
 }
+
+
+def kind_pair(value):
+    """Parse one --type NAME=KIND. The name is everything before the last '='."""
+    name, sep, kind = value.rpartition("=")
+    if not sep or not name:
+        raise argparse.ArgumentTypeError(
+            f"expected NAME=KIND, such as orders-db=database; got {value!r}"
+        )
+    if kind not in SERVICE_TYPES:
+        raise argparse.ArgumentTypeError(
+            f"unknown kind {kind!r} for {name!r}; expected one of: {', '.join(SERVICE_TYPES)}"
+        )
+    return name, kind
+
+
+def declare_kinds(nodes, declarations):
+    """Give the one node named exactly NAME the declared KIND."""
+    declared = set()
+    for name, kind in declarations:
+        if name in declared:
+            raise ValueError(f"--type declares {name!r} more than once.")
+        declared.add(name)
+        matches = [node for node in nodes if node["name"] == name]
+        if len(matches) != 1:
+            raise ValueError(
+                f"--type {name}={kind}: expected exactly one node named {name!r}, "
+                f"found {len(matches)}. A name must match the node's name exactly, "
+                "and a name that repeats cannot be declared."
+            )
+        matches[0]["type"] = kind
+        matches[0]["typeSource"] = "declared"
 
 
 def timestamp(value):
@@ -126,13 +186,16 @@ def aws_node(region, attributes, instrumented):
         and re.fullmatch(r"[a-z][a-z0-9-]{1,63}", arn[3])
     ):
         location = arn[3]
+    # A kind is mapped only from a resource type the platform reported.
+    mapped = RESOURCE_TYPES.get(attributes.get("ResourceType"))
     return {
         "id": hashlib.sha256(identity).hexdigest()[:24],
         "name": (
             attributes.get("Name") or resource or attributes.get("Type", "Dependency")
         )[:320],
         "region": location,
-        "type": RESOURCE_TYPES.get(attributes.get("ResourceType"), "microservice"),
+        "type": mapped or ASSUMED_TYPE,
+        "typeSource": "source" if mapped else "assumed",
     }
 
 
@@ -312,7 +375,10 @@ def collect_samples(call, targets, start, end, period):
         }
 
     seen = defaultdict(dict)
-    incomplete = False
+    # PartialData means more points follow on the next page, so a series is
+    # judged by the status it ends on. An error on any page loses points.
+    ended = {}
+    failed = False
     items = list(queries.values())
     for offset in range(0, len(items), 200):
         params = {
@@ -323,13 +389,16 @@ def collect_samples(call, targets, start, end, period):
         }
         for page in pages(call, "cloudwatch", "get-metric-data", params):
             for result in page["MetricDataResults"]:
-                incomplete |= result.get("StatusCode") not in ("Complete", None)
+                status = result.get("StatusCode")
+                failed |= status not in ("Complete", "PartialData", None)
+                ended[result["Id"]] = status
                 for when, value in zip(
                     result["Timestamps"], result["Values"], strict=True
                 ):
                     at = timestamp(when)
                     if start <= at < end and math.isfinite(value) and value >= 0:
                         seen[result["Id"]][at] = value
+    incomplete = failed or "PartialData" in ended.values()
 
     by_target = {}
     for target, fields in fields_by_target.items():
@@ -396,6 +465,9 @@ def capture(args, call):
         args.service,
         discover_window,
     )
+    # Before any metric is read: a declaration that names no node, or
+    # several, stops the export here.
+    declare_kinds(nodes, args.types)
     samples, incomplete = collect_samples(
         call, {**node_refs, **edge_refs}, start, end, period
     )
@@ -411,8 +483,23 @@ def capture(args, call):
         )
     notes = [
         "The graph lists dependencies discovered in the Application Signals window. A link does not establish that traffic passed at every instant.",
-        "The “Fault” metric includes server errors and OpenTelemetry span errors. The request count is SampleCount of Latency.",
+        "Errors are CloudWatch's “Fault” metric, which counts server errors and OpenTelemetry span errors. Requests are the SampleCount of “Latency”.",
+        "A kind is mapped from the AWS resource type where Application Signals reports one. Every other kind is assumed to be a microservice, unless the operator declared it.",
     ]
+    if args.cloudtrail_resource:
+        notes.append(
+            "Events are the write management events CloudTrail holds for the resource names given to the exporter "
+            f"({len(set(args.cloudtrail_resource))}), as event name, source and ID. Read-only events, other resources "
+            "and the event payloads are left out."
+        )
+        if now - start > TRAIL_HISTORY_MS:
+            notes.append(
+                "The window starts more than 90 days ago. CloudTrail's event history covers 90 days, so earlier events cannot appear."
+            )
+    else:
+        notes.append(
+            "No CloudTrail events were requested, so this capture does not show configuration changes."
+        )
     if start % (period * 1000):
         notes.append(
             "The first sample may start after the requested start, at a CloudWatch aggregation boundary."
@@ -422,7 +509,7 @@ def capture(args, call):
             "CloudWatch returned incomplete or empty service series. Missing samples are unknown."
         )
     return {
-        "kind": "aegis-cloud-replay",
+        "kind": "aegis-incident-capture",
         "version": 1,
         "title": args.title or f"{', '.join(args.service)} · {args.environment}"[:320],
         "source": {
@@ -449,8 +536,11 @@ def capture(args, call):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0],
+        epilog=f"Kinds: {', '.join(SERVICE_TYPES)}.",
+    )
     parser.add_argument("--profile", help="AWS CLI profile to use")
     parser.add_argument(
         "--region", required=True, help="Region containing the instrumented services"
@@ -480,9 +570,18 @@ def main():
         help="Resource name for optional CloudTrail events; repeat for several",
     )
     parser.add_argument(
+        "--type",
+        dest="types",
+        action="append",
+        type=kind_pair,
+        default=[],
+        metavar="NAME=KIND",
+        help="Declare the kind of the one node with exactly this name; repeat for several",
+    )
+    parser.add_argument(
         "--output", type=Path, required=True, help="Path to a new JSON file"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         if not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", args.region):
             raise ValueError("Expected an AWS region code.")

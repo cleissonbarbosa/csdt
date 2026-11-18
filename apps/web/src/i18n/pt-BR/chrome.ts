@@ -28,7 +28,6 @@ export default {
   'Simulated, with {n} live integration': 'Simulado, com {n} integração ao vivo',
   'Simulated, with {n} live integrations': 'Simulado, com {n} integrações ao vivo',
   'Simulated, synthetic data': 'Simulado, dados sintéticos',
-  'Simulated, recording data': 'Simulado, dados de gravação',
   'Simulated, live data': 'Simulado, dados ao vivo',
   Simulated: 'Simulado',
   Environment: 'Ambiente',

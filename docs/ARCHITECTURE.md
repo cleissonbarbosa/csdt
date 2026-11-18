@@ -58,8 +58,8 @@ apps/
   wasm/src/          the same routes and service as a WebAssembly module
   web/src/
     graphics/        layout, modelled pieces, TSL materials, SceneController
-    features/        scene, explorer, inspector, timeline, scenarios, …
-    stores/          telemetry, interface state, persisted settings
+    features/        scene, explorer, inspector, timeline, scenarios, capture, …
+    stores/          telemetry, interface state, persisted settings, capture
     providers/       REST client, stream client, TelemetryProvider
     engine/          the module's binding, its worker and the transport to it
     components/ui/   buttons, badges, dialog, fields, sparkline
@@ -67,6 +67,7 @@ packages/contracts/  zod schemas + samples exported by the server
 fixtures/            the bundled topology, scenarios, recordings and Cedar
                      files, laid out as a workspace
 examples/            a small workspace to copy from
+scripts/             screenshots, benchmarks, the version, the incident capture scripts
 ```
 
 Dependencies point inward: `api → application → simulation/authorization →
@@ -209,7 +210,7 @@ through the API as `unavailableReason`, which the incident console displays.
 
 ```mermaid
 flowchart LR
-  C[Command log<br/>start scenario · decision · import] --> S
+  C[Command log<br/>start scenario · decision · fault] --> S
   K[Checkpoints<br/>full state every 5 s] --> S
   S["step(topology, scenarios, decisions,<br/>state, commands) → events"] --> E[Event log]
   S --> M[Metric history]
@@ -232,8 +233,8 @@ samples already produced.
   (`GET /session`), and loaded like one (`POST /demo/session/load`). The
   interface adds where the cursor is, how the model is being looked at and,
   when the platform is not the bundled one, its files; a small one fits in
-  the fragment of a link. A decision or an imported event is left out and
-  counted: a file may not state an outcome.
+  the fragment of a link. A decision is left out and counted: a file may not
+  state an outcome.
 - **An experiment** runs one scenario twice on timelines of its own, from
   the server's seed: as it is, and with one fault placed at a chosen moment
   (`POST /demo/experiments/compare`). The answer holds both runs, each with
@@ -406,14 +407,14 @@ connections as hairlines, traffic as beads. Why it looks like that is in
 Draw calls follow the number of object classes, not the number of objects
 (28 for 51 services, 34 for 178):
 
-| What         | How                                                                |
-| ------------ | ------------------------------------------------------------------ |
-| Pieces       | one instanced mesh per service type, modelled solids               |
-| Ground marks | one instanced mesh: contact shadow, status lamp, selection ring    |
-| Connections  | one instanced mesh of camera-facing hairlines along Bézier curves  |
-| Traffic      | one instanced mesh of stateless sprites ("beads")                  |
-| Names        | not in the scene: a 2D canvas over it, at the display's resolution |
-| Plates       | one mesh per region, plus the shadow it casts                      |
+| What         | How                                                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Pieces       | one instanced mesh per service type, modelled solids                                                                    |
+| Ground marks | one instanced mesh: contact shadow, status lamp, selection ring, and the dashed ring of a state a capture does not give |
+| Connections  | one instanced mesh of camera-facing hairlines along Bézier curves                                                       |
+| Traffic      | one instanced mesh of stateless sprites ("beads")                                                                       |
+| Names        | not in the scene: a 2D canvas over it, at the display's resolution                                                      |
+| Plates       | one mesh per region, plus the shadow it casts                                                                           |
 
 **Names** are drawn by `graphics/labelLayer.ts` on a canvas of their own,
 laid over the scene. The scene is rendered at whatever resolution the
@@ -424,7 +425,11 @@ Each frame the controller hands the layer every name's anchor on the
 screen, how present it is and how much it matters (the piece in hand, then
 a failing service, then places, then the rest, nearest first);
 `graphics/labelPlacement.ts` leaves out a name that would lie across a more
-important one, and the layer redraws only when the picture changed. The
+important one, or that would not lie wholly inside the part of the stage
+left free by the interface (the layer is given the scene's insets: the
+sheets, a card, the toolbar strip, the timeline), unless it is the
+selected or the pointed-at piece's; the layer redraws only when the
+picture changed. The
 overview's headings are written in full where they fit and cut to their
 numbers, all together, where they would touch. A name left out comes back
 when the camera moves in or its piece is selected or pointed at. In the
@@ -544,14 +549,40 @@ for the detailed arrangement last used, where the service stands on its own.
 | `ui`                   | selection, filters, panels, layout and view mode        |
 | `settings` (persisted) | theme, quality, motion, renderer preference             |
 | `guide` (persisted)    | whether the first visit was oriented, challenges solved |
+| `capture`              | the open incident capture, its cursor, clock and sheets |
 
 The arrangement, the selection and the table view are also kept in the
-address (`app/urlState.ts`), so the address in the bar is a link to the view.
+address (`app/urlState.ts`), so the address in the bar is a link to the view;
+so is a bundled incident capture (`?capture=<id>`, `app/captureUrl.ts`).
 A whole experiment travels as a session (`app/session.ts`).
 
 TanStack Query holds request/response data (scenarios, providers, policy
 catalogue). The client talks to the server only through the
 `TelemetryProvider` interface from `@aegis/contracts`.
+
+### An incident capture
+
+An incident capture ([CAPTURES.md](CAPTURES.md)) is a real incident read by
+the browser from a file, and it is the one thing the client shows that does
+not come from the server or the engine. `features/capture/capture.ts` validates
+the file and holds the reading rules as pure functions of the capture and a
+moment; `stores/capture.ts` holds the open capture and owns its clock (a
+200 ms tick); `app/captureUrl.ts` ties opening and leaving to the address
+and the browser's history. While a capture is open the shell shows its
+parts in the places of the simulation's, and the scene bridge in
+`features/scene/SceneCanvas.tsx` hands the controller the capture, drawn by
+region, with a frame made by `frameAt` at each change of what it states,
+and lets nothing of the simulation through: no snapshot, selection, filter,
+route or trace. The simulation goes on behind it (on the server, or in the
+engine's worker), and is drawn again as it stands when the capture closes.
+
+A capture never reaches the server, a workspace or the simulation's
+timeline, and nothing in capture mode calls the API's mutations or writes
+the telemetry store. Its state colours use `lib/thresholds.ts`, a copy of
+the error levels of the engine's `classify` that a test holds to
+`engine.rs`. A state the capture does not give is a column of its own in
+the scene's frame (`known`), drawn as an upright, fainter piece on a dashed
+ring, so the scene never shows it as normal.
 
 ### Accessibility
 

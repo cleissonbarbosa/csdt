@@ -1,31 +1,49 @@
 # Security model
 
 The AEGIS simulator runs on synthetic data and can change nothing in an
-external system. The browser also has a [cloud incident replay](CLOUD-REPLAY.md)
-that reads captures from disk. Observed data is collected separately by an
-operator's read-only CLI export. The replay does not send the file to a
-server or grant the simulator access to it.
-This document states the boundaries that make that true and how each one is
-enforced.
+external system. Besides what an explicitly connected local instance
+reports (labelled `live`), the one thing it shows that is not synthetic is an
+[incident capture](CAPTURES.md): a real incident read by the browser from a
+file, which it sends nowhere. Capture files are written separately, by
+scripts an operator runs on their own machine with their own access, and
+those scripts only read; AEGIS never runs them. This document states the boundaries that make
+that true and how each one is enforced.
 
 ## What AEGIS cannot do
 
-| Boundary                                      | How it is enforced                                                                                                                        |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **No real attacks.**                          | Scenarios are declarative data that change numbers inside the simulation engine. The `simulation` and `incidents` modules perform no I/O. |
-| **No network scanning.**                      | The adapters contact the configured local services at fixed HTTP endpoints.                                                               |
-| **No infrastructure changes.**                | There are no cloud SDKs or credentials in the dependency tree.                                                                            |
-| **No outbound connections by default.**       | Demo Mode makes none. Integrations must be configured on the server _and_ switched on by the operator.                                    |
-| **No remote targets.**                        | Live adapters accept loopback targets only, unless a host is explicitly allow-listed.                                                     |
-| **No third-party requests from the browser.** | Fonts and scripts are bundled; the deployed CSP is `default-src 'self'`.                                                                  |
+| Boundary                                      | How it is enforced                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **No real attacks.**                          | Scenarios are declarative data that change numbers inside the simulation engine. The `simulation` and `incidents` modules perform no I/O.                                                                                                                                                                                |
+| **No network scanning.**                      | No code in AEGIS scans a host or a port. The two live adapters send fixed HTTP requests (cedar-agent's health check and its policy, data and `is_authorized` endpoints; rinha-backend's `GET /ready`) to the single target configured for each, through `guard.rs`.                                                      |
+| **No infrastructure changes.**                | The server, the engine and the page contain no cloud SDK and hold no cloud credential. The capture exporters in `scripts/` run on the operator's own machine, call read operations only (listed in [CAPTURES.md](CAPTURES.md)), and write no credential, token or backend address into a capture; AEGIS never runs them. |
+| **No outbound connections by default.**       | Demo Mode makes none. Integrations must be configured on the server _and_ switched on by the operator.                                                                                                                                                                                                                   |
+| **No remote targets.**                        | Live adapters accept loopback targets only, unless a host is explicitly allow-listed.                                                                                                                                                                                                                                    |
+| **No third-party requests from the browser.** | Fonts and scripts are bundled; the deployed CSP is `default-src 'self'`.                                                                                                                                                                                                                                                 |
 
 ## Data
 
 All bundled simulation data is synthetic, including services, metrics,
-incidents, principals and policies.
+incidents, principals and policies. The web build also bundles two incident
+captures that are not synthetic: a hand transcription of Google Cloud's
+public report on the incident of 12 June 2025, and aggregates of the RCAEval
+0.2.0 Online Boutique benchmark. Each names its source; neither reaches the
+server or the simulation's timeline.
 
-Every piece of data carries a provenance label (`synthetic`, `recording`,
-`live`) from the server to the pixel. A fixture is never labelled live.
+Every piece of data carries a provenance label from where it is produced to
+the pixel: `synthetic` (the simulation), `live` (a connected local instance)
+or `recording` (an incident capture, read in the browser and labelled as not
+simulated). Nothing the simulation produces is labelled `recording` or
+`live`.
+
+**An incident capture stays in the tab.** A file is read in the page (at most
+12 MiB), checked against the capture format and held in memory; it is not
+uploaded, not written to storage and gone on reload. A capture is not a
+workspace and is never placed on the simulation's timeline: while one is
+open, nothing in the interface acts on the simulation. A bundled capture is
+part of the build and loaded from it when opened. A capture's source link
+must be `https` and is a link the viewer follows, not a request the page
+makes. A capture can name a real system (service names, and in a CloudWatch
+capture an ARN with an account ID), so it is shared as the operator decides.
 
 AEGIS collects no telemetry about its users and stores nothing outside the
 browser's `localStorage` (display preferences).
@@ -89,8 +107,9 @@ Whichever way it arrives, a workspace is held to this:
   because its figures are computed whatever platform it describes. A scenario
   may only announce alerts, authentication failures, mitigations and reroutes;
   a recording, and a session, may only start and stop scenarios and place
-  and lift faults. Authorization decisions come from Cedar, and imported
-  event kinds remain reserved in the v1 format.
+  and lift faults. An authorization decision cannot be written into a file:
+  it comes from Cedar. Nothing a file holds, and nothing an incident capture
+  reads, is placed on the simulation's timeline.
 - **Cedar still decides.** Policies from a workspace are parsed and evaluated
   by `cedar-policy`. A flow is stopped at the authorizer only if Cedar denied
   its request.
@@ -117,8 +136,8 @@ takes an outcome, and what each can make the server do is bounded.
   `POST /demo/session/load` takes one and has the engine simulate it again.
   It is held to what a recording file is held to: it may start and stop
   scenarios and place and lift faults, with figures in range, on services
-  and connections the topology has. A decision or an imported event in it is
-  refused. Session exports omit and count on-demand decisions. At most 512
+  and connections the topology has. A decision in it is refused. Session
+  exports omit and count on-demand decisions. At most 512
   commands, 30 virtual minutes and 256 KiB, simulated off the async workers.
   Loading one replaces the timeline for everyone connected, as loading a
   bundled recording does.
@@ -154,7 +173,10 @@ takes an outcome, and what each can make the server do is bounded.
   platform on show, which the API serves to anyone who can reach it, and
   opening such an address changes nothing on the server. So does
   `?challenge=<id>`, which opens the guide on one question; the questions
-  answered are kept in the browser's own storage and sent nowhere.
+  answered are kept in the browser's own storage and sent nowhere. And so
+  does `?capture=<id>`, which can only name a capture bundled with the build
+  and opens it in the page (an id that names none is ignored); a capture
+  read from a file is never named in the address.
 
 ## Server
 
@@ -204,8 +226,15 @@ Rules enforced in `apps/server/src/integrations/guard.rs`:
   written to a log. A test asserts it does not appear in provider statuses.
 - cedar-agent is used read-only unless `AEGIS_CEDAR_AGENT_SYNC=true`.
 
-AEGIS does not use ambient credentials of any kind (no `gh` session, no cloud
-profile, no SSH agent).
+The server, the engine and the page use no ambient credentials of any kind
+(no `gh` session, no cloud profile, no SSH agent). The one place a cloud
+profile is used is `scripts/export-cloudwatch-capture.py`, through the AWS
+CLI, with the profile the operator names (`--profile`) or, without it, the
+CLI's default credential chain. `scripts/export-otel-capture.py` sends a
+bearer token from `TEMPO_TOKEN` or `PROMETHEUS_TOKEN` only to an `https://`
+URL or a loopback host, and stops before any request otherwise; it asks a
+loopback host directly, never through a proxy from the environment, and
+follows no redirect.
 
 ## Web client
 
@@ -239,8 +268,9 @@ the same routes, so everything above about what a file can and cannot do
 holds there unchanged. What is different is where it runs.
 
 - **It talks to nothing.** There is no API and no socket. The page requests
-  its own files (scripts, styles, fonts, the model file and the engine
-  module) and nothing else, and a test fails if it requests anything more.
+  its own files (scripts, styles, fonts, the model file, the engine module
+  and, when one is opened, a bundled incident capture) and nothing else, and
+  a test fails if it requests anything more.
 - **The module cannot reach out.** It is built with no imports at all: no
   network, no clock, no storage, no DOM. Text goes in, text comes out. This
   is checked on the built file, not assumed.
@@ -276,7 +306,8 @@ holds there unchanged. What is different is where it runs.
   itself is asked of the network first, so a visitor who is online gets the
   published build.
 - **It can be shown inside another page.** `?embed=1` leaves the bar out and
-  says in one line what this is. `&scenario=<id>` also starts an incident,
+  says in one line what this is, and reaches no incident capture, by its
+  address or otherwise. `&scenario=<id>` also starts an incident,
   and only here: on a server the simulation is shared, and there an address
   starts nothing. A host that can set headers and does not want the site
   framed should send `frame-ancestors`.

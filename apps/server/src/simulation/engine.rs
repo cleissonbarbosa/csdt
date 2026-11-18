@@ -11,8 +11,8 @@ use serde_json::json;
 
 use crate::domain::{
     AuthorizationDecision, DataSource, Decision, EventKind, GlobalMetrics, Health, HealthCounts,
-    ImportedEvent, Incident, IncidentStatus, RejectReason, Relationship, SecurityEvent,
-    SecurityStatus, ServiceType, Severity, TrafficCategory, TrafficEvent,
+    Incident, IncidentStatus, RejectReason, Relationship, SecurityEvent, SecurityStatus,
+    ServiceType, Severity, TrafficCategory, TrafficEvent,
 };
 use crate::incidents::{resolve_fault, Effect, ResolvedScenario};
 
@@ -68,13 +68,6 @@ pub enum Command {
     #[schemars(skip)]
     RecordDecision {
         decision: Box<AuthorizationDecision>,
-    },
-    /// Legacy events imported from a fixture-backed provider.
-    #[serde(rename_all = "camelCase")]
-    #[schemars(skip)]
-    ImportEvents {
-        provider_id: String,
-        events: Vec<ImportedEvent>,
     },
     /// Places a fault by hand: one effect, written as in a scenario phase,
     /// on services or connections of the topology. It holds, alongside
@@ -258,11 +251,6 @@ impl Emit {
 
     fn details(mut self, details: serde_json::Value) -> Self {
         self.details = details;
-        self
-    }
-
-    fn source(mut self, data_source: DataSource) -> Self {
-        self.data_source = data_source;
         self
     }
 }
@@ -636,20 +624,6 @@ fn apply_command(ctx: &StepContext, state: &mut SimState, command: &Command, em:
                 .nodes(node_ids)
                 .details(json!({ "origin": "explorer", "decision": decision })),
             );
-        }
-        Command::ImportEvents {
-            provider_id,
-            events,
-        } => {
-            for event in events {
-                em.push(
-                    Emit::new(event.severity, event.kind, event.title.clone())
-                        .message(event.message.clone())
-                        .nodes(event.node_ids.clone())
-                        .source(event.data_source)
-                        .details(json!({ "providerId": provider_id, "payload": event.details })),
-                );
-            }
         }
         Command::InjectFault { effect, ramp_ms } => {
             // A command is checked against the topology before it is

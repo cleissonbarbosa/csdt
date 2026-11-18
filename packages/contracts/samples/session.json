@@ -31,8 +31,7 @@
   },
   "cursorMs": 32000,
   "omitted": {
-    "decisions": 2,
-    "importedEvents": 0
+    "decisions": 2
   },
   "reproducible": true,
   "note": null,
