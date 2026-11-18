@@ -380,6 +380,17 @@ the error rate and the latency were past the values the engine's detection
 rules alert on, tagged _observed_. It does not call them an SLO or an error
 budget: nobody agreed them with anybody.
 
+**Two languages, one vocabulary.** The interface is in English and in
+Brazilian Portuguese. Each says the same things in the same few words: a
+service is a _serviço_ wherever it is met, health is _saudável_, _degradado_,
+_crítico_, _fora do ar_, and a statement is _prescrito_, _modelado_,
+_observado_ or _não explicado_. The rules above hold in both. Simulated time
+is never _ao vivo_: the cursor is at the _agora da simulação_ or in its
+_histórico_. A sentence is translated whole, so each language can put its
+words in its own order; nothing is assembled from fragments. What a file or
+the engine wrote (a service's name, a scenario, an event) is shown as it was
+written, in whatever language it was written in.
+
 **A name says which one.** A platform runs the same service in several
 regions under one name. Where the place is not on show (what a service
 calls, what an incident affected, a path) a name borne by more than one

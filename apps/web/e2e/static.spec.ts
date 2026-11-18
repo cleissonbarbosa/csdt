@@ -287,3 +287,31 @@ test.describe('kept by the browser', () => {
     await context.setOffline(false);
   });
 });
+
+test('the interface speaks Portuguese when asked, and English again when told', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openStatic(page, { language: 'pt-BR' });
+  await waitForScene(page, KINDS);
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe('pt-BR');
+  await expect(page.getByTestId('platform-status')).toContainText('51 serviços, todos normais');
+  await expect(page.getByTestId('explore-incident')).toHaveText('Explorar um incidente');
+  // The names on the model are the interface's too.
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__aegis!.labels())).map((n) => n.text))
+    .toEqual(expect.arrayContaining(['3 gateways de API']));
+  // What a file wrote is shown as it was written: a scenario keeps its name.
+  await page.getByTestId('explore-incident').click();
+  await expect(page.getByTestId('scenario-start-ddos-surge')).toBeVisible();
+  await expect(page.getByTestId('tab-incidents')).toContainText('Incidentes');
+  await expect(page.getByText('DDoS Surge').first()).toBeVisible();
+
+  // Back to English from the settings: the page reloads in it.
+  await fromMenu(page, 'settings');
+  const dialog = page.getByRole('dialog', { name: 'Configurações' });
+  await dialog.getByRole('radio', { name: 'English' }).click();
+  await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe('en');
+  expect(errors).toEqual([]);
+});

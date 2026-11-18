@@ -24,6 +24,10 @@
  * declared where the part is modelled), and the parser lays those mechanisms
  * out as a small table the piece material reads, one column each. `aPart.y`
  * is a vertex's column, so one material moves all twelve.
+ *
+ * not-interface-text: whole file. What it throws is for whoever built a
+ * file it cannot read, in the console; a viewer is told the scene could not
+ * start, in words of the interface's own.
  */
 import { SERVICE_TYPES, type ServiceType } from '@aegis/contracts';
 import * as THREE from 'three/webgpu';

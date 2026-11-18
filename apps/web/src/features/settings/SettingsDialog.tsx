@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Segmented, Switch } from '@/components/ui/Field';
+import { IN_BROWSER } from '@/app/host';
+import { t, type LanguageSetting } from '@/i18n';
 import {
   useSettings,
   useUi,
@@ -31,31 +33,39 @@ function Row({
   );
 }
 
+const LANGUAGE: { value: LanguageSetting; label: string }[] = [
+  { value: 'auto', label: t('Browser#language') },
+  // not-interface-text: each language is named in its own words
+  { value: 'en', label: 'English' },
+  // not-interface-text: each language is named in its own words
+  { value: 'pt-BR', label: 'Português (Brasil)' },
+];
+
 const THEME: { value: ThemeSetting; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'night', label: 'Night' },
+  { value: 'system', label: t('System') },
+  { value: 'light', label: t('Light') },
+  { value: 'night', label: t('Night') },
 ];
 const QUALITY: { value: QualitySetting; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'ultra', label: 'Ultra' },
+  { value: 'auto', label: t('Auto') },
+  { value: 'low', label: t('Low') },
+  { value: 'medium', label: t('Medium') },
+  { value: 'high', label: t('High') },
+  { value: 'ultra', label: t('Ultra') },
 ];
 const MOTION: { value: MotionSetting; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'reduced', label: 'Reduced' },
-  { value: 'full', label: 'Full' },
+  { value: 'system', label: t('System') },
+  { value: 'reduced', label: t('Reduced') },
+  { value: 'full', label: t('Full') },
 ];
 const RENDERER: { value: RendererSetting; label: string }[] = [
-  { value: 'auto', label: 'WebGPU (auto)' },
+  { value: 'auto', label: t('WebGPU (auto)') },
   { value: 'webgl2', label: 'WebGL 2' },
 ];
 const LAYOUT: { value: LayoutMode; label: string }[] = [
-  { value: 'layers', label: 'Overview' },
-  { value: 'regions', label: 'Regions' },
-  { value: 'dependencies', label: 'Dependencies' },
+  { value: 'layers', label: t('Overview') },
+  { value: 'regions', label: t('Regions') },
+  { value: 'dependencies', label: t('Dependencies') },
 ];
 
 export function SettingsDialog() {
@@ -66,93 +76,127 @@ export function SettingsDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => useUi.getState().setPanel(next ? 'settings' : null)}
-      title="Settings"
-      description="Preferences are stored in this browser only."
+      title={t('Settings')}
+      description={t('Preferences are stored in this browser only.')}
       width="max-w-xl"
     >
-      <h3 className="mb-1 text-xs font-bold text-ink">Appearance</h3>
+      <h3 className="mb-1 text-xs font-bold text-ink">{t('Appearance')}</h3>
       <Row
-        label="Theme"
-        hint="Light for a lit room, night for a dark one. Both follow the same rule: a colour is an answer, to you or to the data."
+        label={t('Language')}
+        hint={
+          IN_BROWSER
+            ? t(
+                "The interface's words. Changing it reloads the page, which starts the simulation in this tab again.",
+              )
+            : t(
+                "The interface's words. Changing it reloads the page; the simulation on the server goes on as it is.",
+              )
+        }
       >
         <Segmented
-          label="Theme"
+          label={t('Language')}
+          value={settings.language}
+          options={LANGUAGE}
+          onChange={(value) => {
+            settings.set('language', value);
+            // The language is read when the page loads. The setting is
+            // written before this returns, so the reload finds it.
+            if (value !== settings.language) window.location.reload();
+          }}
+        />
+      </Row>
+      <Row
+        label={t('Theme')}
+        hint={t(
+          'Light for a lit room, night for a dark one. Both follow the same rule: a colour is an answer, to you or to the data.',
+        )}
+      >
+        <Segmented
+          label={t('Theme')}
           value={settings.theme}
           options={THEME}
           onChange={(value) => settings.set('theme', value)}
         />
       </Row>
 
-      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Model</h3>
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">{t('Model')}</h3>
       <Row
-        label="Topology layout"
-        hint="The overview by kind of service, or every service on its own: by cloud region, or by dependency tier."
+        label={t('Topology layout')}
+        hint={t(
+          'The overview by kind of service, or every service on its own: by cloud region, or by dependency tier.',
+        )}
       >
         <Segmented
-          label="Topology layout"
+          label={t('Topology layout')}
           value={layoutMode}
           options={LAYOUT}
           onChange={(mode) => useUi.getState().setLayoutMode(mode)}
         />
       </Row>
       <Row
-        label="Rendering quality"
-        hint="Auto lowers resolution and bead density when frames get slow, and raises them back."
+        label={t('Rendering quality')}
+        hint={t(
+          'Auto lowers resolution and bead density when frames get slow, and raises them back.',
+        )}
       >
         <Segmented
-          label="Rendering quality"
+          label={t('Rendering quality')}
           value={settings.quality}
           options={QUALITY}
           onChange={(value) => settings.set('quality', value)}
         />
       </Row>
       <Row
-        label="Graphics backend"
-        hint="WebGPU is used when the browser offers it; WebGL 2 runs the same shaders. Changing this restarts the scene."
+        label={t('Graphics backend')}
+        hint={t(
+          'WebGPU is used when the browser offers it; WebGL 2 runs the same shaders. Changing this restarts the scene.',
+        )}
       >
         <Segmented
-          label="Graphics backend"
+          label={t('Graphics backend')}
           value={settings.renderer}
           options={RENDERER}
           onChange={(value) => settings.set('renderer', value)}
         />
       </Row>
       <Switch
-        label="Labels"
-        hint="Service and region names in the model."
+        label={t('Labels')}
+        hint={t('Service and region names in the model.')}
         checked={settings.labels}
         onCheckedChange={(v) => settings.set('labels', v)}
       />
       <Switch
-        label="Idle camera drift"
-        hint="Turns the model slowly until you move the camera. Off by default."
+        label={t('Idle camera drift')}
+        hint={t('Turns the model slowly until you move the camera. Off by default.')}
         checked={settings.autoRotate}
         onCheckedChange={(v) => settings.set('autoRotate', v)}
       />
 
-      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Accessibility</h3>
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">{t('Accessibility')}</h3>
       <Row
-        label="Motion"
-        hint="Reduced motion stops camera animation, the working parts of the pieces, the blink of a new alarm and interface transitions."
+        label={t('Motion')}
+        hint={t(
+          'Reduced motion stops camera animation, the working parts of the pieces, the blink of a new alarm and interface transitions.',
+        )}
       >
         <Segmented
-          label="Motion"
+          label={t('Motion')}
           value={settings.motion}
           options={MOTION}
           onChange={(value) => settings.set('motion', value)}
         />
       </Row>
 
-      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">Developer</h3>
+      <h3 className="mb-1 mt-5 text-xs font-bold text-ink">{t('Developer')}</h3>
       <Switch
-        label="Performance overlay"
-        hint="Frame rate, frame time, draw calls, bead count and backend."
+        label={t('Performance overlay')}
+        hint={t('Frame rate, frame time, draw calls, bead count and backend.')}
         checked={settings.devOverlay}
         onCheckedChange={(v) => settings.set('devOverlay', v)}
       />
       <div className="mt-4 flex justify-end">
         <Button variant="ghost" size="sm" onClick={settings.reset}>
-          Restore defaults
+          {t('Restore defaults')}
         </Button>
       </div>
     </Dialog>

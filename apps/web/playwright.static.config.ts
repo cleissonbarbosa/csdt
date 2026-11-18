@@ -25,6 +25,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: `http://127.0.0.1:${WEB_PORT}${BASE}`,
+    // The interface follows the browser's language; the tests are in English.
+    locale: 'en-US',
     viewport: { width: 1600, height: 900 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

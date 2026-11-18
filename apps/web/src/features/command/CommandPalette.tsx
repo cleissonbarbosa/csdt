@@ -7,6 +7,7 @@ import { actions } from '@/app/actions';
 import { showRegion } from '@/app/navigate';
 import { queryKeys } from '@/app/queryClient';
 import { sceneHandle } from '@/graphics/handle';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { api } from '@/providers/api';
 import { useGuide } from '@/stores/guide';
@@ -90,7 +91,7 @@ export function CommandPalette() {
           data-testid="command-palette"
         >
           <RadixDialog.Title className="sr-only">
-            Go to a service or run a command
+            {t('Go to a service or run a command')}
           </RadixDialog.Title>
           <div className="flex items-center gap-2 border-b border-line px-3">
             <Search size={15} aria-hidden className="shrink-0 text-ink-faint" />
@@ -100,8 +101,8 @@ export function CommandPalette() {
               aria-expanded
               aria-controls="command-results"
               aria-activedescendant={results[active] ? `command-${results[active].id}` : undefined}
-              aria-label="Search services, regions, scenarios and actions"
-              placeholder="Orders DB, frame EU West, start a scenario…"
+              aria-label={t('Search services, regions, scenarios and actions')}
+              placeholder={t('Orders DB, frame EU West, start a scenario…')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -122,13 +123,13 @@ export function CommandPalette() {
           </div>
           {results.length === 0 ? (
             <p className="px-3 py-4 text-xs text-ink-faint">
-              Nothing matches. Try the name of a service, a region or a scenario.
+              {t('Nothing matches. Try the name of a service, a region or a scenario.')}
             </p>
           ) : (
             <ul
               id="command-results"
               role="listbox"
-              aria-label="Results"
+              aria-label={t('Results')}
               className="max-h-[50vh] overflow-y-auto p-1"
             >
               {results.map((command, i) => (

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
 import { queryKeys } from '@/app/queryClient';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
 import { closestPermits, describeStanding, groupStandings } from '@/lib/standings';
 import { api } from '@/providers/api';
@@ -29,7 +31,7 @@ function Standing({
         className="flex w-full items-center gap-2 rounded-control px-1 py-0.5 text-left hover:bg-raised"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        title="Show the policy"
+        title={t('Show the policy')}
       >
         <span
           className={cn(
@@ -37,7 +39,7 @@ function Standing({
             standing.effect === 'forbid' ? 'bg-ink text-on-accent' : 'text-ink',
           )}
         >
-          {standing.effect === 'forbid' ? 'Forbid' : 'Permit'}
+          {standing.effect === 'forbid' ? t('Forbid') : t('Permit')}
         </span>
         <span className="numeric min-w-0 flex-1 truncate text-[11px] text-ink">
           {standing.policyId}
@@ -123,7 +125,7 @@ export function PolicyByPolicy({
   if (isError) {
     return (
       <p className="mt-3 text-[11px] text-ink-faint" data-testid="policy-standings-unavailable">
-        The policies could not be taken one by one.
+        {t('The policies could not be taken one by one.')}
       </p>
     );
   }
@@ -134,8 +136,9 @@ export function PolicyByPolicy({
   if (!agrees) {
     return (
       <p className="mt-3 text-[11px] text-ink-faint" data-testid="policy-standings-moved">
-        The policies in force are no longer the ones this was decided under: evaluate again to see
-        how each stands.
+        {t(
+          'The policies in force are no longer the ones this was decided under: evaluate again to see how each stands.',
+        )}
       </p>
     );
   }
@@ -144,28 +147,27 @@ export function PolicyByPolicy({
   const closest = closestPermits(data.policies);
   return (
     <div className="mt-3" data-testid="policy-standings">
-      <p className="caption mb-1">Policy by policy</p>
+      <p className="caption mb-1">{t('Policy by policy')}</p>
       {byDefault && (
         <p className="text-xs leading-relaxed text-ink-dim" data-testid="policy-closest">
-          {closest.length === 0 ? (
-            'No permit is about this request at all.'
-          ) : (
-            <>
-              Closest: <span className="code text-ink">{closest.join(', ')}</span>{' '}
-              {closest.length === 1 ? 'is' : 'are'} about this request, but{' '}
-              {closest.length === 1 ? 'its condition does' : 'their conditions do'} not hold.
-            </>
-          )}
+          {closest.length === 0
+            ? t('No permit is about this request at all.')
+            : tr(
+                closest.length === 1
+                  ? 'Closest: {ids} is about this request, but its condition does not hold.'
+                  : 'Closest: {ids} are about this request, but their conditions do not hold.',
+                { ids: <span className="code text-ink">{closest.join(', ')}</span> },
+              )}
         </p>
       )}
       <Group
-        title="Hold for this request"
+        title={t('Hold for this request')}
         standings={groups.holding}
         decision={data.decision}
         catalog={catalog}
       />
       <Group
-        title="About it, with a condition that does not hold"
+        title={t('About it, with a condition that does not hold')}
         standings={groups.near}
         decision={data.decision}
         catalog={catalog}
@@ -173,13 +175,18 @@ export function PolicyByPolicy({
       {groups.outside.length > 0 && (
         <details className="mt-1.5">
           <summary className="text-[11px] text-ink-faint hover:text-ink">
-            {groups.outside.length} not about this request
+            {t(
+              groups.outside.length === 1
+                ? '{n} not about this request#one'
+                : '{n} not about this request',
+              { n: groups.outside.length },
+            )}
           </summary>
           <Group title="" standings={groups.outside} decision={data.decision} catalog={catalog} />
         </details>
       )}
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-        Each policy in force, put to this request by itself by the embedded Cedar engine.
+        {t('Each policy in force, put to this request by itself by the embedded Cedar engine.')}
       </p>
     </div>
   );

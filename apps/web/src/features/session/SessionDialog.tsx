@@ -27,13 +27,28 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { downloadJson } from '@/features/workspace/files';
+import { t } from '@/i18n';
 import { formatClock } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useNotices } from '@/stores/notices';
 import { useUi } from '@/stores/ui';
 
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+/** The arrangement a view names, as it is said. */
+const ARRANGED: Record<NonNullable<NonNullable<SessionFile['view']>['arrangement']>, string> = {
+  layers: t('arranged by layers'),
+  regions: t('arranged by regions'),
+  dependencies: t('arranged by dependencies'),
+};
+
+/** `node:use-auth` as the view names it: "with node use-auth selected". */
+function selected(select: string): string {
+  const at = select.indexOf(':');
+  const kind = select.slice(0, at);
+  const id = select.slice(at + 1);
+  if (at >= 0 && kind === 'node') return t('with node {id} selected', { id });
+  if (at >= 0 && kind === 'edge') return t('with edge {id} selected', { id });
+  if (at >= 0 && kind === 'group') return t('with group {id} selected', { id });
+  return t('with {selection} selected', { selection: select.replace(':', ' ') });
 }
 
 function Problem({ children }: { children: string }) {
@@ -57,25 +72,30 @@ function Contents({ session }: { session: SessionFile }) {
       className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]"
       data-testid="session-contents"
     >
-      <dt className="text-ink-faint">Platform</dt>
+      <dt className="text-ink-faint">{t('Platform')}</dt>
       <dd className="text-ink">
         <span className="code">{recording.topologyId}</span>
         {session.workspace
-          ? `, with its ${plural(session.workspace.files.length, 'file')}`
-          : ', as bundled with AEGIS'}
+          ? t(
+              session.workspace.files.length === 1 ? ', with its {n} file' : ', with its {n} files',
+              {
+                n: session.workspace.files.length,
+              },
+            )
+          : t(', as bundled with AEGIS')}
       </dd>
-      <dt className="text-ink-faint">Seed</dt>
+      <dt className="text-ink-faint">{t('Seed')}</dt>
       <dd className="numeric text-ink">{recording.seed}</dd>
-      <dt className="text-ink-faint">Length</dt>
+      <dt className="text-ink-faint">{t('Length')}</dt>
       <dd className="numeric text-ink">
         {formatClock(recording.durationMs)}
         {session.cursorMs !== undefined && (
           <span className="font-normal text-ink-dim">
-            , opened paused at {formatClock(session.cursorMs)}
+            {t(', opened paused at {time}', { time: formatClock(session.cursorMs) })}
           </span>
         )}
       </dd>
-      <dt className="text-ink-faint">Commands</dt>
+      <dt className="text-ink-faint">{t('Commands')}</dt>
       <dd className="min-w-0 text-ink">
         <ul className="space-y-0.5">
           {describeSession(recording, scenarios?.scenarios).map((line, index) => (
@@ -88,15 +108,15 @@ function Contents({ session }: { session: SessionFile }) {
       </dd>
       {session.view && (
         <>
-          <dt className="text-ink-faint">View</dt>
+          <dt className="text-ink-faint">{t('View')}</dt>
           <dd className="text-ink">
             {[
-              session.view.arrangement && `arranged by ${session.view.arrangement}`,
-              session.view.view === 'table' && 'as a table',
-              session.view.select && `with ${session.view.select.replace(':', ' ')} selected`,
+              session.view.arrangement && ARRANGED[session.view.arrangement],
+              session.view.view === 'table' && t('as a table'),
+              session.view.select && selected(session.view.select),
             ]
               .filter(Boolean)
-              .join(', ') || 'the overview'}
+              .join(', ') || t('the overview')}
           </dd>
         </>
       )}
@@ -124,7 +144,7 @@ function Save() {
         fresh.workspaceOrigin === 'bundled' ? undefined : await api.exportWorkspace();
       return composeSession(fresh, currentView(), workspace);
     } catch (cause) {
-      setFailure(cause instanceof ApiError ? cause.message : 'The session could not be read.');
+      setFailure(cause instanceof ApiError ? cause.message : t('The session could not be read.'));
       return null;
     }
   };
@@ -145,9 +165,9 @@ function Save() {
       else {
         try {
           await navigator.clipboard.writeText(link);
-          useNotices.getState().push('info', 'Link to this session copied.');
+          useNotices.getState().push('info', t('Link to this session copied.'));
         } catch {
-          setFailure('The link could not be copied to the clipboard.');
+          setFailure(t('The link could not be copied to the clipboard.'));
         }
       }
     }
@@ -157,36 +177,56 @@ function Save() {
   if (error) {
     return (
       <Problem>
-        {error instanceof ApiError ? error.message : 'The session could not be read.'}
+        {error instanceof ApiError ? error.message : t('The session could not be read.')}
       </Problem>
     );
   }
-  if (!exported) return <p className="mt-2 text-xs text-ink-faint">Reading the timeline…</p>;
-  const omitted = exported.omitted.decisions + exported.omitted.importedEvents;
+  if (!exported) return <p className="mt-2 text-xs text-ink-faint">{t('Reading the timeline…')}</p>;
+  const { decisions, importedEvents } = exported.omitted;
+  const omitted = [
+    decisions > 0 &&
+      t(
+        decisions === 1
+          ? '{n} authorization decision evaluated by hand'
+          : '{n} authorization decisions evaluated by hand',
+        { n: decisions },
+      ),
+    importedEvents > 0 &&
+      t(
+        importedEvents === 1 ? '{n} import from an integration' : '{n} imports from an integration',
+        { n: importedEvents },
+      ),
+  ].filter((item) => typeof item === 'string');
   return (
     <div data-testid="session-save" data-reproducible={exported.reproducible}>
       <Contents session={composeSession(exported, currentView())} />
       {exported.workspaceOrigin !== 'bundled' && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-dim">
-          This platform is not the bundled one, so the file carries its files too. A link cannot.
+          {t(
+            'This platform is not the bundled one, so the file carries its files too. A link cannot.',
+          )}
         </p>
       )}
-      {omitted > 0 && (
+      {omitted.length > 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-dim" data-testid="session-omitted">
-          Not carried:{' '}
-          {[
-            exported.omitted.decisions > 0 &&
-              `${plural(exported.omitted.decisions, 'authorization decision')} evaluated by hand`,
-            exported.omitted.importedEvents > 0 &&
-              `${plural(exported.omitted.importedEvents, 'import')} from an integration`,
-          ]
-            .filter(Boolean)
-            .join(' and ')}
-          . A session never states an outcome: Cedar and the importers have to give those again.
+          {t(
+            'Not carried: {items}. A session never states an outcome: Cedar and the importers have to give those again.',
+            {
+              items:
+                omitted.length === 2
+                  ? t('{first} and {second}', { first: omitted[0]!, second: omitted[1]! })
+                  : omitted[0]!,
+            },
+          )}
         </p>
       )}
       {!exported.reproducible && (
-        <Problem>{`This timeline cannot be reproduced from a session: ${exported.note ?? 'part of it is missing'}.`}</Problem>
+        <Problem>
+          {t('This timeline cannot be reproduced from a session: {reason}.', {
+            // The server's note is shown as the server wrote it.
+            reason: exported.note ?? t('part of it is missing'),
+          })}
+        </Problem>
       )}
       {failure && <Problem>{failure}</Problem>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -198,7 +238,7 @@ function Save() {
           onClick={() => void save()}
           data-testid="session-download"
         >
-          Save as a file
+          {t('Save as a file')}
         </Button>
         <Button
           size="sm"
@@ -206,9 +246,11 @@ function Save() {
           disabled={busy || !exported.reproducible || exported.workspaceOrigin !== 'bundled'}
           onClick={() => void copy()}
           data-testid="session-copy-link"
-          title="The session travels in the part of the address after #, which is not sent to any server"
+          title={t(
+            'The session travels in the part of the address after #, which is not sent to any server',
+          )}
         >
-          Copy a link
+          {t('Copy a link')}
         </Button>
       </div>
     </div>
@@ -240,7 +282,7 @@ function Open({
       setFailure(problem);
       return;
     }
-    useNotices.getState().push('info', 'Session opened: its timeline was simulated again.');
+    useNotices.getState().push('info', t('Session opened: its timeline was simulated again.'));
     onDone();
   };
 
@@ -252,14 +294,14 @@ function Open({
           icon={<FileUp size={12} aria-hidden />}
           onClick={() => input.current?.click()}
         >
-          Choose a session file
+          {t('Choose a session file')}
         </Button>
         <input
           ref={input}
           type="file"
           hidden
           accept=".json,application/json"
-          aria-label="Session file to open"
+          aria-label={t('Session file to open')}
           data-testid="session-file"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -268,7 +310,7 @@ function Open({
             setFailure(null);
             void file.text().then(
               (text) => setPicked(parseSession(text)),
-              () => setPicked({ problem: 'The file could not be read.' }),
+              () => setPicked({ problem: t('The file could not be read.') }),
             );
           }}
         />
@@ -276,7 +318,7 @@ function Open({
       {picked && 'problem' in picked && <Problem>{picked.problem}</Problem>}
       {picked && 'session' in picked && (
         <div className="mt-3 rounded-control border border-line px-2.5 py-2">
-          <p className="text-xs text-ink">This session holds:</p>
+          <p className="text-xs text-ink">{t('This session holds:')}</p>
           <Contents session={picked.session} />
           {failure && <Problem>{failure}</Problem>}
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -287,7 +329,7 @@ function Open({
               onClick={() => void open(picked.session)}
               data-testid="session-open-confirm"
             >
-              {busy ? 'Simulating it again…' : 'Open this session'}
+              {busy ? t('Simulating it again…') : t('Open this session')}
             </Button>
             <Button
               size="sm"
@@ -297,11 +339,14 @@ function Open({
                 onDecline();
               }}
             >
-              Not now
+              {t('Not now')}
             </Button>
             <span className="caption">
-              Opening replaces the timeline in use
-              {picked.session.workspace ? ' and the platform files' : ''} for everyone connected.
+              {picked.session.workspace
+                ? t(
+                    'Opening replaces the timeline in use and the platform files for everyone connected.',
+                  )
+                : t('Opening replaces the timeline in use for everyone connected.')}
             </span>
           </div>
         </div>
@@ -339,18 +384,20 @@ export function SessionDialog() {
         if (!next) forget();
         useUi.getState().setPanel(next ? 'session' : null);
       }}
-      title="Session"
-      description="What reproduces the experiment on screen: the platform, the seed, the commands issued, the moment and the view. Opening a session simulates it again; no figure travels with it."
+      title={t('Session')}
+      description={t(
+        'What reproduces the experiment on screen: the platform, the seed, the commands issued, the moment and the view. Opening a session simulates it again; no figure travels with it.',
+      )}
     >
       {offered && (
         <p className="mb-3 text-xs leading-relaxed text-ink" data-testid="session-offered">
-          The link you followed carries a session. Nothing has been changed yet.
+          {t('The link you followed carries a session. Nothing has been changed yet.')}
         </p>
       )}
       {!offered && (
         <section aria-labelledby="session-save-title">
           <h3 id="session-save-title" className="text-xs font-bold text-ink">
-            This session
+            {t('This session')}
           </h3>
           {open && <Save />}
         </section>
@@ -360,7 +407,7 @@ export function SessionDialog() {
         className={offered ? undefined : 'mt-4 border-t border-line pt-4'}
       >
         <h3 id="session-open-title" className="text-xs font-bold text-ink">
-          Open a session
+          {t('Open a session')}
         </h3>
         <Open
           offered={offered}

@@ -17,6 +17,8 @@ import { queryKeys } from '@/app/queryClient';
 import { Button } from '@/components/ui/Button';
 import { Fold } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { exposureOf, guardedBy, resourceTypesAt } from '@/lib/exposure';
 import { api } from '@/providers/api';
 import { useUi } from '@/stores/ui';
@@ -25,6 +27,36 @@ import { useUi } from '@/stores/ui';
 const SHOWN = 6;
 /** The matrix under every policy and nothing in the context. */
 const AS_IT_IS = { context: {}, disabledPolicies: [] as string[] };
+
+/** What a service's connections lead to, and how many of those hold data. */
+function reachSentence(reaches: number, stores: number): string {
+  const values = { n: reaches, stores };
+  if (stores === 0) {
+    return t(reaches === 1 ? 'It reaches {n} service.' : 'It reaches {n} services.', values);
+  }
+  if (stores === 1) {
+    return t(
+      reaches === 1
+        ? 'It reaches {n} service, {stores} of them a store of data.'
+        : 'It reaches {n} services, {stores} of them a store of data.',
+      values,
+    );
+  }
+  return t('It reaches {n} services, {stores} of them stores of data.', values);
+}
+
+/** How many services lead to this one, and whether any of the ways starts outside. */
+function reachedBySentence(count: number, fromOutside: boolean): string {
+  if (fromOutside) {
+    return t(count === 1 ? '{n} service leads to it.' : '{n} services lead to it.', { n: count });
+  }
+  return t(
+    count === 1
+      ? '{n} service leads to it, none of them from outside the platform.'
+      : '{n} services lead to it, none of them from outside the platform.',
+    { n: count },
+  );
+}
 
 function Names({ topology, ids }: { topology: Topology; ids: string[] }) {
   const [all, setAll] = useState(false);
@@ -51,7 +83,7 @@ function Names({ topology, ids }: { topology: Topology; ids: string[] }) {
             className="text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-ink"
             onClick={() => setAll(!all)}
           >
-            {all ? 'fewer' : `and ${ids.length - SHOWN} more`}
+            {all ? t('fewer') : t('and {n} more', { n: ids.length - SHOWN })}
           </button>
         </>
       )}
@@ -78,12 +110,20 @@ function Guarded({ topology, nodeId }: { topology: Topology; nodeId: string }) {
   if (guarded.length === 0) return null;
   return (
     <div className="mt-2.5" data-testid="exposure-guarded">
-      <p className="text-xs text-ink">What Cedar guards here</p>
+      <p className="text-xs text-ink">{t('What Cedar guards here')}</p>
       {guarded.map((entry) => (
         <p key={entry.resourceType} className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
-          Requests for a <span className="code text-ink">{entry.resourceType}</span> end at this
-          service. Of the {entry.asked} the catalogue describes, Cedar allows {entry.allowed}, to{' '}
-          {entry.principals} of {entry.ofPrincipals} principals.
+          {tr(
+            'Requests for a <code>{type}</code> end at this service. Of the {asked} the catalogue describes, Cedar allows {allowed}, to {principals} of {total} principals.',
+            {
+              code: (children) => <span className="code text-ink">{children}</span>,
+              type: entry.resourceType,
+              asked: entry.asked,
+              allowed: entry.allowed,
+              principals: entry.principals,
+              total: entry.ofPrincipals,
+            },
+          )}
         </p>
       ))}
       <Button
@@ -92,9 +132,9 @@ function Guarded({ topology, nodeId }: { topology: Topology; nodeId: string }) {
         onClick={() => useUi.getState().setPanel('matrix')}
         data-testid="exposure-matrix"
       >
-        Who may do what
+        {t('Who may do what')}
       </Button>
-      <p className="caption mt-1">Under every policy in force and an empty context.</p>
+      <p className="caption mt-1">{t('Under every policy in force and an empty context.')}</p>
     </div>
   );
 }
@@ -113,21 +153,18 @@ export function Exposure({ topology, nodeId }: { topology: Topology; nodeId: str
   };
   const { reaches, stores, reachedBy, wayIn } = exposure;
   return (
-    <Fold title="Exposure" testId="node-exposure">
+    <Fold title={t('Exposure')} testId="node-exposure">
       <p className="caption mb-2">
-        Were this service taken over: what its connections lead to, and how it is reached. Read from
-        the topology; nothing is simulated.
+        {t(
+          'Were this service taken over: what its connections lead to, and how it is reached. Read from the topology; nothing is simulated.',
+        )}
       </p>
 
       <div data-testid="exposure-reaches" data-count={reaches.length}>
         <p className="text-xs text-ink">
           {reaches.length === 0
-            ? 'It opens no connection: nothing is reached from it.'
-            : `It reaches ${reaches.length} ${reaches.length === 1 ? 'service' : 'services'}${
-                stores.length > 0
-                  ? `, ${stores.length} of them ${stores.length === 1 ? 'a store' : 'stores'} of data`
-                  : ''
-              }.`}
+            ? t('It opens no connection: nothing is reached from it.')
+            : reachSentence(reaches.length, stores.length)}
         </p>
         {stores.length > 0 && <Names topology={topology} ids={stores} />}
         {reaches.length > 0 && (
@@ -139,7 +176,7 @@ export function Exposure({ topology, nodeId }: { topology: Topology; nodeId: str
             onClick={() => show(!shown)}
             data-testid="exposure-show"
           >
-            {shown ? 'Kept in front on the model' : 'Keep them in front on the model'}
+            {shown ? t('Kept in front on the model') : t('Keep them in front on the model')}
           </Button>
         )}
       </div>
@@ -147,18 +184,20 @@ export function Exposure({ topology, nodeId }: { topology: Topology; nodeId: str
       <div className="mt-2.5" data-testid="exposure-way-in">
         <p className="text-xs text-ink">
           {reachedBy.length === 0
-            ? 'No connection leads to it.'
-            : `${reachedBy.length} ${reachedBy.length === 1 ? 'service leads' : 'services lead'} to it${
-                wayIn ? '.' : ', none of them from outside the platform.'
-              }`}
+            ? t('No connection leads to it.')
+            : reachedBySentence(reachedBy.length, wayIn !== null)}
         </p>
         {wayIn && (
           <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
-            The shortest way in from outside, {wayIn.length - 1}{' '}
-            {wayIn.length === 2 ? 'connection' : 'connections'}:{' '}
+            {t(
+              wayIn.length === 2
+                ? 'The shortest way in from outside, {n} connection:'
+                : 'The shortest way in from outside, {n} connections:',
+              { n: wayIn.length - 1 },
+            )}{' '}
             {wayIn.map((id, i) => (
               <span key={id}>
-                {i > 0 && <ArrowRight size={10} aria-label="then" className="mx-1 inline" />}
+                {i > 0 && <ArrowRight size={10} aria-label={t('then')} className="mx-1 inline" />}
                 <span className="text-ink">
                   <ServiceName topology={topology} id={id} />
                 </span>

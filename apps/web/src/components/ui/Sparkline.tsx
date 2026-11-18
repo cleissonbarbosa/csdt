@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import { COLOR } from '@/lib/palette';
 
 interface SparklineProps {
@@ -33,7 +34,12 @@ export function Sparkline({
   const count = Math.min(length, values.length);
   if (count < 2) {
     return (
-      <svg width={width} height={height} role="img" aria-label={`${label}: not enough data`} />
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label={t('{label}: not enough data', { label })}
+      />
     );
   }
   let top = max ?? 0;

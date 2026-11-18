@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 export interface MenuItem {
@@ -108,7 +109,7 @@ export function Menu({
                 {item.icon}
               </span>
               <span className="min-w-0 flex-1">{item.label}</span>
-              {item.checked && <span className="text-[11px] text-ink-faint">On</span>}
+              {item.checked && <span className="text-[11px] text-ink-faint">{t('On#state')}</span>}
               {item.hint && <kbd className="code text-[10px] text-ink-faint">{item.hint}</kbd>}
             </button>
           ))}

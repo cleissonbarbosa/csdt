@@ -16,6 +16,8 @@ import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
 import { formatPercent } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
@@ -33,43 +35,53 @@ import {
 } from './files';
 
 const ORIGIN: Record<WorkspaceStatus['origin'], string> = {
-  bundled: 'The platform that ships with AEGIS.',
-  startup: 'The workspace this server was started with.',
+  bundled: t('The platform that ships with AEGIS.'),
+  startup: t('The workspace this server was started with.'),
   imported: HOST.imported,
 };
 
-function plural(count: number, noun: string, many = `${noun}s`): string {
-  return `${count} ${count === 1 ? noun : many}`;
-}
+const code = (children: ReactNode) => <span className="code">{children}</span>;
 
 function message(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Something went wrong.';
+  return error instanceof ApiError ? error.message : t('Something went wrong.');
 }
 
 /** What a set of files amounts to: the platforms, the incidents, the policies. */
 function Contents({ workspace }: { workspace: WorkspaceStatus }) {
+  const platforms = workspace.topologies.length;
+  const scenarios = workspace.scenarioIds.length;
+  const recordings = workspace.recordingIds.length;
+  const policies = workspace.policyCount;
+  const unavailable = workspace.unavailable.length;
   const rows: [string, ReactNode][] = [
     [
-      plural(workspace.topologies.length, 'platform'),
+      t(platforms === 1 ? '{n} platform' : '{n} platforms', { n: platforms }),
       workspace.topologies
-        .map((topology) => `${topology.name} (${plural(topology.nodeCount, 'service')})`)
+        .map(
+          (topology) =>
+            `${topology.name} (${t(topology.nodeCount === 1 ? '{n} service' : '{n} services', {
+              n: topology.nodeCount,
+            })})`,
+        )
         .join(', '),
     ],
     [
-      plural(workspace.scenarioIds.length, 'scenario'),
+      t(scenarios === 1 ? '{n} scenario' : '{n} scenarios', { n: scenarios }),
       <span key="scenarios" className="code">
         {workspace.scenarioIds.join(', ')}
       </span>,
     ],
     [
-      plural(workspace.recordingIds.length, 'recording'),
+      t(recordings === 1 ? '{n} recording' : '{n} recordings', { n: recordings }),
       <span key="recordings" className="code">
         {workspace.recordingIds.join(', ')}
       </span>,
     ],
     [
-      plural(workspace.policyCount, 'Cedar policy', 'Cedar policies'),
-      `Cedar denies ${formatPercent(workspace.baselineDenyFraction)} of ordinary requests`,
+      t(policies === 1 ? '{n} Cedar policy' : '{n} Cedar policies', { n: policies }),
+      t('Cedar denies {share} of ordinary requests', {
+        share: formatPercent(workspace.baselineDenyFraction),
+      }),
     ],
   ];
   return (
@@ -85,13 +97,23 @@ function Contents({ workspace }: { workspace: WorkspaceStatus }) {
       {workspace.unavailable.length > 0 && (
         <div className="mt-2 text-[11px] text-ink-dim" data-testid="workspace-unavailable">
           <p className="text-ink">
-            {plural(workspace.unavailable.length, 'scenario')} cannot run on a platform
+            {t(
+              unavailable === 1
+                ? '{n} scenario cannot run on a platform'
+                : '{n} scenarios cannot run on a platform',
+              { n: unavailable },
+            )}
           </p>
           <ul className="mt-1 space-y-0.5">
             {workspace.unavailable.map((entry) => (
               <li key={`${entry.scenarioId}:${entry.topologyId}`}>
-                <span className="code">{entry.scenarioId}</span> on{' '}
-                <span className="code">{entry.topologyId}</span>: {entry.reason}
+                {tr('<c>{scenario}</c> on <c>{topology}</c>: {reason}', {
+                  c: code,
+                  scenario: entry.scenarioId,
+                  topology: entry.topologyId,
+                  // Why, as the server's check wrote it.
+                  reason: entry.reason,
+                })}
               </li>
             ))}
           </ul>
@@ -99,7 +121,7 @@ function Contents({ workspace }: { workspace: WorkspaceStatus }) {
       )}
       {workspace.ignored.length > 0 && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          Not read: <span className="code">{workspace.ignored.join(', ')}</span>
+          {tr('Not read: <c>{files}</c>', { c: code, files: workspace.ignored.join(', ') })}
         </p>
       )}
     </>
@@ -198,14 +220,13 @@ function Import() {
   return (
     <section aria-labelledby="workspace-import">
       <h3 id="workspace-import" className="text-xs font-bold text-ink">
-        Import
+        {t('Import')}
       </h3>
       <p className="mt-1 text-xs leading-relaxed text-ink-dim">
-        A topology, scenarios, recordings, Cedar policies, entities, a catalogue, a whole workspace
-        folder, or a file saved from here. Each kind of file you add replaces that part of{' '}
-        {HOST.started}; the rest stays. A Compose file (<span className="code">.yml</span>) is read
-        as a topology: its services and what each depends on are taken from it, and its traffic and
-        latencies, which it does not state, are defaults.
+        {tr(
+          'A topology, scenarios, recordings, Cedar policies, entities, a catalogue, a whole workspace folder, or a file saved from here. Each kind of file you add replaces that part of {started}; the rest stays. A Compose file (<c>.yml</c>) is read as a topology: its services and what each depends on are taken from it, and its traffic and latencies, which it does not state, are defaults.',
+          { c: code, started: HOST.started },
+        )}
       </p>
 
       <div
@@ -226,23 +247,23 @@ function Import() {
           icon={<FileUp size={12} aria-hidden />}
           onClick={() => filesInput.current?.click()}
         >
-          Choose files
+          {t('Choose files')}
         </Button>
         <Button
           size="sm"
           icon={<FolderUp size={12} aria-hidden />}
           onClick={() => folderInput.current?.click()}
         >
-          Choose a folder
+          {t('Choose a folder')}
         </Button>
-        <span className="text-[11px] text-ink-faint">or drop them here</span>
+        <span className="text-[11px] text-ink-faint">{t('or drop them here')}</span>
         <input
           ref={filesInput}
           type="file"
           multiple
           hidden
           accept=".json,.cedar,.cedarschema,.yml,.yaml"
-          aria-label="Files to import"
+          aria-label={t('Files to import')}
           data-testid="workspace-files"
           onChange={(event) => {
             void add(fromInput(event.target.files ?? []));
@@ -255,7 +276,7 @@ function Import() {
           type="file"
           multiple
           hidden
-          aria-label="Folder to import"
+          aria-label={t('Folder to import')}
           data-testid="workspace-folder"
           // Not in React's types; every current browser has it.
           {...({ webkitdirectory: '' } as object)}
@@ -272,18 +293,19 @@ function Import() {
         onClick={() => void startFromCurrent()}
         data-testid="workspace-start-from-current"
       >
-        Start from the files in use, to add to them
+        {t('Start from the files in use, to add to them')}
       </button>
 
       {skipped.length > 0 && (
         <p className="mt-2 text-[11px] text-ink-faint" data-testid="workspace-skipped">
-          Left out:{' '}
-          {skipped.map((entry, i) => (
-            <span key={entry.path}>
-              {i > 0 && '; '}
-              <span className="code">{entry.path}</span> ({entry.reason})
-            </span>
-          ))}
+          {tr('Left out: {files}', {
+            files: skipped.map((entry, i) => (
+              <span key={entry.path}>
+                {i > 0 && '; '}
+                <span className="code">{entry.path}</span> ({entry.reason})
+              </span>
+            )),
+          })}
         </p>
       )}
 
@@ -291,7 +313,7 @@ function Import() {
         <>
           <ul
             className="mt-3 max-h-40 divide-y divide-line overflow-y-auto rounded-control border border-line"
-            aria-label="Files to import"
+            aria-label={t('Files to import')}
             data-testid="workspace-staged"
           >
             {staged.map((file) => (
@@ -304,7 +326,7 @@ function Import() {
                 </span>
                 <IconButton
                   size="sm"
-                  label={`Remove ${file.path}`}
+                  label={t('Remove {file}', { file: file.path })}
                   onClick={() => setStaged(staged.filter((other) => other !== file))}
                 >
                   <X size={12} />
@@ -315,13 +337,13 @@ function Import() {
 
           <div className="mt-3" role="status" aria-live="polite" data-testid="workspace-check">
             {outcome === null ? (
-              <p className="text-[11px] text-ink-faint">Checking…</p>
+              <p className="text-[11px] text-ink-faint">{t('Checking…')}</p>
             ) : typeof outcome === 'string' ? (
               <Problem>{outcome}</Problem>
             ) : outcome.workspace ? (
               <div data-valid="true">
                 <p className="mb-1.5 text-xs text-ink">
-                  These files are valid. Applying them gives:
+                  {t('These files are valid. Applying them gives:')}
                 </p>
                 <Contents workspace={outcome.workspace} />
                 <PolicyDiff files={staged} />
@@ -333,7 +355,7 @@ function Import() {
                     <span className="code font-bold">{outcome.problem.path}</span>:{' '}
                   </>
                 )}
-                {outcome.problem?.message ?? 'These files are not a valid workspace.'}
+                {outcome.problem?.message ?? t('These files are not a valid workspace.')}
               </Problem>
             )}
           </div>
@@ -350,13 +372,13 @@ function Import() {
               onClick={() => void apply()}
               data-testid="workspace-apply"
             >
-              Apply
+              {t('Apply')}
             </Button>
             <Button disabled={busy} onClick={clear}>
-              Clear
+              {t('Clear')}
             </Button>
             <span className="text-[11px] text-ink-faint">
-              Applying starts a new timeline for everyone connected.
+              {t('Applying starts a new timeline for everyone connected.')}
             </span>
           </div>
         </>
@@ -402,12 +424,14 @@ export function WorkspaceDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => setPanel(next ? 'workspace' : null)}
-      title="Platform files"
-      description="The platform, its incidents and its Cedar policies are read from files. Yours can take their place. What is shown stays a simulation of whatever they describe."
+      title={t('Platform files')}
+      description={t(
+        'The platform, its incidents and its Cedar policies are read from files. Yours can take their place. What is shown stays a simulation of whatever they describe.',
+      )}
     >
       <section aria-labelledby="workspace-in-use" data-testid="workspace-in-use">
         <h3 id="workspace-in-use" className="text-xs font-bold text-ink">
-          In use
+          {t('In use')}
         </h3>
         {workspace ? (
           <div data-origin={workspace.origin}>
@@ -416,7 +440,10 @@ export function WorkspaceDialog() {
               {workspace.origin !== 'bundled' && workspace.replaced.length > 0 && (
                 <>
                   {' '}
-                  From them: <span className="code">{workspace.replaced.join(', ')}</span>.
+                  {tr('From them: <c>{parts}</c>.', {
+                    c: code,
+                    parts: workspace.replaced.join(', '),
+                  })}
                 </>
               )}
             </p>
@@ -429,7 +456,7 @@ export function WorkspaceDialog() {
                 onClick={() => void save()}
                 data-testid="workspace-export"
               >
-                Save as one file
+                {t('Save as one file')}
               </Button>
               {workspace.origin === 'imported' && workspace.importEnabled && (
                 <Button
@@ -439,7 +466,7 @@ export function WorkspaceDialog() {
                   onClick={() => void reset()}
                   data-testid="workspace-reset"
                 >
-                  Return to {HOST.started}
+                  {t('Return to {started}', { started: HOST.started })}
                 </Button>
               )}
             </div>
@@ -457,9 +484,10 @@ export function WorkspaceDialog() {
       <div className="mt-4 border-t border-line pt-4">
         {workspace?.importEnabled === false ? (
           <p className="text-xs leading-relaxed text-ink-dim" data-testid="workspace-import-off">
-            Importing is switched off on this server (<span className="code">AEGIS_IMPORT=off</span>
-            ). Files can still be saved from here and given to it when it starts, with{' '}
-            <span className="code">AEGIS_WORKSPACE</span>.
+            {tr(
+              'Importing is switched off on this server (<c>AEGIS_IMPORT=off</c>). Files can still be saved from here and given to it when it starts, with <c>AEGIS_WORKSPACE</c>.',
+              { c: code },
+            )}
           </p>
         ) : (
           <Import />

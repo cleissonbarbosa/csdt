@@ -7,42 +7,49 @@
  */
 import { transport } from '@transport';
 
+import { t } from '@/i18n';
+
 /** Whether the simulation runs in this tab rather than on a server. */
 export const IN_BROWSER = transport.engine === 'browser';
 
 export const HOST = IN_BROWSER
   ? {
       /** A request got no answer. */
-      unreachable: 'The simulation engine is not running.',
-      asking: 'Asking the engine…',
+      unreachable: t('The simulation engine is not running.'),
+      asking: t('Asking the engine…'),
       /** While the stream is not open, in the top bar. */
-      connecting: 'Loading the engine',
+      connecting: t('Loading the engine'),
       reconnecting: 'Engine stopped',
       /** How synthetic data came to be. */
-      synthetic: 'Produced by the simulation engine, which runs in this tab.',
+      synthetic: t('Produced by the simulation engine, which runs in this tab.'),
       /** The files everything started from, as the object of a sentence. */
-      started: 'what this page opened with',
-      imported:
+      started: t('what this page opened with'),
+      imported: t(
         'Files imported into this page. They are held in its memory and are gone when it is reloaded.',
-      backToStart: 'Back to the files this page opened with.',
-      adapters:
+      ),
+      backToStart: t('Back to the files this page opened with.'),
+      adapters: t(
         'This page runs the simulation in the browser and connects to nothing. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server. Fixtures are files parsed in the format of a public project; importing them contacts nothing.',
-      agent:
+      ),
+      agent: t(
         'Evaluating with a local cedar-agent needs the AEGIS server. This page has the embedded engine only.',
+      ),
     }
   : {
-      unreachable: 'The server could not be reached.',
-      asking: 'Asking the server…',
+      unreachable: t('The server could not be reached.'),
+      asking: t('Asking the server…'),
       connecting: 'Connecting',
       reconnecting: 'Reconnecting',
-      synthetic: 'Produced by the built-in simulation engine.',
-      started: 'what the server started with',
-      imported:
+      synthetic: t('Produced by the built-in simulation engine.'),
+      started: t('what the server started with'),
+      imported: t(
         'Files imported since this server started. They are held in its memory and are gone when it restarts.',
-      backToStart: 'Back to the files the server started with.',
-      adapters:
+      ),
+      backToStart: t('Back to the files the server started with.'),
+      adapters: t(
         'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects. Fixtures are local files parsed in the format of a public project; importing them contacts nothing.',
-      agent: 'Connect a local cedar-agent under Integrations to evaluate with it instead.',
+      ),
+      agent: t('Connect a local cedar-agent under Integrations to evaluate with it instead.'),
     };
 
 /**
@@ -51,5 +58,5 @@ export const HOST = IN_BROWSER
  * not measured is not shown as one.
  */
 export function evaluationTime(micros: number): string {
-  return IN_BROWSER ? 'not timed in the browser' : `${micros} µs measured`;
+  return IN_BROWSER ? t('not timed in the browser') : t('{n} µs measured', { n: micros });
 }

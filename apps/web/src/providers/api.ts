@@ -41,6 +41,8 @@ import {
 import { transport } from '@transport';
 import { z } from 'zod';
 
+import { t } from '@/i18n';
+
 /** Base URL of the API. Empty means "same origin" (the default). */
 export const API_BASE: string = (import.meta.env.VITE_AEGIS_API_URL ?? '').replace(/\/+$/, '');
 const PREFIX = '/api/v1';
@@ -102,14 +104,20 @@ async function request<T>(
   try {
     payload = await response.json();
   } catch {
-    throw new ApiError(response.status, 'invalid_response', 'The server sent a non-JSON response.');
+    throw new ApiError(
+      response.status,
+      'invalid_response',
+      t('The server sent a non-JSON response.'),
+    );
   }
   if (!response.ok) {
     const parsed = ApiErrorSchema.safeParse(payload);
     throw new ApiError(
       response.status,
       parsed.success ? parsed.data.error.code : 'http_error',
-      parsed.success ? parsed.data.error.message : `Request failed with HTTP ${response.status}.`,
+      parsed.success
+        ? parsed.data.error.message
+        : t('Request failed with HTTP {status}.', { status: response.status }),
     );
   }
   const result = schema.safeParse(payload);
@@ -117,7 +125,7 @@ async function request<T>(
     throw new ApiError(
       response.status,
       'contract_violation',
-      `The response for ${path} does not match contract v1.0.`,
+      t('The response for {path} does not match contract v1.0.', { path }),
     );
   }
   return result.data;

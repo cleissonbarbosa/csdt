@@ -1,5 +1,7 @@
 import type { AccessCell, AccessMatrix, AuthorizationCatalog } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 /** What one principal may do with one action: an answer per resource. */
 export interface ActionAccess {
   action: string;
@@ -67,8 +69,8 @@ export function tabulate(
 /** How many of its resources an action is allowed on, in words. */
 export function describeAccess(access: Pick<ActionAccess, 'allowed' | 'cells'>): string {
   const total = access.cells.length;
-  if (total === 0) return 'not asked';
-  if (access.allowed === 0) return 'none';
-  if (access.allowed === total) return total === 1 ? 'yes' : `all ${total}`;
-  return `${access.allowed} of ${total}`;
+  if (total === 0) return t('not asked');
+  if (access.allowed === 0) return t('none#resources');
+  if (access.allowed === total) return total === 1 ? t('yes') : t('all {n}', { n: total });
+  return t('{n} of {total}', { n: access.allowed, total });
 }

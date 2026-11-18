@@ -4,6 +4,7 @@
 import type { SecurityEvent, TimelineReason } from '@aegis/contracts';
 import { useEffect } from 'react';
 
+import { t } from '@/i18n';
 import { api, ApiError } from '@/providers/api';
 import { DemoSimulationProvider } from '@/providers/demoProvider';
 import { useNotices } from '@/stores/notices';
@@ -35,7 +36,7 @@ function loadTopology(): Promise<void> {
       telemetry.setTopology(topology);
     } catch (error) {
       telemetry.setLoadError(
-        error instanceof ApiError ? error.message : 'The topology could not be loaded.',
+        error instanceof ApiError ? error.message : t('The topology could not be loaded.'),
       );
       throw error;
     } finally {
@@ -77,8 +78,8 @@ export function growsReport(event: SecurityEvent): boolean {
 export function announceResolved(event: SecurityEvent): void {
   const incidentId = event.incidentId;
   if (event.kind !== 'incident-resolved' || incidentId === null) return;
-  useNotices.getState().push('info', `${event.title}. Its summary is ready.`, {
-    label: 'Open the summary',
+  useNotices.getState().push('info', t('{title}. Its summary is ready.', { title: event.title }), {
+    label: t('Open the summary'),
     run: () => useUi.getState().inspectIncident(incidentId),
   });
 }

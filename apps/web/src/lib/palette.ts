@@ -7,6 +7,8 @@ import type {
   Severity,
 } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 /**
  * The Signal Field palette.
  *
@@ -127,10 +129,10 @@ export const HEALTH_COLOR: Record<Health, string> = {
 };
 
 export const HEALTH_LABEL: Record<Health, string> = {
-  healthy: 'Healthy',
-  degraded: 'Degraded',
-  critical: 'Critical',
-  down: 'Down',
+  healthy: t('Healthy'),
+  degraded: t('Degraded'),
+  critical: t('Critical'),
+  down: t('Down'),
 };
 
 export const SEVERITY_COLOR: Record<Severity, string> = {
@@ -141,10 +143,10 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
 };
 
 export const SEVERITY_LABEL: Record<Severity, string> = {
-  info: 'Info',
-  notice: 'Notice',
-  warning: 'Warning',
-  critical: 'Critical',
+  info: t('Info'),
+  notice: t('Notice'),
+  warning: t('Warning'),
+  critical: t('Critical'),
 };
 
 export const SECURITY_COLOR: Record<SecurityStatus, string> = {
@@ -156,11 +158,11 @@ export const SECURITY_COLOR: Record<SecurityStatus, string> = {
 };
 
 export const SECURITY_LABEL: Record<SecurityStatus, string> = {
-  secure: 'Secure',
-  authorized: 'Authorizing',
-  throttled: 'Throttled',
-  denied: 'Denied',
-  suspicious: 'Suspicious',
+  secure: t('Secure'),
+  authorized: t('Authorizing'),
+  throttled: t('Throttled'),
+  denied: t('Denied'),
+  suspicious: t('Suspicious'),
 };
 
 interface ServiceTypeInfo {
@@ -173,42 +175,58 @@ interface ServiceTypeInfo {
 
 /** Service types are told apart by silhouette and name, not by colour. */
 export const SERVICE_TYPE: Record<ServiceType, ServiceTypeInfo> = {
-  'api-gateway': { label: 'API gateway', short: 'Gateway', plural: 'API gateways' },
-  'auth-service': { label: 'Authentication', short: 'Auth', plural: 'identity services' },
-  'cedar-authorizer': { label: 'Cedar authorizer', short: 'Cedar', plural: 'Cedar authorizers' },
-  microservice: { label: 'Microservice', short: 'Service', plural: 'microservices' },
-  container: { label: 'Container', short: 'Container', plural: 'containers' },
-  serverless: { label: 'Serverless', short: 'Function', plural: 'functions' },
-  'message-queue': { label: 'Message queue', short: 'Queue', plural: 'queues' },
-  database: { label: 'Database', short: 'Database', plural: 'databases' },
-  storage: { label: 'Storage', short: 'Storage', plural: 'object stores' },
-  'network-gateway': { label: 'Network gateway', short: 'Network', plural: 'network gateways' },
-  'security-monitor': { label: 'Security monitor', short: 'Monitor', plural: 'security monitors' },
-  'external-client': { label: 'External client', short: 'Client', plural: 'external clients' },
+  'api-gateway': { label: t('API gateway'), short: t('Gateway'), plural: t('API gateways') },
+  'auth-service': { label: t('Authentication'), short: t('Auth'), plural: t('identity services') },
+  'cedar-authorizer': {
+    label: t('Cedar authorizer'),
+    short: t('Cedar'),
+    plural: t('Cedar authorizers'),
+  },
+  microservice: { label: t('Microservice'), short: t('Service'), plural: t('microservices') },
+  container: { label: t('Container'), short: t('Container'), plural: t('containers') },
+  serverless: { label: t('Serverless'), short: t('Function'), plural: t('functions') },
+  'message-queue': { label: t('Message queue'), short: t('Queue'), plural: t('queues') },
+  database: { label: t('Database'), short: t('Database'), plural: t('databases') },
+  storage: { label: t('Storage'), short: t('Storage'), plural: t('object stores') },
+  'network-gateway': {
+    label: t('Network gateway'),
+    short: t('Network'),
+    plural: t('network gateways'),
+  },
+  'security-monitor': {
+    label: t('Security monitor'),
+    short: t('Monitor'),
+    plural: t('security monitors'),
+  },
+  'external-client': {
+    label: t('External client'),
+    short: t('Client'),
+    plural: t('external clients'),
+  },
 };
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {
-  route: 'Routes to',
-  call: 'Calls',
-  auth: 'Authenticates with',
-  authz: 'Authorizes with',
-  data: 'Reads / writes',
-  publish: 'Publishes to',
-  consume: 'Consumed by',
-  replication: 'Replicates to',
-  telemetry: 'Reports to',
+  route: t('Routes to'),
+  call: t('Calls'),
+  auth: t('Authenticates with'),
+  authz: t('Authorizes with'),
+  data: t('Reads / writes'),
+  publish: t('Publishes to'),
+  consume: t('Consumed by'),
+  replication: t('Replicates to'),
+  telemetry: t('Reports to'),
 };
 
 export const DATA_SOURCE_LABEL: Record<DataSource, string> = {
-  synthetic: 'Synthetic',
-  recording: 'Recording',
-  live: 'Live',
+  synthetic: t('Synthetic'),
+  recording: t('Recording'),
+  live: t('Live'),
 };
 
 export const DATA_SOURCE_HINT: Record<DataSource, string> = {
-  synthetic: 'Produced by the built-in simulation engine.',
-  recording: 'Imported from a bundled fixture file.',
-  live: 'Measured from an explicitly connected local instance.',
+  synthetic: t('Produced by the built-in simulation engine.'),
+  recording: t('Imported from a bundled fixture file.'),
+  live: t('Measured from an explicitly connected local instance.'),
 };
 
 /**
@@ -237,12 +255,12 @@ export interface TrafficKind {
 }
 
 export const TRAFFIC_LEGEND: TrafficKind[] = [
-  { key: 'request', label: 'Request', shape: 'disc', tone: null },
-  { key: 'response', label: 'Response', shape: 'ring', tone: null },
-  { key: 'authentication', label: 'Authentication', shape: 'diamond', tone: null },
-  { key: 'authorization', label: 'Authorization', shape: 'square', tone: null },
-  { key: 'queue', label: 'Queue message', shape: 'frame', tone: null },
-  { key: 'error', label: 'Error', shape: 'disc', tone: 'critical' },
-  { key: 'rejected', label: 'Rejected', shape: 'bar', tone: 'warning' },
-  { key: 'suspicious', label: 'Suspicious', shape: 'triangle', tone: 'hostile' },
+  { key: 'request', label: t('Request'), shape: 'disc', tone: null },
+  { key: 'response', label: t('Response'), shape: 'ring', tone: null },
+  { key: 'authentication', label: t('Authentication'), shape: 'diamond', tone: null },
+  { key: 'authorization', label: t('Authorization'), shape: 'square', tone: null },
+  { key: 'queue', label: t('Queue message'), shape: 'frame', tone: null },
+  { key: 'error', label: t('Error'), shape: 'disc', tone: 'critical' },
+  { key: 'rejected', label: t('Rejected'), shape: 'bar', tone: 'warning' },
+  { key: 'suspicious', label: t('Suspicious'), shape: 'triangle', tone: 'hostile' },
 ];

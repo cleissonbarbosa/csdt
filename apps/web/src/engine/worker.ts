@@ -3,6 +3,8 @@
  * the simulation, lets wall-clock time pass and answers the page. Nothing in
  * it knows what a request means; that is the module's business.
  */
+import { t } from '@/i18n';
+
 import wasmUrl from './aegis.wasm?url';
 import { Engine, EngineError } from './binding';
 import { DEFAULT_SEED, type FromWorker, type ToWorker } from './messages';
@@ -26,7 +28,9 @@ async function instantiate(): Promise<WebAssembly.Instance> {
   }
   // A host that does not serve the file as application/wasm: take the bytes.
   const response = await fetch(wasmUrl);
-  if (!response.ok) throw new Error(`the engine module answered ${response.status}`);
+  if (!response.ok) {
+    throw new Error(t('the engine module answered {status}', { status: response.status }));
+  }
   return (await WebAssembly.instantiate(await response.arrayBuffer(), {})).instance;
 }
 
@@ -43,7 +47,7 @@ function fail(cause: unknown): void {
     message:
       cause instanceof EngineError
         ? reason
-        : `The simulation engine could not be loaded: ${reason}`,
+        : t('The simulation engine could not be loaded: {reason}', { reason }),
   });
 }
 

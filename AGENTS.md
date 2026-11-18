@@ -437,6 +437,34 @@ worker keeps the build's own files and fetches nothing else; the static
 Playwright suite blocks service workers except in the one test that is
 about them, so a cached file never answers for a missing one.
 
+The interface speaks English and Brazilian Portuguese (`src/i18n/`). A
+phrase is written where it is used, in English, and passed through `t()`
+(`t('{n} services, all normal', { n })`), or `tr()` when an element sits
+inside the sentence. The English is the key; `pt-BR/` holds one dictionary
+part per area, and `Phrase` is the set of their keys, so a phrase nobody
+translated does not compile. Two tests keep it that way:
+`i18n/coverage.test.ts` fails on interface text written without `t()` (a
+literal that is not, such as a command or a sample of Cedar, is marked
+`not-interface-text` where it stands), and `i18n/dictionary.test.ts` fails
+on a translation that drops a placeholder or a tag, a phrase translated two
+ways, or one nothing uses any more.
+
+- One or many is two whole phrases chosen where they are used, never a
+  word glued on; an enum value goes through its label table
+  (`lib/palette.ts`). A word with two meanings takes a note, `t('Open#verb')`,
+  which English does not show.
+- The language is read once, when the page loads (the setting, or the
+  browser's first language), so `t()` may be called in a table at the top
+  of a module. Changing the setting reloads the page. The engine's worker
+  has no storage and is told the page's language in its name.
+- What the server or a file wrote (names, a scenario's text, an event, an
+  error message) is shown as written. The glossary at the top of
+  `pt-BR/common.ts` is the vocabulary every part keeps to, and the rules of
+  "Words" in `docs/DESIGN.md` hold in both languages.
+- The tests are written against English and ask for it: Playwright's
+  `locale`, the `language` in `e2e/support.ts`, and the capture and
+  benchmark scripts. A test of the Portuguese interface sets it itself.
+
 `window.__aegis` (`stats`, `projectNode`, `captureFrame`, `labels`) is the handle the
 E2E suite, `scripts/capture.mjs` and `scripts/benchmark.mjs` drive the scene
 through. Those scripts and `scripts/capture-docs.sh` also select elements by

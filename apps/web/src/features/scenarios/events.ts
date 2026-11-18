@@ -1,4 +1,22 @@
-import type { SecurityEvent, Severity } from '@aegis/contracts';
+import type { EventKind, SecurityEvent, Severity } from '@aegis/contracts';
+
+import { t } from '@/i18n';
+
+/** What kind of event it is, as the log and the scenario editor name it. */
+export const EVENT_KIND_LABEL: Record<EventKind, string> = {
+  'health-transition': t('Health Transition'),
+  'incident-started': t('Incident Started'),
+  'incident-phase': t('Incident Phase'),
+  'incident-resolved': t('Incident Resolved'),
+  'authz-decision': t('Authz Decision'),
+  'auth-failure': t('Auth Failure'),
+  mitigation: t('Mitigation'),
+  reroute: t('Reroute'),
+  alert: t('Alert'),
+  'cve-advisory': t('Cve Advisory'),
+  'scan-finding': t('Scan Finding'),
+  system: t('System'),
+};
 
 /** One entry of the log: a single event, or a run of state changes. */
 export type LogEntry =

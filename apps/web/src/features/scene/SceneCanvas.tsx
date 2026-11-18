@@ -26,6 +26,7 @@ import {
   type SceneStats,
 } from '@/graphics/SceneController';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
+import { t } from '@/i18n';
 import {
   overviewOf,
   partialGroups,
@@ -371,7 +372,7 @@ export function SceneCanvas({ theme, tooltip, onRuntime, onUnavailable }: SceneC
           setBackend(created.backend);
           return created.renderer;
         }}
-        aria-label="Interactive 3D view of the infrastructure topology"
+        aria-label={t('Interactive 3D view of the infrastructure topology')}
         role="img"
       >
         {backend && pieces && (

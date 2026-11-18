@@ -67,6 +67,8 @@ page.on('pageerror', (error) => console.error('[page exception]', error.message)
 
 if (args.webgl2 || args.settings) {
   const settings = {
+    // The pictures in the documents are of the English interface.
+    language: 'en',
     ...(args.webgl2 ? { renderer: 'webgl2' } : {}),
     ...(args.settings ? JSON.parse(args.settings) : {}),
   };

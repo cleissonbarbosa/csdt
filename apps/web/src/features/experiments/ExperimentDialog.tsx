@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Select, TextField } from '@/components/ui/Field';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import {
   affectedOnlyIn,
   comparedRows,
@@ -82,14 +84,21 @@ function RunsChart({
     <figure className="min-w-0">
       <figcaption className="caption mb-1 flex items-baseline justify-between gap-2">
         <span>{label}</span>
-        <span className="numeric">up to {format(peak)}</span>
+        <span className="numeric">{t('up to {peak}', { peak: format(peak) })}</span>
       </figcaption>
       <svg
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
         preserveAspectRatio="none"
         className="h-24 w-full rounded-control border border-line bg-sunken"
         role="img"
-        aria-label={`${label} over both runs. As it is: up to ${format(Math.max(0, ...a.map(value)))}. With the change: up to ${format(Math.max(0, ...b.map(value)))}.`}
+        aria-label={t(
+          '{measure} over both runs. As it is: up to {a}. With the change: up to {b}.',
+          {
+            measure: label,
+            a: format(Math.max(0, ...a.map(value))),
+            b: format(Math.max(0, ...b.map(value))),
+          },
+        )}
       >
         <rect x={started} y={0} width={1} height={CHART_H} fill={COLOR.inkFaint} />
         <rect x={placed - 0.75} y={0} width={1.5} height={CHART_H} fill={COLOR.ink} />
@@ -136,22 +145,42 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
   return (
     <div className="mt-4 space-y-4 border-t border-line pt-4" data-testid="experiment-results">
       <section>
-        <h3 className="text-xs font-bold text-ink">What changed</h3>
+        <h3 className="text-xs font-bold text-ink">{t('What changed')}</h3>
         <p className="mt-1 text-xs leading-relaxed text-ink" data-testid="experiment-change">
-          In run B, <span className="font-bold">{intervention.description}</span> on {names}, placed{' '}
-          <span className="numeric">+{formatClock(intervention.atMs)}</span> into the incident and
-          eased in over <span className="numeric">{formatMs(intervention.rampMs)}</span>.
+          {tr(
+            'In run B, <b>{change}</b> on {services}, placed <n>+{at}</n> into the incident and eased in over <n>{ramp}</n>.',
+            {
+              b: (children) => <span className="font-bold">{children}</span>,
+              n: (children) => <span className="numeric">{children}</span>,
+              // What the server says it changed, as it wrote it.
+              change: intervention.description,
+              services: names,
+              at: formatClock(intervention.atMs),
+              ramp: formatMs(intervention.rampMs),
+            },
+          )}
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">
-          Nothing else differs: both runs are {experiment.scenarioName} on{' '}
-          <span className="code">{experiment.topologyId}</span> with seed{' '}
-          <span className="numeric">{experiment.seed}</span>.{' '}
+          {tr(
+            'Nothing else differs: both runs are {scenario} on <c>{topology}</c> with seed <n>{seed}</n>.',
+            {
+              c: (children) => <span className="code">{children}</span>,
+              n: (children) => <span className="numeric">{children}</span>,
+              scenario: experiment.scenarioName,
+              topology: experiment.topologyId,
+              seed: experiment.seed,
+            },
+          )}{' '}
           {sameUntilPlaced(experiment)
-            ? 'Until the change is placed the two runs are identical, sample for sample.'
-            : 'The two runs differ before the change was placed, which should not happen: do not rely on this comparison.'}
+            ? t('Until the change is placed the two runs are identical, sample for sample.')
+            : t(
+                'The two runs differ before the change was placed, which should not happen: do not rely on this comparison.',
+              )}
         </p>
         <details className="mt-1.5">
-          <summary className="text-[11px] text-ink-dim hover:text-ink">The exact commands</summary>
+          <summary className="text-[11px] text-ink-dim hover:text-ink">
+            {t('The exact commands')}
+          </summary>
           <pre className="code mt-1 max-h-48 overflow-auto rounded-control border border-line bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
             {JSON.stringify(
               {
@@ -173,12 +202,12 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
             <tr className="text-left">
               <th className="py-1 font-normal text-ink-faint" />
               <th className="px-2 py-1 font-bold text-ink">
-                A <span className="font-normal text-ink-dim">as it is</span>
+                A <span className="font-normal text-ink-dim">{t('as it is')}</span>
               </th>
               <th className="px-2 py-1 font-bold text-ink">
-                B <span className="font-normal text-ink-dim">with the change</span>
+                B <span className="font-normal text-ink-dim">{t('with the change')}</span>
               </th>
-              <th className="px-2 py-1 font-normal text-ink-faint">B against A</th>
+              <th className="px-2 py-1 font-normal text-ink-faint">{t('B against A')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line border-y border-line">
@@ -190,7 +219,7 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
                 <td className="numeric px-2 py-1.5 text-ink">{row.a}</td>
                 <td className="numeric px-2 py-1.5 text-ink">{row.b}</td>
                 <td className="numeric px-2 py-1.5 text-ink-dim">
-                  {row.delta || <span className="text-ink-faint">the same</span>}
+                  {row.delta || <span className="text-ink-faint">{t('the same')}</span>}
                 </td>
               </tr>
             ))}
@@ -198,8 +227,12 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
         </table>
         {(only.a.length > 0 || only.b.length > 0) && (
           <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-ink-dim">
-            {only.a.length > 0 && <p>Affected only in A: {list(only.a)}.</p>}
-            {only.b.length > 0 && <p>Affected only in B: {list(only.b)}.</p>}
+            {only.a.length > 0 && (
+              <p>{tr('Affected only in A: {services}.', { services: list(only.a) })}</p>
+            )}
+            {only.b.length > 0 && (
+              <p>{tr('Affected only in B: {services}.', { services: list(only.b) })}</p>
+            )}
           </div>
         )}
       </section>
@@ -208,13 +241,13 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
         <div className="grid gap-3 sm:grid-cols-2">
           <RunsChart
             experiment={experiment}
-            label="Error rate"
+            label={t('Error rate')}
             value={(sample) => sample.errorRate}
             format={formatPercent}
           />
           <RunsChart
             experiment={experiment}
-            label="Latency p95"
+            label={t('Latency p95')}
             value={(sample) => sample.p95LatencyMs}
             format={formatMs}
           />
@@ -232,17 +265,22 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
                 strokeDasharray="5 4"
               />
             </svg>
-            A, as it is
+            {t('A, as it is')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <svg width="22" height="6" aria-hidden>
               <line x1="0" y1="3" x2="22" y2="3" stroke={COLOR.ink} strokeWidth="1.6" />
             </svg>
-            B, with the change
+            {t('B, with the change')}
           </span>
           <span>
-            The thin tick is where the incident begins, the thick one where the change is placed.
-            Each run lasts <span className="numeric">{formatClock(experiment.durationMs)}</span>.
+            {tr(
+              'The thin tick is where the incident begins, the thick one where the change is placed. Each run lasts <n>{duration}</n>.',
+              {
+                n: (children) => <span className="numeric">{children}</span>,
+                duration: formatClock(experiment.durationMs),
+              },
+            )}
           </span>
           <SourceBadge source={experiment.dataSource} />
         </p>
@@ -255,9 +293,9 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
           disabled={busy}
           onClick={() => void watch('variant')}
           data-testid="experiment-watch-b"
-          title="Replaces the timeline in use with run B, to play back and scrub"
+          title={t('Replaces the timeline in use with run B, to play back and scrub')}
         >
-          Watch run B on the timeline
+          {t('Watch run B on the timeline')}
         </Button>
         <Button
           size="sm"
@@ -265,11 +303,11 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
           disabled={busy}
           onClick={() => void watch('baseline')}
           data-testid="experiment-watch-a"
-          title="Replaces the timeline in use with run A"
+          title={t('Replaces the timeline in use with run A')}
         >
-          Watch run A
+          {t('Watch run A')}
         </Button>
-        <span className="caption">Watching a run replaces the timeline in use.</span>
+        <span className="caption">{t('Watching a run replaces the timeline in use.')}</span>
       </section>
     </div>
   );
@@ -314,18 +352,25 @@ function SweepChart({
     high === low ? SWEEP_W / 2 : 6 + ((at - low) / (high - low)) * (SWEEP_W - 12);
   const y = (value: number) => SWEEP_H - 4 - (value / top) * (SWEEP_H - 14);
   const figure = (at: number) => (unit === 'factor' ? `×${at}` : `${at}%`);
+  const byFigure = points.map((point) => `${figure(point.at)} ${format(point.value)}`).join(', ');
   return (
     <figure className="min-w-0">
       <figcaption className="caption mb-1">
-        {label}, up to {format(top)}
+        {t('{measure}, up to {peak}', { measure: label, peak: format(top) })}
       </figcaption>
       <svg
         viewBox={`0 0 ${SWEEP_W} ${SWEEP_H}`}
         className="h-[72px] w-full"
         role="img"
-        aria-label={`${label} by figure: ${points
-          .map((point) => `${figure(point.at)} ${format(point.value)}`)
-          .join(', ')}${asItIs === null ? '' : `; as it is ${format(asItIs)}`}`}
+        aria-label={
+          asItIs === null
+            ? t('{measure} by figure: {points}', { measure: label, points: byFigure })
+            : t('{measure} by figure: {points}; as it is {baseline}', {
+                measure: label,
+                points: byFigure,
+                baseline: format(asItIs),
+              })
+        }
       >
         {asItIs !== null && (
           <line
@@ -371,18 +416,30 @@ function SweepResults({ sweep, unit }: { sweep: Sweep; unit: 'factor' | 'percent
   const latency = (point: Sweep['baseline']) => point.peakP95LatencyMs;
   const calmest = lowestAt(sweep, error);
   const rows = [
-    { key: 'as it is', point: sweep.baseline },
+    { key: t('as it is'), point: sweep.baseline },
     ...sweep.points.map((point) => ({ key: figure(point.value), point })),
   ];
   return (
     <div className="mt-4 space-y-3 border-t border-line pt-4" data-testid="sweep-results">
       <p className="text-xs leading-relaxed text-ink">
-        <span className="font-bold">The same change at {sweep.points.length} figures.</span> Each
-        row is a run of its own from the same seed; the first is the incident as it is.
+        {tr(
+          // One figure is written as English has always written it; the note
+          // lets another language say it in the singular.
+          sweep.points.length === 1
+            ? '<b>The same change at {n} figures.</b> Each row is a run of its own from the same seed; the first is the incident as it is.#one'
+            : '<b>The same change at {n} figures.</b> Each row is a run of its own from the same seed; the first is the incident as it is.',
+          {
+            b: (children) => <span className="font-bold">{children}</span>,
+            n: sweep.points.length,
+          },
+        )}
         {calmest !== null && (
           <>
             {' '}
-            The highest error rate was lowest at <span className="numeric">{figure(calmest)}</span>.
+            {tr('The highest error rate was lowest at <n>{figure}</n>.', {
+              n: (children) => <span className="numeric">{children}</span>,
+              figure: figure(calmest),
+            })}
           </>
         )}
       </p>
@@ -390,19 +447,19 @@ function SweepResults({ sweep, unit }: { sweep: Sweep; unit: 'factor' | 'percent
         <thead>
           <tr className="border-b border-line-strong text-left">
             <th scope="col" className="caption py-1 pr-2 font-normal">
-              Figure
+              {t('Figure')}
             </th>
             <th scope="col" className="caption px-2 py-1 font-normal">
-              Highest error rate
+              {t('Highest error rate')}
             </th>
             <th scope="col" className="caption px-2 py-1 font-normal">
-              Highest latency p95
+              {t('Highest latency p95')}
             </th>
             <th scope="col" className="caption px-2 py-1 font-normal">
-              Services affected
+              {t('Services affected')}
             </th>
             <th scope="col" className="caption py-1 pl-2 font-normal">
-              All back to normal
+              {t('All back to normal')}
             </th>
           </tr>
         </thead>
@@ -424,17 +481,17 @@ function SweepResults({ sweep, unit }: { sweep: Sweep; unit: 'factor' | 'percent
                 {key}
               </th>
               <td className="numeric px-2 py-1 text-ink">
-                {point.peakErrorRate === null ? 'n/a' : formatPercent(point.peakErrorRate)}
+                {point.peakErrorRate === null ? t('n/a') : formatPercent(point.peakErrorRate)}
               </td>
               <td className="numeric px-2 py-1 text-ink">
-                {point.peakP95LatencyMs === null ? 'n/a' : formatMs(point.peakP95LatencyMs)}
+                {point.peakP95LatencyMs === null ? t('n/a') : formatMs(point.peakP95LatencyMs)}
               </td>
               <td className="numeric px-2 py-1 text-ink">{point.affected}</td>
               <td className="numeric py-1 pl-2 text-ink">
                 {point.affected === 0
-                  ? 'nothing was affected'
+                  ? t('nothing was affected')
                   : point.recoveredMs === null
-                    ? 'not within the run'
+                    ? t('not within the run')
                     : `+${formatClock(point.recoveredMs)}`}
               </td>
             </tr>
@@ -444,21 +501,21 @@ function SweepResults({ sweep, unit }: { sweep: Sweep; unit: 'factor' | 'percent
       <div className="grid gap-4 sm:grid-cols-2">
         <SweepChart
           sweep={sweep}
-          label="Highest error rate"
+          label={t('Highest error rate')}
           measure={error}
           format={formatPercent}
           unit={unit}
         />
         <SweepChart
           sweep={sweep}
-          label="Highest latency p95"
+          label={t('Highest latency p95')}
           measure={latency}
           format={formatMs}
           unit={unit}
         />
       </div>
       <p className="caption">
-        A dot is a run; the line only joins them. The dashed line is the incident as it is.
+        {t('A dot is a run; the line only joins them. The dashed line is the incident as it is.')}
       </p>
     </div>
   );
@@ -575,7 +632,7 @@ export function ExperimentDialog() {
     } catch (cause) {
       if (asking === question.current) {
         setResult(null);
-        setError(cause instanceof ApiError ? cause.message : 'The comparison could not be run.');
+        setError(cause instanceof ApiError ? cause.message : t('The comparison could not be run.'));
       }
     } finally {
       setBusy(false);
@@ -610,7 +667,7 @@ export function ExperimentDialog() {
       if (asking === question.current) setSweep(sweepOf(runs));
     } catch (cause) {
       if (asking === question.current) {
-        setError(cause instanceof ApiError ? cause.message : 'The comparison could not be run.');
+        setError(cause instanceof ApiError ? cause.message : t('The comparison could not be run.'));
       }
     } finally {
       setProgress(null);
@@ -623,8 +680,10 @@ export function ExperimentDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => useUi.getState().setPanel(next ? 'experiment' : null)}
-      title="Compare an intervention"
-      description="The same scenario, run twice from the same seed on timelines of their own. The second run has one change. The timeline in use is not touched."
+      title={t('Compare an intervention')}
+      description={t(
+        'The same scenario, run twice from the same seed on timelines of their own. The second run has one change. The timeline in use is not touched.',
+      )}
       width="max-w-3xl"
     >
       <form
@@ -636,7 +695,7 @@ export function ExperimentDialog() {
         data-testid="experiment-form"
       >
         <Select
-          label="Scenario"
+          label={t('Scenario')}
           value={scenarioId}
           onChange={(event) => {
             const next = available.find((entry) => entry.id === event.target.value);
@@ -657,7 +716,7 @@ export function ExperimentDialog() {
           ))}
         </Select>
         <Select
-          label="The one change in run B"
+          label={t('The one change in run B')}
           value={kind}
           onChange={(event) => {
             const next = INTERVENTIONS.find((entry) => entry.kind === event.target.value)!;
@@ -675,7 +734,7 @@ export function ExperimentDialog() {
           ))}
         </Select>
         <Select
-          label="On this service"
+          label={t('On this service')}
           value={nodeId}
           onChange={(event) => {
             setNodeId(event.target.value);
@@ -697,7 +756,9 @@ export function ExperimentDialog() {
         </Select>
         {choice.unit !== null && (
           <TextField
-            label={choice.unit === 'factor' ? 'Multiplied by' : 'Share that fails, in percent'}
+            label={
+              choice.unit === 'factor' ? t('Multiplied by') : t('Share that fails, in percent')
+            }
             type="number"
             inputMode="decimal"
             min={0}
@@ -713,7 +774,7 @@ export function ExperimentDialog() {
           />
         )}
         <TextField
-          label="Placed this many seconds into the incident"
+          label={t('Placed this many seconds into the incident')}
           type="number"
           inputMode="numeric"
           min={0}
@@ -726,7 +787,10 @@ export function ExperimentDialog() {
           }}
           hint={
             scenario
-              ? `From 0 to ${lastSecond}: the scenario lasts ${formatClock(scenario.durationMs)}.`
+              ? t('From 0 to {last}: the scenario lasts {duration}.', {
+                  last: lastSecond,
+                  duration: formatClock(scenario.durationMs),
+                })
               : undefined
           }
           className={choice.unit === null ? 'sm:col-span-1' : undefined}
@@ -739,10 +803,10 @@ export function ExperimentDialog() {
             disabled={!valid || busy}
             data-testid="experiment-run"
           >
-            {busy ? 'Running both…' : result ? 'Run both again' : 'Run both'}
+            {busy ? t('Running both…') : result ? t('Run both again') : t('Run both')}
           </Button>
           {available.length === 0 && scenarios && (
-            <p className="text-xs text-ink-dim">No scenario can run on this platform.</p>
+            <p className="text-xs text-ink-dim">{t('No scenario can run on this platform.')}</p>
           )}
           {error && (
             <p role="alert" className="text-xs text-critical">
@@ -761,13 +825,20 @@ export function ExperimentDialog() {
           data-testid="sweep-form"
         >
           <TextField
-            label={`Or the same change at several figures (${choice.unit === 'factor' ? 'multipliers' : 'percentages'})`}
+            label={
+              choice.unit === 'factor'
+                ? t('Or the same change at several figures (multipliers)')
+                : t('Or the same change at several figures (percentages)')
+            }
             value={range}
             onChange={(event) => {
               setRange(event.target.value);
               setSweep(null);
             }}
-            hint={`Up to ${MAX_SWEEP}, separated by commas. Each is run against the incident as it is.`}
+            hint={t(
+              'Up to {max}, separated by commas. Each is run against the incident as it is.',
+              { max: MAX_SWEEP },
+            )}
             className="min-w-[16rem] flex-1"
             data-testid="sweep-values"
           />
@@ -776,7 +847,9 @@ export function ExperimentDialog() {
             disabled={!valid || busy || figures === null}
             data-testid="sweep-run"
           >
-            {progress ? `Running ${progress.done + 1} of ${progress.of}…` : 'Run them all'}
+            {progress
+              ? t('Running {n} of {total}…', { n: progress.done + 1, total: progress.of })
+              : t('Run them all')}
           </Button>
         </form>
       )}

@@ -11,6 +11,8 @@ import type { Experiment, ExperimentRun, FaultEffect, MetricSample } from '@aegi
 
 import { formatClock, formatMs, formatPercent } from './format';
 
+import { t } from '@/i18n';
+
 export interface ComparedRow {
   id: string;
   label: string;
@@ -29,14 +31,14 @@ function signed(value: number, text: (magnitude: number) => string): string {
 
 /** A difference of two fractions, in percentage points. */
 function points(a: number, b: number): string {
-  return signed((b - a) * 100, (v) => `${v < 10 ? v.toFixed(2) : v.toFixed(1)} pts`);
+  return signed((b - a) * 100, (v) => t('{n} pts', { n: v < 10 ? v.toFixed(2) : v.toFixed(1) }));
 }
 
 /** When a run was back to normal, counted from the start of its incident. */
 function recovery(run: ExperimentRun): { text: string; ms: number | null } {
   const { report } = run;
-  if (report.impactedNodeIds.length === 0) return { text: 'nothing was affected', ms: null };
-  if (report.recoveredAtMs === null) return { text: 'not within the run', ms: null };
+  if (report.impactedNodeIds.length === 0) return { text: t('nothing was affected'), ms: null };
+  if (report.recoveredAtMs === null) return { text: t('not within the run'), ms: null };
   const ms = report.recoveredAtMs - report.startedAtMs;
   return { text: `+${formatClock(ms)}`, ms };
 }
@@ -52,16 +54,16 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
   const errorB = peak(b.peakErrorRate);
   rows.push({
     id: 'peak-error',
-    label: 'Highest error rate',
-    a: errorA === null ? 'n/a' : formatPercent(errorA),
-    b: errorB === null ? 'n/a' : formatPercent(errorB),
+    label: t('Highest error rate'),
+    a: errorA === null ? t('n/a') : formatPercent(errorA),
+    b: errorB === null ? t('n/a') : formatPercent(errorB),
     delta: errorA === null || errorB === null ? '' : points(errorA, errorB),
   });
   rows.push({
     id: 'mean-error',
-    label: 'Mean error rate',
-    a: a.meanErrorRate === null ? 'n/a' : formatPercent(a.meanErrorRate),
-    b: b.meanErrorRate === null ? 'n/a' : formatPercent(b.meanErrorRate),
+    label: t('Mean error rate'),
+    a: a.meanErrorRate === null ? t('n/a') : formatPercent(a.meanErrorRate),
+    b: b.meanErrorRate === null ? t('n/a') : formatPercent(b.meanErrorRate),
     delta:
       a.meanErrorRate === null || b.meanErrorRate === null
         ? ''
@@ -71,15 +73,15 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
   const latencyB = peak(b.peakP95LatencyMs);
   rows.push({
     id: 'peak-latency',
-    label: 'Highest latency p95',
-    a: latencyA === null ? 'n/a' : formatMs(latencyA),
-    b: latencyB === null ? 'n/a' : formatMs(latencyB),
+    label: t('Highest latency p95'),
+    a: latencyA === null ? t('n/a') : formatMs(latencyA),
+    b: latencyB === null ? t('n/a') : formatMs(latencyB),
     delta:
       latencyA === null || latencyB === null ? '' : signed(latencyB - latencyA, (v) => formatMs(v)),
   });
   rows.push({
     id: 'affected',
-    label: 'Services affected',
+    label: t('Services affected'),
     a: String(a.impactedNodeIds.length),
     b: String(b.impactedNodeIds.length),
     delta: signed(b.impactedNodeIds.length - a.impactedNodeIds.length, (v) => String(v)),
@@ -88,7 +90,7 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
   const unwellB = peak(b.peakUnhealthy) ?? 0;
   rows.push({
     id: 'at-once',
-    label: 'Not normal at once',
+    label: t('Not normal at once'),
     a: String(unwellA),
     b: String(unwellB),
     delta: signed(unwellB - unwellA, (v) => String(v)),
@@ -97,13 +99,17 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
   for (const objective of a.objectives) {
     const other = b.objectives.find((entry) => entry.kind === objective.kind);
     if (!other) continue;
-    const time = (ms: number) => (ms === 0 ? 'met throughout' : formatClock(ms));
+    const time = (ms: number) => (ms === 0 ? t('met throughout') : formatClock(ms));
     rows.push({
       id: `objective-${objective.kind}`,
       label:
         objective.kind === 'error-rate'
-          ? `Error rate at ${formatPercent(objective.threshold)} or over for`
-          : `Latency p95 at ${formatMs(objective.threshold)} or over for`,
+          ? t('Error rate at {threshold} or over for', {
+              threshold: formatPercent(objective.threshold),
+            })
+          : t('Latency p95 at {threshold} or over for', {
+              threshold: formatMs(objective.threshold),
+            }),
       a: time(objective.breachedMs),
       b: time(other.breachedMs),
       delta: signed(other.breachedMs - objective.breachedMs, (v) => formatClock(v)),
@@ -113,7 +119,7 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
   const backB = recovery(experiment.variant);
   rows.push({
     id: 'recovered',
-    label: 'All back to normal',
+    label: t('All back to normal'),
     a: backA.text,
     b: backB.text,
     delta:
@@ -172,31 +178,31 @@ export const INTERVENTIONS: readonly {
 }[] = [
   {
     kind: 'capacity',
-    label: 'Change its capacity',
+    label: t('Change its capacity'),
     unit: 'factor',
     value: 2,
-    hint: 'Above 1 scales the service up; below 1 takes capacity away.',
+    hint: t('Above 1 scales the service up; below 1 takes capacity away.'),
   },
   {
     kind: 'latency',
-    label: 'Change its latency',
+    label: t('Change its latency'),
     unit: 'factor',
     value: 0.5,
-    hint: 'Below 1 makes the service faster; above 1 slower.',
+    hint: t('Below 1 makes the service faster; above 1 slower.'),
   },
   {
     kind: 'errorInject',
-    label: 'Make a share of its requests fail',
+    label: t('Make a share of its requests fail'),
     unit: 'percent',
     value: 20,
-    hint: 'A share of the requests it handles, from 0 to 100.',
+    hint: t('A share of the requests it handles, from 0 to 100.'),
   },
   {
     kind: 'down',
-    label: 'Take it out of service',
+    label: t('Take it out of service'),
     unit: null,
     value: 1,
-    hint: 'The service becomes unreachable for the rest of the run.',
+    hint: t('The service becomes unreachable for the rest of the run.'),
   },
 ];
 

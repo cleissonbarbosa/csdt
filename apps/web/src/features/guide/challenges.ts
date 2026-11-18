@@ -12,15 +12,24 @@ import type {
   AuthorizationCatalog,
   AuthorizationDecision,
   EvaluateRequest,
+  Health,
   IncidentReport,
   Scenario,
   TelemetrySnapshot,
   Topology,
 } from '@aegis/contracts';
 
+import { t } from '@/i18n';
 import { entityId, formatPercent } from '@/lib/format';
 import { nodeLabel } from '@/lib/names';
-import { describeOrigin, describePrescribed, explainCause, sinceStart } from '@/lib/report';
+import { HEALTH_LABEL } from '@/lib/palette';
+import {
+  describeOrigin,
+  describePrescribed,
+  explainCause,
+  sinceStart,
+  type Explained,
+} from '@/lib/report';
 import type { Feedback, FeedbackLine } from '@/stores/guide';
 import type { Selection } from '@/stores/ui';
 
@@ -63,37 +72,53 @@ export interface Challenge {
 const hasScenario = (evidence: Evidence, id: string) =>
   evidence.scenarios.some((scenario) => scenario.id === id && scenario.available)
     ? null
-    : 'The platform in use cannot run the scenario this challenge needs.';
+    : t('The platform in use cannot run the scenario this challenge needs.');
 
 /** A selected service; a kind of service in the overview is not one. */
 function selectedService(evidence: Evidence): { label: string } | { waiting: string } {
   const { selection, topology } = evidence;
   if (selection?.kind === 'node') {
-    return { label: `Answer: ${nodeLabel(topology, selection.id)}` };
+    return { label: t('Answer: {service}', { service: nodeLabel(topology, selection.id) }) };
   }
   if (selection?.kind === 'group') {
-    return { waiting: 'That is a kind of service. Open it and select one service.' };
+    return { waiting: t('That is a kind of service. Open it and select one service.') };
   }
-  return { waiting: 'Select a service on the model to answer with it.' };
+  return { waiting: t('Select a service on the model to answer with it.') };
+}
+
+/** `Orders DB became degraded at +0:16 because …`, with the cause when there is one. */
+function became(service: string, to: Health, at: string, why: Explained | null): string {
+  const values = { service, health: HEALTH_LABEL[to].toLowerCase(), at };
+  if (!why) return t('{service} became {health} at {at}.', values);
+  // In Portuguese this case cannot follow the word for "because".
+  if (why.basis === 'unexplained') {
+    return t(
+      '{service} became {health} at {at} because of nothing the report can point to.',
+      values,
+    );
+  }
+  return t('{service} became {health} at {at} because {why}.', { ...values, why: why.text });
 }
 
 const CASCADE: Challenge = {
   id: 'cascade-origin',
-  title: 'Find where the cascade begins',
-  brief:
+  title: t('Find where the cascade begins'),
+  brief: t(
     'Services start failing one after another. One of them is where it began; the rest follow from it.',
-  starts: 'Starts the cascading failure scenario from a clean simulation.',
+  ),
+  starts: t('Starts the cascading failure scenario from a clean simulation.'),
   setup: { kind: 'scenario', scenarioId: 'cascading-failure' },
-  prompt:
+  prompt: t(
     'Watch which services leave their normal state, and in what order. Then select the service you think it began at.',
+  ),
   unavailable: (evidence) => hasScenario(evidence, 'cascading-failure'),
   answerWith: selectedService,
   check: ({ selection, report, topology }) => {
     if (!report || selection?.kind !== 'node') {
       return {
         correct: false,
-        headline: 'There is no incident to answer about yet.',
-        lines: [{ text: 'Start the challenge again and let the incident run.' }],
+        headline: t('There is no incident to answer about yet.'),
+        lines: [{ text: t('Start the challenge again and let the incident run.') }],
       };
     }
     const name = nodeLabel(topology, selection.id);
@@ -105,7 +130,9 @@ const CASCADE: Challenge = {
       if (first) {
         lines.push({
           basis: 'prescribed',
-          text: `In its first phase the scenario holds it to ${describePrescribed(first, topology)}.`,
+          text: t('In its first phase the scenario holds it to {effect}.', {
+            effect: describePrescribed(first, topology),
+          }),
         });
       }
       for (const next of report.propagation
@@ -114,10 +141,19 @@ const CASCADE: Challenge = {
         const why = explainCause(next.cause!, topology);
         lines.push({
           basis: why.basis,
-          text: `${nodeLabel(topology, next.nodeId)} became ${next.to} at ${sinceStart(report, next.atMs)} because ${why.text}.`,
+          text: became(
+            nodeLabel(topology, next.nodeId),
+            next.to,
+            sinceStart(report, next.atMs),
+            why,
+          ),
         });
       }
-      return { correct: true, headline: `Yes: it begins at ${name}.`, lines };
+      return {
+        correct: true,
+        headline: t('Yes: it begins at {service}.', { service: name }),
+        lines,
+      };
     }
     const seen = report.propagation.find((t) => t.nodeId === selection.id);
     if (!seen) {
@@ -125,25 +161,39 @@ const CASCADE: Challenge = {
         basis: 'observed',
         text:
           report.propagation.length === 0
-            ? 'No service has left its normal state yet. Let the incident run a little longer.'
-            : `${name} has stayed normal so far: the incident has not reached it. Look at the services whose lamp is lit.`,
+            ? t('No service has left its normal state yet. Let the incident run a little longer.')
+            : t(
+                '{service} has stayed normal so far: the incident has not reached it. Look at the services whose lamp is lit.',
+                { service: name },
+              ),
       });
-      return { correct: false, headline: `Not ${name}.`, lines };
+      return { correct: false, headline: t('Not {service}.', { service: name }), lines };
     }
     const why = seen.cause ? explainCause(seen.cause, topology) : null;
     lines.push({
       basis: why?.basis ?? 'observed',
-      text: `${name} became ${seen.to} at ${sinceStart(report, seen.atMs)}${why ? ` because ${why.text}` : ''}.`,
+      text: became(name, seen.to, sinceStart(report, seen.atMs), why),
     });
     const earlier = report.propagation.filter((t) => t.atMs < seen.atMs).length;
     lines.push({
       basis: 'observed',
       text:
         earlier > 0
-          ? `${earlier} service${earlier === 1 ? '' : 's'} left the normal state before it did. Follow what it depends on.`
-          : 'Nothing was seen to fail before it, but the run says something acts on another service first. Follow what it calls.',
+          ? t(
+              earlier === 1
+                ? '{n} service left the normal state before it did. Follow what it depends on.'
+                : '{n} services left the normal state before it did. Follow what it depends on.',
+              { n: earlier },
+            )
+          : t(
+              'Nothing was seen to fail before it, but the run says something acts on another service first. Follow what it calls.',
+            ),
     });
-    return { correct: false, headline: `Not ${name}: it is a consequence.`, lines };
+    return {
+      correct: false,
+      headline: t('Not {service}: it is a consequence.', { service: name }),
+      lines,
+    };
   },
 };
 
@@ -157,8 +207,8 @@ function stoppedAt(rule: FeedbackLine): Challenge['check'] {
     if (selection?.kind !== 'node' || !snapshot?.incident) {
       return {
         correct: false,
-        headline: 'There is no incident to answer about.',
-        lines: [{ text: 'Start the challenge again and let the incident run.' }],
+        headline: t('There is no incident to answer about.'),
+        lines: [{ text: t('Start the challenge again and let the incident run.') }],
       };
     }
     const name = nodeLabel(topology, selection.id);
@@ -168,19 +218,25 @@ function stoppedAt(rule: FeedbackLine): Challenge['check'] {
       const mitigation = report?.phases.find((phase) => phase.status === 'mitigating');
       return {
         correct: false,
-        headline: 'Nothing is stopping it yet.',
+        headline: t('Nothing is stopping it yet.'),
         lines: [
           {
             basis: 'observed',
             text: flow
-              ? `Right now ${formatPercent(flow.rps > 0 ? flow.deliveredRps / flow.rps : 0)} of “${flow.label}” still gets through.`
-              : 'The injected traffic has not started or has already ended.',
+              ? t('Right now {share} of “{flow}” still gets through.', {
+                  share: formatPercent(flow.rps > 0 ? flow.deliveredRps / flow.rps : 0),
+                  flow: flow.label,
+                })
+              : t('The injected traffic has not started or has already ended.'),
           },
           {
             basis: 'prescribed',
             text: mitigation
-              ? `The scenario's mitigation phase, “${mitigation.name}”, began at ${sinceStart(report!, mitigation.atMs)}; it takes a few seconds to ease in.`
-              : 'The scenario has not reached its mitigation phase. Let it run.',
+              ? t(
+                  "The scenario's mitigation phase, “{phase}”, began at {at}; it takes a few seconds to ease in.",
+                  { phase: mitigation.name, at: sinceStart(report!, mitigation.atMs) },
+                )
+              : t('The scenario has not reached its mitigation phase. Let it run.'),
           },
         ],
       };
@@ -189,13 +245,25 @@ function stoppedAt(rule: FeedbackLine): Challenge['check'] {
     if (here) {
       return {
         correct: true,
-        headline: `Yes: it is stopped at ${name}.`,
+        headline: t('Yes: it is stopped at {service}.', { service: name }),
         lines: [
           {
             basis: 'observed',
-            text: `Of ${Math.round(here.rps)} req/s of “${here.label}”, ${Math.round(here.deliveredRps)} req/s get past it${
-              here.blockedReason ? ` (turned away by: ${here.blockedReason})` : ''
-            }.`,
+            text: here.blockedReason
+              ? t(
+                  'Of {total} req/s of “{flow}”, {passed} req/s get past it (turned away by: {reason}).',
+                  {
+                    total: Math.round(here.rps),
+                    flow: here.label,
+                    passed: Math.round(here.deliveredRps),
+                    reason: here.blockedReason,
+                  },
+                )
+              : t('Of {total} req/s of “{flow}”, {passed} req/s get past it.', {
+                  total: Math.round(here.rps),
+                  flow: here.label,
+                  passed: Math.round(here.deliveredRps),
+                }),
           },
           rule,
         ],
@@ -208,17 +276,29 @@ function stoppedAt(rule: FeedbackLine): Challenge['check'] {
     });
     return {
       correct: false,
-      headline: `Not ${name}.`,
+      headline: t('Not {service}.', { service: name }),
       lines: [
         {
           basis: 'observed',
           text: onRoute
-            ? `${name} is on the route, but it is not where most of this traffic is turned away.`
-            : `This traffic does not pass through ${name}. Its route is the one drawn on the model.`,
+            ? t(
+                '{service} is on the route, but it is not where most of this traffic is turned away.',
+                { service: name },
+              )
+            : t(
+                'This traffic does not pass through {service}. Its route is the one drawn on the model.',
+                { service: name },
+              ),
         },
         {
           basis: 'observed',
-          text: `Only ${formatPercent(flow.rps > 0 ? flow.deliveredRps / flow.rps : 0)} of “${flow.label}” is still delivered: look for where the route's beads stop.`,
+          text: t(
+            "Only {share} of “{flow}” is still delivered: look for where the route's beads stop.",
+            {
+              share: formatPercent(flow.rps > 0 ? flow.deliveredRps / flow.rps : 0),
+              flow: flow.label,
+            },
+          ),
         },
       ],
     };
@@ -227,47 +307,57 @@ function stoppedAt(rule: FeedbackLine): Challenge['check'] {
 
 const FLOOD: Challenge = {
   id: 'flood-stopped',
-  title: 'Find where the flood is stopped',
-  brief:
+  title: t('Find where the flood is stopped'),
+  brief: t(
     'Hostile traffic pours in from outside. After a while a mitigation engages and most of it is turned away at one service.',
-  starts: 'Starts the DDoS surge scenario from a clean simulation.',
+  ),
+  starts: t('Starts the DDoS surge scenario from a clean simulation.'),
   setup: { kind: 'scenario', scenarioId: 'ddos-surge' },
-  prompt:
+  prompt: t(
     'Follow the incident’s route across the model. When the mitigation has engaged, select the service the flood is being stopped at.',
+  ),
   unavailable: (evidence) => hasScenario(evidence, 'ddos-surge'),
   answerWith: selectedService,
   check: stoppedAt({
     basis: 'prescribed',
-    text: 'The scenario prescribes the rejection at this service; how much load that takes off what lies behind it is the model’s doing.',
+    text: t(
+      'The scenario prescribes the rejection at this service; how much load that takes off what lies behind it is the model’s doing.',
+    ),
   }),
 };
 
 const CONTRACTOR: Challenge = {
   id: 'contractor-stopped',
-  title: 'Find where the contractor is stopped',
-  brief:
+  title: t('Find where the contractor is stopped'),
+  brief: t(
     'A contractor of another tenant is signed in, and asks for things that are not theirs to have. None of it reaches the data.',
-  starts: 'Starts the Cedar authorization denial scenario from a clean simulation.',
+  ),
+  starts: t('Starts the Cedar authorization denial scenario from a clean simulation.'),
   setup: { kind: 'scenario', scenarioId: 'cedar-denial' },
-  prompt:
+  prompt: t(
     'Follow the route of the contractor’s requests. Once they ask for what they may not have, select the service they are stopped at.',
+  ),
   unavailable: (evidence) => hasScenario(evidence, 'cedar-denial'),
   answerWith: selectedService,
   check: stoppedAt({
     basis: 'cedar',
-    text: 'No scenario can write a denial. This traffic stops at the authorizer because Cedar, asked the request it is made of, denies it under the policies in force.',
+    text: t(
+      'No scenario can write a denial. This traffic stops at the authorizer because Cedar, asked the request it is made of, denies it under the policies in force.',
+    ),
   }),
 };
 
 const REGION: Challenge = {
   id: 'region-dark',
-  title: 'Find the region that went dark',
-  brief:
+  title: t('Find the region that went dark'),
+  brief: t(
     'A whole cloud region stops answering. Traffic that went to it is sent elsewhere, and what stands there is out of reach.',
-  starts: 'Starts the regional outage scenario from a clean simulation.',
+  ),
+  starts: t('Starts the regional outage scenario from a clean simulation.'),
   setup: { kind: 'scenario', scenarioId: 'regional-outage' },
-  prompt:
+  prompt: t(
     'Watch the model, by region if you like. When a region has gone dark, select any service that stands in it.',
+  ),
   unavailable: (evidence) => hasScenario(evidence, 'regional-outage'),
   answerWith: selectedService,
   check: ({ selection, snapshot, report, topology }) => {
@@ -276,8 +366,8 @@ const REGION: Challenge = {
     if (!chosen || !snapshot?.incident || !topology) {
       return {
         correct: false,
-        headline: 'There is no incident to answer about.',
-        lines: [{ text: 'Start the challenge again and let the incident run.' }],
+        headline: t('There is no incident to answer about.'),
+        lines: [{ text: t('Start the challenge again and let the incident run.') }],
       };
     }
     const regionName = (id: string) => topology.regions.find((r) => r.id === id)?.name ?? id;
@@ -287,14 +377,22 @@ const REGION: Challenge = {
       const worst = [...snapshot.regions].sort((a, b) => b.nodesUnhealthy - a.nodesUnhealthy)[0];
       return {
         correct: false,
-        headline: 'No region is dark yet.',
+        headline: t('No region is dark yet.'),
         lines: [
           {
             basis: 'observed',
             text:
               worst && worst.nodesUnhealthy > 0
-                ? `${regionName(worst.id)} has ${worst.nodesUnhealthy} of ${worst.nodesTotal} services out of their normal state, and still answers ${formatPercent(1 - worst.errorRate)} of what it is asked.`
-                : 'Every region is still serving. Let the incident run a little longer.',
+                ? t(
+                    '{region} has {n} of {total} services out of their normal state, and still answers {share} of what it is asked.',
+                    {
+                      region: regionName(worst.id),
+                      n: worst.nodesUnhealthy,
+                      total: worst.nodesTotal,
+                      share: formatPercent(1 - worst.errorRate),
+                    },
+                  )
+                : t('Every region is still serving. Let the incident run a little longer.'),
           },
         ],
       };
@@ -303,7 +401,10 @@ const REGION: Challenge = {
       const lines: FeedbackLine[] = [
         {
           basis: 'observed',
-          text: `${mine.nodesUnhealthy} of the ${mine.nodesTotal} services that stand in ${regionName(mine.id)} are out of their normal state.`,
+          text: t(
+            '{n} of the {total} services that stand in {region} are out of their normal state.',
+            { n: mine.nodesUnhealthy, total: mine.nodesTotal, region: regionName(mine.id) },
+          ),
         },
       ];
       const origin = report ? describeOrigin(report, topology) : null;
@@ -314,22 +415,46 @@ const REGION: Challenge = {
       if (elsewhere.length > 0) {
         lines.push({
           basis: 'observed',
-          text: `${elsewhere.map((region) => regionName(region.id)).join(', ')} ${elsewhere.length === 1 ? 'is' : 'are'} still serving.`,
+          text: t(
+            elsewhere.length === 1 ? '{regions} is still serving.' : '{regions} are still serving.',
+            {
+              regions: elsewhere.map((region) => regionName(region.id)).join(', '),
+            },
+          ),
         });
       }
-      return { correct: true, headline: `Yes: ${regionName(mine.id)} is dark.`, lines };
+      return {
+        correct: true,
+        headline: t('Yes: {region} is dark.', { region: regionName(mine.id) }),
+        lines,
+      };
     }
     return {
       correct: false,
-      headline: `Not ${nodeLabel(topology, chosen.id)}.`,
+      headline: t('Not {service}.', { service: nodeLabel(topology, chosen.id) }),
       lines: [
         {
           basis: 'observed',
-          text: `It stands in ${regionName(chosen.region)}, where ${mine ? `${mine.nodesUnhealthy} of ${mine.nodesTotal} services are` : 'no service is'} out of their normal state: that region still answers.`,
+          text: mine
+            ? t(
+                'It stands in {region}, where {n} of {total} services are out of their normal state: that region still answers.',
+                {
+                  region: regionName(chosen.region),
+                  n: mine.nodesUnhealthy,
+                  total: mine.nodesTotal,
+                },
+              )
+            : t(
+                'It stands in {region}, where no service is out of their normal state: that region still answers.',
+                { region: regionName(chosen.region) },
+              ),
         },
         {
           basis: 'observed',
-          text: `One region has ${dark[0]!.nodesUnhealthy} of its ${dark[0]!.nodesTotal} services out at once. Arranged by region, its plate is the one that has gone dark.`,
+          text: t(
+            'One region has {n} of its {total} services out at once. Arranged by region, its plate is the one that has gone dark.',
+            { n: dark[0]!.nodesUnhealthy, total: dark[0]!.nodesTotal },
+          ),
         },
       ],
     };
@@ -365,27 +490,28 @@ function circumstance(
     id: spec.id,
     title: spec.title,
     brief: spec.brief,
-    starts: 'Opens the request tracer with the request. The simulation is left as it is.',
+    starts: t('Opens the request tracer with the request. The simulation is left as it is.'),
     setup: { kind: 'request', request },
-    prompt:
+    prompt: t(
       'Evaluate the request and read the policies. Then change one thing about the circumstances of the request (not who asks, nor for what) so that Cedar allows it, and evaluate again.',
+    ),
     unavailable: ({ catalog }) =>
       catalog &&
       catalog.principals.some((p) => p.uid === request.principal) &&
       catalog.actions.some((a) => a.uid === request.action) &&
       catalog.resources.some((r) => r.uid === request.resource)
         ? null
-        : 'The policies in use do not know this request.',
+        : t('The policies in use do not know this request.'),
     answerWith: ({ decision }) =>
       decision
-        ? { label: 'Check my latest result' }
-        : { waiting: 'Evaluate the request in the tracer first.' },
+        ? { label: t('Check my latest result') }
+        : { waiting: t('Evaluate the request in the tracer first.') },
     check: ({ decision, catalog }) => {
       if (!decision) {
         return {
           correct: false,
-          headline: 'Nothing has been evaluated yet.',
-          lines: [{ text: 'Press “Evaluate with Cedar” in the tracer.' }],
+          headline: t('Nothing has been evaluated yet.'),
+          lines: [{ text: t('Press “Evaluate with Cedar” in the tracer.') }],
         };
       }
       const policies = decision.determiningPolicies;
@@ -396,11 +522,16 @@ function circumstance(
       if (!sameRequest(decision, request)) {
         return {
           correct: false,
-          headline: 'That is another request.',
+          headline: t('That is another request.'),
           lines: [
             {
               basis: 'cedar',
-              text: `Cedar answered for ${entityId(decision.request.principal)} asking to ${entityId(decision.request.action)} ${entityId(decision.request.resource)}. ${spec.keep}`,
+              text: t('Cedar answered for {principal} asking to {action} {resource}. {keep}', {
+                principal: entityId(decision.request.principal),
+                action: entityId(decision.request.action),
+                resource: entityId(decision.request.resource),
+                keep: spec.keep,
+              }),
             },
           ],
         };
@@ -409,33 +540,52 @@ function circumstance(
         const lines: FeedbackLine[] = [
           {
             basis: 'cedar',
-            text: `Cedar allows it under ${context || 'an empty context'}, and names ${policies.join(', ')} as the policy that decides.`,
+            text: t(
+              'Cedar allows it under {context}, and names {policies} as the policy that decides.',
+              {
+                context: context || t('an empty context'),
+                policies: policies.join(', '),
+              },
+            ),
           },
         ];
         const source = catalog?.policies.find((policy) => policy.id === policies[0])?.content;
         if (source) lines.push({ basis: 'cedar', text: source.replace(/\s+/g, ' ').trim() });
         lines.push({ text: spec.lesson });
-        return { correct: true, headline: 'Yes: now it is allowed.', lines };
+        return { correct: true, headline: t('Yes: now it is allowed.'), lines };
       }
       const forbids = policies.filter((id) => effectOf(id) === 'forbid');
       return {
         correct: false,
-        headline: 'Still denied.',
+        headline: t('Still denied.'),
         lines: [
           policies.length === 0
             ? {
                 basis: 'cedar',
-                text: `Under ${context || 'an empty context'} no policy decided this: nothing permits it, and Cedar denies by default. The decision lists, policy by policy, the permit that came closest; read its “when”.`,
+                text: t(
+                  'Under {context} no policy decided this: nothing permits it, and Cedar denies by default. The decision lists, policy by policy, the permit that came closest; read its “when”.',
+                  { context: context || t('an empty context') },
+                ),
               }
             : {
                 basis: 'cedar',
-                text: `Cedar names ${policies.join(', ')}${forbids.length > 0 ? ': a forbid, which no permit overrides. Read what it makes an exception for' : ''}.`,
+                text: t(
+                  forbids.length > 0
+                    ? 'Cedar names {policies}: a forbid, which no permit overrides. Read what it makes an exception for.'
+                    : 'Cedar names {policies}.',
+                  { policies: policies.join(', ') },
+                ),
               },
           ...(decision.disabledPolicies.length > 0
             ? [
                 {
                   basis: 'cedar' as const,
-                  text: `${decision.disabledPolicies.join(', ')} ${decision.disabledPolicies.length === 1 ? 'was' : 'were'} switched off for this evaluation; the answer asked for is the one under every policy.`,
+                  text: t(
+                    decision.disabledPolicies.length === 1
+                      ? '{policies} was switched off for this evaluation; the answer asked for is the one under every policy.'
+                      : '{policies} were switched off for this evaluation; the answer asked for is the one under every policy.',
+                    { policies: decision.disabledPolicies.join(', ') },
+                  ),
                 },
               ]
             : []),
@@ -447,29 +597,33 @@ function circumstance(
 
 const EXPORT = circumstance({
   id: 'export-denied',
-  title: 'Explain why this export was denied',
-  brief:
+  title: t('Explain why this export was denied'),
+  brief: t(
     'Alice is a finance analyst of the tenant that owns the ledger. She asks to export it, and Cedar says no.',
+  ),
   request: EXPORT_REQUEST,
-  keep: 'Keep Alice, the export and the Acme ledger; change only the context or the policies.',
-  lesson:
+  keep: t('Keep Alice, the export and the Acme ledger; change only the context or the policies.'),
+  lesson: t(
     'So the first answer was no for want of a permit, not because anything forbade it: Cedar denies whatever no policy permits.',
+  ),
 });
 
 const DELETION = circumstance({
   id: 'deletion-denied',
-  title: 'Find when a customer may be deleted',
-  brief:
+  title: t('Find when a customer may be deleted'),
+  brief: t(
     'Carol administers her tenant and may do anything in it. She asks to delete one of its customers, and Cedar says no.',
+  ),
   request: {
     principal: 'User::"carol"',
     action: 'Action::"deleteCustomer"',
     resource: 'Customer::"acme-cust-77"',
     context: {},
   },
-  keep: 'Keep Carol, the deletion and the Acme customer; change only the context.',
-  lesson:
+  keep: t('Keep Carol, the deletion and the Acme customer; change only the context.'),
+  lesson: t(
     'So the first answer was no although a permit held: a forbid held too, and a forbid is never overridden. What changed is the one thing that forbid makes an exception for.',
+  ),
 });
 
 export const CHALLENGES: readonly Challenge[] = [

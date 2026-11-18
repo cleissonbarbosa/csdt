@@ -1,4 +1,4 @@
-import type { Health } from '@aegis/contracts';
+import type { DataSource, Health } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
@@ -27,9 +27,10 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import { Menu } from '@/components/ui/Menu';
 import { Deviations } from '@/features/hud/Hud';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatClock } from '@/lib/format';
-import { COLOR, DATA_SOURCE_HINT, DATA_SOURCE_LABEL, HEALTH_COLOR } from '@/lib/palette';
+import { COLOR, DATA_SOURCE_HINT, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
@@ -73,20 +74,38 @@ function PlatformStatus() {
 
   // A fault placed by hand may not have moved anything out of range yet;
   // it is said anyway, so "all normal" is never the whole story.
-  const byHand = faults > 0 ? `; ${faults} fault${faults === 1 ? '' : 's'} placed by hand` : '';
-  let sentence = `${total} services, all normal${byHand}`;
+  let sentence =
+    faults === 0
+      ? t('{total} services, all normal', { total })
+      : t(
+          faults === 1
+            ? '{total} services, all normal; {faults} fault placed by hand'
+            : '{total} services, all normal; {faults} faults placed by hand',
+          { total, faults },
+        );
   let level: Health = 'healthy';
   if (incident && incident.status !== 'resolved') {
     const scenario = scenarios?.scenarios.find((s) => s.id === incident.scenarioId);
     const affected = incident.impactedNodeIds.length;
     // Name the incident and where it stands; the count says how far it reaches.
-    sentence = `${scenario?.name ?? 'Incident'}: ${incident.phaseName.toLowerCase()}, ${affected} service${affected === 1 ? '' : 's'} affected`;
+    sentence = t(
+      affected === 1
+        ? '{incident}: {phase}, {affected} service affected'
+        : '{incident}: {phase}, {affected} services affected',
+      {
+        incident: scenario?.name ?? t('Incident'),
+        phase: incident.phaseName.toLowerCase(),
+        affected,
+      },
+    );
     level = worst === 'healthy' ? 'degraded' : worst;
   } else if (unhealthy > 0) {
-    sentence = `${unhealthy} of ${total} services not normal`;
+    sentence = t('{unhealthy} of {total} services not normal', { unhealthy, total });
     level = worst;
   }
-  if (replayedAt !== null) sentence = `At ${replayedAt}, in history: ${sentence}`;
+  if (replayedAt !== null) {
+    sentence = t('At {moment}, in history: {sentence}', { moment: replayedAt, sentence });
+  }
   const abnormal = level !== 'healthy';
   const fresh = incident !== null && incident.status !== 'resolved' && incident.id !== acknowledged;
 
@@ -106,10 +125,10 @@ function PlatformStatus() {
         // says all of it, and then what the button does.
         title={`${sentence}. ${
           abnormal
-            ? 'Show the incident'
+            ? t('Show the incident')
             : faults > 0
-              ? 'Show what was placed by hand'
-              : 'Show the platform overview'
+              ? t('Show what was placed by hand')
+              : t('Show the platform overview')
         }`}
         onClick={() => {
           const ui = useUi.getState();
@@ -150,11 +169,11 @@ function PlatformStatus() {
 function ConnectionHealth() {
   const connection = useTelemetry((state) => state.connection);
   const view = {
-    open: { label: 'Stream connected', tone: undefined },
+    open: { label: t('Stream connected'), tone: undefined },
     connecting: { label: HOST.connecting, tone: COLOR.warning },
     reconnecting: { label: HOST.reconnecting, tone: COLOR.warning },
-    idle: { label: 'Offline', tone: COLOR.warning },
-    closed: { label: 'Disconnected', tone: COLOR.critical },
+    idle: { label: t('Offline'), tone: COLOR.warning },
+    closed: { label: t('Disconnected'), tone: COLOR.critical },
   }[connection];
   return (
     <span
@@ -173,7 +192,13 @@ function ConnectionHealth() {
 /**
  * Where the data comes from, in a word, on every screen: this is a
  * simulation. It is also the way to the integrations that could add to it.
- */
+ */ /** What the bar says the figures are, by where they come from. */
+const SIMULATED_FROM: Record<DataSource, string> = {
+  synthetic: t('Simulated, synthetic data'),
+  recording: t('Simulated, recording data'),
+  live: t('Simulated, live data'),
+};
+
 function Provenance() {
   const topology = useTelemetry((state) => state.topology);
   const { data: providers } = useQuery({
@@ -186,7 +211,12 @@ function Provenance() {
     providers?.filter((p) => p.kind === 'live-adapter' && p.state === 'connected').length ?? 0;
   const connected = live > 0;
   const hint = connected
-    ? `${live} local integration${live === 1 ? '' : 's'} connected alongside the simulation.`
+    ? t(
+        live === 1
+          ? '{n} local integration connected alongside the simulation.'
+          : '{n} local integrations connected alongside the simulation.',
+        { n: live },
+      )
     : !topology || topology.dataSource === 'synthetic'
       ? HOST.synthetic
       : DATA_SOURCE_HINT[topology.dataSource];
@@ -195,8 +225,8 @@ function Provenance() {
       <button
         type="button"
         onClick={() => setPanel('integrations')}
-        aria-label={`Simulated: ${hint} Open integrations.`}
-        title={`${hint} Open integrations.`}
+        aria-label={t('Simulated: {hint} Open integrations.', { hint })}
+        title={t('{hint} Open integrations.', { hint })}
         data-testid="open-integrations"
         className="inline-flex h-7 items-center gap-2 rounded-control bg-sunken px-2.5 text-[11px] text-ink-dim transition-colors hover:text-ink"
       >
@@ -204,10 +234,15 @@ function Provenance() {
         <span aria-hidden className="size-1.5 rounded-full border border-current" />
         <span className="max-2xl:hidden">
           {connected
-            ? `Simulated, with ${live} live integration${live === 1 ? '' : 's'}`
-            : `Simulated, ${(topology ? DATA_SOURCE_LABEL[topology.dataSource] : 'Synthetic').toLowerCase()} data`}
+            ? t(
+                live === 1
+                  ? 'Simulated, with {n} live integration'
+                  : 'Simulated, with {n} live integrations',
+                { n: live },
+              )
+            : SIMULATED_FROM[topology?.dataSource ?? 'synthetic']}
         </span>
-        <span className="2xl:hidden">Simulated</span>
+        <span className="2xl:hidden">{t('Simulated')}</span>
       </button>
     </div>
   );
@@ -219,7 +254,7 @@ function TopologyPicker() {
   if (!data || !topology) return null;
   return (
     <Select
-      label="Environment"
+      label={t('Environment')}
       hideLabel
       quiet
       value={topology.id}
@@ -299,11 +334,11 @@ export function TopNav() {
           type="button"
           onClick={() => useUi.getState().setCommandOpen(true)}
           className="inline-flex h-8 items-center gap-2 rounded-control border border-line bg-paper px-2.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-          aria-label="Search services and commands"
+          aria-label={t('Search services and commands')}
           data-testid="open-command"
         >
           <Search size={14} aria-hidden />
-          <span className="max-lg:hidden">Search</span>
+          <span className="max-lg:hidden">{t('Search')}</span>
           <kbd className="code text-[10px] text-ink-faint max-2xl:hidden">Ctrl K</kbd>
         </button>
         {/* What makes this a security model, not only an operations one:
@@ -312,13 +347,13 @@ export function TopNav() {
         <Button
           icon={<KeyRound size={13} aria-hidden />}
           aria-expanded={tracerOpen}
-          aria-label="Test an authorization with Cedar"
-          title="Ask Cedar who may do what, and follow the request across the model"
+          aria-label={t('Test an authorization with Cedar')}
+          title={t('Ask Cedar who may do what, and follow the request across the model')}
           onClick={() => useUi.getState().togglePanel('authorization')}
           data-testid="open-tracer"
           className="max-lg:w-8 max-lg:px-0"
         >
-          <span className="max-lg:hidden">Test an authorization</span>
+          <span className="max-lg:hidden">{t('Test an authorization')}</span>
         </Button>
         <Button
           variant="primary"
@@ -339,50 +374,52 @@ export function TopNav() {
           {/* A phone's bar has room for the last word, which is the one
               that says what the button is about. */}
           <span>
-            <span className="max-sm:hidden">{incidentActive ? 'Follow the ' : 'Explore an '}</span>
-            <span className="max-sm:capitalize">incident</span>
+            <span className="max-sm:hidden">
+              {incidentActive ? t('Follow the#incident') : t('Explore an#incident')}{' '}
+            </span>
+            <span className="max-sm:capitalize">{t('incident')}</span>
           </span>
         </Button>
         <Menu
-          label="More"
+          label={t('More')}
           testId="open-menu"
           icon={<Ellipsis size={17} />}
           items={[
             {
               id: 'trace',
-              label: 'Trace a request through Cedar',
+              label: t('Trace a request through Cedar'),
               icon: <KeyRound size={14} />,
               onSelect: () => useUi.getState().togglePanel('authorization'),
             },
             {
               id: 'matrix',
-              label: 'Who may do what',
+              label: t('Who may do what'),
               icon: <Grid3x3 size={14} />,
               onSelect: () => useUi.getState().setPanel('matrix'),
             },
             {
               id: 'experiment',
-              label: 'Compare an intervention',
+              label: t('Compare an intervention'),
               icon: <GitCompareArrows size={14} />,
               onSelect: () => useUi.getState().openExperiment(),
             },
             {
               id: 'guide',
-              label: 'Guided challenges',
+              label: t('Guided challenges'),
               icon: <Flag size={14} />,
               checked: guideOpen,
               onSelect: () => useGuide.getState().setOpen(!guideOpen),
             },
             {
               id: 'services',
-              label: 'List every service',
+              label: t('List every service'),
               hint: '/',
               icon: <List size={14} />,
               onSelect: () => useUi.getState().setLeftTab('explorer'),
             },
             {
               id: 'overview',
-              label: 'Platform signals',
+              label: t('Platform signals'),
               icon: <Activity size={14} />,
               onSelect: () => {
                 const ui = useUi.getState();
@@ -393,14 +430,14 @@ export function TopNav() {
             },
             {
               id: 'timeline',
-              label: 'Timeline and playback',
+              label: t('Timeline and playback'),
               icon: <History size={14} />,
               checked: timelineOpen,
               onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
             },
             {
               id: 'view',
-              label: viewMode === 'scene' ? 'Table view' : '3D model',
+              label: viewMode === 'scene' ? t('Table view') : t('3D model'),
               hint: 'T',
               icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
               onSelect: () =>
@@ -408,25 +445,25 @@ export function TopNav() {
             },
             {
               id: 'session',
-              label: 'Save or share this session',
+              label: t('Save or share this session'),
               icon: <Share2 size={14} />,
               onSelect: () => useUi.getState().setPanel('session'),
             },
             {
               id: 'workspace',
-              label: 'Import or export files',
+              label: t('Import or export files'),
               icon: <FolderOpen size={14} />,
               onSelect: () => useUi.getState().setPanel('workspace'),
             },
             {
               id: 'settings',
-              label: 'Settings',
+              label: t('Settings'),
               icon: <Settings size={14} />,
               onSelect: () => useUi.getState().setPanel('settings'),
             },
             {
               id: 'help',
-              label: 'Help and legend',
+              label: t('Help and legend'),
               hint: '?',
               icon: <CircleHelp size={14} />,
               onSelect: () => useUi.getState().setPanel('help'),

@@ -41,6 +41,7 @@ import {
   probeRenderingSupport,
   type RenderingSupport,
 } from '@/graphics/renderer';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useTelemetry } from '@/stores/telemetry';
 import { LAYOUT_MODES, prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
@@ -236,14 +237,17 @@ function EngineStopped({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
       <div className="panel max-w-md p-6" data-testid="engine-stopped">
-        <h2 className="text-base font-bold text-ink">The simulation engine is not running</h2>
+        <h2 className="text-base font-bold text-ink">
+          {t('The simulation engine is not running')}
+        </h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">{message}</p>
         <p className="caption mt-3">
-          On this page the simulation runs in the browser, from a WebAssembly module. Nothing is
-          shown in its place: AEGIS does not invent data.
+          {t(
+            'On this page the simulation runs in the browser, from a WebAssembly module. Nothing is shown in its place: AEGIS does not invent data.',
+          )}
         </p>
         <Button className="mt-4" onClick={() => window.location.reload()}>
-          Reload the page
+          {t('Reload the page')}
         </Button>
       </div>
     </div>
@@ -255,18 +259,20 @@ function Unreachable({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="alert">
       <div className="panel max-w-md p-6">
-        <h2 className="text-base font-bold text-ink">The AEGIS server is not answering</h2>
+        <h2 className="text-base font-bold text-ink">{t('The AEGIS server is not answering')}</h2>
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">{message}</p>
-        <p className="mt-3 text-xs text-ink-dim">Start it with:</p>
+        <p className="mt-3 text-xs text-ink-dim">{t('Start it with:')}</p>
         <p className="numeric mt-1 rounded-control border border-line bg-sunken px-2 py-1.5 text-xs text-ink">
+          {/* not-interface-text: a command, the same in every language */}
           cargo run -p aegis-server
         </p>
         <p className="caption mt-3">
-          The interface reconnects by itself as soon as the server is up. Nothing is shown in the
-          meantime: AEGIS does not invent data.
+          {t(
+            'The interface reconnects by itself as soon as the server is up. Nothing is shown in the meantime: AEGIS does not invent data.',
+          )}
         </p>
         <Button className="mt-4" onClick={() => window.location.reload()}>
-          Retry now
+          {t('Retry now')}
         </Button>
       </div>
     </div>
@@ -396,9 +402,11 @@ export function App() {
 
   const unavailable =
     sceneError !== null
-      ? 'The 3D renderer could not start on this device. Showing the table view instead.'
+      ? t('The 3D renderer could not start on this device. Showing the table view instead.')
       : support !== null && !canRender3D(support)
-        ? 'This browser offers neither WebGPU nor WebGL 2, so the 3D scene is unavailable. Showing the table view instead.'
+        ? t(
+            'This browser offers neither WebGPU nor WebGL 2, so the 3D scene is unavailable. Showing the table view instead.',
+          )
         : null;
 
   return (
@@ -411,7 +419,7 @@ export function App() {
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-control focus:border focus:border-ink focus:bg-paper focus:px-3 focus:py-2 focus:text-xs"
       >
-        Skip to the topology
+        {t('Skip to the topology')}
       </a>
       {embed === null && <TopNav />}
 
@@ -420,7 +428,7 @@ export function App() {
           id="main"
           tabIndex={-1}
           className="absolute inset-0"
-          aria-label="Infrastructure topology"
+          aria-label={t('Infrastructure topology')}
         >
           {probing ? null : showScene ? (
             <SceneCanvas
@@ -475,7 +483,7 @@ export function App() {
           open={explorerOpen}
           width={LEFT_WIDTH}
           foot={foot + guideFoot}
-          label="Services and incidents"
+          label={t('Services and incidents')}
         >
           <Tabs.Root
             value={leftTab}
@@ -483,22 +491,22 @@ export function App() {
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="flex shrink-0 items-center border-b border-line pr-1">
-              <Tabs.List className="relative flex flex-1" aria-label="Left panel">
+              <Tabs.List className="relative flex flex-1" aria-label={t('Left panel')}>
                 <Tabs.Trigger value="explorer" className={tabClass} data-testid="tab-explorer">
-                  Services
+                  {t('Services')}
                 </Tabs.Trigger>
                 <Tabs.Trigger value="incidents" className={tabClass} data-testid="tab-incidents">
-                  Incidents
+                  {t('Incidents')}
                   {incidentActive && (
                     <span className="ml-1.5 inline-block size-[7px] bg-critical align-baseline">
-                      <span className="sr-only">(incident active)</span>
+                      <span className="sr-only">{t('(incident active)')}</span>
                     </span>
                   )}
                 </Tabs.Trigger>
                 <TabMarker index={leftTab === 'explorer' ? 0 : 1} count={2} />
               </Tabs.List>
               <IconButton
-                label="Close this panel"
+                label={t('Close this panel')}
                 size="sm"
                 onClick={() => useUi.getState().setExplorerOpen(false)}
                 data-testid="close-explorer"
@@ -531,7 +539,7 @@ export function App() {
           compact
           share={narrow ? CARD_SHARE_WHEN_NARROW : undefined}
           onHeight={onCard}
-          label={authorizationOpen ? 'Trace a request' : 'Inspector'}
+          label={authorizationOpen ? t('Trace a request') : t('Inspector')}
         >
           <div className={cn('min-h-0 flex-1 overflow-y-auto', authorizationOpen && 'hidden')}>
             <Inspector selection={inspectorOpen ? selection : inspected} />

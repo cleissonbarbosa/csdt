@@ -1,5 +1,7 @@
 import type { AuthorizationExplanation, PolicyStanding } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 /** The policies in force, by how each stands to a request. */
 export interface Standings {
   /** Hold for the request: these are what Cedar decided by, or would have. */
@@ -31,17 +33,17 @@ export function describeStanding(
 ): string {
   const forbid = standing.effect === 'forbid';
   if (standing.holds) {
-    if (forbid) return 'Holds: it forbids the request.';
+    if (forbid) return t('Holds: it forbids the request.');
     return decision === 'allow'
-      ? 'Holds: it permits the request.'
-      : 'Holds, and would permit the request, but a forbid overrides it.';
+      ? t('Holds: it permits the request.')
+      : t('Holds, and would permit the request, but a forbid overrides it.');
   }
   if (standing.inScope) {
     return forbid
-      ? 'About this request, but its condition does not hold: it does not forbid.'
-      : 'About this request, but its condition does not hold: it does not permit.';
+      ? t('About this request, but its condition does not hold: it does not forbid.')
+      : t('About this request, but its condition does not hold: it does not permit.');
   }
-  return 'Not about this request: who asks, what for, or on which thing is outside its scope.';
+  return t('Not about this request: who asks, what for, or on which thing is outside its scope.');
 }
 
 /**

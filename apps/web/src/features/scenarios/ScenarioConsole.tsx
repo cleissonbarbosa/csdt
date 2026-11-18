@@ -3,7 +3,7 @@ import {
   SEVERITY_ORDER,
   type ActiveFault,
   type Health,
-  type Incident,
+  type IncidentStatus,
   type PlaybackSpeed,
   type Scenario,
   type SecurityEvent,
@@ -31,30 +31,24 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
 import { describeFault, faultEffect, faultTarget } from '@/lib/faults';
 import { formatClock, titleCase } from '@/lib/format';
-import { COLOR, SEVERITY_LABEL } from '@/lib/palette';
+import { COLOR, DATA_SOURCE_LABEL, SEVERITY_LABEL } from '@/lib/palette';
+import { CATEGORY_LABEL, STATUS_LABEL } from '@/lib/scenarioFile';
 import { api } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
-import { foldEvents } from './events';
+import { EVENT_KIND_LABEL, foldEvents } from './events';
 import {
   IncidentSummary,
   PhaseExplanation,
   TransitionWhy,
   useIncidentReport,
 } from './IncidentReport';
-
-type IncidentStatus = Incident['status'];
-
-const STATUS_LABEL: Record<IncidentStatus, string> = {
-  active: 'Active',
-  mitigating: 'Mitigating',
-  recovering: 'Recovering',
-  resolved: 'Resolved',
-};
 
 /** An incident is a deviation until it is resolved; how severe, by stage. */
 const STATUS_TONE: Record<IncidentStatus, string | undefined> = {
@@ -87,9 +81,17 @@ function ScenarioCard({ scenario, running }: { scenario: Scenario; running: bool
         <div className="min-w-0">
           <h4 className="text-xs font-bold text-ink">{scenario.name}</h4>
           <p className="caption mt-0.5">
-            {titleCase(scenario.category)},{' '}
-            <span className="numeric">{formatClock(scenario.durationMs)}</span>,{' '}
-            {scenario.phases.length} phases
+            {tr(
+              scenario.phases.length === 1
+                ? '{category}, <n>{duration}</n>, {count} phases#one'
+                : '{category}, <n>{duration}</n>, {count} phases',
+              {
+                n: (c) => <span className="numeric">{c}</span>,
+                category: CATEGORY_LABEL[scenario.category],
+                duration: formatClock(scenario.durationMs),
+                count: scenario.phases.length,
+              },
+            )}
           </p>
         </div>
         <Button
@@ -101,7 +103,7 @@ function ScenarioCard({ scenario, running }: { scenario: Scenario; running: bool
           data-testid={`scenario-start-${scenario.id}`}
           aria-describedby={scenario.available ? undefined : `scenario-reason-${scenario.id}`}
         >
-          {running ? 'Restart' : 'Start'}
+          {running ? t('Restart') : t('Start')}
         </Button>
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-ink-dim">{scenario.summary}</p>
@@ -110,16 +112,20 @@ function ScenarioCard({ scenario, running }: { scenario: Scenario; running: bool
           type="button"
           onClick={() => useUi.getState().openExperiment(scenario.id)}
           className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
-          title="Run this scenario twice from the same seed, once with one change, and compare"
+          title={t('Run this scenario twice from the same seed, once with one change, and compare')}
           data-testid={`scenario-compare-${scenario.id}`}
         >
-          <GitCompareArrows size={12} aria-hidden /> Compare an intervention
+          <GitCompareArrows size={12} aria-hidden /> {t('Compare an intervention')}
         </button>
       )}
       {!scenario.available && (
         <p id={`scenario-reason-${scenario.id}`} className="mt-1.5 text-xs text-ink-dim">
-          Cannot run:{' '}
-          {scenario.unavailableReason ?? 'This scenario is incompatible with the active platform.'}
+          {/* A reason the server gives is its own words. */}
+          {t('Cannot run: {reason}', {
+            reason:
+              scenario.unavailableReason ??
+              t('This scenario is incompatible with the active platform.'),
+          })}
         </p>
       )}
     </li>
@@ -164,7 +170,7 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
         <div
           className="h-1 bg-line"
           role="progressbar"
-          aria-label="Scenario progress"
+          aria-label={t('Scenario progress')}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(incident.progress * 100)}
@@ -177,17 +183,17 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
         {scenario && (
           <>
             <p className="caption mt-3" data-testid="phase-times">
-              Phases, timed from the start of the incident
-              {report?.incidentId === incident.id && (
-                <>
-                  {' '}
-                  (<span className="numeric">{formatClock(report.startedAtMs)}</span> on the
-                  simulation clock)
-                </>
-              )}
-              . Select one to see why.
+              {report?.incidentId === incident.id
+                ? tr(
+                    'Phases, timed from the start of the incident (<n>{clock}</n> on the simulation clock). Select one to see why.',
+                    {
+                      n: (c) => <span className="numeric">{c}</span>,
+                      clock: formatClock(report.startedAtMs),
+                    },
+                  )
+                : t('Phases, timed from the start of the incident. Select one to see why.')}
             </p>
-            <ol className="mt-1.5 space-y-1.5" aria-label="Phases">
+            <ol className="mt-1.5 space-y-1.5" aria-label={t('Phases')}>
               {scenario.phases.map((phase, i) => {
                 const state =
                   i < incident.phaseIndex ? 'done' : i === incident.phaseIndex ? 'current' : 'next';
@@ -213,9 +219,14 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
                         onClick={() => setExplained(open ? null : i)}
                         title={
                           state === 'next'
-                            ? 'Not reached yet'
+                            ? t('Not reached yet')
                             : entered
-                              ? `Entered at ${formatClock(entered.atMs)} on the simulation clock. ${open ? 'Hide' : 'Show'} what it prescribes and what followed.`
+                              ? t(
+                                  open
+                                    ? 'Entered at {clock} on the simulation clock. Hide what it prescribes and what followed.'
+                                    : 'Entered at {clock} on the simulation clock. Show what it prescribes and what followed.',
+                                  { clock: formatClock(entered.atMs) },
+                                )
                               : undefined
                         }
                         className="group text-left enabled:hover:text-ink"
@@ -257,7 +268,7 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
             onClick={() => void actions.control({ action: playing ? 'pause' : 'play' })}
             data-testid="incident-pause"
           >
-            {playing ? 'Pause' : 'Resume'}
+            {playing ? t('Pause') : t('Resume')}
           </Button>
           <Button
             size="sm"
@@ -265,12 +276,12 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
             icon={<Square size={11} aria-hidden />}
             onClick={() => void actions.stopScenario()}
             data-testid="incident-stop"
-            title="Stop the scenario and let the platform recover. History is kept."
+            title={t('Stop the scenario and let the platform recover. History is kept.')}
           >
-            Stop
+            {t('Stop')}
           </Button>
           <Segmented<PlaybackSpeed>
-            label="Scenario speed"
+            label={t('Scenario speed')}
             size="sm"
             value={playback.speed as PlaybackSpeed}
             options={SPEEDS}
@@ -283,13 +294,17 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
           className="mt-2 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
           data-testid="incident-summary-open"
         >
-          Summary so far: origin, propagation, peak
+          {t('Summary so far: origin, propagation, peak')}
         </button>
         {incident.impactedNodeIds.length > 0 && (
           <div className="mt-3">
             <p className="caption mb-1">
-              {incident.impactedNodeIds.length} service
-              {incident.impactedNodeIds.length === 1 ? '' : 's'} affected
+              {t(
+                incident.impactedNodeIds.length === 1
+                  ? '{n} service affected'
+                  : '{n} services affected',
+                { n: incident.impactedNodeIds.length },
+              )}
             </p>
             <ul
               className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs"
@@ -309,7 +324,9 @@ function ActiveIncident({ scenario }: { scenario: Scenario | undefined }) {
                 </li>
               ))}
               {incident.impactedNodeIds.length > 18 && (
-                <li className="text-ink-faint">and {incident.impactedNodeIds.length - 18} more</li>
+                <li className="text-ink-faint">
+                  {t('and {n} more', { n: incident.impactedNodeIds.length - 18 })}
+                </li>
               )}
             </ul>
           </div>
@@ -349,44 +366,44 @@ function EventDetail({ event, onBack }: { event: SecurityEvent; onBack: () => vo
           onClick={onBack}
           className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
         >
-          <ChevronLeft size={13} aria-hidden /> All events
+          <ChevronLeft size={13} aria-hidden /> {t('All events')}
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <h4 className="text-sm font-bold text-ink">{event.title}</h4>
         <p className="mt-1 text-xs leading-relaxed text-ink-dim">{event.message}</p>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
-          <dt className="text-ink-faint">Severity</dt>
+          <dt className="text-ink-faint">{t('Severity')}</dt>
           <dd>
             <SeverityBadge severity={event.severity} />
           </dd>
-          <dt className="text-ink-faint">Kind</dt>
-          <dd className="text-ink">{titleCase(event.kind)}</dd>
-          <dt className="text-ink-faint">Simulation clock</dt>
+          <dt className="text-ink-faint">{t('Kind')}</dt>
+          <dd className="text-ink">{EVENT_KIND_LABEL[event.kind]}</dd>
+          <dt className="text-ink-faint">{t('Simulation clock')}</dt>
           <dd className="numeric text-ink" data-testid="event-clock">
             {formatClock(event.virtualTimeMs)}
           </dd>
           {started !== undefined && event.virtualTimeMs >= started && (
             <>
-              <dt className="text-ink-faint">Into the incident</dt>
+              <dt className="text-ink-faint">{t('Into the incident')}</dt>
               <dd className="numeric text-ink" data-testid="event-since-incident">
                 +{formatClock(event.virtualTimeMs - started)}
                 <span className="font-normal text-ink-faint">
                   {' '}
-                  (it began at {formatClock(started)})
+                  {t('(it began at {clock})', { clock: formatClock(started) })}
                 </span>
               </dd>
             </>
           )}
-          <dt className="text-ink-faint">Sequence</dt>
+          <dt className="text-ink-faint">{t('Sequence')}</dt>
           <dd className="numeric text-ink">{event.seq}</dd>
           {event.incidentId && (
             <>
-              <dt className="text-ink-faint">Incident</dt>
+              <dt className="text-ink-faint">{t('Incident')}</dt>
               <dd className="code text-ink">{event.incidentId}</dd>
             </>
           )}
-          <dt className="text-ink-faint">Data</dt>
+          <dt className="text-ink-faint">{t('Data')}</dt>
           <dd>
             <SourceBadge source={event.dataSource} />
           </dd>
@@ -396,13 +413,13 @@ function EventDetail({ event, onBack }: { event: SecurityEvent; onBack: () => vo
         )}
         {phase && report && (
           <div className="mt-3">
-            <p className="caption">What this phase prescribes, and what followed</p>
+            <p className="caption">{t('What this phase prescribes, and what followed')}</p>
             <PhaseExplanation report={report} phase={phase} />
           </div>
         )}
         {event.nodeIds.length > 0 && (
           <div className="mt-3">
-            <p className="caption mb-1">Services</p>
+            <p className="caption mb-1">{t('Services')}</p>
             <ul className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs">
               {event.nodeIds.slice(0, 16).map((id) => (
                 <li key={id}>
@@ -429,12 +446,12 @@ function EventDetail({ event, onBack }: { event: SecurityEvent; onBack: () => vo
             }
             data-testid="event-jump"
           >
-            Jump to this moment
+            {t('Jump to this moment')}
           </Button>
         </div>
         {event.details !== undefined && (
           <div className="mt-3">
-            <p className="caption mb-1">Details</p>
+            <p className="caption mb-1">{t('Details')}</p>
             <pre className="code max-h-72 overflow-auto rounded-control border border-line bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
               {JSON.stringify(event.details, null, 2)}
             </pre>
@@ -457,7 +474,7 @@ function RecordedIncidents() {
   });
   if (!incidents || incidents.length === 0) return null;
   return (
-    <Section title="On this timeline">
+    <Section title={t('On this timeline')}>
       <ul className="-mx-1.5" data-testid="recorded-incidents">
         {[...incidents].reverse().map((incident) => (
           <li key={incident.id}>
@@ -475,11 +492,15 @@ function RecordedIncidents() {
                 </span>
               </span>
               <span className="numeric text-[11px] text-ink-faint">
-                {formatClock(incident.startedAtMs)}
-                {incident.resolvedAtMs !== null && ` to ${formatClock(incident.resolvedAtMs)}`}
+                {incident.resolvedAtMs === null
+                  ? formatClock(incident.startedAtMs)
+                  : t('{start} to {end}', {
+                      start: formatClock(incident.startedAtMs),
+                      end: formatClock(incident.resolvedAtMs),
+                    })}
               </span>
               <span className="caption col-span-2">
-                Summary: origin, propagation, peak and recovery
+                {t('Summary: origin, propagation, peak and recovery')}
               </span>
             </button>
           </li>
@@ -490,10 +511,10 @@ function RecordedIncidents() {
 }
 
 const LEVELS: { value: Severity; label: string }[] = [
-  { value: 'info', label: 'All' },
-  { value: 'notice', label: 'Notices' },
-  { value: 'warning', label: 'Warnings' },
-  { value: 'critical', label: 'Critical' },
+  { value: 'info', label: t('All') },
+  { value: 'notice', label: t('Notices') },
+  { value: 'warning', label: t('Warnings') },
+  { value: 'critical', label: t('Critical') },
 ];
 
 function EventRow({
@@ -525,9 +546,13 @@ function EventRow({
       </span>
       <span className={cn('min-w-0 truncate text-xs text-ink', loud && !nested && 'font-bold')}>
         {event.title}
-        <span className="sr-only">, severity {SEVERITY_LABEL[event.severity]}</span>
+        <span className="sr-only">
+          , {t('severity {severity}', { severity: SEVERITY_LABEL[event.severity] })}
+        </span>
         {event.dataSource !== 'synthetic' && (
-          <span className="ml-1.5 font-normal text-ink-faint">{event.dataSource}</span>
+          <span className="ml-1.5 font-normal text-ink-faint">
+            {DATA_SOURCE_LABEL[event.dataSource].toLowerCase()}
+          </span>
         )}
       </span>
       <span className="numeric text-[11px] text-ink-faint">{formatClock(event.virtualTimeMs)}</span>
@@ -551,10 +576,10 @@ function EventLog() {
   }, [events, level]);
   return (
     <Section
-      title="Events"
+      title={t('Events')}
       aside={
         <Segmented
-          label="Minimum severity"
+          label={t('Minimum severity')}
           size="sm"
           value={level}
           options={LEVELS}
@@ -563,9 +588,9 @@ function EventLog() {
       }
     >
       {entries.length === 0 ? (
-        <p className="text-xs text-ink-faint">No events at this level yet.</p>
+        <p className="text-xs text-ink-faint">{t('No events at this level yet.')}</p>
       ) : (
-        <ol className="-mx-1.5" data-testid="event-log" aria-label="Events, newest first">
+        <ol className="-mx-1.5" data-testid="event-log" aria-label={t('Events, newest first')}>
           {entries.map((entry) =>
             entry.kind === 'event' ? (
               <li key={entry.event.seq}>
@@ -587,7 +612,7 @@ function EventLog() {
                     <HealthGlyph health={SEVERITY_GLYPH[entry.severity]} size={8} />
                   </span>
                   <span className="min-w-0 truncate text-xs text-ink">
-                    {entry.events.length} services changed state
+                    {t('{n} services changed state', { n: entry.events.length })}
                   </span>
                   <span className="numeric text-[11px] text-ink-faint">
                     {formatClock(entry.events[0]!.virtualTimeMs)}
@@ -620,7 +645,7 @@ function Recordings() {
   if (!recordings || recordings.length === 0) return null;
   return (
     <Select
-      label="Load a recorded incident"
+      label={t('Load a recorded incident')}
       hideLabel
       value=""
       onChange={(event) => {
@@ -629,7 +654,7 @@ function Recordings() {
       className="mt-2 w-full"
       data-testid="recording-picker"
     >
-      <option value="">Load a recorded incident…</option>
+      <option value="">{t('Load a recorded incident…')}</option>
       {recordings.map((r) => (
         <option key={r.id} value={r.id}>
           {r.name} ({formatClock(r.durationMs)})
@@ -655,7 +680,7 @@ function PlacedByHand() {
   if (!topology || faults.length === 0) return null;
   return (
     <Section
-      title="Placed by hand"
+      title={t('Placed by hand')}
       aside={
         <Button
           size="sm"
@@ -663,7 +688,7 @@ function PlacedByHand() {
           onClick={() => void actions.liftFault()}
           data-testid="faults-lift-all"
         >
-          Lift all
+          {t('Lift all')}
         </Button>
       }
     >
@@ -691,7 +716,7 @@ function PlacedByHand() {
               </button>
               {effect && (
                 <IconButton
-                  label={`Lift this fault from ${target}`}
+                  label={t('Lift this fault from {target}', { target })}
                   size="sm"
                   onClick={() => void actions.liftFault(effect)}
                 >
@@ -747,7 +772,7 @@ export function ScenarioConsole() {
       <RecordedIncidents />
       <PlacedByHand />
       <Section
-        title="Scenarios"
+        title={t('Scenarios')}
         aside={
           confirming ? (
             <span className="flex items-center gap-1">
@@ -760,10 +785,10 @@ export function ScenarioConsole() {
                 }}
                 data-testid="reset-confirm"
               >
-                Erase history
+                {t('Erase history')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-                Cancel
+                {t('Cancel')}
               </Button>
             </span>
           ) : (
@@ -773,18 +798,19 @@ export function ScenarioConsole() {
               icon={<RotateCcw size={12} aria-hidden />}
               onClick={() => setConfirming(true)}
               data-testid="reset-simulation"
-              title="Return to a clean baseline at 0:00"
+              title={t('Return to a clean baseline at 0:00')}
             >
-              Reset
+              {t('Reset')}
             </Button>
           )
         }
       >
         <p className="caption mb-1">
-          Fictional, deterministic incidents that run only inside the simulation engine. Nothing
-          here touches a real system.
+          {t(
+            'Fictional, deterministic incidents that run only inside the simulation engine. Nothing here touches a real system.',
+          )}
         </p>
-        {isError && <EmptyState title="Scenarios unavailable">{HOST.unreachable}</EmptyState>}
+        {isError && <EmptyState title={t('Scenarios unavailable')}>{HOST.unreachable}</EmptyState>}
         <ul className="divide-y divide-line">
           {data?.scenarios.map((scenario) => (
             <ScenarioCard
@@ -801,7 +827,7 @@ export function ScenarioConsole() {
           className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
           data-testid="open-scenario-editor"
         >
-          <PencilLine size={12} aria-hidden /> Write a scenario of your own
+          <PencilLine size={12} aria-hidden /> {t('Write a scenario of your own')}
         </button>
       </Section>
       <EventLog />

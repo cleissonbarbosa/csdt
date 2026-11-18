@@ -7,6 +7,7 @@ import { ExternalLink } from 'lucide-react';
 
 import { fullAddress } from '@/app/embed';
 import { HealthGlyph } from '@/components/ui/Badge';
+import { t } from '@/i18n';
 import { HEALTH_COLOR } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
 
@@ -37,7 +38,7 @@ export function EmbedBar() {
         <Logo />
         <span className="font-bold">AEGIS</span>
       </span>
-      <span className="max-sm:hidden">Simulated, synthetic data</span>
+      <span className="max-sm:hidden">{t('Simulated, synthetic data')}</span>
       {global && (
         <span
           role="status"
@@ -47,10 +48,13 @@ export function EmbedBar() {
         >
           {unhealthy > 0 && <HealthGlyph health={level} size={9} />}
           {running
-            ? `${incident.phaseName}, ${incident.impactedNodeIds.length} affected`
+            ? t('{phase}, {affected} affected', {
+                phase: incident.phaseName,
+                affected: incident.impactedNodeIds.length,
+              })
             : unhealthy > 0
-              ? `${unhealthy} of ${total} services not normal`
-              : `${total} services, all normal`}
+              ? t('{unhealthy} of {total} services not normal', { unhealthy, total })
+              : t('{total} services, all normal', { total })}
         </span>
       )}
       <a
@@ -60,7 +64,7 @@ export function EmbedBar() {
         className="inline-flex shrink-0 items-center gap-1 text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
         data-testid="embed-open"
       >
-        Open <ExternalLink size={11} aria-hidden />
+        {t('Open#verb')} <ExternalLink size={11} aria-hidden />
       </a>
     </div>
   );

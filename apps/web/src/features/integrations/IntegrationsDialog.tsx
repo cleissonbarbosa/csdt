@@ -10,32 +10,35 @@ import { SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/Section';
+import { t } from '@/i18n';
 import { COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
 /** A provider's state is plain text unless it is trying or failing. */
 const STATE: Record<IntegrationState, { label: string; color?: string; quiet?: boolean }> = {
-  active: { label: 'Active' },
-  'not-configured': { label: 'Not configured', quiet: true },
-  available: { label: 'Available' },
-  connecting: { label: 'Connecting', color: COLOR.warning },
-  connected: { label: 'Connected' },
-  imported: { label: 'Imported' },
-  error: { label: 'Error', color: COLOR.critical },
+  active: { label: t('Active') },
+  'not-configured': { label: t('Not configured'), quiet: true },
+  available: { label: t('Available') },
+  connecting: { label: t('Connecting'), color: COLOR.warning },
+  connected: { label: t('Connected') },
+  imported: { label: t('Imported') },
+  error: { label: t('Error'), color: COLOR.critical },
 };
 
-const KIND = {
-  simulation: 'Built-in simulation',
-  'live-adapter': 'Live adapter',
-  fixture: 'Fixture',
-} as const;
+const KIND: Record<IntegrationStatus['kind'], string> = {
+  simulation: t('Built-in simulation'),
+  'live-adapter': t('Live adapter'),
+  fixture: t('Fixture'),
+};
 
 const SETUP_HINT: Record<string, string> = {
-  'cedar-agent':
+  'cedar-agent': t(
     'Set AEGIS_CEDAR_AGENT_URL on the server (for example http://127.0.0.1:8180) and restart it.',
-  'rinha-backend':
+  ),
+  'rinha-backend': t(
     'Set AEGIS_RINHA_URL on the server (for example http://127.0.0.1:9999) and restart it.',
+  ),
 };
 
 function ProviderCard({ provider }: { provider: IntegrationStatus }) {
@@ -79,7 +82,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
         {provider.repository && (
           <>
-            <dt className="text-ink-faint">Repository</dt>
+            <dt className="text-ink-faint">{t('Repository')}</dt>
             <dd className="min-w-0">
               <a
                 href={provider.repository}
@@ -89,20 +92,20 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
               >
                 {provider.repository.replace('https://github.com/', '')}
                 <ExternalLink size={11} aria-hidden />
-                <span className="sr-only">(opens in a new tab)</span>
+                <span className="sr-only">{t('(opens in a new tab)')}</span>
               </a>
             </dd>
           </>
         )}
         {provider.verifiedInterface && (
           <>
-            <dt className="text-ink-faint">Verified interface</dt>
+            <dt className="text-ink-faint">{t('Verified interface')}</dt>
             <dd className="numeric text-ink-dim">{provider.verifiedInterface}</dd>
           </>
         )}
         {provider.endpoint && (
           <>
-            <dt className="text-ink-faint">Target</dt>
+            <dt className="text-ink-faint">{t('Target')}</dt>
             <dd className="numeric text-ink-dim">{provider.endpoint}</dd>
           </>
         )}
@@ -124,7 +127,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
       )}
       {provider.state === 'not-configured' && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          {SETUP_HINT[provider.id] ?? 'Not configured on the server.'}
+          {SETUP_HINT[provider.id] ?? t('Not configured on the server.')}
         </p>
       )}
 
@@ -132,7 +135,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
         <div className="mt-3 flex gap-1.5">
           {on ? (
             <Button size="sm" disabled={busy} onClick={() => void run(false)}>
-              {fixture ? 'Forget import' : 'Disconnect'}
+              {fixture ? t('Forget import') : t('Disconnect')}
             </Button>
           ) : (
             <Button
@@ -142,7 +145,7 @@ function ProviderCard({ provider }: { provider: IntegrationStatus }) {
               onClick={() => void run(true)}
               data-testid={`provider-connect-${provider.id}`}
             >
-              {busy ? 'Working…' : fixture ? 'Import onto timeline' : 'Connect'}
+              {busy ? t('Working…') : fixture ? t('Import onto timeline') : t('Connect')}
             </Button>
           )}
         </div>
@@ -162,11 +165,13 @@ export function IntegrationsDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => useUi.getState().setPanel(next ? 'integrations' : null)}
-      title="Integrations"
-      description="Demo Mode needs none of these. Each one is opt-in, and every piece of data is labelled with where it came from."
+      title={t('Integrations')}
+      description={t(
+        'Demo Mode needs none of these. Each one is opt-in, and every piece of data is labelled with where it came from.',
+      )}
       width="max-w-3xl"
     >
-      {isError && <EmptyState title="Unavailable">{HOST.unreachable}</EmptyState>}
+      {isError && <EmptyState title={t('Unavailable')}>{HOST.unreachable}</EmptyState>}
       <ul className="grid gap-3 md:grid-cols-2">
         {data?.map((provider) => (
           <ProviderCard key={provider.id} provider={provider} />

@@ -5,6 +5,7 @@ import { HealthBadge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Field';
 import { sceneHandle } from '@/graphics/handle';
+import { t } from '@/i18n';
 import { formatMs, formatRate } from '@/lib/format';
 import { overviewOf, projectSnapshot } from '@/lib/overview';
 import { SERVICE_TYPE } from '@/lib/palette';
@@ -14,9 +15,9 @@ import { filtersActive, useUi, type LayoutMode } from '@/stores/ui';
 
 /** The overview first, then the two arrangements that show every service. */
 const LAYOUTS: { value: LayoutMode; label: string }[] = [
-  { value: 'layers', label: 'Overview' },
-  { value: 'regions', label: 'Regions' },
-  { value: 'dependencies', label: 'Dependencies' },
+  { value: 'layers', label: t('Overview') },
+  { value: 'regions', label: t('Regions') },
+  { value: 'dependencies', label: t('Dependencies') },
 ];
 
 /** Camera and layout controls floating over the scene. */
@@ -24,9 +25,13 @@ export function SceneToolbar() {
   const layoutMode = useUi((state) => state.layoutMode);
   const filters = useUi((state) => state.filters);
   return (
-    <div className="panel flex items-center gap-1.5 p-1" role="toolbar" aria-label="Scene controls">
+    <div
+      className="panel flex items-center gap-1.5 p-1"
+      role="toolbar"
+      aria-label={t('Scene controls')}
+    >
       <Segmented
-        label="Topology layout"
+        label={t('Topology layout')}
         size="sm"
         value={layoutMode}
         options={LAYOUTS}
@@ -34,7 +39,7 @@ export function SceneToolbar() {
         onChange={(mode) => useUi.getState().setLayoutMode(mode)}
       />
       <IconButton
-        label="Frame everything"
+        label={t('Frame everything')}
         size="sm"
         onClick={() => sceneHandle.current?.frameAll()}
         data-testid="scene-frame"
@@ -42,7 +47,7 @@ export function SceneToolbar() {
         <Maximize2 size={13} />
       </IconButton>
       <IconButton
-        label="Reset camera"
+        label={t('Reset camera')}
         size="sm"
         onClick={() => sceneHandle.current?.resetView()}
         data-testid="scene-reset"
@@ -51,7 +56,7 @@ export function SceneToolbar() {
       </IconButton>
       {filtersActive(filters) && (
         <Button size="sm" variant="ghost" onClick={() => useUi.getState().clearFilters()}>
-          Clear filters
+          {t('Clear filters')}
         </Button>
       )}
     </div>
@@ -87,7 +92,7 @@ export function HoverCard() {
         <p className="text-xs font-bold text-ink">{node.name}</p>
         <p className="caption">
           {count > 1
-            ? `${count} ${SERVICE_TYPE[node.serviceType].plural}`
+            ? t('{n} {kinds}', { n: count, kinds: SERVICE_TYPE[node.serviceType].plural })
             : SERVICE_TYPE[node.serviceType].label}
         </p>
         <p className="mt-1 flex items-center gap-2.5 text-[11px]">
@@ -121,7 +126,7 @@ export function Notices() {
           <button
             type="button"
             onClick={() => useNotices.getState().dismiss(notice.id)}
-            title="Dismiss"
+            title={t('Dismiss')}
             className={`min-w-0 px-3 py-1.5 text-left text-xs ${
               notice.tone === 'error' ? 'font-bold text-critical' : 'text-ink'
             }`}

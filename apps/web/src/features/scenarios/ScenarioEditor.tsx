@@ -19,9 +19,13 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { NumberField, Select, TextArea, TextField } from '@/components/ui/Field';
 import { downloadJson } from '@/features/workspace/files';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
+import { SEVERITY_LABEL } from '@/lib/palette';
 import {
   blankScenario,
   CATEGORIES,
+  CATEGORY_LABEL,
   draftFromFile,
   draftProblems,
   draftToFile,
@@ -33,6 +37,7 @@ import {
   rowKey,
   SEVERITIES,
   slug,
+  STATUS_LABEL,
   targetChoices,
   type EffectDraft,
   type EffectKind,
@@ -41,10 +46,11 @@ import {
   type ScenarioDraft,
   type TargetChoice,
 } from '@/lib/scenarioFile';
-import { titleCase } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
+
+import { EVENT_KIND_LABEL } from './events';
 
 /** A time typed in seconds, as the file keeps it: whole milliseconds, never before zero. */
 const millis = (seconds: number) => Math.max(0, Math.round(seconds * 1000));
@@ -80,7 +86,7 @@ function TargetSelect({
       data-testid={testId}
     >
       {allowNone !== undefined && <option value="">{allowNone}</option>}
-      {!known && <option value={value}>{value} (not on this platform)</option>}
+      {!known && <option value={value}>{t('{value} (not on this platform)', { value })}</option>}
       {groups.map((group) => (
         <optgroup key={group} label={group}>
           {choices
@@ -108,7 +114,7 @@ function EffectRow({
   onRemove: () => void;
 }) {
   const remove = (
-    <IconButton label="Remove this effect" size="sm" onClick={onRemove}>
+    <IconButton label={t('Remove this effect')} size="sm" onClick={onRemove}>
       <Trash2 size={13} />
     </IconButton>
   );
@@ -118,7 +124,7 @@ function EffectRow({
         <span className="code min-w-0 flex-1 truncate text-[11px] text-ink-dim">
           {JSON.stringify(effect.json)}
         </span>
-        <span className="caption shrink-0">kept as written</span>
+        <span className="caption shrink-0">{t('kept as written')}</span>
         {remove}
       </li>
     );
@@ -131,7 +137,7 @@ function EffectRow({
       data-testid="effect-row"
     >
       <Select
-        label="Effect"
+        label={t('Effect')}
         hideLabel
         value={effect.kind}
         onChange={(event) => {
@@ -155,11 +161,11 @@ function EffectRow({
         ))}
       </Select>
       <TargetSelect
-        label="On"
+        label={t('On#target')}
         hideLabel
         value={effect.target}
         choices={choices}
-        allowNone="Choose what it acts on…"
+        allowNone={t('Choose what it acts on…')}
         onChange={(target) => onChange({ ...effect, target })}
         testId="effect-target"
       />
@@ -167,7 +173,7 @@ function EffectRow({
         <span />
       ) : (
         <NumberField
-          label={shape.figure === 'rate' ? 'Share, 0 to 1' : 'Factor'}
+          label={shape.figure === 'rate' ? t('Share, 0 to 1') : t('Factor')}
           hideLabel
           min={0}
           max={shape.figure === 'rate' ? 1 : 1000}
@@ -176,8 +182,8 @@ function EffectRow({
           onValue={(value) => onChange({ ...effect, value })}
           title={
             shape.figure === 'rate'
-              ? 'A share from 0 to 1'
-              : 'A factor: 1 leaves it as it is, 0.5 halves it, 2 doubles it'
+              ? t('A share from 0 to 1')
+              : t('A factor: 1 leaves it as it is, 0.5 halves it, 2 doubles it')
           }
         />
       )}
@@ -201,46 +207,46 @@ function EventRow({
       data-testid="event-draft"
     >
       <NumberField
-        label="After, s"
+        label={t('After, s')}
         hideLabel
         min={0}
         step="any"
         value={event.delayMs / 1000}
         onValue={(value) => onChange({ ...event, delayMs: millis(value) })}
-        title="Seconds after the phase begins"
+        title={t('Seconds after the phase begins')}
       />
       <Select
-        label="Severity"
+        label={t('Severity')}
         hideLabel
         value={event.severity}
         onChange={(e) => onChange({ ...event, severity: e.target.value as EventDraft['severity'] })}
       >
         {SEVERITIES.map((severity) => (
           <option key={severity} value={severity}>
-            {titleCase(severity)}
+            {SEVERITY_LABEL[severity]}
           </option>
         ))}
       </Select>
       <Select
-        label="Kind"
+        label={t('Kind')}
         hideLabel
         value={event.kind}
         onChange={(e) => onChange({ ...event, kind: e.target.value as EventDraft['kind'] })}
       >
         {EVENT_KINDS.map((kind) => (
           <option key={kind} value={kind}>
-            {titleCase(kind)}
+            {EVENT_KIND_LABEL[kind]}
           </option>
         ))}
       </Select>
       <TextField
-        label="What it says"
+        label={t('What it says')}
         hideLabel
-        placeholder="What the event says"
+        placeholder={t('What the event says')}
         value={event.title}
         onChange={(e) => onChange({ ...event, title: e.target.value })}
       />
-      <IconButton label="Remove this event" size="sm" onClick={onRemove}>
+      <IconButton label={t('Remove this event')} size="sm" onClick={onRemove}>
         <Trash2 size={13} />
       </IconButton>
     </li>
@@ -272,30 +278,30 @@ function PhaseCard({
     <li className="rounded-control border border-line p-2.5" data-testid={`phase-draft-${index}`}>
       <div className="grid grid-cols-[minmax(0,1fr)_5rem_5rem_7rem_auto] items-end gap-1.5">
         <TextField
-          label={`Phase ${index + 1}`}
+          label={t('Phase {n}', { n: index + 1 })}
           value={phase.name}
           onChange={(event) => onChange({ ...phase, name: event.target.value })}
           data-testid="phase-name"
         />
         <NumberField
-          label="Starts at, s"
+          label={t('Starts at, s')}
           min={0}
           step="any"
           value={phase.atMs / 1000}
           onValue={(value) => onChange({ ...phase, atMs: millis(value) })}
-          title="Seconds after the scenario starts"
+          title={t('Seconds after the scenario starts')}
           data-testid="phase-at"
         />
         <NumberField
-          label="Eases in, s"
+          label={t('Eases in, s')}
           min={0}
           step="any"
           value={phase.rampMs / 1000}
           onValue={(value) => onChange({ ...phase, rampMs: millis(value) })}
-          title="How long its effects take to ease in from what held before"
+          title={t('How long its effects take to ease in from what held before')}
         />
         <Select
-          label="Incident is"
+          label={t('Incident is')}
           value={phase.status}
           onChange={(event) =>
             onChange({ ...phase, status: event.target.value as PhaseDraft['status'] })
@@ -303,12 +309,12 @@ function PhaseCard({
         >
           {PHASE_STATUSES.map((status) => (
             <option key={status} value={status}>
-              {titleCase(status)}
+              {STATUS_LABEL[status]}
             </option>
           ))}
         </Select>
         <IconButton
-          label={`Remove phase ${index + 1}`}
+          label={t('Remove phase {n}', { n: index + 1 })}
           size="sm"
           disabled={only}
           onClick={onRemove}
@@ -317,7 +323,7 @@ function PhaseCard({
         </IconButton>
       </div>
       <TextArea
-        label="What happens, in a sentence"
+        label={t('What happens, in a sentence')}
         className="mt-2"
         value={phase.description}
         onChange={(event) => onChange({ ...phase, description: event.target.value })}
@@ -325,7 +331,9 @@ function PhaseCard({
 
       <div className="mt-2.5">
         <p className="caption mb-1">
-          Effects held during this phase. Whatever a phase does not list eases back to nominal.
+          {t(
+            'Effects held during this phase. Whatever a phase does not list eases back to nominal.',
+          )}
         </p>
         {phase.effects.length > 0 && (
           <ul className="space-y-1.5">
@@ -366,14 +374,14 @@ function PhaseCard({
           }
           data-testid="phase-add-effect"
         >
-          Add an effect
+          {t('Add an effect')}
         </Button>
       </div>
 
       <div className="mt-2">
         {phase.events.length > 0 && (
           <>
-            <p className="caption mb-1">Events it announces</p>
+            <p className="caption mb-1">{t('Events it announces')}</p>
             <ul className="space-y-1.5">
               {phase.events.map((event) => (
                 <EventRow
@@ -414,7 +422,7 @@ function PhaseCard({
             })
           }
         >
-          Add an event it announces
+          {t('Add an event it announces')}
         </Button>
       </div>
     </li>
@@ -527,7 +535,8 @@ function Editor({
           !stale &&
           setChecked({
             text: fileText,
-            outcome: error instanceof ApiError ? error.message : 'The file could not be checked.',
+            outcome:
+              error instanceof ApiError ? error.message : t('The file could not be checked.'),
           }),
       );
     }, 350);
@@ -563,11 +572,15 @@ function Editor({
     const file = scenarioFiles.find((entry) => entry.path === path);
     const read = file ? readDraft(file.text) : null;
     if (!read) {
-      setFailure('That file could not be read as a scenario.');
+      setFailure(t('That file could not be read as a scenario.'));
       return;
     }
     // A copy, so the scenario it was read from is not replaced by accident.
-    setDraft({ ...read, id: `${read.id}-copy`.slice(0, 64), name: `${read.name} (copy)` });
+    setDraft({
+      ...read,
+      id: `${read.id}-copy`.slice(0, 64),
+      name: t('{name} (copy)', { name: read.name }),
+    });
     setIdTouched(true);
   };
 
@@ -600,21 +613,21 @@ function Editor({
     <div data-testid="scenario-editor">
       <div className="grid gap-2.5 sm:grid-cols-2">
         <Select
-          label="Start from"
+          label={t('Start from')}
           value={startFrom}
           onChange={(event) => load(event.target.value)}
           className="sm:col-span-2"
           data-testid="editor-start-from"
         >
-          <option value="">A blank scenario</option>
+          <option value="">{t('A blank scenario')}</option>
           {scenarioFiles.map((file) => (
             <option key={file.path} value={file.path}>
-              A copy of {idOf(file) ?? file.path}
+              {t('A copy of {name}', { name: idOf(file) ?? file.path })}
             </option>
           ))}
         </Select>
         <TextField
-          label="Name"
+          label={t('Name')}
           value={draft.name}
           onChange={(event) =>
             set({
@@ -625,7 +638,7 @@ function Editor({
           data-testid="editor-name"
         />
         <TextField
-          label="Id, as the file and the API name it"
+          label={t('Id, as the file and the API name it')}
           value={draft.id}
           onChange={(event) => {
             setIdTouched(true);
@@ -634,55 +647,55 @@ function Editor({
           data-testid="editor-id"
         />
         <TextArea
-          label="Summary"
+          label={t('Summary')}
           className="sm:col-span-2"
           value={draft.summary}
           onChange={(event) => set({ summary: event.target.value })}
           data-testid="editor-summary"
         />
         <Select
-          label="Category"
+          label={t('Category')}
           value={draft.category}
           onChange={(event) => set({ category: event.target.value as ScenarioDraft['category'] })}
         >
           {CATEGORIES.map((category) => (
             <option key={category} value={category}>
-              {titleCase(category)}
+              {CATEGORY_LABEL[category]}
             </option>
           ))}
         </Select>
         <Select
-          label="Severity"
+          label={t('Severity')}
           value={draft.severity}
           onChange={(event) => set({ severity: event.target.value as ScenarioDraft['severity'] })}
         >
           {SEVERITIES.map((severity) => (
             <option key={severity} value={severity}>
-              {titleCase(severity)}
+              {SEVERITY_LABEL[severity]}
             </option>
           ))}
         </Select>
         <NumberField
-          label="Lasts, in seconds"
+          label={t('Lasts, in seconds')}
           min={1}
           max={1800}
           step="any"
           value={draft.durationMs / 1000}
           onValue={(value) => set({ durationMs: millis(value) })}
-          hint="Up to 1800: the half hour of history the timeline keeps."
+          hint={t('Up to 1800: the half hour of history the timeline keeps.')}
           data-testid="editor-duration"
         />
         <TargetSelect
-          label="Root cause, if it names one"
+          label={t('Root cause, if it names one')}
           value={draft.rootCause}
           choices={single}
-          allowNone="None named"
+          allowNone={t('None named')}
           onChange={(rootCause) => set({ rootCause })}
           testId="editor-root-cause"
         />
       </div>
 
-      <h3 className="mt-4 text-xs font-bold text-ink">Phases</h3>
+      <h3 className="mt-4 text-xs font-bold text-ink">{t('Phases')}</h3>
       <ol className="mt-1.5 space-y-2">
         {draft.phases.map((phase, index) => (
           <PhaseCard
@@ -713,13 +726,16 @@ function Editor({
         }
         data-testid="editor-add-phase"
       >
-        Add a phase
+        {t('Add a phase')}
       </Button>
       {draft.flows.length > 0 && (
         <p className="caption mt-2" data-testid="editor-flows">
-          {draft.flows.length} injected flow{draft.flows.length === 1 ? '' : 's'} read from the file{' '}
-          {draft.flows.length === 1 ? 'is' : 'are'} kept as written. Flows are edited in the file
-          itself.
+          {t(
+            draft.flows.length === 1
+              ? '{n} injected flow read from the file is kept as written. Flows are edited in the file itself.'
+              : '{n} injected flows read from the file are kept as written. Flows are edited in the file itself.',
+            { n: draft.flows.length },
+          )}
         </p>
       )}
 
@@ -734,33 +750,50 @@ function Editor({
           </Note>
         ) : filesError ? (
           <Note tone="problem">
-            The scenarios in use could not be read, so this one cannot be checked against them.
+            {t(
+              'The scenarios in use could not be read, so this one cannot be checked against them.',
+            )}
           </Note>
         ) : outcome === null ? (
-          <p className="text-[11px] text-ink-faint">Asking the engine whether this is valid…</p>
+          <p className="text-[11px] text-ink-faint">
+            {t('Asking the engine whether this is valid…')}
+          </p>
         ) : typeof outcome === 'string' ? (
           <Note tone="problem">
-            {outcome} The file can still be saved and given to a server when it starts.
+            {/* The error is the server's, in its own words. */}
+            {t('{error} The file can still be saved and given to a server when it starts.', {
+              error: outcome,
+            })}
           </Note>
         ) : !outcome.valid ? (
           <Note tone="problem">
-            {outcome.problem?.message ?? 'The engine does not accept this scenario.'}
+            {outcome.problem?.message ?? t('The engine does not accept this scenario.')}
           </Note>
         ) : (
           <Note tone="fine">
             <p className="text-xs text-ink">
-              The engine accepts this scenario
-              {runsHere ? ` and can run it on ${topology.name}.` : '.'}
+              {runsHere
+                ? t('The engine accepts this scenario and can run it on {platform}.', {
+                    platform: topology.name,
+                  })
+                : t('The engine accepts this scenario.')}
             </p>
             {cannotRun.map((entry) => (
               <p key={entry.topologyId} data-testid="editor-unavailable">
-                It cannot run on <span className="code">{entry.topologyId}</span>: {entry.reason}
+                {/* The reason is the server's, in its own words. */}
+                {tr('It cannot run on <id>{topology}</id>: {reason}', {
+                  id: (c) => <span className="code">{c}</span>,
+                  topology: entry.topologyId,
+                  reason: entry.reason,
+                })}
               </p>
             ))}
             {replaces && (
               <p>
-                A scenario with the id <span className="code">{draft.id}</span> is in use; running
-                this one takes its place.
+                {tr(
+                  'A scenario with the id <id>{scenario}</id> is in use; running this one takes its place.',
+                  { id: (c) => <span className="code">{c}</span>, scenario: draft.id },
+                )}
               </p>
             )}
           </Note>
@@ -774,7 +807,7 @@ function Editor({
             onClick={() => void run()}
             data-testid="editor-run"
           >
-            {busy ? 'Starting…' : 'Add it and run it'}
+            {busy ? t('Starting…') : t('Add it and run it')}
           </Button>
           <Button
             icon={<Download size={13} aria-hidden />}
@@ -782,15 +815,16 @@ function Editor({
             onClick={() => downloadJson(draftToFile(draft), `${draft.id}.json`)}
             data-testid="editor-download"
           >
-            Save the file
+            {t('Save the file')}
           </Button>
           <span className="caption">
-            Running it adds it to the scenarios in use and starts a new timeline for everyone
-            connected.
+            {t(
+              'Running it adds it to the scenarios in use and starts a new timeline for everyone connected.',
+            )}
           </span>
         </div>
         <details>
-          <summary className="text-[11px] text-ink-dim hover:text-ink">The file</summary>
+          <summary className="text-[11px] text-ink-dim hover:text-ink">{t('The file')}</summary>
           <pre
             className="code mt-1 max-h-64 overflow-auto rounded-control border border-line bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim"
             data-testid="editor-file"
@@ -815,8 +849,10 @@ export function ScenarioEditor() {
     <Dialog
       open={open}
       onOpenChange={(next) => useUi.getState().setPanel(next ? 'scenario-editor' : null)}
-      title="Write a scenario"
-      description="Phases on a timeline, the effects each holds and the events it announces, in the file format the engine reads. A scenario changes figures inside the simulation and nothing else."
+      title={t('Write a scenario')}
+      description={t(
+        'Phases on a timeline, the effects each holds and the events it announces, in the file format the engine reads. A scenario changes figures inside the simulation and nothing else.',
+      )}
       width="max-w-3xl"
     >
       {open && topology && (

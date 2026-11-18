@@ -11,6 +11,7 @@ import { HealthGlyph, HealthMark } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { Fold, Section, Stat } from '@/components/ui/Section';
 import { RangeBar, Sparkline } from '@/components/ui/Sparkline';
+import { t } from '@/i18n';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
 import { LAYERS, overviewOf, projectSnapshot } from '@/lib/overview';
 import { COLOR, HEALTH_COLOR, SERVICE_TYPE } from '@/lib/palette';
@@ -158,11 +159,18 @@ export function GroupCard({
             </h2>
             <p className="caption mt-0.5">
               {single
-                ? `${type.label} in the ${layer?.name.toLowerCase() ?? ''} layer`
-                : `${members.length} ${type.plural} in the ${layer?.name.toLowerCase() ?? ''} layer`}
+                ? t('{kind} in the {layer} layer', {
+                    kind: type.label,
+                    layer: layer?.name.toLowerCase() ?? '',
+                  })
+                : t('{n} {kinds} in the {layer} layer', {
+                    n: members.length,
+                    kinds: type.plural,
+                    layer: layer?.name.toLowerCase() ?? '',
+                  })}
             </p>
           </div>
-          <IconButton label="Clear selection" onClick={() => useUi.getState().select(null)}>
+          <IconButton label={t('Clear selection')} onClick={() => useUi.getState().select(null)}>
             <X size={15} />
           </IconButton>
         </div>
@@ -174,40 +182,42 @@ export function GroupCard({
             data-testid="group-state"
           >
             <HealthGlyph health={worst} />
-            {single ? 'Not normal' : `${unwell} of ${members.length} not normal`}
+            {single
+              ? t('Not normal')
+              : t('{unwell} of {total} not normal', { unwell, total: members.length })}
           </p>
         )}
       </header>
 
-      <Section title="Signals">
+      <Section title={t('Signals')}>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3" data-testid="inspector-metrics">
           <div>
-            <Stat label="Throughput" value={formatRate(throughput)} unit="req/s" />
+            <Stat label={t('Throughput')} value={formatRate(throughput)} unit="req/s" />
             {series && (
               <Sparkline
                 values={series.throughput}
                 length={history.length}
                 normal={baselineRps > 0 ? [baselineRps * 0.5, baselineRps * 1.5] : undefined}
-                label="Throughput over the last 90 seconds"
+                label={t('Throughput over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
-            <Stat label="Latency" value={formatMs(latency)} tone={latencyTone} />
+            <Stat label={t('Latency')} value={formatMs(latency)} tone={latencyTone} />
             {series && (
               <Sparkline
                 values={series.latency}
                 length={history.length}
                 color={latencyTone}
                 normal={[0, baselineLatency * 2.5]}
-                label="Latency over the last 90 seconds"
+                label={t('Latency over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
-            <Stat label="Error rate" value={formatPercent(errorRate)} tone={errorTone} />
+            <Stat label={t('Error rate')} value={formatPercent(errorRate)} tone={errorTone} />
             {series && (
               <Sparkline
                 values={series.error}
@@ -215,15 +225,15 @@ export function GroupCard({
                 color={errorTone}
                 max={Math.max(0.1, errorRate * 1.3)}
                 normal={[0, 0.04]}
-                label="Error rate over the last 90 seconds"
+                label={t('Error rate over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
             <Stat
-              label={single ? 'Saturation' : 'Fullest instance'}
-              value={node.capacityRps > 0 ? formatPercent(saturation) : 'n/a'}
+              label={single ? t('Saturation') : t('Fullest instance')}
+              value={node.capacityRps > 0 ? formatPercent(saturation) : t('n/a')}
               tone={saturationTone}
             />
             {node.capacityRps > 0 && (
@@ -238,17 +248,25 @@ export function GroupCard({
           </div>
         </dl>
         <p className="caption mt-2.5">
-          {single ? 'Last' : 'All of them together, last'} {NODE_HISTORY} s; the grey band is the
-          normal range.
+          {t(
+            single
+              ? 'Last {seconds} s; the grey band is the normal range.'
+              : 'All of them together, last {seconds} s; the grey band is the normal range.',
+            { seconds: NODE_HISTORY },
+          )}
         </p>
       </Section>
 
       {node.serviceType === 'cedar-authorizer' && snapshot && (
-        <Section title="Authorization">
+        <Section title={t('Authorization')}>
           <dl className="grid grid-cols-2 gap-x-4" data-testid="group-authorization">
-            <Stat label="Checks" value={formatRate(snapshot.global.authzChecksRps)} unit="per s" />
             <Stat
-              label="Denied"
+              label={t('Checks')}
+              value={formatRate(snapshot.global.authzChecksRps)}
+              unit={t('per s')}
+            />
+            <Stat
+              label={t('Denied')}
               value={formatPercent(snapshot.global.authzDenialRate)}
               tone={grade(snapshot.global.authzDenialRate, 0.15, 0.3)}
             />
@@ -257,7 +275,7 @@ export function GroupCard({
       )}
 
       <Fold
-        title={single ? 'The service' : 'Instances'}
+        title={single ? t('The service') : t('Instances')}
         count={single ? undefined : members.length}
         open={members.length <= 5}
         testId="group-members"
@@ -271,7 +289,7 @@ export function GroupCard({
                 <button
                   type="button"
                   onClick={() => useUi.getState().selectNode(member.id)}
-                  title="Open this service where it stands"
+                  title={t('Open this service where it stands')}
                   data-testid={`member-${member.id}`}
                   className="flex w-full items-center gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                 >
@@ -296,12 +314,12 @@ export function GroupCard({
         </ul>
       </Fold>
       {calls.length > 0 && (
-        <Fold title="Calls" count={calls.length} open={calls.length <= 3}>
+        <Fold title={t('Calls')} count={calls.length} open={calls.length <= 3}>
           {peerList(calls)}
         </Fold>
       )}
       {calledBy.length > 0 && (
-        <Fold title="Called by" count={calledBy.length} open={calledBy.length <= 3}>
+        <Fold title={t('Called by')} count={calledBy.length} open={calledBy.length <= 3}>
           {peerList(calledBy)}
         </Fold>
       )}

@@ -12,6 +12,8 @@ import type { ReactNode } from 'react';
 
 import { useReportedHeight } from '@/app/hooks';
 import { IconButton } from '@/components/ui/Button';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { useGuide } from '@/stores/guide';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -82,22 +84,22 @@ export function Orientation({
       ref={element}
       className="panel floating absolute left-1/2 z-20 w-[min(44rem,calc(100%-1.5rem))] -translate-x-1/2 animate-rise p-3"
       style={{ bottom }}
-      aria-label="Where to start"
+      aria-label={t('Where to start')}
       data-testid="orientation"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-bold text-ink">
-            A fictional cloud platform, simulated, to take apart
+            {t('A fictional cloud platform, simulated, to take apart')}
           </h2>
           <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
-            Each piece is a kind of service. Select one to see what it does and how it is doing;
-            everything you see is computed by the simulation, and Cedar decides every authorization.
-            Where would you like to start?
+            {t(
+              'Each piece is a kind of service. Select one to see what it does and how it is doing; everything you see is computed by the simulation, and Cedar decides every authorization. Where would you like to start?',
+            )}
           </p>
         </div>
         <IconButton
-          label="Dismiss; this does not come back"
+          label={t('Dismiss; this does not come back')}
           size="sm"
           onClick={() => useGuide.getState().setOriented()}
           data-testid="orientation-dismiss"
@@ -108,7 +110,7 @@ export function Orientation({
       <ul className="mt-2.5 flex gap-2 max-sm:flex-col">
         <Path
           icon={<Activity size={15} />}
-          title="Understand the platform"
+          title={t('Understand the platform')}
           testId="orientation-platform"
           onClick={() => {
             // The platform's own card: what it is, its signals, its regions.
@@ -118,43 +120,55 @@ export function Orientation({
             ui.setInspectorOpen(true);
           }}
         >
-          {kinds > 0 ? `Its ${kinds} kinds of service` : 'Its services'}, the path a request takes
-          through them, and the signals that say how it is doing.
+          {kinds > 0
+            ? t(
+                'Its {n} kinds of service, the path a request takes through them, and the signals that say how it is doing.',
+                { n: kinds },
+              )
+            : t(
+                'Its services, the path a request takes through them, and the signals that say how it is doing.',
+              )}
         </Path>
         <Path
           icon={<Play size={15} />}
-          title="Investigate a failure"
+          title={t('Investigate a failure')}
           testId="orientation-incident"
           onClick={() => useUi.getState().setLeftTab('incidents')}
         >
-          Start an incident, watch it spread, and read back where it began and why each service
-          followed.
+          {t(
+            'Start an incident, watch it spread, and read back where it began and why each service followed.',
+          )}
         </Path>
         <Path
           icon={<KeyRound size={15} />}
-          title="Test an authorization"
+          title={t('Test an authorization')}
           testId="orientation-authorization"
           onClick={() => {
             const ui = useUi.getState();
             if (ui.openPanel !== 'authorization') ui.togglePanel('authorization');
           }}
         >
-          Ask Cedar who may do what, see which policy decides, and follow the request across the
-          model.
+          {t(
+            'Ask Cedar who may do what, see which policy decides, and follow the request across the model.',
+          )}
         </Path>
       </ul>
       <p className="caption mt-2">
-        Or{' '}
-        <button
-          type="button"
-          onClick={() => useGuide.getState().setOpen(true)}
-          className="text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
-          data-testid="orientation-guide"
-        >
-          take a guided challenge
-        </button>
-        : a question about the platform, checked against the model. All of this stays in the menu at
-        the end of the bar.
+        {tr(
+          'Or <guide>take a guided challenge</guide>: a question about the platform, checked against the model. All of this stays in the menu at the end of the bar.',
+          {
+            guide: (children) => (
+              <button
+                type="button"
+                onClick={() => useGuide.getState().setOpen(true)}
+                className="text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+                data-testid="orientation-guide"
+              >
+                {children}
+              </button>
+            ),
+          },
+        )}
       </p>
     </section>
   );

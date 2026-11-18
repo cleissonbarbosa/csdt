@@ -19,9 +19,11 @@ import { DecisionTag, HealthGlyph, SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState, Section, Stat } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
-import { entityId, formatClock, formatMs, formatPercent, titleCase } from '@/lib/format';
-import { COLOR } from '@/lib/palette';
+import { entityId, formatClock, formatMs, formatPercent } from '@/lib/format';
+import { COLOR, HEALTH_LABEL } from '@/lib/palette';
 import {
   BASIS_HINT,
   BASIS_LABEL,
@@ -82,7 +84,7 @@ function When({ report, atMs }: { report: IncidentReport; atMs: number }) {
   return (
     <button
       type="button"
-      title={`${bothClocks(report, atMs)}. Go to this moment.`}
+      title={t('{when}. Go to this moment.', { when: bothClocks(report, atMs) })}
       onClick={() => void actions.control({ action: 'seek', toMs: Math.max(0, atMs - 1000) })}
       className="numeric shrink-0 text-[11px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-ink hover:decoration-ink"
     >
@@ -115,7 +117,7 @@ function TransitionRow({
           className="min-w-0 flex-1 truncate text-left text-xs text-ink hover:underline hover:underline-offset-2"
         >
           <ServiceName topology={topology} id={transition.nodeId} />
-          <span className="sr-only">, {transition.to}</span>
+          <span className="sr-only">, {HEALTH_LABEL[transition.to].toLowerCase()}</span>
         </button>
         <When report={report} atMs={transition.atMs} />
       </div>
@@ -125,10 +127,17 @@ function TransitionRow({
         {why && <BasisTag basis={why.basis} />}
         <span data-testid="report-cause">
           {transition.to === 'healthy'
-            ? 'Back to normal.'
+            ? t('Back to normal.')
             : why
-              ? `${titleCase(transition.to)} because ${why.text}.`
-              : `${titleCase(transition.to)}, from ${transition.from}.`}
+              ? why.basis === 'unexplained'
+                ? t('{state} because of nothing the report can point to.', {
+                    state: HEALTH_LABEL[transition.to],
+                  })
+                : t('{state} because {why}.', { state: HEALTH_LABEL[transition.to], why: why.text })
+              : t('{state}, from {previous}.', {
+                  state: HEALTH_LABEL[transition.to],
+                  previous: HEALTH_LABEL[transition.from].toLowerCase(),
+                })}
         </span>
       </p>
     </li>
@@ -157,11 +166,11 @@ export function PhaseExplanation({
     >
       <div>
         <p className="caption mb-0.5" title={BASIS_HINT.prescribed}>
-          Prescribed by the scenario
+          {t('Prescribed by the scenario')}
         </p>
         {phase.prescribed.length === 0 && scripted.length === 0 ? (
           <p className="text-[11px] text-ink-faint">
-            Nothing: what earlier phases held eases back to nominal.
+            {t('Nothing: what earlier phases held eases back to nominal.')}
           </p>
         ) : (
           <ul
@@ -175,19 +184,23 @@ export function PhaseExplanation({
             ))}
             {scripted.map((event) => (
               <li key={event.seq} className="text-ink-dim">
-                Announces “{event.title}” at {sinceStart(report, event.atMs)}
+                {/* The title is the scenario's own, as its file wrote it. */}
+                {t('Announces “{title}” at {at}', {
+                  title: event.title,
+                  at: sinceStart(report, event.atMs),
+                })}
               </li>
             ))}
           </ul>
         )}
       </div>
       <div>
-        <p className="caption mb-0.5">What followed</p>
+        <p className="caption mb-0.5">{t('What followed')}</p>
         {phase.transitions.length === 0 ? (
           <p className="text-[11px] text-ink-faint">
             {phase.endedAtMs === null
-              ? 'No service has left its normal state in this phase so far.'
-              : 'No service got worse during this phase.'}
+              ? t('No service has left its normal state in this phase so far.')
+              : t('No service got worse during this phase.')}
           </p>
         ) : (
           <ul className="-my-1" data-testid="phase-followed">
@@ -203,43 +216,53 @@ export function PhaseExplanation({
         )}
       </div>
       <div>
-        <p className="caption mb-0.5">Observed</p>
+        <p className="caption mb-0.5">{t('Observed')}</p>
         <ul
           className="space-y-0.5 text-[11px] leading-snug text-ink-dim"
           data-testid="phase-observed"
         >
           {phase.peakErrorRate && (
             <li>
-              Error rate up to{' '}
-              <span className="numeric text-ink">{formatPercent(phase.peakErrorRate.value)}</span>{' '}
-              at <When report={report} atMs={phase.peakErrorRate.atMs} />
-              {report.baseline && (
-                <>
-                  , from <span className="numeric">{formatPercent(report.baseline.errorRate)}</span>{' '}
-                  before the incident
-                </>
+              {tr(
+                report.baseline
+                  ? 'Error rate up to <peak>{figure}</peak> at {when}, from <before>{baseline}</before> before the incident'
+                  : 'Error rate up to <peak>{figure}</peak> at {when}',
+                {
+                  peak: (c) => <span className="numeric text-ink">{c}</span>,
+                  before: (c) => <span className="numeric">{c}</span>,
+                  figure: formatPercent(phase.peakErrorRate.value),
+                  when: <When report={report} atMs={phase.peakErrorRate.atMs} />,
+                  baseline: report.baseline ? formatPercent(report.baseline.errorRate) : '',
+                },
               )}
             </li>
           )}
           {phase.peakP95LatencyMs && (
             <li>
-              Latency p95 up to{' '}
-              <span className="numeric text-ink">{formatMs(phase.peakP95LatencyMs.value)}</span>
-              {report.baseline && (
-                <>
-                  , from <span className="numeric">{formatMs(report.baseline.p95LatencyMs)}</span>{' '}
-                  before
-                </>
+              {tr(
+                report.baseline
+                  ? 'Latency p95 up to <peak>{figure}</peak>, from <before>{baseline}</before> before'
+                  : 'Latency p95 up to <peak>{figure}</peak>',
+                {
+                  peak: (c) => <span className="numeric text-ink">{c}</span>,
+                  before: (c) => <span className="numeric">{c}</span>,
+                  figure: formatMs(phase.peakP95LatencyMs.value),
+                  baseline: report.baseline ? formatMs(report.baseline.p95LatencyMs) : '',
+                },
               )}
             </li>
           )}
           {raised.map((event) => (
             <li key={event.seq}>
-              A detection rule raised “{event.title}” at <When report={report} atMs={event.atMs} />
+              {/* The title is the detection rule's own, as the engine wrote it. */}
+              {tr('A detection rule raised “{title}” at {when}', {
+                title: event.title,
+                when: <When report={report} atMs={event.atMs} />,
+              })}
             </li>
           ))}
           {!phase.peakErrorRate && !phase.peakP95LatencyMs && raised.length === 0 && (
-            <li className="text-ink-faint">No sample of this phase is on record yet.</li>
+            <li className="text-ink-faint">{t('No sample of this phase is on record yet.')}</li>
           )}
         </ul>
       </div>
@@ -261,10 +284,14 @@ export function TransitionWhy({ incidentId, seq }: { incidentId: string; seq: nu
   const why = explainCause(transition.cause, topology);
   return (
     <div className="mt-3" data-testid="event-why">
-      <p className="caption mb-1">Why</p>
+      <p className="caption mb-1">{t('Why')}</p>
       <p className="flex items-baseline gap-1.5 text-xs leading-relaxed text-ink">
         <BasisTag basis={why.basis} />
-        <span>Because {why.text}.</span>
+        <span>
+          {why.basis === 'unexplained'
+            ? t('Because of nothing the report can point to.')
+            : t('Because {why}.', { why: why.text })}
+        </span>
       </p>
       {transition.cause.viaNodeId && (
         <button
@@ -272,7 +299,9 @@ export function TransitionWhy({ incidentId, seq }: { incidentId: string; seq: nu
           onClick={() => useUi.getState().selectNode(transition.cause!.viaNodeId!)}
           className="mt-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
         >
-          Show <ServiceName topology={topology} id={transition.cause.viaNodeId} />
+          {tr('Show {service}', {
+            service: <ServiceName topology={topology} id={transition.cause.viaNodeId} />,
+          })}
         </button>
       )}
     </div>
@@ -312,7 +341,7 @@ function Transitions({
           onClick={() => setAll(!all)}
           className="mt-1.5 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
         >
-          {all ? 'Show fewer' : `Show all ${transitions.length}`}
+          {all ? t('Show fewer') : t('Show all {n}', { n: transitions.length })}
         </button>
       )}
     </>
@@ -342,7 +371,7 @@ export function IncidentSummary({
         onClick={onBack}
         className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
       >
-        <ChevronLeft size={13} aria-hidden /> Incidents and scenarios
+        <ChevronLeft size={13} aria-hidden /> {t('Incidents and scenarios')}
       </button>
     </div>
   );
@@ -350,9 +379,10 @@ export function IncidentSummary({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {back}
-        <EmptyState title="No summary">
-          This incident is not on the timeline any more: it was reset, or is older than the history
-          that is kept.
+        <EmptyState title={t('No summary')}>
+          {t(
+            'This incident is not on the timeline any more: it was reset, or is older than the history that is kept.',
+          )}
         </EmptyState>
       </div>
     );
@@ -361,7 +391,7 @@ export function IncidentSummary({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {back}
-        <EmptyState title="Reading the incident back" />
+        <EmptyState title={t('Reading the incident back')} />
       </div>
     );
   }
@@ -369,9 +399,9 @@ export function IncidentSummary({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(reportText(report, topology));
-      useNotices.getState().push('info', 'Summary copied as text.');
+      useNotices.getState().push('info', t('Summary copied as text.'));
     } catch {
-      useNotices.getState().push('error', 'The summary could not be copied.');
+      useNotices.getState().push('error', t('The summary could not be copied.'));
     }
   };
   return (
@@ -392,9 +422,9 @@ export function IncidentSummary({
               icon={<Copy size={12} aria-hidden />}
               onClick={() => void copy()}
               data-testid="summary-copy"
-              title="Copy this summary as plain text"
+              title={t('Copy this summary as plain text')}
             >
-              Copy
+              {t('Copy')}
             </Button>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-ink-dim" data-testid="summary-outcome">
@@ -402,15 +432,19 @@ export function IncidentSummary({
           </p>
           <p className="caption mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>
-              Read back from this run. Times are since the incident began, at{' '}
-              <span className="numeric">{formatClock(report.startedAtMs)}</span> on the simulation
-              clock.
+              {tr(
+                'Read back from this run. Times are since the incident began, at <n>{clock}</n> on the simulation clock.',
+                {
+                  n: (c) => <span className="numeric">{c}</span>,
+                  clock: formatClock(report.startedAtMs),
+                },
+              )}
             </span>
             <SourceBadge source={report.dataSource} />
           </p>
         </header>
 
-        <Section title="Moments">
+        <Section title={t('Moments')}>
           <ul className="flex flex-wrap gap-x-3 gap-y-1" data-testid="summary-moments">
             {moments(report).map((moment) => (
               <li key={moment.id}>
@@ -422,7 +456,7 @@ export function IncidentSummary({
                       toMs: Math.max(0, moment.atMs - 1000),
                     })
                   }
-                  title={`${bothClocks(report, moment.atMs)}. Go to this moment.`}
+                  title={t('{when}. Go to this moment.', { when: bothClocks(report, moment.atMs) })}
                   className="text-xs text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
                   data-testid={`moment-${moment.id}`}
                 >
@@ -435,7 +469,7 @@ export function IncidentSummary({
         </Section>
 
         {origin && (
-          <Section title="Origin">
+          <Section title={t('Origin')}>
             <button
               type="button"
               onClick={() => useUi.getState().selectNode(report.origin!.nodeId)}
@@ -449,19 +483,21 @@ export function IncidentSummary({
         )}
 
         <Section
-          title="Propagation"
+          title={t('Propagation')}
           aside={
             <span className="numeric text-[11px] text-ink-faint">
-              {report.impactedNodeIds.length} affected
+              {t(report.impactedNodeIds.length === 1 ? '{n} affected#one' : '{n} affected', {
+                n: report.impactedNodeIds.length,
+              })}
             </span>
           }
         >
           {report.propagation.length === 0 ? (
-            <p className="text-xs text-ink-faint">No service left its normal state.</p>
+            <p className="text-xs text-ink-faint">{t('No service left its normal state.')}</p>
           ) : (
             <>
               <p className="caption mb-1.5">
-                The first time each service left its normal state, and why.
+                {t('The first time each service left its normal state, and why.')}
               </p>
               <Transitions
                 report={report}
@@ -472,11 +508,11 @@ export function IncidentSummary({
           )}
         </Section>
 
-        <Section title="Peak impact">
+        <Section title={t('Peak impact')}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5" data-testid="summary-peaks">
             <Stat
-              label="Highest error rate"
-              value={report.peakErrorRate ? formatPercent(report.peakErrorRate.value) : 'n/a'}
+              label={t('Highest error rate')}
+              value={report.peakErrorRate ? formatPercent(report.peakErrorRate.value) : t('n/a')}
               tone={
                 report.peakErrorRate && report.peakErrorRate.value >= 0.05
                   ? COLOR.critical
@@ -484,30 +520,35 @@ export function IncidentSummary({
               }
             />
             <Stat
-              label="Highest latency p95"
-              value={report.peakP95LatencyMs ? formatMs(report.peakP95LatencyMs.value) : 'n/a'}
+              label={t('Highest latency p95')}
+              value={report.peakP95LatencyMs ? formatMs(report.peakP95LatencyMs.value) : t('n/a')}
             />
             <Stat
-              label="Not normal at once"
+              label={t('Not normal at once')}
               value={report.peakUnhealthy ? String(report.peakUnhealthy.value) : '0'}
-              unit="services"
+              unit={t('services')}
             />
             <Stat
-              label="Mean error rate"
-              value={report.meanErrorRate === null ? 'n/a' : formatPercent(report.meanErrorRate)}
+              label={t('Mean error rate')}
+              value={report.meanErrorRate === null ? t('n/a') : formatPercent(report.meanErrorRate)}
             />
           </dl>
           {report.baseline && (
             <p className="caption mt-2">
-              Before the incident: error rate{' '}
-              <span className="numeric">{formatPercent(report.baseline.errorRate)}</span>, latency
-              p95 <span className="numeric">{formatMs(report.baseline.p95LatencyMs)}</span>.
+              {tr(
+                'Before the incident: error rate <n>{errors}</n>, latency p95 <n>{latency}</n>.',
+                {
+                  n: (c) => <span className="numeric">{c}</span>,
+                  errors: formatPercent(report.baseline.errorRate),
+                  latency: formatMs(report.baseline.p95LatencyMs),
+                },
+              )}
             </p>
           )}
         </Section>
 
         {report.objectives.length > 0 && (
-          <Section title="Objectives">
+          <Section title={t('Objectives')}>
             <ul className="space-y-1.5" data-testid="summary-objectives">
               {report.objectives.map((objective) => (
                 <li
@@ -530,16 +571,19 @@ export function IncidentSummary({
               ))}
             </ul>
             <p className="caption mt-2">
-              Observed: the objectives are the ones the engine alerts on, and the time each was not
-              met is its samples counted, one a second.
+              {t(
+                'Observed: the objectives are the ones the engine alerts on, and the time each was not met is its samples counted, one a second.',
+              )}
             </p>
           </Section>
         )}
 
         {report.decisions.length > 0 && (
-          <Section title="What Cedar decided">
+          <Section title={t('What Cedar decided')}>
             <p className="caption mb-1.5">
-              For the requests the scenario sends, as the decision events of this run record them.
+              {t(
+                'For the requests the scenario sends, as the decision events of this run record them.',
+              )}
             </p>
             <ul className="space-y-1" data-testid="summary-decisions">
               {report.decisions.map((decision) => (
@@ -555,17 +599,24 @@ export function IncidentSummary({
                           same action of several resources. */}
                       <span
                         className="min-w-0 flex-1 truncate text-xs text-ink"
-                        title={`${entityId(decision.principal)} → ${entityId(decision.action)} on ${entityId(decision.resource)}`}
+                        title={t('{principal} → {action} on {resource}', {
+                          principal: entityId(decision.principal),
+                          action: entityId(decision.action),
+                          resource: entityId(decision.resource),
+                        })}
                       >
                         {entityId(decision.principal)} → {entityId(decision.action)}
-                        <span className="text-ink-faint"> on {entityId(decision.resource)}</span>
+                        <span className="text-ink-faint">
+                          {' '}
+                          {t('on {resource}', { resource: entityId(decision.resource) })}
+                        </span>
                       </span>
                       <span className="numeric text-[11px] text-ink-faint">{decision.count}×</span>
                     </span>
                     <span className="code mt-0.5 block truncate text-[11px] text-ink-faint">
                       {decision.determiningPolicies.length > 0
                         ? decision.determiningPolicies.join(', ')
-                        : 'no policy permits it: denied by default'}
+                        : t('no policy permits it: denied by default')}
                     </span>
                   </button>
                 </li>
@@ -574,7 +625,7 @@ export function IncidentSummary({
           </Section>
         )}
 
-        <Section title="Phases">
+        <Section title={t('Phases')}>
           <ol className="space-y-2.5">
             {report.phases.map((phase) => (
               <li key={phase.index}>
@@ -589,12 +640,12 @@ export function IncidentSummary({
         </Section>
 
         {report.recovery.length > 0 && (
-          <Section title="Recovery">
+          <Section title={t('Recovery')}>
             <Transitions report={report} transitions={report.recovery} testId="summary-recovery" />
           </Section>
         )}
         {report.truncated && (
-          <p className="caption px-3 py-2">Some lists were cut to their bound.</p>
+          <p className="caption px-3 py-2">{t('Some lists were cut to their bound.')}</p>
         )}
       </div>
     </div>

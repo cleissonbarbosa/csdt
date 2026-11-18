@@ -7,6 +7,7 @@
  */
 import type { Scenario, Topology } from '@aegis/contracts';
 
+import { t } from '@/i18n';
 import { SERVICE_TYPE } from '@/lib/palette';
 import type { LayoutMode, PanelId } from '@/stores/ui';
 
@@ -44,9 +45,9 @@ export interface CommandContext {
 }
 
 const ARRANGEMENTS: { mode: LayoutMode; title: string }[] = [
-  { mode: 'layers', title: 'Show the overview' },
-  { mode: 'regions', title: 'Show every service, by region' },
-  { mode: 'dependencies', title: 'Show every service, by dependency tier' },
+  { mode: 'layers', title: t('Show the overview') },
+  { mode: 'regions', title: t('Show every service, by region') },
+  { mode: 'dependencies', title: t('Show every service, by dependency tier') },
 ];
 
 export function buildCommands(context: CommandContext): Command[] {
@@ -59,15 +60,21 @@ export function buildCommands(context: CommandContext): Command[] {
     {
       id: 'play',
       group: 'Actions',
-      title: context.playing ? 'Pause the simulation' : 'Resume the simulation',
-      hint: 'Space',
+      title: context.playing ? t('Pause the simulation') : t('Resume the simulation'),
+      hint: t('Space'),
       run: act.togglePlay,
     },
-    { id: 'camera', group: 'Actions', title: 'Reset the camera', hint: 'R', run: act.resetCamera },
+    {
+      id: 'camera',
+      group: 'Actions',
+      title: t('Reset the camera'),
+      hint: 'R',
+      run: act.resetCamera,
+    },
     {
       id: 'view',
       group: 'Actions',
-      title: context.viewMode === 'scene' ? 'Show the table view' : 'Show the 3D model',
+      title: context.viewMode === 'scene' ? t('Show the table view') : t('Show the 3D model'),
       hint: 'T',
       run: () => act.setViewMode(context.viewMode === 'scene' ? 'table' : 'scene'),
     },
@@ -82,100 +89,100 @@ export function buildCommands(context: CommandContext): Command[] {
     {
       id: 'theme-light',
       group: 'Actions',
-      title: 'Use the light theme',
+      title: t('Use the light theme'),
       run: () => act.setTheme('light'),
     },
     {
       id: 'theme-night',
       group: 'Actions',
-      title: 'Use the night theme',
+      title: t('Use the night theme'),
       run: () => act.setTheme('night'),
     },
     {
       id: 'theme-system',
       group: 'Actions',
-      title: 'Follow the system theme',
+      title: t('Follow the system theme'),
       run: () => act.setTheme('system'),
     },
     {
       id: 'authorization',
       group: 'Actions',
-      title: 'Open the authorization explorer',
+      title: t('Open the authorization explorer'),
       hint: 'Cedar',
       run: () => act.openPanel('authorization'),
     },
     {
       id: 'matrix',
       group: 'Actions',
-      title: 'See who may do what',
+      title: t('See who may do what'),
       hint: 'Cedar',
       run: () => act.openPanel('matrix'),
     },
     {
       id: 'policies',
       group: 'Actions',
-      title: 'Edit the Cedar policies',
+      title: t('Edit the Cedar policies'),
       hint: 'Cedar',
       run: () => act.openPanel('policies'),
     },
     {
       id: 'experiment',
       group: 'Actions',
-      title: 'Compare an intervention',
-      hint: 'the same incident twice, A/B',
+      title: t('Compare an intervention'),
+      hint: t('the same incident twice, A/B'),
       run: () => act.openPanel('experiment'),
     },
     {
       id: 'guide',
       group: 'Actions',
-      title: 'Take a guided challenge',
-      hint: 'objectives, training',
+      title: t('Take a guided challenge'),
+      hint: t('objectives, training'),
       run: act.openGuide,
     },
     {
       id: 'session',
       group: 'Actions',
-      title: 'Save or share this session',
-      hint: 'link, file, reproduce',
+      title: t('Save or share this session'),
+      hint: t('link, file, reproduce'),
       run: () => act.openPanel('session'),
     },
     {
       id: 'scenario-editor',
       group: 'Actions',
-      title: 'Write a scenario',
-      hint: 'editor, phases, effects',
+      title: t('Write a scenario'),
+      hint: t('editor, phases, effects'),
       run: () => act.openPanel('scenario-editor'),
     },
     {
       id: 'integrations',
       group: 'Actions',
-      title: 'Open integrations',
+      title: t('Open integrations'),
       run: () => act.openPanel('integrations'),
     },
     {
       id: 'workspace',
       group: 'Actions',
-      title: 'Import or export the platform files',
-      hint: 'topology, scenarios, Cedar policies',
+      title: t('Import or export the platform files'),
+      hint: t('topology, scenarios, Cedar policies'),
       run: () => act.openPanel('workspace'),
     },
     {
       id: 'settings',
       group: 'Actions',
-      title: 'Open settings',
+      title: t('Open settings'),
       run: () => act.openPanel('settings'),
     },
     {
       id: 'help',
       group: 'Actions',
-      title: 'Open help and legend',
+      title: t('Open help and legend'),
       hint: '?',
       run: () => act.openPanel('help'),
     },
     {
       id: 'overlay',
       group: 'Actions',
-      title: 'Toggle the performance overlay',
+      title: t('Toggle the performance overlay'),
       hint: 'P',
       run: act.toggleOverlay,
     },
@@ -186,8 +193,8 @@ export function buildCommands(context: CommandContext): Command[] {
     commands.push({
       id: `scenario-${scenario.id}`,
       group: 'Scenarios',
-      title: `Start ${scenario.name}`,
-      hint: 'incident scenario',
+      title: t('Start {scenario}', { scenario: scenario.name }),
+      hint: t('incident scenario'),
       run: () => act.startScenario(scenario.id),
     });
   }
@@ -196,7 +203,7 @@ export function buildCommands(context: CommandContext): Command[] {
     commands.push({
       id: `region-${region.id}`,
       group: 'Regions',
-      title: `Frame ${region.name}`,
+      title: t('Frame {region}', { region: region.name }),
       hint: region.location,
       run: () => act.frameRegion(region.id),
     });

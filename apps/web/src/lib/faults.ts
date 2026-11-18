@@ -6,6 +6,8 @@
  */
 import type { ActiveFault, FaultEffect, FaultKind, Topology } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 import { nodeLabel } from './names';
 
 function times(value: number): string {
@@ -20,23 +22,23 @@ function percent(value: number): string {
 export function describeFault(kind: FaultKind, value: number): string {
   switch (kind) {
     case 'demand':
-      return `demand ${times(value)}`;
+      return t('demand {factor}', { factor: times(value) });
     case 'capacity':
-      return `capacity ${times(value)}`;
+      return t('capacity {factor}', { factor: times(value) });
     case 'latency':
-      return `latency ${times(value)}`;
+      return t('latency {factor}', { factor: times(value) });
     case 'errorInject':
-      return `${percent(value)} of requests fail`;
+      return t('{share} of requests fail', { share: percent(value) });
     case 'down':
-      return 'unreachable';
+      return t('unreachable');
     case 'edgeWeight':
-      return `calls ${times(value)}`;
+      return t('calls {factor}', { factor: times(value) });
     case 'edgeLatency':
-      return `network latency ${times(value)}`;
+      return t('network latency {factor}', { factor: times(value) });
     case 'edgeError':
-      return `${percent(value)} of calls fail`;
+      return t('{share} of calls fail', { share: percent(value) });
     case 'routeShift':
-      return `${percent(value)} of traffic moved`;
+      return t('{share} of traffic moved', { share: percent(value) });
   }
 }
 
@@ -111,9 +113,9 @@ export function faultTarget(topology: Topology, fault: ActiveFault): string {
   const name = (id: string) => nodeLabel(topology, id);
   if (fault.node !== null) {
     const node = topology.nodes[fault.node];
-    return node ? name(node.id) : 'Unknown service';
+    return node ? name(node.id) : t('Unknown service');
   }
   const edge = fault.edge === null ? undefined : topology.edges[fault.edge];
-  if (!edge) return 'Unknown connection';
+  if (!edge) return t('Unknown connection');
   return `${name(edge.source)} → ${name(edge.target)}`;
 }

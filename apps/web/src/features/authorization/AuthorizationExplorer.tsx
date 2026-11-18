@@ -10,11 +10,14 @@ import { Badge, DecisionTag, SourceBadge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select, Switch } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
 import {
   compare,
   contextRows,
   policyFingerprint,
+  valueWord,
   requestOf,
   staleReasons,
   type EngineChoice,
@@ -31,20 +34,24 @@ import { PolicyByPolicy } from './PolicyByPolicy';
 
 type Tri = 'absent' | 'true' | 'false';
 const TRI: { value: Tri; label: string }[] = [
-  { value: 'absent', label: 'Absent' },
-  { value: 'true', label: 'True' },
-  { value: 'false', label: 'False' },
+  { value: 'absent', label: t('Absent') },
+  { value: 'true', label: t('True') },
+  { value: 'false', label: t('False') },
 ];
 
-const ENGINE_LABEL = { 'embedded-cedar': 'Embedded Cedar', 'cedar-agent': 'cedar-agent' } as const;
+const ENGINE_LABEL = {
+  'embedded-cedar': t('Embedded Cedar'),
+  // not-interface-text: the name of a product
+  'cedar-agent': 'cedar-agent',
+} as const;
 
 const STAGE_LABEL = {
-  client: 'Client',
-  edge: 'Edge',
-  gateway: 'API gateway',
-  authentication: 'Authentication',
-  authorization: 'Cedar authorizer',
-  resource: 'Resource',
+  client: t('Client'),
+  edge: t('Edge'),
+  gateway: t('API gateway'),
+  authentication: t('Authentication'),
+  authorization: t('Cedar authorizer'),
+  resource: t('Resource'),
 } as const;
 
 /** The configuration a decision answers, written out under it. */
@@ -69,7 +76,7 @@ function EvaluatedWith({
   return (
     <div className="mt-3" data-testid="decision-inputs">
       <div className="mb-1 flex min-h-6 items-center justify-between gap-2">
-        <p className="caption">Evaluated with</p>
+        <p className="caption">{t('Evaluated with')}</p>
         {action}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
@@ -80,27 +87,26 @@ function EvaluatedWith({
               className={cn('numeric', row.value === 'absent' ? 'text-ink-faint' : 'text-ink')}
               data-testid={`decision-context-${row.key}`}
             >
-              {row.value}
+              {valueWord(row.value)}
             </dd>
           </div>
         ))}
-        <dt className="text-ink-faint">Policies</dt>
+        <dt className="text-ink-faint">{t('Policies')}</dt>
         <dd className="text-ink" data-testid="decision-policies-used">
-          {decision.engine.kind === 'cedar-agent' ? (
-            "the agent's own policy store"
-          ) : (
-            <>
-              <span className="numeric">
-                {policyCount - off.length} of {policyCount}
-              </span>{' '}
-              active
-              {off.length > 0 && (
-                <>
-                  ; off: <span className="code">{off.join(', ')}</span>
-                </>
-              )}
-            </>
-          )}
+          {decision.engine.kind === 'cedar-agent'
+            ? t("the agent's own policy store")
+            : off.length > 0
+              ? tr('<n>{on} of {total}</n> active; off: {ids}', {
+                  n: (c) => <span className="numeric">{c}</span>,
+                  on: policyCount - off.length,
+                  total: policyCount,
+                  ids: <span className="code">{off.join(', ')}</span>,
+                })
+              : tr('<n>{on} of {total}</n> active', {
+                  n: (c) => <span className="numeric">{c}</span>,
+                  on: policyCount,
+                  total: policyCount,
+                })}
         </dd>
       </dl>
     </div>
@@ -125,6 +131,7 @@ function DecisionCard({
   const traced = useUi((state) => state.tracedDecision?.id === decision.id);
   const tracing = useUi((state) => state.tracing) && traced;
   const allowed = decision.decision === 'allow';
+  const verdict = allowed ? t('Allow') : t('Deny');
   const outdated = stale.length > 0;
   const nameOf = (id: string) => names?.get(id) ?? id;
   return (
@@ -150,9 +157,11 @@ function DecisionCard({
           role="status"
           data-testid="decision-stale"
         >
-          <p className="text-xs font-bold text-ink">Configuration changed. Evaluate again.</p>
+          <p className="text-xs font-bold text-ink">
+            {t('Configuration changed. Evaluate again.')}
+          </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
-            The result below answers the earlier configuration, not the one in the form.
+            {t('The result below answers the earlier configuration, not the one in the form.')}
           </p>
           <ul className="mt-1 space-y-0.5 text-[11px] text-ink-dim" data-testid="decision-changes">
             {stale.map((reason) => (
@@ -177,8 +186,12 @@ function DecisionCard({
         <div className="flex items-center gap-2">
           {allowed ? <Check size={18} aria-hidden /> : <X size={18} aria-hidden />}
           <span className="text-lg font-bold leading-none" data-testid="decision-result">
-            {outdated && <span className="text-xs font-normal">Was </span>}
-            {allowed ? 'Allow' : 'Deny'}
+            {outdated
+              ? tr('<was>Was </was>{decision}', {
+                  was: (c) => <span className="text-xs font-normal">{c}</span>,
+                  decision: verdict,
+                })
+              : verdict}
           </span>
         </div>
         <span className="flex items-center gap-1">
@@ -190,7 +203,7 @@ function DecisionCard({
             onClick={() => useUi.getState().traceDecision({ ...decision })}
             data-testid="decision-trace"
           >
-            {tracing ? 'Tracing…' : traced ? 'Trace again' : 'Show the path'}
+            {tracing ? t('Tracing…') : traced ? t('Trace again') : t('Show the path')}
           </Button>
         </span>
       </div>
@@ -201,7 +214,7 @@ function DecisionCard({
         </p>
 
         <div className="mt-3">
-          <p className="caption mb-1">Determining policies</p>
+          <p className="caption mb-1">{t('Determining policies')}</p>
           {decision.determiningPolicies.length > 0 ? (
             <ul className="flex flex-wrap gap-1" data-testid="decision-policies">
               {decision.determiningPolicies.map((id) => (
@@ -212,7 +225,7 @@ function DecisionCard({
             </ul>
           ) : (
             <p className="text-xs text-ink-dim">
-              None. No policy permits this request, so Cedar denies it by default.
+              {t('None. No policy permits this request, so Cedar denies it by default.')}
             </p>
           )}
         </div>
@@ -221,7 +234,7 @@ function DecisionCard({
 
         {decision.errors.length > 0 && (
           <div className="mt-3">
-            <p className="caption mb-1">Evaluation diagnostics</p>
+            <p className="caption mb-1">{t('Evaluation diagnostics')}</p>
             <ul className="space-y-1" data-testid="decision-errors">
               {decision.errors.map((error) => (
                 <li
@@ -243,14 +256,15 @@ function DecisionCard({
         />
 
         <div className="mt-3">
-          <p className="caption mb-1.5">Path through the platform</p>
+          <p className="caption mb-1.5">{t('Path through the platform')}</p>
           {decision.path.length === 0 && (
             // A topology from a workspace may not say which of its services
             // are the gateway and the authorizer. The decision is still
             // Cedar's; there is only nowhere to draw it.
             <p className="text-xs text-ink-dim" data-testid="decision-path-none">
-              None to draw. This platform does not name its gateway, authentication service and
-              authorizer.
+              {t(
+                'None to draw. This platform does not name its gateway, authentication service and authorizer.',
+              )}
             </p>
           )}
           <ol className="space-y-1" data-testid="decision-path">
@@ -296,7 +310,11 @@ function DecisionCard({
                   <span className="shrink-0 text-[11px] text-ink-faint">
                     {STAGE_LABEL[stage.kind]}
                     <span className="sr-only">
-                      {blocked ? ', blocked here' : stage.reached ? ', reached' : ', not reached'}
+                      {blocked
+                        ? t(', blocked here')
+                        : stage.reached
+                          ? t(', reached')
+                          : t(', not reached')}
                     </span>
                   </span>
                 </li>
@@ -307,19 +325,22 @@ function DecisionCard({
 
         <dl className="numeric mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-2 text-[11px] text-ink-faint">
           <div>
-            <dt className="sr-only">Engine</dt>
+            <dt className="sr-only">{t('Engine')}</dt>
             <dd data-testid="decision-engine">
-              {ENGINE_LABEL[decision.engine.kind]}
-              {decision.engine.version ? ` ${decision.engine.version}` : ' (version not reported)'}
+              {decision.engine.version
+                ? `${ENGINE_LABEL[decision.engine.kind]} ${decision.engine.version}`
+                : t('{engine} (version not reported)', {
+                    engine: ENGINE_LABEL[decision.engine.kind],
+                  })}
             </dd>
           </div>
           <div>
-            <dt className="sr-only">Evaluation time</dt>
+            <dt className="sr-only">{t('Evaluation time')}</dt>
             <dd data-testid="decision-time">{evaluationTime(decision.evaluationMicros)}</dd>
           </div>
           <div>
-            <dt className="sr-only">Virtual time</dt>
-            <dd>at {formatClock(decision.virtualTimeMs)}</dd>
+            <dt className="sr-only">{t('Virtual time')}</dt>
+            <dd>{t('at {time}', { time: formatClock(decision.virtualTimeMs) })}</dd>
           </div>
           <SourceBadge source={decision.dataSource} />
         </dl>
@@ -333,7 +354,7 @@ function Verdict({ decision }: { decision: 'allow' | 'deny' }) {
   return (
     <span className={cn('inline-flex items-center gap-1 font-bold', !allowed && 'text-critical')}>
       {allowed ? <Check size={13} aria-hidden /> : <X size={13} aria-hidden />}
-      {allowed ? 'Allow' : 'Deny'}
+      {allowed ? t('Allow') : t('Deny')}
     </span>
   );
 }
@@ -365,33 +386,38 @@ function ComparisonSection({
     side.decision.determiningPolicies.length > 0 ? (
       <span className="code break-words">{side.decision.determiningPolicies.join(', ')}</span>
     ) : (
-      <span className="text-ink-faint">none: denied by default</span>
+      <span className="text-ink-faint">{t('none: denied by default')}</span>
     );
   const off = (side: Evaluation) =>
     side.decision.disabledPolicies.length > 0 ? (
       <span className="code break-words">{side.decision.disabledPolicies.join(', ')}</span>
     ) : (
-      <span className="text-ink-faint">none</span>
+      <span className="text-ink-faint">{t('none#policies')}</span>
     );
   const cell = 'min-w-0 px-2 py-1 align-top';
-  const pending = <span className="text-ink-faint">not evaluated yet</span>;
+  const pending = <span className="text-ink-faint">{t('not evaluated yet')}</span>;
   return (
     <Section
-      title="Comparison"
+      title={t('Comparison')}
       aside={
         <Button size="sm" variant="ghost" onClick={onClear} data-testid="comparison-clear">
-          Clear
+          {t('Clear')}
         </Button>
       }
     >
       <p className="mb-2 text-[11px] leading-relaxed text-ink-dim" data-testid="comparison-verdict">
         {!result
-          ? 'A is kept. Change the context or switch a policy, then evaluate: the new result appears here as B.'
+          ? t(
+              'A is kept. Change the context or switch a policy, then evaluate: the new result appears here as B.',
+            )
           : !result.sameRequest
-            ? 'A and B are different requests, so the two decisions answer different questions.'
+            ? t('A and B are different requests, so the two decisions answer different questions.')
             : result.decisionChanged
-              ? `The decision changed from ${a.decision.decision === 'allow' ? 'Allow' : 'Deny'} to ${b!.decision.decision === 'allow' ? 'Allow' : 'Deny'}.`
-              : 'The decision is the same on both sides.'}
+              ? t('The decision changed from {a} to {b}.', {
+                  a: a.decision.decision === 'allow' ? t('Allow') : t('Deny'),
+                  b: b?.decision.decision === 'allow' ? t('Allow') : t('Deny'),
+                })
+              : t('The decision is the same on both sides.')}
       </p>
       <table className="w-full table-fixed border-collapse text-[11px]" data-testid="comparison">
         <thead>
@@ -400,14 +426,14 @@ function ComparisonSection({
             <th className={cn(cell, 'font-bold text-ink')}>
               A{' '}
               <span className="numeric font-normal">
-                at {formatClock(a.decision.virtualTimeMs)}
+                {t('at {time}', { time: formatClock(a.decision.virtualTimeMs) })}
               </span>
             </th>
             <th className={cn(cell, 'font-bold text-ink')}>
               B{' '}
               {b && (
                 <span className="numeric font-normal">
-                  at {formatClock(b.decision.virtualTimeMs)}
+                  {t('at {time}', { time: formatClock(b.decision.virtualTimeMs) })}
                 </span>
               )}
             </th>
@@ -416,7 +442,7 @@ function ComparisonSection({
         <tbody className="divide-y divide-line border-y border-line">
           <tr>
             <th scope="row" className="py-1 text-left font-normal text-ink-faint">
-              Decision
+              {t('Decision')}
             </th>
             <td className={cell} data-testid="comparison-a">
               <Verdict decision={a.decision.decision} />
@@ -427,7 +453,7 @@ function ComparisonSection({
           </tr>
           <tr>
             <th scope="row" className="py-1 text-left font-normal text-ink-faint">
-              Decided by
+              {t('Decided by')}
             </th>
             <td className={cell}>{policies(a)}</td>
             <td className={cell}>{b ? policies(b) : pending}</td>
@@ -442,18 +468,21 @@ function ComparisonSection({
                 <th
                   scope="row"
                   className="py-1 text-left font-normal text-ink-faint"
+                  // not-interface-text: the key as Cedar names it
                   title={`context.${row.key}`}
                 >
                   {row.label}
                 </th>
-                <td className={cn(cell, 'numeric text-ink')}>{row.value}</td>
-                <td className={cn(cell, 'numeric text-ink')}>{other ?? ''}</td>
+                <td className={cn(cell, 'numeric text-ink')}>{valueWord(row.value)}</td>
+                <td className={cn(cell, 'numeric text-ink')}>
+                  {other === undefined ? '' : valueWord(other)}
+                </td>
               </tr>
             );
           })}
           <tr>
             <th scope="row" className="py-1 text-left font-normal text-ink-faint">
-              Policies off
+              {t('Policies off')}
             </th>
             <td className={cell}>{off(a)}</td>
             <td className={cell}>{b ? off(b) : ''}</td>
@@ -462,7 +491,7 @@ function ComparisonSection({
       </table>
       {result && (
         <div className="mt-2 text-[11px] leading-relaxed text-ink-dim">
-          <p className="caption mb-0.5">What differs from A to B</p>
+          <p className="caption mb-0.5">{t('What differs from A to B')}</p>
           {result.differences.length > 0 ? (
             <ul className="space-y-0.5" data-testid="comparison-differences">
               {result.differences.map((line) => (
@@ -470,21 +499,21 @@ function ComparisonSection({
               ))}
             </ul>
           ) : (
-            <p>Nothing: the same request under the same context and policies.</p>
+            <p>{t('Nothing: the same request under the same context and policies.')}</p>
           )}
           {result.sameRequest && (result.onlyInA.length > 0 || result.onlyInB.length > 0) && (
             <p className="mt-1" data-testid="comparison-attribution">
               {result.onlyInA.length > 0 && (
                 <>
-                  Only A is decided by <span className="code">{result.onlyInA.join(', ')}</span>
-                  .{' '}
+                  {tr('Only A is decided by {ids}.', {
+                    ids: <span className="code">{result.onlyInA.join(', ')}</span>,
+                  })}{' '}
                 </>
               )}
-              {result.onlyInB.length > 0 && (
-                <>
-                  Only B is decided by <span className="code">{result.onlyInB.join(', ')}</span>.
-                </>
-              )}
+              {result.onlyInB.length > 0 &&
+                tr('Only B is decided by {ids}.', {
+                  ids: <span className="code">{result.onlyInB.join(', ')}</span>,
+                })}
             </p>
           )}
         </div>
@@ -605,7 +634,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
 
   return (
     <>
-      <Section title="Request">
+      <Section title={t('Request')}>
         <form
           className="space-y-2.5"
           onSubmit={(event) => {
@@ -615,7 +644,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
           data-testid="authz-form"
         >
           <Select
-            label="Principal"
+            label={t('Principal')}
             value={principal}
             onChange={(e) => setPrincipal(e.target.value)}
             data-testid="authz-principal"
@@ -627,7 +656,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             ))}
           </Select>
           <Select
-            label="Action"
+            label={t('Action')}
             value={action}
             onChange={(e) => setAction(e.target.value)}
             data-testid="authz-action"
@@ -639,42 +668,45 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             ))}
           </Select>
           <Select
-            label="Resource"
+            label={t('Resource')}
             value={resource}
             onChange={(e) => setResource(e.target.value)}
             data-testid="authz-resource"
           >
             {resources.map((r) => (
               <option key={r.uid} value={r.uid}>
-                {r.label}, tenant {r.tenant}
+                {t('{resource}, tenant {tenant}', { resource: r.label, tenant: r.tenant })}
               </option>
             ))}
           </Select>
           {principalInfo && resourceInfo && (
             <p className="text-[11px] text-ink-faint">
-              {principalInfo.label} belongs to tenant{' '}
-              <span className="text-ink-dim">{principalInfo.tenant}</span>
-              {principalInfo.roles.length === 0 ? (
-                ' and has no role'
-              ) : (
-                <>
-                  {' '}
-                  with role{principalInfo.roles.length === 1 ? '' : 's'}{' '}
-                  <span className="text-ink-dim">{principalInfo.roles.join(', ')}</span>
-                </>
+              {tr(
+                principalInfo.roles.length === 0
+                  ? '{principal} belongs to tenant <v>{tenant}</v> and has no role; the resource belongs to <v>{owner}</v>.'
+                  : principalInfo.roles.length === 1
+                    ? '{principal} belongs to tenant <v>{tenant}</v> with role <v>{roles}</v>; the resource belongs to <v>{owner}</v>.'
+                    : '{principal} belongs to tenant <v>{tenant}</v> with roles <v>{roles}</v>; the resource belongs to <v>{owner}</v>.',
+                {
+                  v: (c) => <span className="text-ink-dim">{c}</span>,
+                  principal: principalInfo.label,
+                  tenant: principalInfo.tenant,
+                  roles: principalInfo.roles.join(', '),
+                  owner: resourceInfo.tenant,
+                },
               )}
-              ; the resource belongs to <span className="text-ink-dim">{resourceInfo.tenant}</span>.
             </p>
           )}
           {/* A fieldset is as wide as its content unless told otherwise. */}
           <fieldset className="min-w-0" hidden={catalog.contextKeys.length === 0}>
-            <legend className="caption mb-1.5">Context</legend>
+            <legend className="caption mb-1.5">{t('Context')}</legend>
             <div className="space-y-1.5">
               {catalog.contextKeys.map((key) => (
                 <div key={key.key} className="flex items-center justify-between gap-2">
                   <span className="min-w-0 text-xs text-ink" title={key.description}>
                     {key.label}
                     <span className="numeric ml-1.5 text-[11px] text-ink-faint">
+                      {/* not-interface-text: the key as Cedar names it */}
                       context.{key.key}
                     </span>
                   </span>
@@ -692,15 +724,15 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             </div>
           </fieldset>
           <div className="flex items-center justify-between gap-2">
-            <span className="caption">Engine</span>
+            <span className="caption">{t('Engine')}</span>
             <Segmented
-              label="Policy engine"
+              label={t('Policy engine')}
               size="sm"
               value={engine}
               options={[
-                { value: 'embedded' as const, label: 'Embedded' },
+                { value: 'embedded' as const, label: t('Embedded') },
                 ...(agentAvailable
-                  ? [{ value: 'cedar-agent' as const, label: 'cedar-agent' }]
+                  ? [{ value: 'cedar-agent' as const, label: ENGINE_LABEL['cedar-agent'] }]
                   : []),
               ]}
               onChange={setEngine}
@@ -714,7 +746,11 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             className="w-full"
             data-testid="authz-evaluate"
           >
-            {busy ? 'Evaluating…' : result && !current ? 'Evaluate again' : 'Evaluate with Cedar'}
+            {busy
+              ? t('Evaluating…')
+              : result && !current
+                ? t('Evaluate again')
+                : t('Evaluate with Cedar')}
           </Button>
           {error && (
             <p
@@ -728,7 +764,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
       </Section>
 
       {result && (
-        <Section title="Decision">
+        <Section title={t('Decision')}>
           <DecisionCard
             evaluation={result}
             catalog={catalog}
@@ -739,10 +775,12 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
                   type="button"
                   onClick={() => setKept(result)}
                   className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
-                  title="Keep this result, change the context or the policies, and evaluate again to see the two side by side"
+                  title={t(
+                    'Keep this result, change the context or the policies, and evaluate again to see the two side by side',
+                  )}
                   data-testid="decision-keep"
                 >
-                  <GitCompareArrows size={12} aria-hidden /> Keep to compare
+                  <GitCompareArrows size={12} aria-hidden /> {t('Keep to compare')}
                 </button>
               ) : null
             }
@@ -760,10 +798,13 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
       )}
 
       <Section
-        title="Policies"
+        title={t('Policies')}
         aside={
           <span className="numeric text-[11px] text-ink-faint">
-            {catalog.policies.length - disabled.length}/{catalog.policies.length} active
+            {t('{on}/{total} active', {
+              on: catalog.policies.length - disabled.length,
+              total: catalog.policies.length,
+            })}
           </span>
         }
       >
@@ -774,7 +815,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             onClick={() => useUi.getState().setPanel('matrix')}
             data-testid="open-matrix"
           >
-            Who may do what
+            {t('Who may do what')}
           </Button>
           <Button
             size="sm"
@@ -782,15 +823,17 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
             onClick={() => useUi.getState().setPanel('policies')}
             data-testid="open-policy-editor"
           >
-            Edit the policies
+            {t('Edit the policies')}
           </Button>
         </div>
         <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
-          These are the real Cedar policies being evaluated. Switch one off to see how the decision
-          changes
           {engine === 'cedar-agent'
-            ? ' (embedded engine only; the agent uses its own policy store).'
-            : '.'}
+            ? t(
+                'These are the real Cedar policies being evaluated. Switch one off to see how the decision changes (embedded engine only; the agent uses its own policy store).',
+              )
+            : t(
+                'These are the real Cedar policies being evaluated. Switch one off to see how the decision changes.',
+              )}
         </p>
         <ul className="space-y-1.5" data-testid="policy-list">
           {catalog.policies.map((policy) => {
@@ -813,7 +856,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
                       policy.effect === 'forbid' ? 'bg-ink text-on-accent' : 'text-ink',
                     )}
                   >
-                    {policy.effect === 'forbid' ? 'Forbid' : 'Permit'}
+                    {policy.effect === 'forbid' ? t('Forbid') : t('Permit')}
                   </span>
                   <span className="numeric min-w-0 flex-1 truncate text-[11px] text-ink">
                     {policy.id}
@@ -831,7 +874,7 @@ function RequestForm({ catalog }: { catalog: AuthorizationCatalog }) {
                 />
                 <details>
                   <summary className="text-[11px] text-ink-dim hover:text-ink">
-                    Cedar source
+                    {t('Cedar source')}
                   </summary>
                   <pre className="code mt-1 overflow-x-auto whitespace-pre-wrap rounded-control bg-sunken p-2 text-[11px] leading-relaxed text-ink-dim">
                     {policy.content}
@@ -850,7 +893,7 @@ function RecentDecisions() {
   const { data } = useQuery({ queryKey: queryKeys.decisions, queryFn: api.authorizationDecisions });
   if (!data || data.length === 0) return null;
   return (
-    <Section title="Evaluated in this timeline">
+    <Section title={t('Evaluated in this timeline')}>
       <ul className="space-y-1" data-testid="recent-decisions">
         {data
           .slice(-6)
@@ -861,7 +904,7 @@ function RecentDecisions() {
                 type="button"
                 onClick={() => useUi.getState().traceDecision({ ...decision })}
                 className="flex w-full items-center gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
-                title="Trace this decision through the scene"
+                title={t('Trace this decision through the scene')}
               >
                 <DecisionTag decision={decision.decision} />
                 <span className="min-w-0 flex-1 truncate text-xs text-ink">
@@ -883,26 +926,31 @@ export function AuthorizationExplorer() {
     queryKey: queryKeys.catalog,
     queryFn: api.authorizationCatalog,
   });
-  if (isError) return <EmptyState title="Authorization unavailable">{HOST.unreachable}</EmptyState>;
-  if (!catalog) return <EmptyState title="Loading policies" />;
+  if (isError)
+    return <EmptyState title={t('Authorization unavailable')}>{HOST.unreachable}</EmptyState>;
+  if (!catalog) return <EmptyState title={t('Loading policies')} />;
   const embedded = catalog.engines.find((e) => e.kind === 'embedded-cedar');
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="authorization-explorer">
       <header className="border-b border-line px-3 py-3">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-base font-bold text-ink">Trace a request</h2>
+          <h2 className="text-base font-bold text-ink">{t('Trace a request')}</h2>
           <IconButton
-            label="Close and put the path away"
+            label={t('Close and put the path away')}
             onClick={() => useUi.getState().setInspectorOpen(false)}
           >
             <X size={15} />
           </IconButton>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-ink-dim">
-          Choose who asks for what, and follow the request across the model to where Cedar allows it
-          or stops it. The decision is computed by the Cedar policy engine
-          {embedded?.version ? ` (cedar-policy ${embedded.version})` : ''} over the principals and
-          resources in its entity store; nothing is scripted.
+          {embedded?.version
+            ? t(
+                'Choose who asks for what, and follow the request across the model to where Cedar allows it or stops it. The decision is computed by the Cedar policy engine (cedar-policy {version}) over the principals and resources in its entity store; nothing is scripted.',
+                { version: embedded.version },
+              )
+            : t(
+                'Choose who asks for what, and follow the request across the model to where Cedar allows it or stops it. The decision is computed by the Cedar policy engine over the principals and resources in its entity store; nothing is scripted.',
+              )}
         </p>
       </header>
       <RequestForm catalog={catalog} />

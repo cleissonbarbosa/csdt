@@ -15,6 +15,8 @@ import type {
 
 import { entityId } from './format';
 
+import { t } from '@/i18n';
+
 export type EngineChoice = 'embedded' | 'cedar-agent';
 
 /** Everything that shapes Cedar's answer. Context keys left absent are not listed. */
@@ -67,6 +69,21 @@ export interface Labels {
 const word = (value: boolean | undefined) =>
   value === undefined ? 'absent' : value ? 'true' : 'false';
 
+/** How a value of the context is said; one the form does not offer is shown as it is. */
+const VALUE_WORDS: Record<string, string> = {
+  absent: t('absent'),
+  true: t('true'),
+  false: t('false'),
+};
+
+/** A value from `contextRows`, in the words of the page. */
+export function valueWord(value: string): string {
+  return VALUE_WORDS[value] ?? value;
+}
+
+/** The engine, as the page names it. */
+const engineWord = (engine: EngineChoice) => (engine === 'embedded' ? t('embedded') : engine);
+
 /**
  * In what `now` differs from `before`, one sentence fragment per difference,
  * each naming the old value and the new. Empty when they are the same
@@ -78,23 +95,45 @@ export function differences(
   labels: Labels = { context: {} },
 ): string[] {
   const out: string[] = [];
-  const part = (name: string, from: string, to: string) => {
-    if (from !== to) out.push(`${name} was ${entityId(from)}, now ${entityId(to)}`);
-  };
-  part('Principal', before.principal, now.principal);
-  part('Action', before.action, now.action);
-  part('Resource', before.resource, now.resource);
+  const ids = (from: string, to: string) => ({ from: entityId(from), to: entityId(to) });
+  if (before.principal !== now.principal) {
+    out.push(t('Principal was {from}, now {to}', ids(before.principal, now.principal)));
+  }
+  if (before.action !== now.action) {
+    out.push(t('Action was {from}, now {to}', ids(before.action, now.action)));
+  }
+  if (before.resource !== now.resource) {
+    out.push(t('Resource was {from}, now {to}', ids(before.resource, now.resource)));
+  }
   const keys = [...new Set([...Object.keys(before.context), ...Object.keys(now.context)])].sort();
   for (const key of keys) {
     const from = word(before.context[key]);
     const to = word(now.context[key]);
-    if (from !== to) out.push(`${labels.context[key] ?? `context.${key}`} was ${from}, now ${to}`);
+    if (from !== to) {
+      out.push(
+        t('{name} was {from}, now {to}', {
+          // not-interface-text: the key as Cedar names it
+          name: labels.context[key] ?? `context.${key}`,
+          from: valueWord(from),
+          to: valueWord(to),
+        }),
+      );
+    }
   }
   const switched = (from: string[], to: string[]) => from.filter((id) => !to.includes(id));
-  for (const id of switched(now.disabled, before.disabled)) out.push(`Policy ${id} switched off`);
-  for (const id of switched(before.disabled, now.disabled)) out.push(`Policy ${id} switched on`);
+  for (const id of switched(now.disabled, before.disabled)) {
+    out.push(t('Policy {id} switched off', { id }));
+  }
+  for (const id of switched(before.disabled, now.disabled)) {
+    out.push(t('Policy {id} switched on', { id }));
+  }
   if (before.engine !== now.engine) {
-    out.push(`Engine was ${before.engine}, now ${now.engine}`);
+    out.push(
+      t('Engine was {from}, now {to}', {
+        from: engineWord(before.engine),
+        to: engineWord(now.engine),
+      }),
+    );
   }
   return out;
 }
@@ -111,7 +150,7 @@ export function staleReasons(
 ): string[] {
   const reasons = differences(evaluation.inputs, now, labels);
   if (evaluation.policies !== policyFingerprint(catalog)) {
-    reasons.push('The policies in use were replaced');
+    reasons.push(t('The policies in use were replaced'));
   }
   return reasons;
 }
@@ -130,6 +169,7 @@ export function contextRows(
   const extra = Object.keys(context)
     .filter((key) => !keys.some((entry) => entry.key === key))
     .sort()
+    // not-interface-text: the key as Cedar names it
     .map((key) => ({ key, label: `context.${key}`, value: JSON.stringify(context[key]) }));
   return [...known, ...extra];
 }
@@ -150,7 +190,7 @@ export interface Comparison {
 export function compare(a: Evaluation, b: Evaluation, labels?: Labels): Comparison {
   const only = (from: string[], other: string[]) => from.filter((id) => !other.includes(id));
   const configured = differences(a.inputs, b.inputs, labels);
-  if (a.policies !== b.policies) configured.push('The policies in use were replaced in between');
+  if (a.policies !== b.policies) configured.push(t('The policies in use were replaced in between'));
   return {
     sameRequest:
       a.inputs.principal === b.inputs.principal &&

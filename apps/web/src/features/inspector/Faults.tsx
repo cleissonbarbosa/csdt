@@ -6,7 +6,7 @@
  * toggle, and what the server reports in force is what is shown as pressed.
  */
 import type { ActiveFault, TelemetrySnapshot, Topology, Trial } from '@aegis/contracts';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
 import { HealthGlyph } from '@/components/ui/Badge';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import { Fold } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { EDGE_FAULTS, faultEffect, faultLabel, NODE_FAULTS, type FaultChoice } from '@/lib/faults';
 import { formatClock, formatMs, formatPercent } from '@/lib/format';
 import { HEALTH_LABEL } from '@/lib/palette';
@@ -24,6 +26,9 @@ import { useUi } from '@/stores/ui';
 const TRIAL_RAMP_MS = 1000;
 /** How many of the services a trial reached are listed before the rest is folded. */
 const SHOWN = 6;
+
+/** The figure a trial started from, set back beside the one it reached. */
+const faint = (children: ReactNode) => <span className="text-ink-faint">{children}</span>;
 
 /**
  * What a fault did when it was tried on a timeline of its own: what the
@@ -56,25 +61,38 @@ function TrialResult({
       data-testid="fault-trial"
       data-affected={count}
     >
-      <p className="text-xs font-bold text-ink">Tried, not placed: {label.toLowerCase()}</p>
+      <p className="text-xs font-bold text-ink">
+        {t('Tried, not placed: {fault}', { fault: label.toLowerCase() })}
+      </p>
       <p className="mt-0.5 text-xs leading-relaxed text-ink">
         {count === 0
-          ? `No service leaves normal in ${formatClock(held)}.`
-          : `${count} ${count === 1 ? 'service leaves' : 'services leave'} normal within ${formatClock(held)}.`}
+          ? t('No service leaves normal in {time}.', { time: formatClock(held) })
+          : t(
+              count === 1
+                ? '{n} service leaves normal within {time}.'
+                : '{n} services leave normal within {time}.',
+              { n: count, time: formatClock(held) },
+            )}
       </p>
       <dl className="mt-1.5 grid grid-cols-2 gap-x-3 text-[11px]">
         <div>
-          <dt className="text-ink-faint">Error rate</dt>
+          <dt className="text-ink-faint">{t('Error rate')}</dt>
           <dd className="numeric text-ink" data-testid="trial-errors">
-            up to {formatPercent(trial.peak.errorRate)}{' '}
-            <span className="text-ink-faint">from {formatPercent(trial.before.errorRate)}</span>
+            {tr('up to {peak} <dim>from {before}</dim>', {
+              peak: formatPercent(trial.peak.errorRate),
+              before: formatPercent(trial.before.errorRate),
+              dim: faint,
+            })}
           </dd>
         </div>
         <div>
-          <dt className="text-ink-faint">Latency p95</dt>
+          <dt className="text-ink-faint">{t('Latency p95')}</dt>
           <dd className="numeric text-ink">
-            up to {formatMs(trial.peak.p95LatencyMs)}{' '}
-            <span className="text-ink-faint">from {formatMs(trial.before.p95LatencyMs)}</span>
+            {tr('up to {peak} <dim>from {before}</dim>', {
+              peak: formatMs(trial.peak.p95LatencyMs),
+              before: formatMs(trial.before.p95LatencyMs),
+              dim: faint,
+            })}
           </dd>
         </div>
       </dl>
@@ -105,7 +123,7 @@ function TrialResult({
           className="mt-1 text-[11px] text-ink-dim underline decoration-line-strong underline-offset-2 hover:text-ink"
           onClick={() => setAll(!all)}
         >
-          {all ? 'Show fewer' : `Show all ${count}`}
+          {all ? t('Show fewer') : t('Show all {n}', { n: count })}
         </button>
       )}
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -116,15 +134,16 @@ function TrialResult({
           onClick={onPlace}
           data-testid="trial-place"
         >
-          Place it
+          {t('Place it')}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClose} data-testid="trial-close">
-          Put this away
+          {t('Put this away')}
         </Button>
       </div>
       <p className="caption mt-1.5">
-        Simulated from the platform at rest, on a timeline of its own. The one in use was not
-        touched.
+        {t(
+          'Simulated from the platform at rest, on a timeline of its own. The one in use was not touched.',
+        )}
       </p>
     </div>
   );
@@ -148,8 +167,8 @@ export function Faults({
   position: Position;
 }) {
   const [busy, setBusy] = useState(false);
-  const subject = 'node' in position ? 'service' : 'connection';
-  const choices: readonly FaultChoice[] = 'node' in position ? NODE_FAULTS : EDGE_FAULTS;
+  const onNode = 'node' in position;
+  const choices: readonly FaultChoice[] = onNode ? NODE_FAULTS : EDGE_FAULTS;
   const inForce = snapshot?.faults.filter((fault) => on(fault, position)) ?? [];
   // Placed some other way (a recording, the API): shown, and can be lifted.
   const others = inForce.filter((fault) => !choices.some((choice) => choice.kind === fault.kind));
@@ -199,23 +218,32 @@ export function Faults({
     } catch (error) {
       setTried(null);
       useUi.getState().setReach(null);
-      setRefused(error instanceof ApiError ? error.message : 'The trial could not be run.');
+      setRefused(error instanceof ApiError ? error.message : t('The trial could not be run.'));
     }
     setTrying(null);
   };
 
   return (
     <Fold
-      title="Faults"
+      title={t('Faults')}
       count={inForce.length > 0 ? inForce.length : undefined}
       open={inForce.length > 0}
       testId="faults"
     >
       <p className="caption mb-2">
-        Hold this {subject} away from normal, outside any scenario. A fault stays until it is lifted
-        or the simulation is reset.
+        {onNode
+          ? t(
+              'Hold this service away from normal, outside any scenario. A fault stays until it is lifted or the simulation is reset.',
+            )
+          : t(
+              'Hold this connection away from normal, outside any scenario. A fault stays until it is lifted or the simulation is reset.',
+            )}
       </p>
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Faults on this ${subject}`}>
+      <div
+        className="flex flex-wrap gap-1.5"
+        role="group"
+        aria-label={onNode ? t('Faults on this service') : t('Faults on this connection')}
+      >
         {choices.map((choice) => {
           const placed = inForce.find((fault) => fault.kind === choice.kind);
           return (
@@ -236,7 +264,7 @@ export function Faults({
       </div>
       <div className="mt-2">
         <Select
-          label="Try one first, without placing it"
+          label={t('Try one first, without placing it')}
           value=""
           disabled={trying !== null}
           onChange={(event) => {
@@ -245,7 +273,7 @@ export function Faults({
           }}
           data-testid="fault-try"
         >
-          <option value="">{trying ? 'Trying…' : 'Choose a fault to try…'}</option>
+          <option value="">{trying ? t('Trying…') : t('Choose a fault to try…')}</option>
           {choices.map((choice) => (
             <option key={choice.kind} value={choice.kind}>
               {faultLabel(choice.kind, choice.value)}
@@ -255,7 +283,7 @@ export function Faults({
       </div>
       {refused && (
         <p className="mt-1.5 text-[11px] text-ink" data-testid="fault-trial-refused">
-          Not tried: {refused}
+          {t('Not tried: {reason}', { reason: refused })}
         </p>
       )}
       {tried && (
@@ -286,7 +314,7 @@ export function Faults({
                 disabled={busy}
                 onClick={() => void run(fault, true)}
               >
-                Lift
+                {t('Lift')}
               </Button>
             </li>
           ))}

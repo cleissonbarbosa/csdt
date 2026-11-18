@@ -14,6 +14,7 @@ import type {
   WorkspaceStatus,
 } from '@aegis/contracts';
 
+import { t } from '@/i18n';
 import { api, ApiError } from '@/providers/api';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
@@ -26,7 +27,7 @@ import { invalidateWorkspaceQueries, queryClient, queryKeys } from './queryClien
 const FAULT_RAMP_MS = 2000;
 
 function describe(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'Something went wrong.';
+  return error instanceof ApiError ? error.message : t('Something went wrong.');
 }
 
 async function run<T>(task: () => Promise<T>, failure: string): Promise<T | null> {
@@ -61,10 +62,12 @@ function asApiError(error: unknown): ApiError {
 
 export const actions = {
   control: async (action: ControlAction) =>
-    adopt(await run(() => api.control(action), 'Playback could not be changed.')),
+    adopt(await run(() => api.control(action), t('Playback could not be changed.'))),
 
   startScenario: async (scenarioId: string) => {
-    const ok = adopt(await run(() => api.startScenario(scenarioId), 'The scenario did not start.'));
+    const ok = adopt(
+      await run(() => api.startScenario(scenarioId), t('The scenario did not start.')),
+    );
     if (ok) void queryClient.invalidateQueries({ queryKey: queryKeys.scenarios });
     return ok;
   },
@@ -72,39 +75,41 @@ export const actions = {
   /** Places a fault by hand on a service or a connection. It holds until lifted. */
   placeFault: async (effect: FaultEffect) =>
     adopt(
-      await run(() => api.injectFault(effect, FAULT_RAMP_MS), 'The fault could not be placed.'),
+      await run(() => api.injectFault(effect, FAULT_RAMP_MS), t('The fault could not be placed.')),
     ),
 
   /** Lifts one fault placed by hand, or with no effect named, all of them. */
   liftFault: async (effect?: FaultEffect) =>
-    adopt(await run(() => api.clearFaults(effect), 'The fault could not be lifted.')),
+    adopt(await run(() => api.clearFaults(effect), t('The fault could not be lifted.'))),
 
   /** Stops the running scenario and lets the platform recover. History is kept. */
   stopScenario: async () =>
-    adopt(await run(() => api.reset('scenario'), 'The scenario could not be stopped.')),
+    adopt(await run(() => api.reset('scenario'), t('The scenario could not be stopped.'))),
 
   /** Returns to tick 0 with a clean history. */
   resetSimulation: async () => {
     const ok = adopt(
-      await run(() => api.reset('simulation'), 'The simulation could not be reset.'),
+      await run(() => api.reset('simulation'), t('The simulation could not be reset.')),
     );
-    if (ok) useNotices.getState().push('info', 'Simulation reset to a clean baseline.');
+    if (ok) useNotices.getState().push('info', t('Simulation reset to a clean baseline.'));
     return ok;
   },
 
   /** Clean slate, then the same scenario again: reproduces it exactly. */
   restartScenario: async (scenarioId: string) => {
-    if (!adopt(await run(() => api.reset('simulation'), 'The simulation could not be reset.'))) {
+    if (!adopt(await run(() => api.reset('simulation'), t('The simulation could not be reset.')))) {
       return false;
     }
     return actions.startScenario(scenarioId);
   },
 
   selectTopology: async (topologyId: string) =>
-    adopt(await run(() => api.selectTopology(topologyId), 'The topology could not be switched.')),
+    adopt(
+      await run(() => api.selectTopology(topologyId), t('The topology could not be switched.')),
+    ),
 
   loadRecording: async (recordingId: string) =>
-    adopt(await run(() => api.loadRecording(recordingId), 'The recording could not be loaded.')),
+    adopt(await run(() => api.loadRecording(recordingId), t('The recording could not be loaded.'))),
 
   /**
    * Replaces the timeline with the one a recording describes: the engine
@@ -113,15 +118,15 @@ export const actions = {
    */
   loadSession: async (recording: Recording, cursorMs?: number) =>
     adopt(
-      await run(() => api.loadSession(recording, cursorMs), 'The session could not be loaded.'),
+      await run(() => api.loadSession(recording, cursorMs), t('The session could not be loaded.')),
     ),
 
   setProvider: async (id: string, connect: boolean) => {
     const statuses = await run(
       () => (connect ? api.connectProvider(id) : api.disconnectProvider(id)),
       connect
-        ? 'The integration could not be connected.'
-        : 'The integration could not be disconnected.',
+        ? t('The integration could not be connected.')
+        : t('The integration could not be disconnected.'),
     );
     // Refresh either way: a failed attempt changes the provider's state too.
     if (statuses) queryClient.setQueryData(queryKeys.providers, statuses);
@@ -137,7 +142,7 @@ export const actions = {
   importWorkspace: async (files: WorkspaceFile[]): Promise<WorkspaceStatus | ApiError> => {
     try {
       const workspace = adoptWorkspace(await api.importWorkspace(files));
-      useNotices.getState().push('info', 'Now showing the imported files.');
+      useNotices.getState().push('info', t('Now showing the imported files.'));
       return workspace;
     } catch (error) {
       return asApiError(error);

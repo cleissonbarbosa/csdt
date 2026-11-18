@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Segmented, Switch } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/Section';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { describeAccess, tabulate, type ActionAccess } from '@/lib/accessMatrix';
 import { cn } from '@/lib/cn';
 import { api } from '@/providers/api';
@@ -15,9 +17,9 @@ import { useUi } from '@/stores/ui';
 
 type Tri = 'absent' | 'true' | 'false';
 const TRI: { value: Tri; label: string }[] = [
-  { value: 'absent', label: 'Absent' },
-  { value: 'true', label: 'True' },
-  { value: 'false', label: 'False' },
+  { value: 'absent', label: t('Absent') },
+  { value: 'true', label: t('True') },
+  { value: 'false', label: t('False') },
 ];
 
 interface Picked {
@@ -59,19 +61,23 @@ function Answer({
           one of a hundred answers, and takes no colour. */}
       <span className="inline-flex items-center gap-1 text-xs font-bold text-ink">
         {allowed ? <Check size={13} aria-hidden /> : <X size={13} aria-hidden />}
-        {allowed ? 'Allow' : 'Deny'}
+        {allowed ? t('Allow') : t('Deny')}
       </span>
       <span className="min-w-0">
         <span className="block truncate text-xs text-ink">{resource?.label ?? cell.resource}</span>
         <span className="block text-[11px] leading-snug text-ink-faint">
-          {cell.determiningPolicies.length > 0 ? (
-            <>
-              decided by <span className="code">{cell.determiningPolicies.join(', ')}</span>
-            </>
-          ) : (
-            'no policy permits it'
-          )}
-          {changed && '; differs from all policies in force'}
+          {cell.determiningPolicies.length > 0
+            ? tr(
+                changed
+                  ? 'decided by {ids}; differs from all policies in force'
+                  : 'decided by {ids}',
+                { ids: <span className="code">{cell.determiningPolicies.join(', ')}</span> },
+              )
+            : t(
+                changed
+                  ? 'no policy permits it; differs from all policies in force'
+                  : 'no policy permits it',
+              )}
         </span>
       </span>
       <Button
@@ -89,7 +95,7 @@ function Answer({
         }
         data-testid="matrix-trace"
       >
-        Trace it
+        {t('Trace it')}
       </Button>
     </li>
   );
@@ -128,8 +134,8 @@ function Matrix({ catalog }: { catalog: AuthorizationCatalog }) {
 
   if (isError) {
     return (
-      <EmptyState title="The matrix could not be worked out">
-        Cedar was not asked. Try again in a moment.
+      <EmptyState title={t('The matrix could not be worked out')}>
+        {t('Cedar was not asked. Try again in a moment.')}
       </EmptyState>
     );
   }
@@ -175,14 +181,16 @@ function Matrix({ catalog }: { catalog: AuthorizationCatalog }) {
           onClick={() => useUi.getState().setPanel('policies')}
           data-testid="matrix-edit-policies"
         >
-          Edit the policies
+          {t('Edit the policies')}
         </Button>
       </div>
 
       <details className="mt-3" data-testid="matrix-policies">
         <summary className="text-xs text-ink-dim hover:text-ink">
-          Policies in force: {catalog.policies.length - disabled.length} of{' '}
-          {catalog.policies.length}
+          {t('Policies in force: {on} of {total}', {
+            on: catalog.policies.length - disabled.length,
+            total: catalog.policies.length,
+          })}
         </summary>
         <ul className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
           {catalog.policies.map((policy) => (
@@ -204,29 +212,33 @@ function Matrix({ catalog }: { catalog: AuthorizationCatalog }) {
 
       {matrix?.note && (
         <p className="mt-3 text-xs text-ink-dim" data-testid="matrix-note">
-          Not asked: {matrix.note}.
+          {t('Not asked: {reason}.', { reason: matrix.note })}
         </p>
       )}
 
       {table && table.asked > 0 && (
         <>
           <p className="mt-3 text-xs text-ink" role="status" data-testid="matrix-summary">
-            Cedar allows {table.allowed} of {table.asked} requests
-            {against &&
-              (table.changed === 0
-                ? '; none differs from all policies in force'
-                : `; ${table.changed} ${table.changed === 1 ? 'differs' : 'differ'} from all policies in force`)}
-            .
+            {t(
+              !against
+                ? 'Cedar allows {allowed} of {asked} requests.'
+                : table.changed === 0
+                  ? 'Cedar allows {allowed} of {asked} requests; none differs from all policies in force.'
+                  : table.changed === 1
+                    ? 'Cedar allows {allowed} of {asked} requests; {changed} differs from all policies in force.'
+                    : 'Cedar allows {allowed} of {asked} requests; {changed} differ from all policies in force.',
+              { allowed: table.allowed, asked: table.asked, changed: table.changed },
+            )}
           </p>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full border-collapse text-left text-xs">
               <caption className="sr-only">
-                For each principal and action, on how many resources Cedar allows it
+                {t('For each principal and action, on how many resources Cedar allows it')}
               </caption>
               <thead>
                 <tr className="border-b border-line-strong">
                   <th scope="col" className="caption py-1.5 pr-3 font-normal">
-                    Principal
+                    {t('Principal')}
                   </th>
                   {catalog.actions.map((action) => (
                     <th key={action.uid} scope="col" className="caption px-1 py-1.5 font-normal">
@@ -277,7 +289,7 @@ function Matrix({ catalog }: { catalog: AuthorizationCatalog }) {
                               {describeAccess(entry)}
                               {entry.changed > 0 && was && (
                                 <span className="block text-[10px] font-normal text-ink-faint">
-                                  was {describeAccess(was)}
+                                  {t('was {access}', { access: describeAccess(was) })}
                                 </span>
                               )}
                             </button>
@@ -315,16 +327,18 @@ function Matrix({ catalog }: { catalog: AuthorizationCatalog }) {
               </section>
             ) : (
               <p className="text-[11px] leading-relaxed text-ink-faint">
-                Select a cell to see each request it stands for, the policy that decided it, and to
-                follow it across the model.
+                {t(
+                  'Select a cell to see each request it stands for, the policy that decided it, and to follow it across the model.',
+                )}
               </p>
             )}
           </div>
         </>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-        Each answer is the embedded Cedar engine&apos;s, to a request made of the catalogue&apos;s
-        principals, actions and resources. Asking leaves the timeline as it is.
+        {t(
+          "Each answer is the embedded Cedar engine's, to a request made of the catalogue's principals, actions and resources. Asking leaves the timeline as it is.",
+        )}
       </p>
     </div>
   );
@@ -347,12 +361,16 @@ export function AccessMatrixDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => !next && useUi.getState().setPanel(null)}
-      title="Who may do what"
-      description="Every principal and action of the catalogue, on every resource the action applies to, each asked of Cedar."
+      title={t('Who may do what')}
+      description={t(
+        'Every principal and action of the catalogue, on every resource the action applies to, each asked of Cedar.',
+      )}
       width="max-w-4xl"
     >
       {isError ? (
-        <EmptyState title="The catalogue is unavailable">Cedar could not be asked.</EmptyState>
+        <EmptyState title={t('The catalogue is unavailable')}>
+          {t('Cedar could not be asked.')}
+        </EmptyState>
       ) : catalog ? (
         <Matrix catalog={catalog} />
       ) : null}

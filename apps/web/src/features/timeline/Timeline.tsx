@@ -8,6 +8,7 @@ import { useMinWidth } from '@/app/hooks';
 import { queryKeys } from '@/app/queryClient';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Field';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatClock } from '@/lib/format';
 import { COLOR, SEVERITY_COLOR } from '@/lib/palette';
@@ -146,12 +147,15 @@ function Track({ incidents }: TrackProps) {
       <div
         role="slider"
         tabIndex={0}
-        aria-label="Timeline position"
+        aria-label={t('Timeline position')}
         aria-orientation="horizontal"
         aria-valuemin={Math.round(start / 1000)}
         aria-valuemax={Math.round(head / 1000)}
         aria-valuenow={Math.round(cursor / 1000)}
-        aria-valuetext={`${formatClock(cursor)} of ${formatClock(head)}`}
+        aria-valuetext={t('{cursor} of {head}', {
+          cursor: formatClock(cursor),
+          head: formatClock(head),
+        })}
         data-testid="timeline-track"
         data-dragging={held}
         className="timeline-track absolute inset-x-0 bottom-0 cursor-ew-resize touch-none select-none overflow-hidden rounded-control border border-line bg-sunken"
@@ -308,22 +312,22 @@ export function describePlayback(
   if (mode === 'live') {
     return status === 'playing'
       ? {
-          label: 'Simulation now',
-          hint: "At the simulation's now: new history is being made.",
+          label: t('Simulation now'),
+          hint: t("At the simulation's now: new history is being made."),
         }
       : {
-          label: 'Paused',
-          hint: "Paused at the simulation's now: nothing advances until it is played.",
+          label: t('Paused'),
+          hint: t("Paused at the simulation's now: nothing advances until it is played."),
         };
   }
   return status === 'playing'
     ? {
-        label: 'History',
-        hint: 'Inside recorded history: the past is being re-simulated exactly.',
+        label: t('History'),
+        hint: t('Inside recorded history: the past is being re-simulated exactly.'),
       }
     : {
-        label: 'Paused in history',
-        hint: 'Paused inside recorded history, at a moment that was re-simulated exactly.',
+        label: t('Paused in history'),
+        hint: t('Paused inside recorded history, at a moment that was re-simulated exactly.'),
       };
 }
 
@@ -391,7 +395,7 @@ export function Timeline() {
     <section
       className="panel floating absolute inset-x-3 bottom-3 z-20 flex animate-rise flex-wrap items-center gap-x-3 gap-y-2 px-2 max-sm:content-center max-sm:gap-x-2"
       style={{ height }}
-      aria-label="Timeline and playback"
+      aria-label={t('Timeline and playback')}
       data-testid="timeline"
       data-status={playback.status}
       data-mode={playback.mode}
@@ -405,10 +409,10 @@ export function Timeline() {
           data-testid="playback-toggle"
           className="w-[72px]"
         >
-          {playing ? 'Pause' : 'Play'}
+          {playing ? t('Pause') : t('Play')}
         </Button>
         <IconButton
-          label="Step one tick forward"
+          label={t('Step one tick forward')}
           size="sm"
           disabled={playing}
           onClick={() => void actions.control({ action: 'step' })}
@@ -431,18 +435,21 @@ export function Timeline() {
           title={
             atNow
               ? where.hint
-              : `${where.hint} The simulation's now is at ${formatClock(playback.headTimeMs)}.`
+              : t("{hint} The simulation's now is at {head}.", {
+                  hint: where.hint,
+                  head: formatClock(playback.headTimeMs),
+                })
           }
         >
           <span data-testid="playback-mode">{where.label}</span>
           {!atNow && (
             <span className="numeric font-normal max-sm:hidden" data-testid="playback-head">
-              , now is {formatClock(playback.headTimeMs)}
+              {t(', now is {head}', { head: formatClock(playback.headTimeMs) })}
             </span>
           )}
           {recording && (
             <span className="hidden font-normal lg:inline" title={recording.description}>
-              , recording {recording.name}
+              {t(', recording {name}', { name: recording.name })}
             </span>
           )}
         </p>
@@ -457,12 +464,12 @@ export function Timeline() {
           icon={<History size={13} aria-hidden />}
           disabled={(incidents ?? []).length === 0}
           onClick={() => void actions.control({ action: 'replay' })}
-          title="Go back to where the latest incident began and watch it again"
-          aria-label="Replay the incident"
+          title={t('Go back to where the latest incident began and watch it again')}
+          aria-label={t('Replay the incident')}
           data-testid="playback-replay"
         >
-          <span className="max-lg:hidden">Replay the incident</span>
-          <span className="max-sm:hidden lg:hidden">Replay</span>
+          <span className="max-lg:hidden">{t('Replay the incident')}</span>
+          <span className="max-sm:hidden lg:hidden">{t('Replay')}</span>
         </Button>
         <Button
           variant="ghost"
@@ -470,17 +477,17 @@ export function Timeline() {
           icon={<ChevronLast size={13} aria-hidden />}
           pressed={atNow}
           onClick={() => void actions.control({ action: 'live' })}
-          title="Jump to the simulation's now, the end of recorded history"
-          aria-label="Go to the simulation's now"
+          title={t("Jump to the simulation's now, the end of recorded history")}
+          aria-label={t("Go to the simulation's now")}
           data-testid="playback-live"
         >
-          Now
+          {t('Now')}
         </Button>
         {/* On a narrow screen the strip of history matters more than the
             speed, which the incident panel still sets while a scenario runs. */}
         <div className="max-md:hidden">
           <Segmented<PlaybackSpeed>
-            label="Playback speed"
+            label={t('Playback speed')}
             size="sm"
             value={playback.speed as PlaybackSpeed}
             options={SPEED_OPTIONS}
@@ -489,7 +496,7 @@ export function Timeline() {
         </div>
         {!needed && (
           <IconButton
-            label="Put the timeline away"
+            label={t('Put the timeline away')}
             size="sm"
             onClick={() => useUi.getState().setTimelineOpen(false)}
             data-testid="timeline-close"

@@ -5,6 +5,8 @@
  */
 import type { WorkspaceBundle, WorkspaceFile } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 /** The server's limits, mirrored so that what it would refuse is not sent. */
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const MAX_FILES = 256;
@@ -100,21 +102,27 @@ export async function stage(
   for (const { file, path } of picked) {
     const extension = path.includes('.') ? path.slice(path.lastIndexOf('.') + 1).toLowerCase() : '';
     if (!EXTENSIONS.includes(extension)) {
-      skipped.push({ path, reason: 'not a .json, .cedar, .cedarschema or Compose (.yml) file' });
+      skipped.push({ path, reason: t('not a .json, .cedar, .cedarschema or Compose (.yml) file') });
       continue;
     }
     if (file.size > MAX_FILE_BYTES) {
-      skipped.push({ path, reason: `larger than ${formatBytes(MAX_FILE_BYTES)}` });
+      skipped.push({
+        path,
+        reason: t('larger than {size}', { size: formatBytes(MAX_FILE_BYTES) }),
+      });
       continue;
     }
     const replaced = files.get(path);
     const without = total - (replaced ? bytesOf(replaced.text) : 0);
     if (without + file.size > MAX_TOTAL_BYTES) {
-      skipped.push({ path, reason: `would take the import past ${formatBytes(MAX_TOTAL_BYTES)}` });
+      skipped.push({
+        path,
+        reason: t('would take the import past {size}', { size: formatBytes(MAX_TOTAL_BYTES) }),
+      });
       continue;
     }
     if (!replaced && files.size >= MAX_FILES) {
-      skipped.push({ path, reason: `more than ${MAX_FILES} files` });
+      skipped.push({ path, reason: t('more than {n} files', { n: MAX_FILES }) });
       continue;
     }
     try {
@@ -122,7 +130,7 @@ export async function stage(
       files.set(path, { path, text });
       total = without + bytesOf(text);
     } catch {
-      skipped.push({ path, reason: 'could not be read' });
+      skipped.push({ path, reason: t('could not be read') });
     }
   }
   return { files: [...files.values()], skipped };

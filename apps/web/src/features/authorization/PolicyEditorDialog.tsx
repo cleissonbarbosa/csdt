@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/Section';
 import { PolicyDiff } from '@/features/workspace/PolicyDiff';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { policiesAsCedar, withPolicies } from '@/lib/policies';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
@@ -20,7 +22,7 @@ interface Checked {
 }
 
 function message(error: unknown): string {
-  return error instanceof ApiError ? error.message : 'The policies could not be checked.';
+  return error instanceof ApiError ? error.message : t('The policies could not be checked.');
 }
 
 function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
@@ -66,7 +68,7 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
   return (
     <div data-testid="policy-editor">
       <label className="caption mb-1 block" htmlFor="policy-text">
-        The policies in force, in Cedar&apos;s own syntax
+        {t("The policies in force, in Cedar's own syntax")}
       </label>
       <textarea
         id="policy-text"
@@ -83,9 +85,10 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
         data-testid="policy-text"
       />
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-        A policy goes by its <span className="code">@id</span>. Nothing is applied until you say so,
-        and applying replaces the policies only: the platform, its scenarios and its entities stay
-        as they are. The timeline starts again, as it does for any change of files.
+        {tr(
+          'A policy goes by its {id}. Nothing is applied until you say so, and applying replaces the policies only: the platform, its scenarios and its entities stay as they are. The timeline starts again, as it does for any change of files.',
+          { id: <span className="code">@id</span> },
+        )}
       </p>
 
       <div
@@ -95,9 +98,9 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
         data-testid="policy-check"
       >
         {!changed ? (
-          <p className="text-[11px] text-ink-faint">These are the policies in use.</p>
+          <p className="text-[11px] text-ink-faint">{t('These are the policies in use.')}</p>
         ) : outcome === null ? (
-          <p className="text-[11px] text-ink-faint">Checking…</p>
+          <p className="text-[11px] text-ink-faint">{t('Checking…')}</p>
         ) : typeof outcome === 'string' ? (
           <p className="text-xs text-ink" data-valid="false">
             {outcome}
@@ -105,21 +108,25 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
         ) : outcome.workspace ? (
           <div data-valid="true">
             <p className="text-xs text-ink">
-              Cedar accepts them: {outcome.workspace.policyCount}{' '}
-              {outcome.workspace.policyCount === 1 ? 'policy' : 'policies'}.
+              {t(
+                outcome.workspace.policyCount === 1
+                  ? 'Cedar accepts them: {n} policy.'
+                  : 'Cedar accepts them: {n} policies.',
+                { n: outcome.workspace.policyCount },
+              )}
             </p>
             <PolicyDiff files={candidate} />
           </div>
         ) : (
           <p className="text-xs leading-relaxed text-ink" data-valid="false">
-            <span className="font-bold">Not valid. </span>
+            <span className="font-bold">{t('Not valid.')} </span>
             {outcome.problem?.path && <span className="code">{outcome.problem.path}: </span>}
             <span className="whitespace-pre-wrap">{outcome.problem?.message}</span>
           </p>
         )}
         {failure && (
           <p className="mt-1 text-xs text-ink" data-testid="policy-failure">
-            Not applied: {failure}
+            {t('Not applied: {reason}', { reason: failure })}
           </p>
         )}
       </div>
@@ -131,7 +138,7 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
           onClick={() => void apply()}
           data-testid="policy-apply"
         >
-          {busy ? 'Applying…' : 'Apply these policies'}
+          {busy ? t('Applying…') : t('Apply these policies')}
         </Button>
         <Button
           icon={<RotateCcw size={13} aria-hidden />}
@@ -142,7 +149,7 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
           }}
           data-testid="policy-revert"
         >
-          Put back the ones in use
+          {t('Put back the ones in use')}
         </Button>
       </div>
     </div>
@@ -176,13 +183,13 @@ export function PolicyEditorDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => !next && useUi.getState().setPanel(null)}
-      title="Edit the Cedar policies"
-      description="Change what Cedar decides by, see which answers would change, then apply."
+      title={t('Edit the Cedar policies')}
+      description={t('Change what Cedar decides by, see which answers would change, then apply.')}
       width="max-w-3xl"
     >
       {noCatalog || noFiles ? (
-        <EmptyState title="The policies are unavailable">
-          The files in use could not be read.
+        <EmptyState title={t('The policies are unavailable')}>
+          {t('The files in use could not be read.')}
         </EmptyState>
       ) : inUse !== null && bundle ? (
         // A new editor for each set of policies: applying, or an import made

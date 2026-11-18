@@ -17,6 +17,8 @@ import { transport } from '@transport';
 
 import type { SocketLike } from './transport';
 
+import { t } from '@/i18n';
+
 export type { SocketLike };
 
 const INITIAL_BACKOFF_MS = 500;
@@ -172,12 +174,12 @@ export class StreamClient {
     try {
       raw = JSON.parse(data);
     } catch {
-      this.options.onViolation?.('message is not JSON');
+      this.options.onViolation?.(t('message is not JSON'));
       return;
     }
     const parsed = StreamMessageSchema.safeParse(raw);
     if (!parsed.success) {
-      this.options.onViolation?.('message does not match stream contract v1');
+      this.options.onViolation?.(t('message does not match stream contract v1'));
       return;
     }
     const message = parsed.data;

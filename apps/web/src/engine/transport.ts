@@ -3,9 +3,12 @@
  * with a real `Response`, so the REST client above reads it exactly as it
  * reads the server's.
  */
+import { t } from '@/i18n';
 import type { Transport } from '@/providers/transport';
 
 import { EngineError } from './binding';
+import { language } from '@/i18n';
+
 import { EngineClient } from './client';
 import type { WorkerLike } from './messages';
 
@@ -13,7 +16,8 @@ const client = new EngineClient(
   () =>
     new Worker(new URL('./worker.ts', import.meta.url), {
       type: 'module',
-      name: 'aegis-engine',
+      // The worker reads the page's language from its name (`i18n`).
+      name: `aegis-engine:${language}`,
     }) as unknown as WorkerLike,
 );
 
@@ -37,8 +41,8 @@ export const transport: Transport = {
   socket: () => client.socket(),
   unanswered: (timedOut, cause) =>
     timedOut
-      ? 'The simulation engine did not answer in time.'
+      ? t('The simulation engine did not answer in time.')
       : cause instanceof EngineError
         ? cause.message
-        : 'The simulation engine is not running.',
+        : t('The simulation engine is not running.'),
 };

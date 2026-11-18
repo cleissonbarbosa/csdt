@@ -5,6 +5,7 @@ import { useThrottledSnapshot } from '@/app/hooks';
 import { HealthBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/Section';
 import { impactedSet, matchesFilters, nodeHealth } from '@/features/explorer/filtering';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
 import { listNames, namedFrom } from '@/lib/names';
@@ -49,7 +50,7 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
       .filter((group) => group.rows.length > 0);
   }, [topology, snapshot, filters]);
 
-  if (!topology || !index) return <EmptyState title="Loading topology" />;
+  if (!topology || !index) return <EmptyState title={t('Loading topology')} />;
   const live = snapshot?.topologyId === topology.id ? snapshot : null;
 
   return (
@@ -60,7 +61,9 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
         </p>
       )}
       {groups.length === 0 && (
-        <EmptyState title="No services match">Loosen the filters to see services again.</EmptyState>
+        <EmptyState title={t('No services match')}>
+          {t('Loosen the filters to see services again.')}
+        </EmptyState>
       )}
       <div className="mx-auto max-w-5xl space-y-5">
         {groups.map(({ region, rows }) => (
@@ -68,7 +71,10 @@ export function TopologyTable({ notice }: { notice?: string | null }) {
             <caption className="px-3 pb-2 pt-3 text-left">
               <span className="text-sm font-bold text-ink">{region.name}</span>
               <span className="ml-2 text-[11px] text-ink-faint">
-                {region.location}, {rows.length} service{rows.length === 1 ? '' : 's'}
+                {t(rows.length === 1 ? '{place}, {n} service' : '{place}, {n} services', {
+                  place: region.location,
+                  n: rows.length,
+                })}
               </span>
             </caption>
             <thead>

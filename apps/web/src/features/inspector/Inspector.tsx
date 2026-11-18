@@ -1,5 +1,6 @@
 import {
   SECURITY_STATUS_BY_CODE,
+  type DataSource,
   type Health,
   type SecurityEvent,
   type SecurityStatus,
@@ -20,11 +21,12 @@ import { RangeBar, Sparkline } from '@/components/ui/Sparkline';
 import { Hud } from '@/features/hud/Hud';
 import { askedByViewer, foldEvents } from '@/features/scenarios/events';
 import { sceneHandle } from '@/graphics/handle';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { entityId, formatClock, formatMs, formatPercent, formatRate } from '@/lib/format';
 import { nodeLabel } from '@/lib/names';
 import {
   COLOR,
-  DATA_SOURCE_LABEL,
   RELATIONSHIP_LABEL,
   SECURITY_COLOR,
   SECURITY_LABEL,
@@ -47,6 +49,13 @@ import { GroupCard } from './GroupCard';
 /** How long an alert stays under "Needs attention", in virtual time. */
 const ALERT_WINDOW_MS = 90_000;
 
+/** Where a service's figures come from, said as a whole phrase in every language. */
+const SOURCE_LABEL: Record<DataSource, string> = {
+  synthetic: t('Synthetic data'),
+  recording: t('Recording data'),
+  live: t('Live data'),
+};
+
 const SEVERITY_GLYPH: Record<Severity, Health> = {
   info: 'healthy',
   notice: 'healthy',
@@ -68,7 +77,9 @@ function EventRow({ event }: { event: SecurityEvent }) {
         </span>
         <span className={`min-w-0 truncate text-xs text-ink ${loud ? 'font-bold' : ''}`}>
           {event.title}
-          <span className="sr-only">, severity {SEVERITY_LABEL[event.severity]}</span>
+          <span className="sr-only">
+            {t(', severity {severity}', { severity: SEVERITY_LABEL[event.severity] })}
+          </span>
         </span>
         <span className="numeric text-[11px] text-ink-faint">
           {formatClock(event.virtualTimeMs)}
@@ -178,7 +189,7 @@ function NodeInspector({
           onMouseLeave={() => useUi.getState().setHovered(null)}
           // How the two are related is one hover away, and in full when the
           // connection itself is inspected.
-          title={`${RELATIONSHIP_LABEL[edge.edge.relationship]}, ${edge.edge.protocol.toUpperCase()}${edge.edge.crossRegion ? ', cross-region' : ''}`}
+          title={`${RELATIONSHIP_LABEL[edge.edge.relationship]}, ${edge.edge.protocol.toUpperCase()}${edge.edge.crossRegion ? t(', cross-region') : ''}`}
           className="flex min-w-0 flex-1 items-baseline gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
         >
           <SecurityMark status={status} />
@@ -195,7 +206,7 @@ function NodeInspector({
               className="numeric shrink-0 text-[11px] font-bold"
               style={{ color: COLOR.critical }}
             >
-              {formatPercent(edge.errorRate)} errors
+              {t('{percent} errors', { percent: formatPercent(edge.errorRate) })}
             </span>
           )}
           <span className="numeric shrink-0 text-[11px] text-ink-faint">
@@ -203,7 +214,7 @@ function NodeInspector({
           </span>
         </button>
         <IconButton
-          label={`Inspect connection to ${nodeLabel(topology, peerId)}`}
+          label={t('Inspect connection to {service}', { service: nodeLabel(topology, peerId) })}
           size="sm"
           onClick={() => useUi.getState().select({ kind: 'edge', id: edge.edge.id })}
         >
@@ -222,24 +233,24 @@ function NodeInspector({
               {node.name}
             </h2>
             <p className="caption mt-0.5 truncate">
-              {type.label} in {region?.name ?? node.region}
+              {t('{kind} in {region}', { kind: type.label, region: region?.name ?? node.region })}
             </p>
           </div>
           <div className="flex shrink-0 gap-0.5">
             <IconButton
-              label="Focus camera on this service"
+              label={t('Focus camera on this service')}
               onClick={() => sceneHandle.current?.focusNode(node.id)}
             >
               <Crosshair size={15} />
             </IconButton>
-            <IconButton label="Clear selection" onClick={() => useUi.getState().select(null)}>
+            <IconButton label={t('Clear selection')} onClick={() => useUi.getState().select(null)}>
               <X size={15} />
             </IconButton>
           </div>
         </div>
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <HealthBadge health={live.health} />
-          <span className="caption">{DATA_SOURCE_LABEL[node.dataSource]} data</span>
+          <span className="caption">{SOURCE_LABEL[node.dataSource]}</span>
           <span className="code caption truncate">{node.id}</span>
         </p>
         {node.description && (
@@ -247,35 +258,35 @@ function NodeInspector({
         )}
       </header>
 
-      <Section title="Signals">
+      <Section title={t('Signals')}>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3" data-testid="inspector-metrics">
           <div>
-            <Stat label="Throughput" value={formatRate(live.throughputRps)} unit="req/s" />
+            <Stat label={t('Throughput')} value={formatRate(live.throughputRps)} unit="req/s" />
             {series && (
               <Sparkline
                 values={series.throughput}
                 length={history.length}
                 normal={baselineRps > 0 ? [baselineRps * 0.5, baselineRps * 1.5] : undefined}
-                label="Throughput over the last 90 seconds"
+                label={t('Throughput over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
-            <Stat label="Latency" value={formatMs(live.latencyMs)} tone={latencyTone} />
+            <Stat label={t('Latency')} value={formatMs(live.latencyMs)} tone={latencyTone} />
             {series && (
               <Sparkline
                 values={series.latency}
                 length={history.length}
                 color={latencyTone}
                 normal={[0, baselineLatency * 2.5]}
-                label="Latency over the last 90 seconds"
+                label={t('Latency over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
-            <Stat label="Error rate" value={formatPercent(live.errorRate)} tone={errorTone} />
+            <Stat label={t('Error rate')} value={formatPercent(live.errorRate)} tone={errorTone} />
             {series && (
               <Sparkline
                 values={series.error}
@@ -283,15 +294,15 @@ function NodeInspector({
                 color={errorTone}
                 max={Math.max(0.1, live.errorRate * 1.3)}
                 normal={[0, 0.04]}
-                label="Error rate over the last 90 seconds"
+                label={t('Error rate over the last 90 seconds')}
                 width={132}
               />
             )}
           </div>
           <div>
             <Stat
-              label="Saturation"
-              value={node.capacityRps > 0 ? formatPercent(live.saturation) : 'n/a'}
+              label={t('Saturation')}
+              value={node.capacityRps > 0 ? formatPercent(live.saturation) : t('n/a')}
               tone={saturationTone}
             />
             {node.capacityRps > 0 && (
@@ -305,30 +316,41 @@ function NodeInspector({
             )}
             <p className="caption">
               {node.serviceType === 'message-queue'
-                ? `Backlog ${formatRate(live.queueDepth)} messages`
+                ? t('Backlog {n} messages', { n: formatRate(live.queueDepth) })
                 : node.capacityRps > 0
-                  ? `Capacity ${formatRate(node.capacityRps)} req/s`
-                  : 'No capacity limit'}
+                  ? t('Capacity {n} req/s', { n: formatRate(node.capacityRps) })
+                  : t('No capacity limit')}
             </p>
           </div>
         </dl>
         <p className="caption mt-2.5">
-          Last {NODE_HISTORY} s; the grey band is the normal range. Baseline latency{' '}
-          <span className="numeric">{formatMs(node.baselineLatencyMs)}</span>.
+          {tr(
+            'Last {seconds} s; the grey band is the normal range. Baseline latency <n>{latency}</n>.',
+            {
+              seconds: NODE_HISTORY,
+              latency: formatMs(node.baselineLatencyMs),
+              n: (children) => <span className="numeric">{children}</span>,
+            },
+          )}
         </p>
       </Section>
 
       {/* What it depends on and what depends on it: a short list is shown,
           a long one waits to be asked for. */}
-      <Fold title="Calls" count={outgoing.length} open={outgoing.length <= 3} testId="node-calls">
+      <Fold
+        title={t('Calls')}
+        count={outgoing.length}
+        open={outgoing.length <= 3}
+        testId="node-calls"
+      >
         {outgoing.length > 0 ? (
           <ul className="-mx-1.5">{outgoing.map((e) => connection(e, true))}</ul>
         ) : (
-          <p className="text-xs text-ink-faint">This service calls nothing.</p>
+          <p className="text-xs text-ink-faint">{t('This service calls nothing.')}</p>
         )}
       </Fold>
       <Fold
-        title="Called by"
+        title={t('Called by')}
         count={incoming.length}
         open={incoming.length <= 3}
         testId="node-callers"
@@ -336,14 +358,14 @@ function NodeInspector({
         {incoming.length > 0 ? (
           <ul className="-mx-1.5">{incoming.map((e) => connection(e, false))}</ul>
         ) : (
-          <p className="text-xs text-ink-faint">Nothing calls this service.</p>
+          <p className="text-xs text-ink-faint">{t('Nothing calls this service.')}</p>
         )}
       </Fold>
       <Exposure topology={topology} nodeId={topology.nodes[nodeIndex]!.id} />
       <Faults topology={topology} snapshot={snapshot} position={{ node: nodeIndex }} />
 
       {decisions.length > 0 && (
-        <Section title="Authorization decisions">
+        <Section title={t('Authorization decisions')}>
           <ul className="space-y-1" data-testid="inspector-decisions">
             {decisions.map((event) => {
               const decision = decisionOf(event);
@@ -379,7 +401,7 @@ function NodeInspector({
       )}
 
       {other.length > 0 && (
-        <Fold title="Events" count={other.length} open={other.length <= 3}>
+        <Fold title={t('Events')} count={other.length} open={other.length <= 3}>
           <ul className="-mx-1.5" data-testid="inspector-events">
             {other.map((event) => (
               <EventRow key={event.seq} event={event} />
@@ -425,18 +447,22 @@ function EdgeInspector({
               {RELATIONSHIP_LABEL[edge.relationship]}
             </h2>
             <p className="caption mt-0.5">
-              Connection over {edge.protocol.toUpperCase()}
-              {edge.crossRegion && ', between regions'}
+              {t(
+                edge.crossRegion
+                  ? 'Connection over {protocol}, between regions'
+                  : 'Connection over {protocol}',
+                { protocol: edge.protocol.toUpperCase() },
+              )}
             </p>
           </div>
-          <IconButton label="Clear selection" onClick={() => useUi.getState().select(null)}>
+          <IconButton label={t('Clear selection')} onClick={() => useUi.getState().select(null)}>
             <X size={15} />
           </IconButton>
         </div>
         <div className="mt-2 flex items-center gap-1.5">
-          {endpoint('From', edge.source)}
+          {endpoint(t('From'), edge.source)}
           <ArrowRight size={14} aria-hidden className="shrink-0 text-ink-faint" />
-          {endpoint('To', edge.target)}
+          {endpoint(t('To'), edge.target)}
         </div>
         <p
           className="mt-2 flex items-center gap-1.5 text-[11px]"
@@ -448,28 +474,28 @@ function EdgeInspector({
           </span>
         </p>
       </header>
-      <Section title="Traffic">
+      <Section title={t('Traffic')}>
         <dl className="grid grid-cols-2 gap-x-3 gap-y-3">
-          <Stat label="Traffic" value={formatRate(live.trafficRps)} unit="req/s" />
-          <Stat label="Network latency" value={formatMs(live.latencyMs)} />
+          <Stat label={t('Traffic')} value={formatRate(live.trafficRps)} unit="req/s" />
+          <Stat label={t('Network latency')} value={formatMs(live.latencyMs)} />
           <Stat
-            label="Error rate"
+            label={t('Error rate')}
             value={formatPercent(live.errorRate)}
             tone={live.errorRate >= 0.04 ? COLOR.critical : undefined}
           />
           <Stat
-            label="Rejected"
+            label={t('Rejected')}
             value={formatRate(live.rejectedRps)}
             unit="req/s"
             tone={live.rejectedRps > live.trafficRps * 0.25 ? COLOR.warning : undefined}
           />
           <Stat
-            label="Suspicious"
+            label={t('Suspicious')}
             value={formatRate(live.suspiciousRps)}
             unit="req/s"
             tone={live.suspiciousRps > 0 ? COLOR.hostile : undefined}
           />
-          <Stat label="Calls per request" value={edge.weight.toFixed(2)} />
+          <Stat label={t('Calls per request')} value={edge.weight.toFixed(2)} />
         </dl>
       </Section>
       <Faults topology={topology} snapshot={snapshot} position={{ edge: edgeIndex }} />
@@ -508,7 +534,7 @@ function Overview({
         <div className="flex items-start justify-between gap-2">
           <h2 className="min-w-0 text-base font-bold text-ink">{topology.name}</h2>
           <IconButton
-            label="Close the overview"
+            label={t('Close the overview')}
             onClick={() => useUi.getState().setInspectorOpen(false)}
           >
             <X size={15} />
@@ -516,10 +542,10 @@ function Overview({
         </div>
         <p className="mt-1 text-xs leading-relaxed text-ink-dim">{topology.description}</p>
       </header>
-      <Section title="Signals">
+      <Section title={t('Signals')}>
         <Hud />
       </Section>
-      <Section title="Needs attention">
+      <Section title={t('Needs attention')}>
         {alerts.length > 0 ? (
           <ul className="-mx-1.5">
             {alerts.map((entry) =>
@@ -530,14 +556,14 @@ function Overview({
                   <button
                     type="button"
                     onClick={() => useUi.getState().setLeftTab('incidents')}
-                    title="Show these events"
+                    title={t('Show these events')}
                     className="grid w-full grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-1.5 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                   >
                     <span className="self-center">
                       <HealthGlyph health={SEVERITY_GLYPH[entry.severity]} size={8} />
                     </span>
                     <span className="min-w-0 truncate text-xs text-ink">
-                      {entry.events.length} services changed state
+                      {t('{n} services changed state', { n: entry.events.length })}
                     </span>
                     <span className="numeric text-[11px] text-ink-faint">
                       {formatClock(entry.events[0]!.virtualTimeMs)}
@@ -548,10 +574,10 @@ function Overview({
             )}
           </ul>
         ) : (
-          <p className="text-xs text-ink-faint">Nothing needs attention.</p>
+          <p className="text-xs text-ink-faint">{t('Nothing needs attention.')}</p>
         )}
       </Section>
-      <Section title="Regions">
+      <Section title={t('Regions')}>
         <ul className="-mx-1.5">
           {(snapshot?.regions ?? []).map((status) => {
             const region = topology.regions.find((r) => r.id === status.id);
@@ -561,7 +587,7 @@ function Overview({
                 <button
                   type="button"
                   onClick={() => showRegion(status.id)}
-                  title={`Frame ${region?.name ?? status.id}`}
+                  title={t('Frame {region}', { region: region?.name ?? status.id })}
                   className="flex w-full items-center gap-2 rounded-control px-1.5 py-1 text-left hover:bg-raised"
                   data-testid={`region-${status.id}`}
                   data-health={status.health}
@@ -575,15 +601,18 @@ function Overview({
                     </span>
                     <span className="caption block">
                       {status.nodesUnhealthy === 0
-                        ? `${status.nodesTotal} services, all normal`
-                        : `${status.nodesUnhealthy} of ${status.nodesTotal} services not normal`}
+                        ? t('{total} services, all normal', { total: status.nodesTotal })
+                        : t('{unhealthy} of {total} services not normal', {
+                            unhealthy: status.nodesUnhealthy,
+                            total: status.nodesTotal,
+                          })}
                     </span>
                   </span>
                   <span className="numeric text-right text-[11px] text-ink-dim">
                     {formatRate(status.rps)}/s
                     {status.errorRate >= 0.01 && (
                       <span className="block font-bold" style={{ color: COLOR.critical }}>
-                        {formatPercent(status.errorRate)} errors
+                        {t('{percent} errors', { percent: formatPercent(status.errorRate) })}
                       </span>
                     )}
                   </span>
@@ -594,28 +623,28 @@ function Overview({
         </ul>
       </Section>
       {global && (
-        <Section title="Platform figures">
+        <Section title={t('Platform figures')}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5" data-testid="platform-figures">
-            <Stat label="Average latency" value={formatMs(global.avgLatencyMs)} />
-            <Stat label="Latency p99" value={formatMs(global.p99LatencyMs)} />
+            <Stat label={t('Average latency')} value={formatMs(global.avgLatencyMs)} />
+            <Stat label={t('Latency p99')} value={formatMs(global.p99LatencyMs)} />
             <Stat
-              label="Authorization checks"
+              label={t('Authorization checks')}
               value={formatRate(global.authzChecksRps)}
-              unit="per s"
+              unit={t('per s')}
             />
             <Stat
-              label="Checks denied"
+              label={t('Checks denied')}
               value={formatPercent(global.authzDenialRate)}
               tone={grade(global.authzDenialRate, 0.15, 0.3)}
             />
             <Stat
-              label="Rejected at the edge"
+              label={t('Rejected at the edge')}
               value={formatRate(global.rejectedRps)}
               unit="req/s"
               tone={global.rejectedRps > global.rps * 0.25 ? COLOR.warning : undefined}
             />
             <Stat
-              label="Suspicious traffic"
+              label={t('Suspicious traffic')}
               value={formatRate(global.suspiciousRps)}
               unit="req/s"
               tone={global.suspiciousRps > 0 ? COLOR.hostile : undefined}
@@ -635,7 +664,7 @@ export function Inspector({ selection }: { selection: Selection }) {
   const topology = useTelemetry((state) => state.topology);
   const index = useTelemetry((state) => state.index);
   const snapshot = useThrottledSnapshot(500);
-  if (!topology || !index) return <EmptyState title="Loading" />;
+  if (!topology || !index) return <EmptyState title={t('Loading')} />;
   const live = snapshot?.topologyId === topology.id ? snapshot : null;
 
   if (selection?.kind === 'group') {

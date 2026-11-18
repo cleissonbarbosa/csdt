@@ -1,37 +1,40 @@
 import { SERVICE_TYPES } from '@aegis/contracts';
+import type { ReactNode } from 'react';
 
 import { HealthGlyph } from '@/components/ui/Badge';
 import { Dialog } from '@/components/ui/Dialog';
+import { t } from '@/i18n';
+import { tr } from '@/i18n/rich';
 import { COLOR, HEALTH_LABEL, SERVICE_TYPE, TRAFFIC_LEGEND, type BeadShape } from '@/lib/palette';
 import { useUi } from '@/stores/ui';
 
 const SHAPES: Record<(typeof SERVICE_TYPES)[number], string> = {
-  'api-gateway': 'A gate; its door turns as requests pass',
-  'auth-service': 'A shield; its lock turns for each sign-in',
-  'cedar-authorizer': 'A cedar; its tiers turn a notch for each decision',
-  microservice: 'A hexagonal cell; its lid turns one side on',
-  container: 'A shipping container; its doors open to take work in',
-  serverless: 'A lightning bolt; it strikes once for each call',
-  'message-queue': 'Slabs standing in line; the line moves up as they are taken',
-  database: 'A stack of platters, turning',
-  storage: 'A bucket; objects are lifted out and put back',
-  'network-gateway': 'A desk globe, turning',
-  'security-monitor': 'A lighthouse above the edge; its lamp sweeps round',
-  'external-client': 'A pawn; its head lifts as it asks',
+  'api-gateway': t('A gate; its door turns as requests pass'),
+  'auth-service': t('A shield; its lock turns for each sign-in'),
+  'cedar-authorizer': t('A cedar; its tiers turn a notch for each decision'),
+  microservice: t('A hexagonal cell; its lid turns one side on'),
+  container: t('A shipping container; its doors open to take work in'),
+  serverless: t('A lightning bolt; it strikes once for each call'),
+  'message-queue': t('Slabs standing in line; the line moves up as they are taken'),
+  database: t('A stack of platters, turning'),
+  storage: t('A bucket; objects are lifted out and put back'),
+  'network-gateway': t('A desk globe, turning'),
+  'security-monitor': t('A lighthouse above the edge; its lamp sweeps round'),
+  'external-client': t('A pawn; its head lifts as it asks'),
 };
 
 const KEYS: [string, string][] = [
-  ['Space', 'Play or pause the simulation'],
-  ['R', 'Reset the camera'],
-  ['F', 'Move in on what is selected'],
-  ['Esc', 'Let go of the selection, then put the panels away'],
-  ['Ctrl K', 'Go to anything: a service, a region, a scenario, an action'],
-  ['/', 'Search services'],
-  ['L', 'Next arrangement: overview, by region, by dependency'],
-  ['T', 'Switch between the 3D view and the table'],
-  ['P', 'Toggle the performance overlay'],
-  ['?', 'Open this help'],
-  ['← / →', 'On the timeline: step 5 s (hold Shift for 30 s)'],
+  [t('Space'), t('Play or pause the simulation')],
+  ['R', t('Reset the camera')],
+  ['F', t('Move in on what is selected')],
+  ['Esc', t('Let go of the selection, then put the panels away')],
+  ['Ctrl K', t('Go to anything: a service, a region, a scenario, an action')],
+  ['/', t('Search services')],
+  ['L', t('Next arrangement: overview, by region, by dependency')],
+  ['T', t('Switch between the 3D view and the table')],
+  ['P', t('Toggle the performance overlay')],
+  ['?', t('Open this help')],
+  ['← / →', t('On the timeline: step 5 s (hold Shift for 30 s)')],
 ];
 
 /** The same shapes the scene draws its traffic beads with. */
@@ -63,6 +66,9 @@ function Heading({ children, first }: { children: string; first?: boolean }) {
   return <h3 className={`mb-2 text-xs font-bold text-ink ${first ? '' : 'mt-5'}`}>{children}</h3>;
 }
 
+/** A word the text names: a gesture, a term of the legend. */
+const ink = (children: ReactNode) => <span className="text-ink">{children}</span>;
+
 function Key({ children }: { children: string }) {
   return (
     <kbd className="code inline-flex h-5 min-w-5 items-center justify-center rounded-control border border-line-strong bg-sunken px-1.5 text-[11px] text-ink">
@@ -77,52 +83,48 @@ export function HelpDialog() {
     <Dialog
       open={open}
       onOpenChange={(next) => useUi.getState().setPanel(next ? 'help' : null)}
-      title="Help and legend"
-      description="How to read the model and move around it."
+      title={t('Help and legend')}
+      description={t('How to read the model and move around it.')}
       width="max-w-3xl"
     >
       <div className="grid gap-6 md:grid-cols-2">
         <section>
-          <Heading first>Two levels</Heading>
+          <Heading first>{t('Two levels')}</Heading>
           <p className="mb-5 text-xs leading-relaxed text-ink-dim">
-            The <span className="text-ink">overview</span> shows the platform as its kinds of
-            service, in the four layers a request crosses: entry, identity, compute, data. A piece
-            there stands for every service of its kind and says how many; its figures are theirs,
-            added up. The two detailed arrangements show every service on its own, by region or by
-            dependency tier. Opening a service from a list or from a kind takes you to it there.
+            {tr(
+              'The <ink>overview</ink> shows the platform as its kinds of service, in the four layers a request crosses: entry, identity, compute, data. A piece there stands for every service of its kind and says how many; its figures are theirs, added up. The two detailed arrangements show every service on its own, by region or by dependency tier. Opening a service from a list or from a kind takes you to it there.',
+              { ink },
+            )}
           </p>
 
-          <Heading>Camera</Heading>
+          <Heading>{t('Camera')}</Heading>
           <ul className="space-y-1.5 text-xs text-ink-dim">
+            <li>{tr('<ink>Drag</ink> to orbit', { ink })}</li>
+            <li>{tr('<ink>Right-drag</ink> or <ink>two-finger drag</ink> to pan', { ink })}</li>
             <li>
-              <span className="text-ink">Drag</span> to orbit
+              {tr('<ink>Scroll</ink> or <ink>pinch</ink> to zoom toward the pointer', { ink })}
+            </li>
+            <li>{tr('<ink>Click</ink> a service or a connection to inspect it', { ink })}</li>
+            <li>
+              {tr(
+                '<ink>Double-click</ink> a service to move in on it, or a plate to move in on its region',
+                { ink },
+              )}
             </li>
             <li>
-              <span className="text-ink">Right-drag</span> or{' '}
-              <span className="text-ink">two-finger drag</span> to pan
+              {tr(
+                '<ink>Point</ink> at a service to see what it is connected to; selecting it keeps that neighbourhood in front while the rest recedes',
+                { ink },
+              )}
             </li>
             <li>
-              <span className="text-ink">Scroll</span> or <span className="text-ink">pinch</span> to
-              zoom toward the pointer
-            </li>
-            <li>
-              <span className="text-ink">Click</span> a service or a connection to inspect it
-            </li>
-            <li>
-              <span className="text-ink">Double-click</span> a service to move in on it, or a plate
-              to move in on its region
-            </li>
-            <li>
-              <span className="text-ink">Point</span> at a service to see what it is connected to;
-              selecting it keeps that neighbourhood in front while the rest recedes
-            </li>
-            <li>
-              Tracing a request, or an incident among every service, takes the camera to its path;
-              taking the camera yourself stops that
+              {t(
+                'Tracing a request, or an incident among every service, takes the camera to its path; taking the camera yourself stops that',
+              )}
             </li>
           </ul>
 
-          <Heading>Keyboard</Heading>
+          <Heading>{t('Keyboard')}</Heading>
           <dl className="space-y-1.5">
             {KEYS.map(([key, description]) => (
               <div key={key} className="flex items-center gap-3 text-xs">
@@ -134,11 +136,12 @@ export function HelpDialog() {
             ))}
           </dl>
 
-          <Heading>State of a service</Heading>
+          <Heading>{t('State of a service')}</Heading>
           <p className="mb-2 text-xs leading-relaxed text-ink-dim">
-            Colour is an answer. <span style={{ color: COLOR.focus }}>Blue</span> answers you: what
-            you selected, the request you are following. The other colours answer the data:
-            something is not normal. A service that is well is neutral, and has no mark in any list.
+            {tr(
+              'Colour is an answer. <blue>Blue</blue> answers you: what you selected, the request you are following. The other colours answer the data: something is not normal. A service that is well is neutral, and has no mark in any list.',
+              { blue: (children) => <span style={{ color: COLOR.focus }}>{children}</span> },
+            )}
           </p>
           <ul className="space-y-1.5">
             {(['healthy', 'degraded', 'critical', 'down'] as const).map((health) => (
@@ -147,22 +150,22 @@ export function HelpDialog() {
                   <HealthGlyph health={health} />
                 </span>
                 <span className="w-16 text-ink">{HEALTH_LABEL[health]}</span>
-                {health === 'healthy' && 'Neutral piece, no mark; its part runs evenly'}
-                {health === 'degraded' && 'Amber piece and a lamp; its part hesitates'}
-                {health === 'critical' && 'Red piece and a lamp; its part is jammed'}
-                {health === 'down' && 'Pale piece; its part hangs crooked and still'}
+                {health === 'healthy' && t('Neutral piece, no mark; its part runs evenly')}
+                {health === 'degraded' && t('Amber piece and a lamp; its part hesitates')}
+                {health === 'critical' && t('Red piece and a lamp; its part is jammed')}
+                {health === 'down' && t('Pale piece; its part hangs crooked and still')}
               </li>
             ))}
           </ul>
           <p className="caption mt-2 leading-relaxed">
-            In the overview a lamp under a neutral piece means some of that kind are affected, and
-            its part hesitates; the piece itself takes the colour, and the manner, when all of them
-            are. A red badge with a cross marks where a request was stopped.
+            {t(
+              'In the overview a lamp under a neutral piece means some of that kind are affected, and its part hesitates; the piece itself takes the colour, and the manner, when all of them are. A red badge with a cross marks where a request was stopped.',
+            )}
           </p>
         </section>
 
         <section>
-          <Heading first>Traffic</Heading>
+          <Heading first>{t('Traffic')}</Heading>
           <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5">
             {TRAFFIC_LEGEND.map(({ key, label, shape, tone }) => (
               <li key={key} className="flex items-center gap-2 text-xs text-ink-dim">
@@ -172,50 +175,51 @@ export function HelpDialog() {
             ))}
           </ul>
           <p className="caption mt-2 leading-relaxed">
-            Every bead is a share of the requests on a connection; how many there are follows the
-            request rate. Ordinary traffic is told apart by shape. Traffic that went wrong takes a
-            colour once it amounts to something: errors above one request in a hundred, rejections
-            above one in ten. Below that it keeps its shape and stays ink. Rejected requests stop
-            short of their target.
+            {t(
+              'Every bead is a share of the requests on a connection; how many there are follows the request rate. Ordinary traffic is told apart by shape. Traffic that went wrong takes a colour once it amounts to something: errors above one request in a hundred, rejections above one in ten. Below that it keeps its shape and stays ink. Rejected requests stop short of their target.',
+            )}
           </p>
 
-          <Heading>Time</Heading>
+          <Heading>{t('Time')}</Heading>
           <p className="text-xs leading-relaxed text-ink-dim">
-            The clock is the simulation&apos;s own. The cursor is either at the{' '}
-            <span className="text-ink">simulation&apos;s now</span>, where new history is being
-            made, or in its <span className="text-ink">history</span>, which is re-simulated exactly
-            as it happened; either can be <span className="text-ink">paused</span>. A phase of an
-            incident is timed from the start of that incident (
-            <span className="numeric">+0:14</span>); an event shows both that and the simulation
-            clock, which differ by when the incident began.
+            {tr(
+              "The clock is the simulation's own. The cursor is either at the <ink>simulation's now</ink>, where new history is being made, or in its <ink>history</ink>, which is re-simulated exactly as it happened; either can be <ink>paused</ink>. A phase of an incident is timed from the start of that incident (<n>+0:14</n>); an event shows both that and the simulation clock, which differ by when the incident began.",
+              { ink, n: (children) => <span className="numeric">{children}</span> },
+            )}
           </p>
 
-          <Heading>Why something happened</Heading>
+          <Heading>{t('Why something happened')}</Heading>
           <p className="mb-2 text-xs leading-relaxed text-ink-dim">
-            An incident can be read back from its own record: select a phase, an event or the
-            summary. Each line says what kind of statement it is.
+            {t(
+              'An incident can be read back from its own record: select a phase, an event or the summary. Each line says what kind of statement it is.',
+            )}
           </p>
           <ul className="space-y-1.5 text-xs text-ink-dim">
             <li>
-              <span className="text-ink">Prescribed</span>: written in the scenario file. The
-              scenario does this by itself.
+              {tr('{term}: written in the scenario file. The scenario does this by itself.', {
+                term: ink(t('Prescribed')),
+              })}
             </li>
             <li>
-              <span className="text-ink">Modelled</span>: a relation of the topology the model
-              follows. A dependency carries failures back to its callers; added traffic flows on to
-              what is called.
+              {tr(
+                '{term}: a relation of the topology the model follows. A dependency carries failures back to its callers; added traffic flows on to what is called.',
+                { term: ink(t('Modelled')) },
+              )}
             </li>
             <li>
-              <span className="text-ink">Observed</span>: an event or a figure the engine recorded
-              during the run.
+              {tr('{term}: an event or a figure the engine recorded during the run.', {
+                term: ink(t('Observed')),
+              })}
             </li>
             <li>
-              <span className="text-ink">Not explained</span>: none of the relations the report
-              knows accounts for it, and it does not guess.
+              {tr(
+                '{term}: none of the relations the report knows accounts for it, and it does not guess.',
+                { term: ink(t('Not explained')) },
+              )}
             </li>
           </ul>
 
-          <Heading>Kinds of service</Heading>
+          <Heading>{t('Kinds of service')}</Heading>
           <ul className="space-y-1.5">
             {SERVICE_TYPES.map((type) => (
               <li key={type} className="flex items-baseline gap-2 text-xs">
@@ -225,14 +229,16 @@ export function HelpDialog() {
             ))}
           </ul>
           <p className="caption mt-2 leading-relaxed">
-            The part of a piece that moves runs at the pace of its service&apos;s traffic: faster
-            under a surge, slower as traffic thins, and still when nothing passes.
+            {t(
+              "The part of a piece that moves runs at the pace of its service's traffic: faster under a surge, slower as traffic thins, and still when nothing passes.",
+            )}
           </p>
         </section>
       </div>
       <p className="caption mt-6 border-t border-line pt-3 leading-relaxed">
-        AEGIS is a simulation. The platform, its metrics and every incident are synthetic and
-        deterministic; no real system is observed, scanned or attacked.
+        {t(
+          'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is observed, scanned or attacked.',
+        )}
       </p>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Settings that make the scene deterministic: no camera drift, no easing. */
-const SETTINGS = { autoRotate: false, motion: 'reduced', quality: 'low' };
+const SETTINGS = { autoRotate: false, motion: 'reduced', quality: 'low', language: 'en' };
 
 export const API = '/api/v1';
 
@@ -27,16 +27,25 @@ export interface OpenOptions {
    * with and is not on the stage.
    */
   firstVisit?: boolean;
+  /** The interface's language; the tests are written against English. */
+  language?: 'en' | 'pt-BR';
 }
 
-/** Puts the deterministic settings in place before the page loads. */
+/**
+ * Puts the deterministic settings in place before the page loads. The script
+ * runs again on every load of the page; the settings are written only the
+ * first time, so a setting the test changes in the interface is still there
+ * after the reload it may cause.
+ */
 async function applySettings(page: Page, options: OpenOptions = {}): Promise<void> {
   await page.addInitScript(
     ({ settings, returning }) => {
-      window.localStorage.setItem(
-        'aegis.settings.v1',
-        JSON.stringify({ state: settings, version: 1 }),
-      );
+      if (window.localStorage.getItem('aegis.settings.v1') === null) {
+        window.localStorage.setItem(
+          'aegis.settings.v1',
+          JSON.stringify({ state: settings, version: 1 }),
+        );
+      }
       if (returning) {
         window.localStorage.setItem(
           'aegis.guide.v1',
@@ -44,7 +53,10 @@ async function applySettings(page: Page, options: OpenOptions = {}): Promise<voi
         );
       }
     },
-    { settings: SETTINGS, returning: !options.firstVisit },
+    {
+      settings: { ...SETTINGS, language: options.language ?? 'en' },
+      returning: !options.firstVisit,
+    },
   );
 }
 
@@ -60,8 +72,8 @@ export async function openApp(page: Page, options: OpenOptions = {}): Promise<vo
  * Opens the static site. There is no simulation to reset: every page load
  * starts an engine of its own, at its beginning.
  */
-export async function openStatic(page: Page): Promise<void> {
-  await applySettings(page);
+export async function openStatic(page: Page, options: OpenOptions = {}): Promise<void> {
+  await applySettings(page, options);
   // Relative to the base URL, which is a path below the root.
   await page.goto('./');
   await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
@@ -109,7 +121,10 @@ export const SERVICES = 51;
  * on the overview, which draws one piece per kind of service.
  */
 export async function waitForScene(page: Page, nodes = KINDS): Promise<void> {
-  await expect(page.getByRole('img', { name: /Interactive 3D view/ })).toBeVisible();
+  // Named in either language the interface speaks.
+  await expect(
+    page.getByRole('img', { name: /Interactive 3D view|Vista 3D interativa/ }),
+  ).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => window.__aegis?.stats().nodes ?? 0), { timeout: 30_000 })
     .toBe(nodes);

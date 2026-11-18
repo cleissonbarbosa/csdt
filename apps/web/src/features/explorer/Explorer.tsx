@@ -7,6 +7,7 @@ import { HealthGlyph, HealthMark } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Section';
 import { sceneHandle } from '@/graphics/handle';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatRate } from '@/lib/format';
 import { HEALTH_LABEL, SERVICE_TYPE } from '@/lib/palette';
@@ -95,7 +96,7 @@ export function Explorer() {
     });
   }, [topology, snapshot, filters]);
 
-  if (!topology) return <EmptyState title="Loading topology" />;
+  if (!topology) return <EmptyState title={t('Loading topology')} />;
   const shown = groups.reduce((sum, g) => sum + g.rows.length, 0);
   const active = filtersActive(filters);
 
@@ -115,8 +116,8 @@ export function Explorer() {
               type="search"
               value={filters.search}
               onChange={(event) => ui.setSearch(event.target.value)}
-              placeholder="Search services"
-              aria-label="Search services by name, type or region"
+              placeholder={t('Search services')}
+              aria-label={t('Search services by name, type or region')}
               data-testid="explorer-search"
               className="h-8 w-full rounded-control border border-line-strong bg-paper pl-7 pr-2 text-xs text-ink placeholder:text-ink-faint"
             />
@@ -129,13 +130,13 @@ export function Explorer() {
             onClick={() => setShowFilters(!showFilters)}
             data-testid="explorer-filters-toggle"
           >
-            Filter{narrowed > 0 ? ` (${narrowed})` : ''}
+            {narrowed > 0 ? t('Filter ({n})', { n: narrowed }) : t('Filter')}
           </Button>
         </div>
         {showFilters && (
           <div id="explorer-filters" className="space-y-2.5 pt-1">
             <fieldset>
-              <legend className="caption mb-1">State</legend>
+              <legend className="caption mb-1">{t('State')}</legend>
               <div className="flex flex-wrap gap-1">
                 {HEALTHS.map((health) => (
                   <Chip
@@ -151,12 +152,12 @@ export function Explorer() {
                   active={filters.impactedOnly}
                   onClick={() => ui.setImpactedOnly(!filters.impactedOnly)}
                 >
-                  Affected by the incident
+                  {t('Affected by the incident')}
                 </Chip>
               </div>
             </fieldset>
             <fieldset>
-              <legend className="caption mb-1">Kind of service</legend>
+              <legend className="caption mb-1">{t('Kind of service')}</legend>
               <div className="flex flex-wrap gap-1">
                 {typesPresent.map((type) => (
                   <Chip
@@ -173,7 +174,7 @@ export function Explorer() {
         )}
         <div className="flex items-center justify-between">
           <p className="caption" aria-live="polite" data-testid="explorer-count">
-            {shown} of {topology.nodes.length} services
+            {t('{shown} of {total} services', { shown, total: topology.nodes.length })}
           </p>
           {active && (
             <button
@@ -181,16 +182,16 @@ export function Explorer() {
               onClick={ui.clearFilters}
               className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
             >
-              <X size={12} aria-hidden /> Clear filters
+              <X size={12} aria-hidden /> {t('Clear filters')}
             </button>
           )}
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto" aria-label="Infrastructure by region">
+      <nav className="min-h-0 flex-1 overflow-y-auto" aria-label={t('Infrastructure by region')}>
         {shown === 0 && (
-          <EmptyState title="No services match">
-            Loosen the filters to see services again.
+          <EmptyState title={t('No services match')}>
+            {t('Loosen the filters to see services again.')}
           </EmptyState>
         )}
         {groups.map(({ region, rows, total, status }) => {
@@ -204,7 +205,7 @@ export function Explorer() {
                   type="button"
                   aria-pressed={regionActive}
                   onClick={() => ui.toggleRegion(region.id)}
-                  title={regionActive ? 'Show all regions' : 'Show only this region'}
+                  title={regionActive ? t('Show all regions') : t('Show only this region')}
                   className={cn(
                     'min-w-0 flex-1 truncate text-left text-xs font-bold text-ink',
                     regionActive
@@ -215,11 +216,12 @@ export function Explorer() {
                   {region.name}
                 </button>
                 <span className="caption">
-                  {rows.length}
-                  {rows.length !== total && ` of ${total}`}
+                  {rows.length !== total
+                    ? t('{shown} of {total}', { shown: rows.length, total })
+                    : rows.length}
                 </span>
                 <IconButton
-                  label={`Frame ${region.name}`}
+                  label={t('Frame {region}', { region: region.name })}
                   size="sm"
                   onClick={() => sceneHandle.current?.frameRegion(region.id)}
                 >

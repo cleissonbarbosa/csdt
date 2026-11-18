@@ -3,6 +3,8 @@ import type { AuthorizationDecision, EvaluateRequest, Health, ServiceType } from
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import type { LanguageSetting } from '@/i18n';
+
 /**
  * What is selected. A `group` is a piece of the overview: every service of
  * one kind. A `node` or an `edge` is one service or one connection, and
@@ -346,6 +348,8 @@ export type ThemeSetting = 'system' | 'light' | 'night';
 
 export interface SettingsState {
   theme: ThemeSetting;
+  /** Read once, when the page loads (`i18n`); changing it reloads the page. */
+  language: LanguageSetting;
   quality: QualitySetting;
   labels: boolean;
   autoRotate: boolean;
@@ -360,6 +364,7 @@ type SettingsValues = Omit<SettingsState, 'set' | 'reset'>;
 
 export const DEFAULT_SETTINGS: SettingsValues = {
   theme: 'system',
+  language: 'auto',
   quality: 'auto',
   labels: true,
   // Off by default: the scene only moves when the data or the viewer does.

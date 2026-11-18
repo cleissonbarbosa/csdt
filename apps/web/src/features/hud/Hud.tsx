@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { RangeBar } from '@/components/ui/Sparkline';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatMs, formatPercent, formatRate } from '@/lib/format';
 import { COLOR } from '@/lib/palette';
@@ -50,8 +51,8 @@ function usePlatformSignals(): PlatformSignal[] | null {
   return [
     {
       key: 'rps',
-      label: 'Traffic',
-      short: 'Traffic',
+      label: t('Traffic'),
+      short: t('Traffic'),
       value: `${formatRate(global.rps)}/s`,
       reading: global.rps,
       max: normalRps * 3,
@@ -60,8 +61,8 @@ function usePlatformSignals(): PlatformSignal[] | null {
     },
     {
       key: 'p95',
-      label: 'Latency p95',
-      short: 'Latency',
+      label: t('Latency p95'),
+      short: t('Latency'),
       value: formatMs(global.p95LatencyMs),
       reading: global.p95LatencyMs,
       max: normalP95 * 4,
@@ -70,8 +71,8 @@ function usePlatformSignals(): PlatformSignal[] | null {
     },
     {
       key: 'errors',
-      label: 'Errors',
-      short: 'Errors',
+      label: t('Errors'),
+      short: t('Errors'),
       value: formatPercent(global.errorRate),
       reading: global.errorRate,
       max: 0.2,
@@ -80,8 +81,8 @@ function usePlatformSignals(): PlatformSignal[] | null {
     },
     {
       key: 'saturation',
-      label: 'Peak saturation',
-      short: 'Saturation',
+      label: t('Peak saturation'),
+      short: t('Saturation'),
       value: formatPercent(Math.min(1, saturation)),
       reading: saturation,
       max: 1,
@@ -98,7 +99,7 @@ export function Hud() {
   return (
     <dl
       className="grid grid-cols-2 gap-x-4 gap-y-3"
-      aria-label="Platform signals"
+      aria-label={t('Platform signals')}
       data-testid="hud"
     >
       {signals.map((signal) => (
@@ -198,7 +199,7 @@ export function Deviations({ className }: { className?: string }) {
       <dl
         className="flex items-center"
         style={{ gap: INSTRUMENT_GAP }}
-        aria-label="Signals outside their normal range"
+        aria-label={t('Signals outside their normal range')}
       >
         {abnormal.slice(0, shown).map((signal) => (
           <div
@@ -229,9 +230,15 @@ export function Deviations({ className }: { className?: string }) {
           type="button"
           className="numeric shrink-0 rounded-control px-1 text-xs font-bold transition-colors hover:bg-raised"
           style={{ color: rest[0]!.tone }}
-          aria-label={`${rest.length} more ${rest.length === 1 ? 'signal' : 'signals'} outside the normal range: ${rest
-            .map((signal) => `${signal.label} ${signal.value}`)
-            .join(', ')}. Show the platform signals.`}
+          aria-label={t(
+            rest.length === 1
+              ? '{n} more signal outside the normal range: {signals}. Show the platform signals.'
+              : '{n} more signals outside the normal range: {signals}. Show the platform signals.',
+            {
+              n: rest.length,
+              signals: rest.map((signal) => `${signal.label} ${signal.value}`).join(', '),
+            },
+          )}
           title={rest.map((signal) => `${signal.label} ${signal.value}`).join(', ')}
           onClick={() => {
             // The overview is the inspector with nothing selected.

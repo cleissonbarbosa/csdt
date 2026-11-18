@@ -1,3 +1,5 @@
+import { t } from '@/i18n';
+
 /**
  * The boundary of the in-browser engine (`apps/wasm`), from the JavaScript
  * side. The module imports nothing; text goes in through a buffer it owns and
@@ -71,13 +73,16 @@ export class Engine {
     const candidate = exports as Partial<Record<keyof EngineExports, unknown>>;
     const missing = FUNCTIONS.filter((name) => typeof candidate[name] !== 'function');
     if (missing.length > 0 || !(candidate.memory instanceof WebAssembly.Memory)) {
-      throw new EngineError('The module is not the AEGIS engine.');
+      throw new EngineError(t('The module is not the AEGIS engine.'));
     }
     const engine = new Engine(exports as unknown as EngineExports);
     const version = engine.exports.aegis_abi();
     if (version !== ABI_VERSION) {
       throw new EngineError(
-        `The engine module speaks version ${version} of its boundary and this page version ${ABI_VERSION}. Rebuild it.`,
+        t(
+          'The engine module speaks version {module} of its boundary and this page version {page}. Rebuild it.',
+          { module: version, page: ABI_VERSION },
+        ),
       );
     }
     return engine;
@@ -119,7 +124,7 @@ export class Engine {
         // Nothing more can be learnt from a module in this state.
       }
       const reason = said || (cause instanceof Error ? cause.message : String(cause));
-      this.stopped = new EngineError(`The simulation engine stopped: ${reason}`);
+      this.stopped = new EngineError(t('The simulation engine stopped: {reason}', { reason }));
       throw this.stopped;
     }
   }
@@ -138,7 +143,9 @@ export class Engine {
   boot(seed: number, nowMs: number): void {
     const said = this.call((exports) => exports.aegis_boot(seed, nowMs));
     if (said !== 'ok') {
-      this.stopped = new EngineError(`The simulation engine could not start: ${said}`);
+      this.stopped = new EngineError(
+        t('The simulation engine could not start: {reason}', { reason: said }),
+      );
       throw this.stopped;
     }
   }

@@ -1,6 +1,7 @@
 import type { DataSource, Health, Severity } from '@aegis/contracts';
 import type { ReactNode } from 'react';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import {
   DATA_SOURCE_HINT,
@@ -142,7 +143,7 @@ export function DecisionTag({ decision }: { decision: 'allow' | 'deny' }) {
         deny ? 'border-critical bg-critical text-on-accent' : 'border-line-strong text-ink',
       )}
     >
-      {deny ? 'Deny' : 'Allow'}
+      {deny ? t('Deny') : t('Allow')}
     </span>
   );
 }

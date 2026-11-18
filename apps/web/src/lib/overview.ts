@@ -31,6 +31,8 @@ import {
   type Topology,
 } from '@aegis/contracts';
 
+import { t } from '@/i18n';
+
 import { SERVICE_TYPE } from './palette';
 
 export interface LayerSpec {
@@ -47,22 +49,22 @@ export interface LayerSpec {
 export const LAYERS: readonly LayerSpec[] = [
   {
     id: 'layer:entry',
-    name: 'Entry',
+    name: t('Entry#layer'),
     columns: [['external-client'], ['network-gateway'], ['api-gateway']],
   },
   {
     id: 'layer:identity',
-    name: 'Identity',
+    name: t('Identity#layer'),
     columns: [['auth-service', 'cedar-authorizer', 'security-monitor']],
   },
   {
     id: 'layer:compute',
-    name: 'Compute',
+    name: t('Compute#layer'),
     columns: [['microservice', 'container', 'serverless']],
   },
   {
     id: 'layer:data',
-    name: 'Data',
+    name: t('Data#layer'),
     columns: [['message-queue'], ['database', 'storage']],
   },
 ];
@@ -198,7 +200,7 @@ export function buildOverview(source: Topology): Overview {
           groupOfNode.set(source.nodes[i]!.id, id);
         }
         members.push(indices);
-        labels.push(single ? first.name : `${group.length} ${plural}`);
+        labels.push(single ? first.name : t('{n} {kinds}', { n: group.length, kinds: plural }));
         nodes.push({
           id,
           name: single ? first.name : capitalise(plural),
@@ -208,7 +210,13 @@ export function buildOverview(source: Topology): Overview {
           tier: column,
           description: single
             ? first.description
-            : `${group.length} ${plural} in ${places.length === 1 ? places[0] : `${places.length} regions`}.`,
+            : places.length === 1
+              ? t('{n} {kinds} in {place}.', { n: group.length, kinds: plural, place: places[0]! })
+              : t('{n} {kinds} in {regions} regions.', {
+                  n: group.length,
+                  kinds: plural,
+                  regions: places.length,
+                }),
           dataSource: first.dataSource,
           capacityRps: group.reduce((sum, node) => sum + node.capacityRps, 0),
           baselineLatencyMs: weighted(

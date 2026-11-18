@@ -3,6 +3,7 @@
  * their answers by id, and the stream handed to whoever opened it. It knows
  * nothing about what is asked; it only carries it.
  */
+import { t } from '@/i18n';
 import type { SocketLike } from '@/providers/transport';
 
 import { EngineError } from './binding';
@@ -61,10 +62,10 @@ export class EngineClient {
     try {
       const worker = this.spawn();
       worker.onmessage = (event) => this.receive(event.data);
-      worker.onerror = () => this.fail('The simulation engine could not be loaded.');
+      worker.onerror = () => this.fail(t('The simulation engine could not be loaded.'));
       this.worker = worker;
     } catch {
-      this.fail('This browser could not start the simulation engine.');
+      this.fail(t('This browser could not start the simulation engine.'));
     }
     return this.worker;
   }
@@ -132,7 +133,7 @@ export class EngineClient {
   ): Promise<{ status: number; body: string }> {
     const worker = this.start();
     if (!worker)
-      return Promise.reject(this.failure ?? new EngineError('The engine is not running.'));
+      return Promise.reject(this.failure ?? new EngineError(t('The engine is not running.')));
     if (signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {

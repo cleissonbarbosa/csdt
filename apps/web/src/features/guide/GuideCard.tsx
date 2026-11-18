@@ -15,6 +15,7 @@ import { useReportedHeight } from '@/app/hooks';
 import { queryClient, queryKeys } from '@/app/queryClient';
 import { Button, IconButton } from '@/components/ui/Button';
 import { BasisTag } from '@/features/scenarios/IncidentReport';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { api } from '@/providers/api';
 import { useGuide, type Feedback, type FeedbackLine } from '@/stores/guide';
@@ -63,19 +64,20 @@ function CopyLink({ id }: { id: string }) {
       }}
       data-testid="guide-copy-link"
     >
-      <Link2 size={12} aria-hidden /> {copied ? 'Link copied' : 'Copy a link to this challenge'}
+      <Link2 size={12} aria-hidden />{' '}
+      {copied ? t('Link copied') : t('Copy a link to this challenge')}
     </button>
   );
 }
 
 const TAG: Record<'observed' | 'cedar', { label: string; hint: string }> = {
   observed: {
-    label: 'Observed',
-    hint: 'Read from the events and figures the engine recorded in this run.',
+    label: t('Observed'),
+    hint: t('Read from the events and figures the engine recorded in this run.'),
   },
   cedar: {
     label: 'Cedar',
-    hint: 'What the Cedar policy engine answered, or the text of a policy it holds.',
+    hint: t('What the Cedar policy engine answered, or the text of a policy it holds.'),
   },
 };
 
@@ -202,7 +204,7 @@ function Active({ challenge }: { challenge: Challenge }) {
         onClick={() => useGuide.getState().leave()}
         className="inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
       >
-        <ChevronLeft size={13} aria-hidden /> All challenges
+        <ChevronLeft size={13} aria-hidden /> {t('All challenges')}
       </button>
       <h3 className="mt-2 text-sm font-bold text-ink">{challenge.title}</h3>
       <p className="mt-1 text-xs leading-relaxed text-ink-dim">{challenge.brief}</p>
@@ -230,7 +232,7 @@ function Active({ challenge }: { challenge: Challenge }) {
             disabled={next.unavailable({ ...evidence, report: null }) !== null}
             data-testid="guide-next"
           >
-            Next: {next.title}
+            {t('Next: {title}', { title: next.title })}
           </Button>
         )}
       </div>
@@ -254,13 +256,14 @@ function List() {
   );
   return (
     <div data-testid="guide-list">
-      <h3 className="text-sm font-bold text-ink">Guided challenges</h3>
+      <h3 className="text-sm font-bold text-ink">{t('Guided challenges')}</h3>
       <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">
-        Each asks one question about the platform. Your answer is checked against the model itself:
-        the record of the incident, or Cedar&apos;s own decision.
+        {t(
+          "Each asks one question about the platform. Your answer is checked against the model itself: the record of the incident, or Cedar's own decision.",
+        )}
       </p>
       <p className="mt-1.5 text-[11px] text-ink" data-testid="guide-progress">
-        {solvedCount} of {CHALLENGES.length} solved
+        {t('{n} of {total} solved', { n: solvedCount, total: CHALLENGES.length })}
         {solvedCount > 0 && (
           <>
             .{' '}
@@ -270,7 +273,7 @@ function List() {
               onClick={() => useGuide.getState().forget()}
               data-testid="guide-forget"
             >
-              Start over
+              {t('Start over')}
             </button>
           </>
         )}
@@ -287,14 +290,14 @@ function List() {
               data-invited={challenge.id === invitedId}
             >
               {challenge.id === invitedId && (
-                <p className="caption mb-0.5">The one you were sent</p>
+                <p className="caption mb-0.5">{t('The one you were sent')}</p>
               )}
               <div className="flex items-start justify-between gap-2">
                 <h4 className="min-w-0 text-xs font-bold text-ink">
                   {challenge.title}
                   {solved && (
                     <span className="ml-1.5 inline-flex items-center gap-0.5 font-normal text-ink-faint">
-                      <Check size={12} aria-hidden /> solved
+                      <Check size={12} aria-hidden /> {t('solved')}
                     </span>
                   )}
                 </h4>
@@ -309,7 +312,7 @@ function List() {
                   }}
                   data-testid={`guide-start-${challenge.id}`}
                 >
-                  {starting === challenge.id ? 'Starting…' : solved ? 'Again' : 'Start'}
+                  {starting === challenge.id ? t('Starting…') : solved ? t('Again') : t('Start')}
                 </Button>
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">{challenge.brief}</p>
@@ -354,12 +357,12 @@ export function GuideCard({
         alongFoot ? 'max-h-[46%]' : 'max-h-[min(70%,30rem)]',
       )}
       style={{ left, bottom }}
-      aria-label="Guided challenges"
+      aria-label={t('Guided challenges')}
       data-testid="guide"
     >
       <div className="flex justify-end px-1 pt-1">
         <IconButton
-          label="Close the guide"
+          label={t('Close the guide')}
           size="sm"
           onClick={() => useGuide.getState().setOpen(false)}
           data-testid="guide-close"

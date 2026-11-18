@@ -12,14 +12,31 @@
  * two named ends) is kept exactly as it was read and written back
  * untouched, so opening a file here and saving it loses nothing.
  */
-import type { Topology } from '@aegis/contracts';
+import type { IncidentStatus, Topology } from '@aegis/contracts';
 
 import { nodeLabel } from './names';
+
+import { t } from '@/i18n';
 
 export const CATEGORIES = ['availability', 'identity', 'authorization', 'resilience'] as const;
 export const SEVERITIES = ['info', 'notice', 'warning', 'critical'] as const;
 export const PHASE_STATUSES = ['active', 'mitigating', 'recovering'] as const;
 export const EVENT_KINDS = ['alert', 'auth-failure', 'mitigation', 'reroute'] as const;
+
+export const CATEGORY_LABEL: Record<(typeof CATEGORIES)[number], string> = {
+  availability: t('Availability'),
+  identity: t('Identity'),
+  authorization: t('Authorization'),
+  resilience: t('Resilience'),
+};
+
+/** The stage an incident is at, which each phase of a scenario names. */
+export const STATUS_LABEL: Record<IncidentStatus, string> = {
+  active: t('Active'),
+  mitigating: t('Mitigating'),
+  recovering: t('Recovering'),
+  resolved: t('Resolved'),
+};
 
 /** The effects the editor has controls for. */
 export const EFFECT_KINDS = [
@@ -46,15 +63,15 @@ export const EFFECT: Record<
     start: number;
   }
 > = {
-  capacity: { label: 'Capacity ×', figure: 'factor', on: 'nodes', start: 0.3 },
-  latency: { label: 'Latency ×', figure: 'factor', on: 'nodes', start: 4 },
-  errorInject: { label: 'Share of requests that fail', figure: 'rate', on: 'nodes', start: 0.2 },
-  down: { label: 'Unreachable', figure: 'none', on: 'nodes', start: 1 },
-  demand: { label: 'Demand ×', figure: 'factor', on: 'node', start: 3 },
-  edgeWeight: { label: 'Calls into it ×', figure: 'factor', on: 'inbound', start: 1.8 },
-  edgeLatency: { label: 'Network latency into it ×', figure: 'factor', on: 'inbound', start: 4 },
+  capacity: { label: t('Capacity ×'), figure: 'factor', on: 'nodes', start: 0.3 },
+  latency: { label: t('Latency ×'), figure: 'factor', on: 'nodes', start: 4 },
+  errorInject: { label: t('Share of requests that fail'), figure: 'rate', on: 'nodes', start: 0.2 },
+  down: { label: t('Unreachable'), figure: 'none', on: 'nodes', start: 1 },
+  demand: { label: t('Demand ×'), figure: 'factor', on: 'node', start: 3 },
+  edgeWeight: { label: t('Calls into it ×'), figure: 'factor', on: 'inbound', start: 1.8 },
+  edgeLatency: { label: t('Network latency into it ×'), figure: 'factor', on: 'inbound', start: 4 },
   edgeError: {
-    label: 'Share of calls into it that fail',
+    label: t('Share of calls into it that fail'),
     figure: 'rate',
     on: 'inbound',
     start: 0.2,
@@ -125,7 +142,7 @@ export function slug(name: string): string {
 export function emptyPhase(atMs: number, status: PhaseDraft['status'] = 'active'): PhaseDraft {
   return {
     key: rowKey(),
-    name: status === 'recovering' ? 'Recovery' : 'New phase',
+    name: status === 'recovering' ? t('Recovery') : t('New phase'),
     atMs,
     rampMs: 2000,
     status,
@@ -138,11 +155,11 @@ export function emptyPhase(atMs: number, status: PhaseDraft['status'] = 'active'
 /** A scenario to start from: one phase that does something, one that lets go. */
 export function blankScenario(target: string): ScenarioDraft {
   const first = emptyPhase(0);
-  first.name = 'Degradation';
+  first.name = t('Degradation');
   first.effects = [{ key: rowKey(), kind: 'latency', target, value: EFFECT.latency.start }];
   return {
     id: 'my-scenario',
-    name: 'My scenario',
+    name: t('My scenario'),
     summary: '',
     category: 'resilience',
     severity: 'warning',
@@ -310,26 +327,30 @@ export function draftToFile(draft: ScenarioDraft): Record<string, unknown> {
  */
 export function draftProblems(draft: ScenarioDraft): string[] {
   const problems: string[] = [];
-  if (draft.name.trim() === '') problems.push('The scenario needs a name.');
+  if (draft.name.trim() === '') problems.push(t('The scenario needs a name.'));
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(draft.id)) {
-    problems.push('The id is 1 to 64 letters, digits, "-", "_" or ".".');
+    problems.push(t('The id is 1 to 64 letters, digits, "-", "_" or ".".'));
   }
-  if (draft.phases.length === 0) problems.push('A scenario needs at least one phase.');
+  if (draft.phases.length === 0) problems.push(t('A scenario needs at least one phase.'));
   if (draft.phases.length > 0 && !draft.phases.some((phase) => phase.atMs === 0)) {
-    problems.push('One phase has to start at 0 seconds.');
+    problems.push(t('One phase has to start at 0 seconds.'));
   }
   for (const phase of draft.phases) {
-    if (phase.name.trim() === '') problems.push('Every phase needs a name.');
+    if (phase.name.trim() === '') problems.push(t('Every phase needs a name.'));
     if (phase.atMs >= draft.durationMs) {
-      problems.push(`“${phase.name}” starts after the scenario ends.`);
+      problems.push(t('“{phase}” starts after the scenario ends.', { phase: phase.name }));
     }
     for (const effect of phase.effects) {
       if (effect.kind !== 'raw' && effect.target === '') {
-        problems.push(`An effect of “${phase.name}” is not placed on anything.`);
+        problems.push(
+          t('An effect of “{phase}” is not placed on anything.', { phase: phase.name }),
+        );
       }
     }
     for (const event of phase.events) {
-      if (event.title.trim() === '') problems.push(`An event of “${phase.name}” has no title.`);
+      if (event.title.trim() === '') {
+        problems.push(t('An event of “{phase}” has no title.', { phase: phase.name }));
+      }
     }
   }
   return [...new Set(problems)];
@@ -355,20 +376,26 @@ export function targetChoices(topology: Topology, single: boolean): TargetChoice
       choices.push({
         value: `role:${role}`,
         label: `${role} (${nodeLabel(topology, target)})`,
-        group: 'By role: runs wherever the role exists',
+        group: t('By role: runs wherever the role exists'),
       });
     } else if (regionName.has(target)) {
       if (!single) {
         choices.push({
           value: `region:${role}`,
-          label: `every service of ${role} (${regionName.get(target)})`,
-          group: 'By role: runs wherever the role exists',
+          label: t('every service of {role} ({region})', {
+            role,
+            region: regionName.get(target) ?? target,
+          }),
+          group: t('By role: runs wherever the role exists'),
         });
       }
       choices.push({
         value: `gatewayOf:${role}`,
-        label: `the gateway of ${role} (${regionName.get(target)})`,
-        group: 'By role: runs wherever the role exists',
+        label: t('the gateway of {role} ({region})', {
+          role,
+          region: regionName.get(target) ?? target,
+        }),
+        group: t('By role: runs wherever the role exists'),
       });
     }
   }
@@ -376,8 +403,8 @@ export function targetChoices(topology: Topology, single: boolean): TargetChoice
     for (const region of topology.regions) {
       choices.push({
         value: `region:${region.id}`,
-        label: `every service of ${region.name}`,
-        group: 'A region of this platform',
+        label: t('every service of {region}', { region: region.name }),
+        group: t('A region of this platform'),
       });
     }
   }
@@ -385,7 +412,7 @@ export function targetChoices(topology: Topology, single: boolean): TargetChoice
     choices.push({
       value: `node:${node.id}`,
       label: nodeLabel(topology, node.id),
-      group: 'A service of this platform',
+      group: t('A service of this platform'),
     });
   }
   return choices;

@@ -19,6 +19,7 @@ import {
 } from '@aegis/contracts';
 import { z } from 'zod';
 
+import { t } from '@/i18n';
 import { formatClock } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
@@ -137,11 +138,13 @@ function fromBase64Url(text: string): string {
  */
 export function sessionLink(session: SessionFile, base: string): string | { reason: string } {
   if (session.workspace) {
-    return { reason: 'This platform was imported; a link cannot carry its files. Save the file.' };
+    return {
+      reason: t('This platform was imported; a link cannot carry its files. Save the file.'),
+    };
   }
   const url = `${base.replace(/#.*$/, '')}${HASH}${toBase64Url(JSON.stringify(session))}`;
   return url.length > MAX_LINK_CHARS
-    ? { reason: 'This session holds too many commands for a link. Save the file.' }
+    ? { reason: t('This session holds too many commands for a link. Save the file.') }
     : url;
 }
 
@@ -153,7 +156,7 @@ export function parseSession(text: string): Parsed {
   try {
     raw = JSON.parse(text);
   } catch {
-    return { problem: 'This is not a session file: it is not JSON.' };
+    return { problem: t('This is not a session file: it is not JSON.') };
   }
   const result = SessionFileSchema.safeParse(raw);
   if (!result.success) {
@@ -162,8 +165,13 @@ export function parseSession(text: string): Parsed {
         typeof raw === 'object' &&
         raw !== null &&
         (raw as { format?: unknown }).format === 'aegis-session'
-          ? `This session file is not in a format this version reads: ${z.prettifyError(result.error)}`
-          : 'This is not a session file. One is saved from “Save or share this session”.',
+          ? t('This session file is not in a format this version reads: {problem}', {
+              // What does not fit, in zod's own words.
+              problem: z.prettifyError(result.error),
+            })
+          : t('This is not a session file. One is saved from “{command}”.', {
+              command: t('Save or share this session'),
+            }),
     };
   }
   return { session: result.data };
@@ -175,7 +183,7 @@ export function sessionFromHash(hash: string): Parsed | null {
   try {
     return parseSession(fromBase64Url(hash.slice(HASH.length)));
   } catch {
-    return { problem: 'The session in this link is damaged and cannot be read.' };
+    return { problem: t('The session in this link is damaged and cannot be read.') };
   }
 }
 
@@ -186,16 +194,22 @@ export function describeSession(recording: Recording, scenarios: Scenario[] = []
     const at = formatClock(atMs);
     switch (command.type) {
       case 'startScenario':
-        return `${at} starts ${name(command.scenarioId)}`;
+        return t('{at} starts {scenario}', { at, scenario: name(command.scenarioId) });
       case 'abortScenario':
-        return `${at} stops the running scenario`;
+        return t('{at} stops the running scenario', { at });
       case 'injectFault':
-        return `${at} places a fault by hand (${String(command.effect.type)})`;
+        // The effect is named by its type in the scenario file format, as a file writes it.
+        return t('{at} places a fault by hand ({effect})', {
+          at,
+          effect: String(command.effect.type),
+        });
       case 'clearFaults':
-        return `${at} lifts ${command.effect ? 'a fault' : 'every fault'} placed by hand`;
+        return command.effect
+          ? t('{at} lifts a fault placed by hand', { at })
+          : t('{at} lifts every fault placed by hand', { at });
     }
   });
-  return lines.length > 0 ? lines : ['No command: time simply passes.'];
+  return lines.length > 0 ? lines : [t('No command: time simply passes.')];
 }
 
 /**
@@ -207,13 +221,13 @@ export async function openSession(session: SessionFile): Promise<string | null> 
   if (session.workspace) {
     const imported = await actions.importWorkspace(session.workspace.files);
     if (imported instanceof ApiError)
-      return `Its platform could not be imported. ${imported.message}`;
+      return t('Its platform could not be imported. {reason}', { reason: imported.message });
   }
   try {
     const { playback } = await api.loadSession(session.recording, session.cursorMs);
     useTelemetry.getState().setPlayback(playback);
   } catch (error) {
-    return error instanceof ApiError ? error.message : 'The session could not be loaded.';
+    return error instanceof ApiError ? error.message : t('The session could not be loaded.');
   }
   // The stream announces the new timeline and the topology is fetched
   // again; the view is put back on the platform the session names. A

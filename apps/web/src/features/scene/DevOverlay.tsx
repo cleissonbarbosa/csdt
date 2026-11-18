@@ -1,7 +1,10 @@
+// not-interface-text: whole file. A developer's figures, named as the renderer
+// names them; the panel's own name is translated.
 import { useEffect, useState } from 'react';
 
 import { sceneHandle } from '@/graphics/handle';
 import type { SceneStats } from '@/graphics/SceneController';
+import { t } from '@/i18n';
 import { formatCount } from '@/lib/format';
 import { COLOR } from '@/lib/palette';
 import { useTelemetry } from '@/stores/telemetry';
@@ -36,7 +39,7 @@ export function DevOverlay() {
   return (
     <aside
       className="panel pointer-events-none px-2.5 py-2"
-      aria-label="Performance overlay"
+      aria-label={t('Performance overlay')}
       data-testid="dev-overlay"
     >
       <dl className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-[11px]">

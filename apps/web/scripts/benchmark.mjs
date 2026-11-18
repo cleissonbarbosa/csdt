@@ -144,6 +144,7 @@ async function frameRuns(mode, extraFlags) {
   const rows = [];
   for (const backend of ['webgpu', 'webgl2']) {
     const settings = {
+      language: 'en',
       quality: 'ultra',
       theme: 'light',
       // Keep the picture changing, so every frame is a full redraw.

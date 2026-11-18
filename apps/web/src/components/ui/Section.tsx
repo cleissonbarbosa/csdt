@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 /** A titled block inside a panel. */
@@ -55,10 +56,10 @@ export function Fold({
         <span className="flex items-baseline gap-2 text-[11px] text-ink-faint">
           {count !== undefined && <span className="numeric">{count}</span>}
           <span aria-hidden className="group-open:hidden">
-            Show
+            {t('Show')}
           </span>
           <span aria-hidden className="hidden group-open:inline">
-            Hide
+            {t('Hide')}
           </span>
         </span>
       </summary>
