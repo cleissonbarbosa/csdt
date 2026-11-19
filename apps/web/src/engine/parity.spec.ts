@@ -17,6 +17,9 @@ import { Engine } from './binding';
 const POLICIES = fileURLToPath(
   new URL('../../../../fixtures/cedar/policies.json', import.meta.url),
 );
+const HELIOS = fileURLToPath(
+  new URL('../../../../fixtures/topologies/helios-commerce.json', import.meta.url),
+);
 const MODULE = fileURLToPath(new URL('./aegis.wasm', import.meta.url));
 const SAMPLES = fileURLToPath(new URL('../../../../packages/contracts/samples/', import.meta.url));
 
@@ -158,6 +161,47 @@ function policiesWithout(id: string): { path: string; text: string } {
   };
 }
 
+/** The bundled platform with a larger gateway and one more service; the exporter's own. */
+function largerGateway(): { path: string; text: string } {
+  const topology = JSON.parse(readFileSync(HELIOS, 'utf8')) as {
+    nodes: { id: string; capacityRps?: number }[];
+    edges: { source: string; target: string; weight: number }[];
+    roles: Record<string, string>;
+  };
+  for (const node of topology.nodes) {
+    if (node.id === 'use-gateway') node.capacityRps = 7300;
+  }
+  topology.nodes.push({
+    id: 'use-loyalty',
+    name: 'Loyalty',
+    type: 'microservice',
+    region: 'us-east',
+    tier: 4,
+    baseLatencyMs: 9,
+  } as (typeof topology.nodes)[number]);
+  for (const edge of topology.edges) {
+    if (edge.source === 'use-gateway' && edge.target === 'use-search') edge.weight = 0.1;
+  }
+  topology.edges.push(
+    {
+      source: 'use-gateway',
+      target: 'use-loyalty',
+      protocol: 'grpc',
+      relationship: 'call',
+      weight: 0.2,
+    } as (typeof topology.edges)[number],
+    {
+      source: 'use-loyalty',
+      target: 'use-orders-db',
+      protocol: 'sql',
+      relationship: 'data',
+      weight: 1,
+    } as (typeof topology.edges)[number],
+  );
+  topology.roles['resource:Loyalty'] = 'use-loyalty';
+  return { path: 'topologies/helios-commerce.json', text: JSON.stringify(topology) };
+}
+
 describe('the engine built for the browser', () => {
   let engine: Engine;
   let clock = 0;
@@ -258,6 +302,11 @@ describe('the engine built for the browser', () => {
         rampMs: 1000,
       }).body,
     );
+    produced.set(
+      'platform-comparison',
+      post('/demo/experiments/platforms', { files: [largerGateway()], scenarioId: 'ddos-surge' })
+        .body,
+    );
     produced.set('stream-snapshot', message(engine.open(clock)[1]!));
     const [replay] = engine.message('{"type":"resync","afterSeq":0}', clock);
     produced.set('stream-events', message(replay!));
@@ -315,6 +364,7 @@ describe('the engine built for the browser', () => {
     'session',
     'experiment',
     'trial',
+    'platform-comparison',
     'stream-snapshot',
     'stream-timeline',
     'topology-stress-summary',
@@ -424,6 +474,11 @@ describe('every route, in the module', () => {
         },
       ],
       ['POST', '/demo/experiments/trial', { effect: { type: 'down', nodes: 'node:use-search' } }],
+      [
+        'POST',
+        '/demo/experiments/platforms',
+        { files: [largerGateway()], scenarioId: 'regional-outage' },
+      ],
       ['POST', '/demo/playback/control', { action: 'setSpeed', speed: 4 }],
       ['POST', '/demo/playback/control', { action: 'pause' }],
       ['POST', '/demo/playback/control', { action: 'step' }],

@@ -23,6 +23,7 @@ import { formatPercent } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
+import { PlatformRuns } from './PlatformRuns';
 import { PolicyDiff } from './PolicyDiff';
 import {
   download,
@@ -347,6 +348,15 @@ function Import() {
                 </p>
                 <Contents workspace={outcome.workspace} />
                 <PolicyDiff files={staged} />
+                <PlatformRuns
+                  staged={staged}
+                  files={outcome.workspace}
+                  onLeave={(applied) => {
+                    // Applied files are no longer waiting to be.
+                    if (applied) clear();
+                    useUi.getState().setPanel(null);
+                  }}
+                />
               </div>
             ) : (
               <Problem>

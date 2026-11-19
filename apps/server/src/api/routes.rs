@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::application::access;
 use crate::application::diff::{compare, Diff};
 use crate::application::experiment::{Experiment, Trial};
+use crate::application::platforms::PlatformComparison;
 use crate::application::session::SessionExport;
 use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
 use crate::authorization::{
@@ -640,6 +641,40 @@ pub async fn workspace_diff(
         decisions_changed: diff.decisions_changed(),
         diff,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PlatformsBody {
+    files: Vec<SourceFile>,
+    scenario_id: String,
+    /// Which platform of the files to run on, when they describe several.
+    #[serde(default)]
+    topology_id: Option<String>,
+}
+
+/// Runs one scenario on the platform in use and on the one the uploaded
+/// files describe, from the same seed, and reports both with what the two
+/// descriptions state differently. The files are built the way an import
+/// builds them; nothing is applied and the timeline in use is not touched.
+pub async fn experiment_platforms(
+    State(state): State<AppState>,
+    body: Result<Json<PlatformsBody>, JsonRejection>,
+) -> ApiResult<PlatformComparison> {
+    import_allowed(&state)?;
+    let Json(body) = body?;
+    check_id("scenarioId", &body.scenario_id)?;
+    if let Some(id) = &body.topology_id {
+        check_id("topologyId", id)?;
+    }
+    let candidate = build_import(&state, body.files).await?;
+    let service = state.service.clone();
+    let comparison = off_the_workers(move || {
+        service.compare_platforms(&candidate, &body.scenario_id, body.topology_id.as_deref())
+    })
+    .await
+    .map_err(|()| internal("the comparison could not be run"))??;
+    Ok(Json(comparison))
 }
 
 fn apply(state: &AppState, loaded: Loaded) -> Json<WorkspaceResponse> {

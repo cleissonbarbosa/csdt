@@ -181,6 +181,17 @@ a run of its own from the same seed, tabled and charted against the incident
 as it is, with the figure at which the highest error rate was lowest said in
 a sentence.
 
+A change the form cannot make is a change to the platform's files: another
+service, another connection, a capacity written down. Stage the changed
+files in **Import or export files** and **How would an incident go on
+each?** runs one scenario on the platform in use and on the one the files
+describe, before anything is applied. It lists what the two descriptions
+state differently, and what follows without being stated: a service with no
+stated capacity is resized by its new load, and a flood written as a share
+of a gateway's capacity grows with the gateway. Then it lays the two runs
+side by side, and **Apply these files and watch run B** puts the second on
+the model.
+
 A fault can be tried before it is placed. **Try one first** simulates the
 platform at rest twice, once with the fault, and lists the services that
 would leave normal and when, with the rest of the model set back; nothing is

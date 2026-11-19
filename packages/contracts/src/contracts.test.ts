@@ -34,6 +34,7 @@ import {
   AccessMatrixSchema,
   AuthorizationExplanationSchema,
   TrialSchema,
+  PlatformComparisonSchema,
 } from './index';
 
 const SAMPLES = join(dirname(fileURLToPath(import.meta.url)), '..', 'samples');
@@ -58,6 +59,7 @@ const CASES: Record<string, z.ZodType> = {
   session: SessionExportSchema,
   experiment: ExperimentSchema,
   trial: TrialSchema,
+  'platform-comparison': PlatformComparisonSchema,
   scenarios: ScenariosResponseSchema,
   'scenarios-unavailable': ScenariosResponseSchema,
   recordings: z.array(RecordingSummarySchema),
@@ -188,6 +190,60 @@ describe('what is read back from a run', () => {
       samples.filter((s) => s.virtualTimeMs < placedAt);
     expect(before(variant.samples)).toEqual(before(baseline.samples));
     expect(variant.samples).not.toEqual(baseline.samples);
+  });
+});
+
+describe('one scenario on two platforms', () => {
+  const comparison = PlatformComparisonSchema.parse(sample('platform-comparison'));
+  const { baseline, variant, changes } = comparison;
+
+  it('runs the same commands from one seed on each', () => {
+    expect(variant.recording.seed).toBe(baseline.recording.seed);
+    expect(variant.recording.commands).toEqual(baseline.recording.commands);
+    expect(variant.recording.durationMs).toBe(baseline.recording.durationMs);
+    expect(baseline.recording.topologyId).toBe(comparison.base.id);
+    expect(variant.recording.topologyId).toBe(comparison.candidate.id);
+  });
+
+  it('states what the file changed, as the file wrote it', () => {
+    // The exporter's file: a larger gateway, one more service, fewer calls to search.
+    expect(changes.servicesAdded).toEqual([{ id: 'use-loyalty', name: 'Loyalty' }]);
+    expect(changes.servicesChanged).toEqual([
+      {
+        id: 'use-gateway',
+        name: 'API Gateway',
+        fields: [{ field: 'capacityRps', base: null, candidate: 7300 }],
+      },
+    ]);
+    expect(changes.connectionsChanged[0]?.fields).toEqual([
+      { field: 'weight', base: 0.14, candidate: 0.1 },
+    ]);
+    expect(comparison.candidate.nodeCount).toBe(comparison.base.nodeCount + 1);
+  });
+
+  it('lists capacity only where no file states it', () => {
+    const stated = new Set(
+      changes.servicesChanged
+        .filter((change) => change.fields.some((entry) => entry.field === 'capacityRps'))
+        .map((change) => change.id),
+    );
+    expect(changes.derivedCapacity.length).toBeGreaterThan(0);
+    for (const entry of changes.derivedCapacity) {
+      expect(stated.has(entry.id)).toBe(false);
+      expect(entry.candidate).not.toBe(entry.base);
+    }
+  });
+
+  it('says where the scenario prescribes another figure, from the two reports', () => {
+    // The surge is written as a share of the gateway's capacity.
+    expect(comparison.prescribed.length).toBeGreaterThan(0);
+    for (const change of comparison.prescribed) {
+      const phase = (run: typeof baseline) =>
+        run.report.phases.find((entry) => entry.name === change.phase)?.prescribed;
+      expect(change.base).toEqual(phase(baseline));
+      expect(change.candidate).toEqual(phase(variant));
+      expect(change.candidate).not.toEqual(change.base);
+    }
   });
 });
 

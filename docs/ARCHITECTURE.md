@@ -240,6 +240,16 @@ samples already produced.
   (`POST /demo/experiments/compare`). The answer holds both runs, each with
   its recording, so what differs between them is one command and is said as
   such. The timeline in use is not touched.
+- **A comparison of platforms** runs one scenario on the topology in use and
+  on one a set of uploaded files describes, again on timelines of its own
+  from the server's seed (`POST /demo/experiments/platforms`,
+  `application/platforms.rs`). The files are built as an import builds them
+  and are not applied. The answer holds both runs and what the two
+  descriptions state differently, matched by id, plus the two things that
+  follow without being stated: capacities the model sizes from load at rest,
+  and phases in which the same scenario prescribes another figure (a rate
+  written as a share of a capacity). It lists differences; it does not say
+  which of them an outcome follows from.
 
 Tests assert bit-for-bit equality of the state digest after arbitrary seeks,
 equality of regenerated events, and that history stays bounded (30 minutes of
@@ -309,6 +319,7 @@ are mirrored in `packages/contracts`.
 | `GET /session` · `POST /demo/session/load`             | the timeline as what reproduces it           |
 | `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed    |
 | `POST /demo/experiments/trial`                         | one fault on the platform at rest            |
+| `POST /demo/experiments/platforms`                     | one scenario in use and on uploaded files    |
 | `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
 | `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
 | `POST /demo/workspace/diff`                            | what Cedar would decide differently          |

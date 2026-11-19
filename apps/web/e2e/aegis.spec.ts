@@ -1108,6 +1108,81 @@ test('uploaded policies are compared with the ones in use before anything is app
   );
 });
 
+test('a changed platform is put through the same incident before it is applied, then watched', async ({
+  page,
+}) => {
+  await openApp(page);
+  const bundle = (await (await page.request.get(`${API}/workspace/export`)).json()) as {
+    files: { path: string; text: string }[];
+  };
+  // The platform in use, with a gateway three times the size.
+  const topology = bundle.files
+    .filter((file) => file.path.startsWith('topologies/'))
+    .map((file) => JSON.parse(file.text) as { id: string; nodes: Record<string, unknown>[] })
+    .find((entry) => entry.id === 'helios-commerce')!;
+  topology.nodes.find((node) => node.id === 'use-gateway')!.capacityRps = 7300;
+
+  await fromMenu(page, 'workspace');
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  await dialog.getByTestId('workspace-files').setInputFiles({
+    name: 'helios-commerce.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(topology)),
+  });
+  await expect(dialog.getByTestId('workspace-check')).toContainText('These files are valid');
+  const runs = dialog.getByTestId('platform-runs');
+  await runs.getByTestId('platform-runs-scenario').selectOption('ddos-surge');
+  await runs.getByTestId('platform-runs-run').click();
+
+  const result = runs.getByTestId('platform-runs-result');
+  await expect(result).toHaveAttribute('data-same', 'false');
+  // The one thing the file changed, as the file wrote it.
+  const changed = result.getByTestId('platform-changed');
+  await expect(changed.getByRole('listitem')).toHaveCount(1);
+  await expect(changed).toContainText('API Gateway (use-gateway): capacityRps not stated');
+  await expect(changed).toContainText('7300');
+  // The surge is written as a share of that gateway's capacity: it is said
+  // to be another flood, not left to be read as the same attack.
+  const prescribed = result.getByTestId('platform-prescribed');
+  await expect(prescribed).toContainText('Volumetric surge');
+  await expect(prescribed).toContainText('A injected traffic “Volumetric flood” at 5360 req/s');
+  await expect(prescribed).toContainText('B injected traffic “Volumetric flood” at 16060 req/s');
+  // Both runs are on the page, figure by figure and over time.
+  const peak = result.getByTestId('platform-row-peak-error').getByRole('cell');
+  await expect(peak).toHaveCount(3);
+  await expect(peak.nth(0)).toHaveText(/^\d+(\.\d+)?%$/);
+  await expect(peak.nth(1)).toHaveText(/^\d+(\.\d+)?%$/);
+  await expect(
+    result.getByRole('img', { name: /^Error rate over both runs\. In use: up to/ }),
+  ).toBeVisible();
+
+  // Asking applied nothing and started nothing.
+  await expect(dialog.getByTestId('workspace-in-use').locator('[data-origin]')).toHaveAttribute(
+    'data-origin',
+    'bundled',
+  );
+  await expect(page.getByTestId('timeline')).toHaveCount(0);
+
+  // Watching run B applies the files and puts that run on the timeline.
+  await result.getByTestId('platform-watch-b').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('timeline')).toBeVisible();
+  const workspace = (await (await page.request.get(`${API}/workspace`)).json()) as {
+    origin: string;
+  };
+  expect(workspace.origin).toBe('imported');
+  // The run is the surge, on the platform with the larger gateway. The
+  // report is read from the whole run, wherever the cursor is.
+  const report = (await (await page.request.get(`${API}/incidents/inc-001/report`)).json()) as {
+    scenarioId: string;
+  };
+  expect(report.scenarioId).toBe('ddos-surge');
+  const applied = (await (await page.request.get(`${API}/topology`)).json()) as {
+    nodes: { id: string; capacityRps: number }[];
+  };
+  expect(applied.nodes.find((node) => node.id === 'use-gateway')?.capacityRps).toBe(7300);
+});
+
 test('a denial is taken policy by policy, everyone is asked at once, and edited policies change the answers', async ({
   page,
 }) => {

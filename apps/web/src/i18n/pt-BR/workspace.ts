@@ -119,6 +119,67 @@ export default {
   '<e>{principal} → {action} on {resource}</e>, {where}; now decided by {now}; would be decided by {then}':
     '<e>{principal} → {action} em {resource}</e>, {where}; agora decidida por {now}; seria decidida por {then}',
 
+  // One scenario on the platform in use and on the one the files describe.
+  'How would an incident go on each?': 'Como um incidente correria em cada uma?',
+  'One scenario is run on the platform in use and on the one these files describe, from the same seed, on timelines of their own; nothing is applied.':
+    'Um cenário é executado na plataforma em uso e na que estes arquivos descrevem, a partir da mesma semente, em linhas do tempo próprias; nada é aplicado.',
+  'Platform of the files': 'Plataforma dos arquivos',
+  'No scenario can be run on both: it has to be in use and among these files, and able to run on each platform.':
+    'Nenhum cenário pode ser executado nas duas: ele precisa estar em uso e entre estes arquivos, e poder ser executado em cada plataforma.',
+  'What differs': 'O que difere',
+  'A is <e>{base}</e>, in use ({services}). B is <e>{candidate}</e>, as these files describe it ({others}).':
+    'A é <e>{base}</e>, em uso ({services}). B é <e>{candidate}</e>, como estes arquivos a descrevem ({others}).',
+  'Both runs are {scenario} with seed <n>{seed}</n>, begun at the same moment.':
+    'As duas execuções são {scenario} com a semente <n>{seed}</n>, iniciadas no mesmo instante.',
+  'The files describe the platform in use as it is and Cedar answers the same, so the two runs are one run.':
+    'Os arquivos descrevem a plataforma em uso tal como ela é e o Cedar responde da mesma forma; por isso as duas execuções são uma só.',
+  'The files describe the platform in use as it is.':
+    'Os arquivos descrevem a plataforma em uso tal como ela é.',
+  'Services added': 'Serviços adicionados',
+  'Services removed': 'Serviços removidos',
+  'Services described differently': 'Serviços descritos de outra forma',
+  'Connections added': 'Conexões adicionadas',
+  'Connections removed': 'Conexões removidas',
+  'Connections described differently': 'Conexões descritas de outra forma',
+  'Regions added': 'Regiões adicionadas',
+  'Regions removed': 'Regiões removidas',
+  'Regions described differently': 'Regiões descritas de outra forma',
+  Roles: 'Funções',
+  'not stated': 'não informado',
+  '<c>{role}</c> names nothing; in use it names <c>{other}</c>.':
+    '<c>{role}</c> não aponta para nada; em uso, aponta para <c>{other}</c>.',
+  '<c>{role}</c> names <c>{target}</c>; nothing has that role in use.':
+    '<c>{role}</c> aponta para <c>{target}</c>; em uso, nada tem essa função.',
+  '<c>{role}</c> names <c>{target}</c>; in use it names <c>{other}</c>.':
+    '<c>{role}</c> aponta para <c>{target}</c>; em uso, aponta para <c>{other}</c>.',
+  'Cedar also answers the simulation differently under these files; the comparison of decisions above says where.':
+    'O Cedar também responde à simulação de outra forma com estes arquivos; a comparação de decisões acima diz onde.',
+  'What follows without being stated': 'O que decorre sem estar escrito',
+  'Where a file states no capacity, the model sizes the service from its load at rest, and that load is another on B.':
+    'Onde um arquivo não informa a capacidade, o modelo dimensiona o serviço pela carga dele em repouso, e essa carga é outra em B.',
+  'Capacity the model works with': 'Capacidade com que o modelo trabalha',
+  '<n>{base}</n> req/s in A, <n>{candidate}</n> req/s in B':
+    '<n>{base}</n> req/s em A, <n>{candidate}</n> req/s em B',
+  'The scenario is one file, yet it prescribes something else on B: a role names another service there, or a rate is written as a share of a capacity that is another.':
+    'O cenário é um só arquivo, mas prescreve outra coisa em B: lá uma função aponta para outro serviço, ou uma taxa está escrita como parte de uma capacidade que é outra.',
+  'What the scenario prescribes': 'O que o cenário prescreve',
+  nothing: 'nada',
+  'Two runs do not say which of these differences an outcome follows from. To see what one of them does, change that one alone.':
+    'Duas execuções não dizem de qual destas diferenças um resultado decorre. Para ver o que uma delas faz, mude apenas essa.',
+  'in use': 'em uso',
+  'with these files': 'com estes arquivos',
+  '{measure} over both runs. In use: up to {a}. With these files: up to {b}.':
+    '{measure} nas duas execuções. Em uso: até {a}. Com estes arquivos: até {b}.',
+  'A, in use': 'A, em uso',
+  'B, with these files': 'B, com estes arquivos',
+  'The tick is where the incident begins. Each run lasts <n>{duration}</n>.':
+    'A marca é onde o incidente começa. Cada execução dura <n>{duration}</n>.',
+  'Applies the files, then puts run B on the timeline, to play back and scrub':
+    'Aplica os arquivos e depois põe a execução B na linha do tempo, para reproduzir e percorrer',
+  'Apply these files and watch run B': 'Aplicar estes arquivos e ver a execução B',
+  'Either replaces the timeline in use, for everyone connected.':
+    'Qualquer uma das duas substitui a linha do tempo em uso, para todos que estão conectados.',
+
   // Integrations.
   Integrations: 'Integrações',
   'Demo Mode needs none of these. Each one is opt-in, and every piece of data is labelled with where it came from.':

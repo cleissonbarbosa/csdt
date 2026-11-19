@@ -19,6 +19,7 @@ use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
 use super::experiment::{self, Experiment, Trial};
+use super::platforms::{self, PlatformComparison, Side};
 use super::session::{self, SessionExport};
 use super::{Assets, Loaded};
 
@@ -650,6 +651,93 @@ impl SimulationService {
             effect,
             at_ms,
             ramp_ms,
+        )
+        .map_err(ServiceError::InvalidExperiment)
+    }
+
+    /// Runs a scenario on the topology in use and on a topology of
+    /// `candidate`, a set of files that is not in use, each on a timeline of
+    /// its own with the server's seed. The candidate's topology is the one
+    /// named, or the one with the id in use, or the one its files open on.
+    /// Neither the timeline nor the files in use are touched.
+    pub fn compare_platforms(
+        &self,
+        candidate: &Loaded,
+        scenario_id: &str,
+        topology_id: Option<&str>,
+    ) -> Result<PlatformComparison, ServiceError> {
+        let (base, in_use) = {
+            let rt = self.lock();
+            (rt.loaded.clone(), rt.timeline.topology().spec.id.clone())
+        };
+        let world = base
+            .assets
+            .world(&in_use)
+            .ok_or_else(|| ServiceError::UnknownTopology(in_use.clone()))?;
+        let scenario = world
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.info.id == scenario_id)
+            .ok_or_else(|| ServiceError::UnknownScenario(scenario_id.to_string()))?;
+        if !scenario.info.available {
+            return Err(ServiceError::ScenarioUnavailable(scenario_id.to_string()));
+        }
+
+        let files = &candidate.assets;
+        let other_id = match topology_id {
+            Some(id) => id,
+            None if files.world(&in_use).is_some() => &in_use,
+            None => &files.default_topology,
+        };
+        let other_world = files.world(other_id).ok_or_else(|| {
+            ServiceError::InvalidExperiment(format!("the files have no topology `{other_id}`"))
+        })?;
+        let other = other_world
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.info.id == scenario_id)
+            .ok_or_else(|| {
+                ServiceError::InvalidExperiment(format!(
+                    "the files have no scenario `{scenario_id}`; a comparison needs the incident on both sides"
+                ))
+            })?;
+        if !other.info.available {
+            return Err(ServiceError::InvalidExperiment(format!(
+                "scenario `{scenario_id}` cannot run on `{other_id}` as the files describe it: {}",
+                other
+                    .info
+                    .unavailable_reason
+                    .as_deref()
+                    .unwrap_or("not available")
+            )));
+        }
+        // The same incident on both sides, or the comparison is of two
+        // things at once.
+        let written = |loaded: &Loaded| {
+            loaded
+                .sources
+                .scenarios
+                .iter()
+                .find(|def| def.id == scenario_id)
+                .cloned()
+        };
+        if written(&base) != written(candidate) {
+            return Err(ServiceError::InvalidExperiment(format!(
+                "scenario `{scenario_id}` is written differently in the files than in use; a comparison needs the same incident on both sides"
+            )));
+        }
+        platforms::compare(
+            &Side {
+                world,
+                decisions: &base.assets.decisions,
+                scenario,
+            },
+            &Side {
+                world: other_world,
+                decisions: &files.decisions,
+                scenario: other,
+            },
+            self.seed,
         )
         .map_err(ServiceError::InvalidExperiment)
     }

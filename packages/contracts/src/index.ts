@@ -837,6 +837,102 @@ export interface TrialRequest {
   rampMs?: number;
 }
 
+/**
+ * One field two descriptions of the same thing state differently, as each
+ * file wrote it. `null` is a field the file left out.
+ */
+export const FieldChangeSchema = z.object({
+  field: z.string(),
+  base: z.unknown(),
+  candidate: z.unknown(),
+});
+export type FieldChange = z.infer<typeof FieldChangeSchema>;
+
+const NamedSchema = z.object({ id: z.string(), name: z.string() });
+const ItemChangeSchema = z.object({
+  id: z.string(),
+  /** Its name on the platform in use. */
+  name: z.string(),
+  fields: z.array(FieldChangeSchema),
+});
+const ConnectionSchema = z.object({ source: z.string(), target: z.string() });
+
+/**
+ * What two descriptions of a platform state differently, matched by id, and
+ * the one thing that follows without being stated: a capacity neither file
+ * gives is sized from the service's load at rest, which follows from
+ * everything that calls it.
+ */
+export const PlatformChangesSchema = z.object({
+  servicesAdded: z.array(NamedSchema),
+  servicesRemoved: z.array(NamedSchema),
+  servicesChanged: z.array(ItemChangeSchema),
+  connectionsAdded: z.array(ConnectionSchema),
+  connectionsRemoved: z.array(ConnectionSchema),
+  connectionsChanged: z.array(
+    z.object({ source: z.string(), target: z.string(), fields: z.array(FieldChangeSchema) }),
+  ),
+  regionsAdded: z.array(NamedSchema),
+  regionsRemoved: z.array(NamedSchema),
+  regionsChanged: z.array(ItemChangeSchema),
+  roles: z.array(
+    z.object({ role: z.string(), base: z.string().nullable(), candidate: z.string().nullable() }),
+  ),
+  derivedCapacity: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      base: z.number().positive(),
+      candidate: z.number().positive(),
+    }),
+  ),
+});
+export type PlatformChanges = z.infer<typeof PlatformChangesSchema>;
+
+/**
+ * One scenario on the platform in use and on the one a set of files
+ * describes, each on a timeline of its own from the same seed. `baseline`
+ * is the run in use and `variant` the run on the files; nothing is applied.
+ */
+export const PlatformComparisonSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  seed: count,
+  scenarioId: z.string(),
+  scenarioName: z.string(),
+  incidentStartedAtMs: count,
+  durationMs: count,
+  /** The platform in use. */
+  base: TopologySummarySchema,
+  /** The platform the files describe. */
+  candidate: TopologySummarySchema,
+  changes: PlatformChangesSchema,
+  /** Whether Cedar answers the simulation differently under the files. */
+  decisionsChanged: z.boolean(),
+  /**
+   * Phases in which the same scenario prescribes something else on each
+   * platform: a role that names another service, or a rate written as a
+   * share of a capacity that is another.
+   */
+  prescribed: z.array(
+    z.object({
+      phase: z.string(),
+      base: z.array(PrescribedEffectSchema),
+      candidate: z.array(PrescribedEffectSchema),
+    }),
+  ),
+  baseline: ExperimentRunSchema,
+  variant: ExperimentRunSchema,
+});
+export type PlatformComparison = z.infer<typeof PlatformComparisonSchema>;
+
+export interface PlatformComparisonRequest {
+  files: WorkspaceFile[];
+  scenarioId: string;
+  /** Which platform of the files to run on, when they describe several. */
+  topologyId?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Authorization
 // ---------------------------------------------------------------------------

@@ -144,6 +144,12 @@ takes an outcome, and what each can make the server do is bounded.
 - **A comparison touches nothing.** `POST /demo/experiments/compare`
   simulates one scenario twice on timelines of its own, bounded the same
   way, and answers with both. The timeline in use is not changed.
+- **Nor does a comparison of platforms.**
+  `POST /demo/experiments/platforms` takes files as an import does, builds
+  them the same way under the same limits (8 MiB, the file and item counts
+  of a workspace) and simulates one scenario on what is in use and on what
+  they describe. Nothing is applied, and the route is off where importing
+  is (`AEGIS_IMPORT=off`).
 - **A trial touches nothing either.** `POST /demo/experiments/trial`
   simulates the platform at rest twice, sixty seconds each, once with one
   fault, and answers with what the engine recorded. The fault is held to

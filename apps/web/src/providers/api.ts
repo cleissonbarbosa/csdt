@@ -32,6 +32,8 @@ import {
   type ControlAction,
   type EvaluateRequest,
   type ExperimentRequest,
+  type PlatformComparisonRequest,
+  PlatformComparisonSchema,
   type FaultEffect,
   type Recording,
   type WorkspaceFile,
@@ -185,6 +187,9 @@ export const api = {
   /** One fault tried on the platform at rest. The timeline in use is not touched. */
   tryFault: (body: TrialRequest) =>
     request(TrialSchema, '/demo/experiments/trial', body, LONG_TIMEOUT_MS),
+  /** One scenario on the platform in use and on the one the files describe. Nothing is applied. */
+  comparePlatforms: (body: PlatformComparisonRequest) =>
+    request(PlatformComparisonSchema, '/demo/experiments/platforms', body, LONG_TIMEOUT_MS),
   authorizationCatalog: () => request(AuthorizationCatalogSchema, '/demo/authorization/catalog'),
   authorizationDecisions: () =>
     request(z.array(AuthorizationDecisionSchema), '/demo/authorization/decisions'),

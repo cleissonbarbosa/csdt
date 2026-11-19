@@ -181,6 +181,17 @@ services affected and recovery side by side, and draws both runs. **Watch
 run B on the timeline** puts it there to scrub. Below the form, **Run them
 all** runs the same change at several figures and charts them.
 
+A change of architecture is tried the same way, from the files. Open **⋯ →
+Import or export files**, press **Save as one file**, and in the saved file
+give `use-gateway` a `"capacityRps": 7300` (three times what the model sizes
+it at). Drop the file back on the dialog, choose **DDoS Surge** under **How
+would an incident go on each?** and press **Run both**. Run B is worse, and
+the dialog says why before the figures: the surge is written as 2.2 times
+what the gateway can take, so the larger gateway is sent 16 060 requests a
+second where the one in use is sent 5 360, and everything behind it is the
+size it was. **Apply these files and watch run B** puts that run on the
+model.
+
 To see what a fault would do before placing it, open a service, open
 **Faults** on its card and choose one under **Try one first, without placing
 it**. The card lists the services that would leave normal and when, and the

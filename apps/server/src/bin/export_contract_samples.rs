@@ -225,6 +225,16 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
+    // One scenario on the platform in use and on the one a file describes,
+    // again on timelines of their own; the file is not applied.
+    save(
+        "platform-comparison",
+        post(
+            "/demo/experiments/platforms",
+            json!({ "files": [larger_gateway()?], "scenarioId": "ddos-surge" }),
+        )
+        .await?,
+    )?;
     let events = state.service.events(0, 5, None, None);
     save(
         "stream-events",
@@ -326,6 +336,57 @@ fn experiment_request() -> Value {
             "rampMs": 1000,
         },
     })
+}
+
+/// The bundled platform as an uploaded file, changed in four places: a
+/// gateway three times the size, one more service behind it with a role of
+/// its own, and fewer calls to search. The gateway is the one the surge is
+/// sized from, so the comparison also has a flood of another size to state.
+fn larger_gateway() -> Result<Value, AnyError> {
+    let mut topology = Sources::bundled()?
+        .topologies
+        .into_iter()
+        .next()
+        .ok_or("there is no bundled topology")?;
+    for node in &mut topology.nodes {
+        if node.id == "use-gateway" {
+            node.capacity_rps = Some(7300.0);
+        }
+    }
+    topology.nodes.push(serde_json::from_value(json!({
+        "id": "use-loyalty",
+        "name": "Loyalty",
+        "type": "microservice",
+        "region": "us-east",
+        "tier": 4,
+        "baseLatencyMs": 9.0,
+    }))?);
+    for edge in &mut topology.edges {
+        if edge.source == "use-gateway" && edge.target == "use-search" {
+            edge.weight = 0.1;
+        }
+    }
+    topology.edges.push(serde_json::from_value(json!({
+        "source": "use-gateway",
+        "target": "use-loyalty",
+        "protocol": "grpc",
+        "relationship": "call",
+        "weight": 0.2,
+    }))?);
+    topology.edges.push(serde_json::from_value(json!({
+        "source": "use-loyalty",
+        "target": "use-orders-db",
+        "protocol": "sql",
+        "relationship": "data",
+        "weight": 1.0,
+    }))?);
+    topology
+        .roles
+        .insert("resource:Loyalty".to_string(), "use-loyalty".to_string());
+    Ok(json!({
+        "path": "topologies/helios-commerce.json",
+        "text": serde_json::to_string(&topology)?,
+    }))
 }
 
 /// The bundled policies as an uploaded file, with one of them left out.

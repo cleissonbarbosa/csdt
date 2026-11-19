@@ -13,6 +13,7 @@ import {
   IncidentsResponseSchema,
   IntegrationStatusSchema,
   MetricsReportSchema,
+  PlatformComparisonSchema,
   RecordingSummarySchema,
   ScenariosResponseSchema,
   SessionExportSchema,
@@ -69,6 +70,8 @@ export const workspaceDiff = () => sample('workspace-diff', WorkspaceDiffSchema)
 export const incidentReport = () => sample('incident-report', IncidentReportSchema);
 export const session = () => sample('session', SessionExportSchema);
 export const experiment = () => sample('experiment', ExperimentSchema);
+/** The surge on the bundled platform and on one with a larger gateway and one more service. */
+export const platformComparison = () => sample('platform-comparison', PlatformComparisonSchema);
 
 /** A snapshot taken mid-incident (credential stuffing). */
 export function snapshot(): TelemetrySnapshot {

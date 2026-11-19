@@ -76,13 +76,13 @@ pub struct Experiment {
 /// When the scenario starts in a run, and how long the run lasts. A run can
 /// be no longer than the history a timeline keeps: a scenario that nearly
 /// fills it gives up the quiet lead-in before it gives up its own end.
-fn frame(scenario_ms: u64) -> (u64, u64) {
+pub(super) fn frame(scenario_ms: u64) -> (u64, u64) {
     let lead_in_ms = LEAD_IN_MS.min(MAX_DURATION_MS.saturating_sub(scenario_ms));
     let duration_ms = (lead_in_ms + scenario_ms + TAIL_MS).min(MAX_DURATION_MS);
     (lead_in_ms, duration_ms)
 }
 
-fn simulate(
+pub(super) fn simulate(
     world: &World,
     decisions: &Arc<DecisionTable>,
     recording: Recording,

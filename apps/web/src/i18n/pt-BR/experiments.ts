@@ -15,6 +15,8 @@ export default {
   'Running both…': 'Executando as duas…',
   'No scenario can run on this platform.': 'Nenhum cenário pode ser executado nesta plataforma.',
   'The comparison could not be run.': 'A comparação não pôde ser executada.',
+  'A change this form cannot make, such as another service or another connection, is a change to the files: stage them under <a>Platform files</a> and the same incident is run on both platforms.':
+    'Uma mudança que este formulário não faz, como mais um serviço ou outra conexão, é uma mudança nos arquivos: prepare-os em <a>Arquivos da plataforma</a> e o mesmo incidente é executado nas duas plataformas.',
 
   // The kinds of change, and what their figure means.
   'Change its capacity': 'Alterar a capacidade',
@@ -61,6 +63,9 @@ export default {
   'Services affected': 'Serviços afetados',
   'Error rate at {threshold} or over for': 'Taxa de erro de {threshold} ou mais durante',
   'Latency p95 at {threshold} or over for': 'Latência p95 de {threshold} ou mais durante',
+  'Error rate at its objective or over for': 'Taxa de erro no objetivo ou acima dele durante',
+  'Latency p95 at its objective or over for': 'Latência p95 no objetivo ou acima dele durante',
+  '{time} (objective {threshold})': '{time} (objetivo {threshold})',
   'met throughout': 'cumprido o tempo todo',
   'nothing was affected': 'nada foi afetado',
   'not within the run': 'não durante a execução',

@@ -1,0 +1,5678 @@
+{
+  "schemaVersion": "1.0",
+  "dataSource": "synthetic",
+  "seed": 42,
+  "scenarioId": "ddos-surge",
+  "scenarioName": "DDoS Surge",
+  "incidentStartedAtMs": 4200,
+  "durationMs": 140000,
+  "base": {
+    "id": "helios-commerce",
+    "name": "Helios Commerce",
+    "description": "Fictional multi-region commerce platform. Every service, metric and incident is synthetic.",
+    "nodeCount": 51,
+    "edgeCount": 75,
+    "regionCount": 4,
+    "dataSource": "synthetic"
+  },
+  "candidate": {
+    "id": "helios-commerce",
+    "name": "Helios Commerce",
+    "description": "Fictional multi-region commerce platform. Every service, metric and incident is synthetic.",
+    "nodeCount": 52,
+    "edgeCount": 77,
+    "regionCount": 4,
+    "dataSource": "synthetic"
+  },
+  "changes": {
+    "servicesAdded": [
+      {
+        "id": "use-loyalty",
+        "name": "Loyalty"
+      }
+    ],
+    "servicesRemoved": [],
+    "servicesChanged": [
+      {
+        "id": "use-gateway",
+        "name": "API Gateway",
+        "fields": [
+          {
+            "field": "capacityRps",
+            "base": null,
+            "candidate": 7300.0
+          }
+        ]
+      }
+    ],
+    "connectionsAdded": [
+      {
+        "source": "use-gateway",
+        "target": "use-loyalty"
+      },
+      {
+        "source": "use-loyalty",
+        "target": "use-orders-db"
+      }
+    ],
+    "connectionsRemoved": [],
+    "connectionsChanged": [
+      {
+        "source": "use-gateway",
+        "target": "use-search",
+        "fields": [
+          {
+            "field": "weight",
+            "base": 0.14,
+            "candidate": 0.1
+          }
+        ]
+      }
+    ],
+    "regionsAdded": [],
+    "regionsRemoved": [],
+    "regionsChanged": [],
+    "roles": [
+      {
+        "role": "resource:Loyalty",
+        "base": null,
+        "candidate": "use-loyalty"
+      }
+    ],
+    "derivedCapacity": [
+      {
+        "id": "use-search",
+        "name": "Search",
+        "base": 312.68160000000006,
+        "candidate": 223.34400000000002
+      },
+      {
+        "id": "use-orders-db",
+        "name": "Orders DB",
+        "base": 716.4875520000002,
+        "candidate": 1163.1755520000002
+      },
+      {
+        "id": "use-catalog-db",
+        "name": "Catalog DB",
+        "base": 1105.002,
+        "candidate": 1033.938
+      },
+      {
+        "id": "euw-orders-db",
+        "name": "Orders DB",
+        "base": 684.6876,
+        "candidate": 811.5876000000001
+      },
+      {
+        "id": "euw-catalog-db",
+        "name": "Catalog DB",
+        "base": 691.4484,
+        "candidate": 677.2356000000001
+      },
+      {
+        "id": "aps-orders-db",
+        "name": "Orders DB",
+        "base": 273.32856,
+        "candidate": 349.46856
+      }
+    ]
+  },
+  "decisionsChanged": false,
+  "prescribed": [
+    {
+      "phase": "Probing",
+      "base": [
+        {
+          "description": "injected traffic “Volumetric flood” at 292 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        }
+      ],
+      "candidate": [
+        {
+          "description": "injected traffic “Volumetric flood” at 876 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "Volumetric surge",
+      "base": [
+        {
+          "description": "injected traffic “Volumetric flood” at 5360 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        }
+      ],
+      "candidate": [
+        {
+          "description": "injected traffic “Volumetric flood” at 16060 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "Edge mitigation",
+      "base": [
+        {
+          "description": "injected traffic “Volumetric flood” at 5360 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        },
+        {
+          "description": "94% of “Volumetric flood” turned away",
+          "nodeIds": [
+            "edge-router"
+          ],
+          "edgeIds": []
+        }
+      ],
+      "candidate": [
+        {
+          "description": "injected traffic “Volumetric flood” at 16060 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        },
+        {
+          "description": "94% of “Volumetric flood” turned away",
+          "nodeIds": [
+            "edge-router"
+          ],
+          "edgeIds": []
+        }
+      ]
+    },
+    {
+      "phase": "Attack subsides",
+      "base": [
+        {
+          "description": "injected traffic “Volumetric flood” at 609 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        },
+        {
+          "description": "94% of “Volumetric flood” turned away",
+          "nodeIds": [
+            "edge-router"
+          ],
+          "edgeIds": []
+        }
+      ],
+      "candidate": [
+        {
+          "description": "injected traffic “Volumetric flood” at 1825 req/s",
+          "nodeIds": [
+            "edge-router",
+            "use-gateway"
+          ],
+          "edgeIds": [
+            "unknown-sources->edge-router",
+            "edge-router->use-gateway"
+          ]
+        },
+        {
+          "description": "94% of “Volumetric flood” turned away",
+          "nodeIds": [
+            "edge-router"
+          ],
+          "edgeIds": []
+        }
+      ]
+    }
+  ],
+  "baseline": {
+    "recording": {
+      "id": "platforms-in-use",
+      "name": "DDoS Surge, on Helios Commerce",
+      "description": "Run of a comparison of platforms on helios-commerce with seed 42.",
+      "topologyId": "helios-commerce",
+      "seed": 42,
+      "durationMs": 140000,
+      "commands": [
+        {
+          "atMs": 4000,
+          "command": {
+            "type": "startScenario",
+            "scenarioId": "ddos-surge"
+          }
+        }
+      ]
+    },
+    "report": {
+      "schemaVersion": "1.0",
+      "dataSource": "synthetic",
+      "incidentId": "inc-001",
+      "scenarioId": "ddos-surge",
+      "title": "DDoS Surge",
+      "severity": "critical",
+      "status": "resolved",
+      "startedAtMs": 4200,
+      "resolvedAtMs": 100200,
+      "resolution": "The scenario ran to completion.",
+      "recoveredAtMs": 107800,
+      "observedUntilMs": 107800,
+      "origin": {
+        "nodeId": "use-gateway",
+        "basis": "declared"
+      },
+      "baseline": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "phases": [
+        {
+          "index": 0,
+          "name": "Probing",
+          "status": "active",
+          "description": "Low-rate probes map the public API surface.",
+          "atMs": 4200,
+          "sinceStartMs": 0,
+          "endedAtMs": 12200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 292 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "seq": 6,
+              "nodeId": "use-order-worker",
+              "atMs": 9200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            }
+          ],
+          "events": [
+            {
+              "seq": 4,
+              "atMs": 6200,
+              "severity": "notice",
+              "title": "Unusual request pattern at the edge",
+              "scripted": true
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 5000
+          },
+          "peakP95LatencyMs": {
+            "value": 172.6,
+            "atMs": 9000
+          }
+        },
+        {
+          "index": 1,
+          "name": "Volumetric surge",
+          "status": "active",
+          "description": "Request volume climbs to several times the gateway's capacity. Latency rises and requests are shed.",
+          "atMs": 12200,
+          "sinceStartMs": 8000,
+          "endedAtMs": 40200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 5360 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "seq": 10,
+              "nodeId": "use-catalog",
+              "atMs": 14400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-catalog"
+              }
+            },
+            {
+              "seq": 11,
+              "nodeId": "use-search",
+              "atMs": 14400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-search"
+              }
+            },
+            {
+              "seq": 12,
+              "nodeId": "use-cart",
+              "atMs": 14400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cart"
+              }
+            },
+            {
+              "seq": 13,
+              "nodeId": "use-customers",
+              "atMs": 14400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-customers"
+              }
+            },
+            {
+              "seq": 14,
+              "nodeId": "use-inventory",
+              "atMs": 14400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 15,
+              "nodeId": "use-gateway",
+              "atMs": 14600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+              }
+            },
+            {
+              "seq": 16,
+              "nodeId": "use-orders",
+              "atMs": 14600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-orders"
+              }
+            },
+            {
+              "seq": 17,
+              "nodeId": "use-customer-db",
+              "atMs": 14800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 18,
+              "nodeId": "use-auth",
+              "atMs": 15000,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-auth"
+              }
+            },
+            {
+              "seq": 20,
+              "nodeId": "clients-na",
+              "atMs": 15200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-na->edge-router"
+              }
+            },
+            {
+              "seq": 21,
+              "nodeId": "clients-eu",
+              "atMs": 15200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-eu->edge-router"
+              }
+            },
+            {
+              "seq": 22,
+              "nodeId": "clients-apac",
+              "atMs": 15200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-apac->edge-router"
+              }
+            },
+            {
+              "seq": 23,
+              "nodeId": "partner-api",
+              "atMs": 15200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "partner-api->edge-router"
+              }
+            },
+            {
+              "seq": 24,
+              "nodeId": "edge-router",
+              "atMs": 15200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+              }
+            },
+            {
+              "seq": 25,
+              "nodeId": "use-orders-db",
+              "atMs": 15600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 26,
+              "nodeId": "use-gateway",
+              "atMs": 15800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+              }
+            },
+            {
+              "seq": 29,
+              "nodeId": "clients-na",
+              "atMs": 17000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-na->edge-router"
+              }
+            },
+            {
+              "seq": 30,
+              "nodeId": "clients-eu",
+              "atMs": 17000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-eu->edge-router"
+              }
+            },
+            {
+              "seq": 31,
+              "nodeId": "clients-apac",
+              "atMs": 17000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-apac->edge-router"
+              }
+            },
+            {
+              "seq": 32,
+              "nodeId": "partner-api",
+              "atMs": 17000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "partner-api->edge-router"
+              }
+            },
+            {
+              "seq": 33,
+              "nodeId": "edge-router",
+              "atMs": 17000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+              }
+            },
+            {
+              "seq": 34,
+              "nodeId": "use-order-events",
+              "atMs": 17600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "use-order-worker",
+                "edgeId": "use-order-events->use-order-worker"
+              }
+            },
+            {
+              "seq": 40,
+              "nodeId": "use-order-events",
+              "atMs": 30000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "use-order-worker",
+                "edgeId": "use-order-events->use-order-worker"
+              }
+            }
+          ],
+          "events": [
+            {
+              "seq": 9,
+              "atMs": 13400,
+              "severity": "warning",
+              "title": "Suspicious traffic surge",
+              "scripted": false
+            },
+            {
+              "seq": 19,
+              "atMs": 15000,
+              "severity": "warning",
+              "title": "Error budget burning",
+              "scripted": false
+            },
+            {
+              "seq": 28,
+              "atMs": 16200,
+              "severity": "warning",
+              "title": "Latency objective breached",
+              "scripted": false
+            },
+            {
+              "seq": 35,
+              "atMs": 19200,
+              "severity": "critical",
+              "title": "Volumetric attack detected",
+              "scripted": true
+            },
+            {
+              "seq": 38,
+              "atMs": 26200,
+              "severity": "warning",
+              "title": "Downstream services saturating",
+              "scripted": true
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.3025,
+            "atMs": 26000
+          },
+          "peakP95LatencyMs": {
+            "value": 607.8,
+            "atMs": 26000
+          }
+        },
+        {
+          "index": 2,
+          "name": "Edge mitigation",
+          "status": "mitigating",
+          "description": "Rate-based rules at the edge router drop traffic from the offending sources before it reaches the gateway.",
+          "atMs": 40200,
+          "sinceStartMs": 36000,
+          "endedAtMs": 66200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 5360 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            },
+            {
+              "description": "94% of “Volumetric flood” turned away",
+              "nodeIds": [
+                "edge-router"
+              ],
+              "edgeIds": []
+            }
+          ],
+          "transitions": [],
+          "events": [
+            {
+              "seq": 45,
+              "atMs": 40200,
+              "severity": "notice",
+              "title": "Edge filtering engaged",
+              "scripted": true
+            },
+            {
+              "seq": 52,
+              "atMs": 44800,
+              "severity": "info",
+              "title": "Error rate back within objective",
+              "scripted": false
+            },
+            {
+              "seq": 53,
+              "atMs": 45000,
+              "severity": "info",
+              "title": "Latency back within objective",
+              "scripted": false
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.2967,
+            "atMs": 41000
+          },
+          "peakP95LatencyMs": {
+            "value": 578.3,
+            "atMs": 41000
+          }
+        },
+        {
+          "index": 3,
+          "name": "Attack subsides",
+          "status": "recovering",
+          "description": "The flood loses intensity while filtering stays in place.",
+          "atMs": 66200,
+          "sinceStartMs": 62000,
+          "endedAtMs": 84200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 609 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            },
+            {
+              "description": "94% of “Volumetric flood” turned away",
+              "nodeIds": [
+                "edge-router"
+              ],
+              "edgeIds": []
+            }
+          ],
+          "transitions": [],
+          "events": [],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 67000
+          },
+          "peakP95LatencyMs": {
+            "value": 171.2,
+            "atMs": 67000
+          }
+        },
+        {
+          "index": 4,
+          "name": "Recovery",
+          "status": "recovering",
+          "description": "Traffic returns to its normal shape and services recover.",
+          "atMs": 84200,
+          "sinceStartMs": 80000,
+          "endedAtMs": 100200,
+          "prescribed": [],
+          "transitions": [],
+          "events": [
+            {
+              "seq": 83,
+              "atMs": 90200,
+              "severity": "info",
+              "title": "Traffic back to baseline",
+              "scripted": true
+            },
+            {
+              "seq": 84,
+              "atMs": 90200,
+              "severity": "info",
+              "title": "Suspicious traffic subsided",
+              "scripted": false
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 85000
+          },
+          "peakP95LatencyMs": {
+            "value": 168.9,
+            "atMs": 88000
+          }
+        }
+      ],
+      "propagation": [
+        {
+          "seq": 6,
+          "nodeId": "use-order-worker",
+          "atMs": 9200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 10,
+          "nodeId": "use-catalog",
+          "atMs": 14400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-catalog"
+          }
+        },
+        {
+          "seq": 11,
+          "nodeId": "use-search",
+          "atMs": 14400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-search"
+          }
+        },
+        {
+          "seq": 12,
+          "nodeId": "use-cart",
+          "atMs": 14400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-cart"
+          }
+        },
+        {
+          "seq": 13,
+          "nodeId": "use-customers",
+          "atMs": 14400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-customers"
+          }
+        },
+        {
+          "seq": 14,
+          "nodeId": "use-inventory",
+          "atMs": 14400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 15,
+          "nodeId": "use-gateway",
+          "atMs": 14600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+          }
+        },
+        {
+          "seq": 16,
+          "nodeId": "use-orders",
+          "atMs": 14600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-orders"
+          }
+        },
+        {
+          "seq": 17,
+          "nodeId": "use-customer-db",
+          "atMs": 14800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 18,
+          "nodeId": "use-auth",
+          "atMs": 15000,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-auth"
+          }
+        },
+        {
+          "seq": 20,
+          "nodeId": "clients-na",
+          "atMs": 15200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-na->edge-router"
+          }
+        },
+        {
+          "seq": 21,
+          "nodeId": "clients-eu",
+          "atMs": 15200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-eu->edge-router"
+          }
+        },
+        {
+          "seq": 22,
+          "nodeId": "clients-apac",
+          "atMs": 15200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-apac->edge-router"
+          }
+        },
+        {
+          "seq": 23,
+          "nodeId": "partner-api",
+          "atMs": 15200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "partner-api->edge-router"
+          }
+        },
+        {
+          "seq": 24,
+          "nodeId": "edge-router",
+          "atMs": 15200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Volumetric flood” at 5360 req/s"
+          }
+        },
+        {
+          "seq": 25,
+          "nodeId": "use-orders-db",
+          "atMs": 15600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 34,
+          "nodeId": "use-order-events",
+          "atMs": 17600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "use-order-worker",
+            "edgeId": "use-order-events->use-order-worker"
+          }
+        }
+      ],
+      "recovery": [
+        {
+          "seq": 47,
+          "nodeId": "clients-na",
+          "atMs": 44600,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 48,
+          "nodeId": "clients-eu",
+          "atMs": 44600,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 49,
+          "nodeId": "clients-apac",
+          "atMs": 44600,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 50,
+          "nodeId": "partner-api",
+          "atMs": 44600,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 51,
+          "nodeId": "edge-router",
+          "atMs": 44600,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 54,
+          "nodeId": "clients-na",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 55,
+          "nodeId": "clients-eu",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 56,
+          "nodeId": "clients-apac",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 57,
+          "nodeId": "partner-api",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 58,
+          "nodeId": "edge-router",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 59,
+          "nodeId": "use-auth",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 60,
+          "nodeId": "use-orders-db",
+          "atMs": 45800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 61,
+          "nodeId": "use-customer-db",
+          "atMs": 46000,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 62,
+          "nodeId": "use-gateway",
+          "atMs": 46200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 63,
+          "nodeId": "use-orders",
+          "atMs": 46200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 64,
+          "nodeId": "use-catalog",
+          "atMs": 46400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 65,
+          "nodeId": "use-search",
+          "atMs": 46400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 66,
+          "nodeId": "use-cart",
+          "atMs": 46400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 67,
+          "nodeId": "use-customers",
+          "atMs": 46400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 68,
+          "nodeId": "use-inventory",
+          "atMs": 46400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 79,
+          "nodeId": "use-order-events",
+          "atMs": 83200,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 89,
+          "nodeId": "use-order-events",
+          "atMs": 102800,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 91,
+          "nodeId": "use-order-worker",
+          "atMs": 107800,
+          "from": "degraded",
+          "to": "healthy"
+        }
+      ],
+      "decisions": [],
+      "impactedNodeIds": [
+        "clients-na",
+        "clients-eu",
+        "clients-apac",
+        "partner-api",
+        "edge-router",
+        "use-gateway",
+        "use-auth",
+        "use-catalog",
+        "use-search",
+        "use-cart",
+        "use-orders",
+        "use-customers",
+        "use-inventory",
+        "use-order-events",
+        "use-order-worker",
+        "use-orders-db",
+        "use-customer-db"
+      ],
+      "stillUnhealthyNodeIds": [],
+      "peakErrorRate": {
+        "value": 0.3025,
+        "atMs": 26000
+      },
+      "peakP95LatencyMs": {
+        "value": 607.8,
+        "atMs": 26000
+      },
+      "peakUnhealthy": {
+        "value": 17.0,
+        "atMs": 17600
+      },
+      "meanErrorRate": 0.0802,
+      "objectives": [
+        {
+          "kind": "error-rate",
+          "threshold": 0.05,
+          "breachedMs": 30000,
+          "firstBreachedAtMs": 15000
+        },
+        {
+          "kind": "latency-p95",
+          "threshold": 417.0,
+          "breachedMs": 27000,
+          "firstBreachedAtMs": 17000
+        }
+      ],
+      "truncated": false
+    },
+    "samples": [
+      {
+        "tick": 0,
+        "virtualTimeMs": 0,
+        "rps": 2160.0,
+        "avgLatencyMs": 98.2,
+        "p95LatencyMs": 166.8,
+        "p99LatencyMs": 213.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 5,
+        "virtualTimeMs": 1000,
+        "rps": 2200.9,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.3,
+        "p99LatencyMs": 214.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 10,
+        "virtualTimeMs": 2000,
+        "rps": 2218.2,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 15,
+        "virtualTimeMs": 3000,
+        "rps": 2230.4,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 20,
+        "virtualTimeMs": 4000,
+        "rps": 2243.6,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 25,
+        "virtualTimeMs": 5000,
+        "rps": 2246.7,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.8,
+        "p99LatencyMs": 214.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 20.8
+      },
+      {
+        "tick": 30,
+        "virtualTimeMs": 6000,
+        "rps": 2348.1,
+        "avgLatencyMs": 99.5,
+        "p95LatencyMs": 169.1,
+        "p99LatencyMs": 216.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 104.2
+      },
+      {
+        "tick": 35,
+        "virtualTimeMs": 7000,
+        "rps": 2428.9,
+        "avgLatencyMs": 100.2,
+        "p95LatencyMs": 170.5,
+        "p99LatencyMs": 218.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 209.1
+      },
+      {
+        "tick": 40,
+        "virtualTimeMs": 8000,
+        "rps": 2523.6,
+        "avgLatencyMs": 101.1,
+        "p95LatencyMs": 172.1,
+        "p99LatencyMs": 220.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 281.1
+      },
+      {
+        "tick": 45,
+        "virtualTimeMs": 9000,
+        "rps": 2551.8,
+        "avgLatencyMs": 101.3,
+        "p95LatencyMs": 172.6,
+        "p99LatencyMs": 221.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 292.0
+      },
+      {
+        "tick": 50,
+        "virtualTimeMs": 10000,
+        "rps": 2543.1,
+        "avgLatencyMs": 101.2,
+        "p95LatencyMs": 172.3,
+        "p99LatencyMs": 220.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 292.4
+      },
+      {
+        "tick": 55,
+        "virtualTimeMs": 11000,
+        "rps": 2522.4,
+        "avgLatencyMs": 101.0,
+        "p95LatencyMs": 172.0,
+        "p99LatencyMs": 220.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 292.4
+      },
+      {
+        "tick": 60,
+        "virtualTimeMs": 12000,
+        "rps": 2519.9,
+        "avgLatencyMs": 101.0,
+        "p95LatencyMs": 171.9,
+        "p99LatencyMs": 220.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 292.4
+      },
+      {
+        "tick": 65,
+        "virtualTimeMs": 13000,
+        "rps": 2615.9,
+        "avgLatencyMs": 102.1,
+        "p95LatencyMs": 174.1,
+        "p99LatencyMs": 223.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 388.8
+      },
+      {
+        "tick": 70,
+        "virtualTimeMs": 14000,
+        "rps": 3043.4,
+        "avgLatencyMs": 115.7,
+        "p95LatencyMs": 199.9,
+        "p99LatencyMs": 258.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 831.7
+      },
+      {
+        "tick": 75,
+        "virtualTimeMs": 15000,
+        "rps": 3794.9,
+        "avgLatencyMs": 194.8,
+        "p95LatencyMs": 362.9,
+        "p99LatencyMs": 488.3,
+        "errorRate": 0.06,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1557.9
+      },
+      {
+        "tick": 80,
+        "virtualTimeMs": 16000,
+        "rps": 4671.1,
+        "avgLatencyMs": 216.9,
+        "p95LatencyMs": 411.4,
+        "p99LatencyMs": 559.3,
+        "errorRate": 0.1609,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 2450.3
+      },
+      {
+        "tick": 85,
+        "virtualTimeMs": 17000,
+        "rps": 5622.1,
+        "avgLatencyMs": 237.2,
+        "p95LatencyMs": 457.8,
+        "p99LatencyMs": 628.8,
+        "errorRate": 0.2271,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 3390.3
+      },
+      {
+        "tick": 90,
+        "virtualTimeMs": 18000,
+        "rps": 6451.6,
+        "avgLatencyMs": 256.7,
+        "p95LatencyMs": 503.6,
+        "p99LatencyMs": 698.3,
+        "errorRate": 0.2666,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 4258.9
+      },
+      {
+        "tick": 95,
+        "virtualTimeMs": 19000,
+        "rps": 7138.8,
+        "avgLatencyMs": 277.7,
+        "p95LatencyMs": 554.1,
+        "p99LatencyMs": 776.0,
+        "errorRate": 0.2901,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 4937.6
+      },
+      {
+        "tick": 100,
+        "virtualTimeMs": 20000,
+        "rps": 7512.8,
+        "avgLatencyMs": 297.2,
+        "p95LatencyMs": 602.1,
+        "p99LatencyMs": 850.9,
+        "errorRate": 0.3007,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5307.4
+      },
+      {
+        "tick": 105,
+        "virtualTimeMs": 21000,
+        "rps": 7561.2,
+        "avgLatencyMs": 299.0,
+        "p95LatencyMs": 606.5,
+        "p99LatencyMs": 857.8,
+        "errorRate": 0.3021,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5358.6
+      },
+      {
+        "tick": 110,
+        "virtualTimeMs": 22000,
+        "rps": 7574.7,
+        "avgLatencyMs": 299.2,
+        "p95LatencyMs": 607.1,
+        "p99LatencyMs": 858.7,
+        "errorRate": 0.3023,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.2
+      },
+      {
+        "tick": 115,
+        "virtualTimeMs": 23000,
+        "rps": 7552.6,
+        "avgLatencyMs": 298.9,
+        "p95LatencyMs": 606.3,
+        "p99LatencyMs": 857.4,
+        "errorRate": 0.302,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 120,
+        "virtualTimeMs": 24000,
+        "rps": 7551.6,
+        "avgLatencyMs": 298.9,
+        "p95LatencyMs": 606.3,
+        "p99LatencyMs": 857.3,
+        "errorRate": 0.302,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 125,
+        "virtualTimeMs": 25000,
+        "rps": 7568.6,
+        "avgLatencyMs": 299.2,
+        "p95LatencyMs": 606.9,
+        "p99LatencyMs": 858.3,
+        "errorRate": 0.3022,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 130,
+        "virtualTimeMs": 26000,
+        "rps": 7591.6,
+        "avgLatencyMs": 299.5,
+        "p95LatencyMs": 607.8,
+        "p99LatencyMs": 859.7,
+        "errorRate": 0.3025,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 135,
+        "virtualTimeMs": 27000,
+        "rps": 7587.1,
+        "avgLatencyMs": 299.5,
+        "p95LatencyMs": 607.6,
+        "p99LatencyMs": 859.4,
+        "errorRate": 0.3024,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 140,
+        "virtualTimeMs": 28000,
+        "rps": 7558.9,
+        "avgLatencyMs": 299.0,
+        "p95LatencyMs": 606.6,
+        "p99LatencyMs": 857.8,
+        "errorRate": 0.3021,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 145,
+        "virtualTimeMs": 29000,
+        "rps": 7587.5,
+        "avgLatencyMs": 299.5,
+        "p95LatencyMs": 607.6,
+        "p99LatencyMs": 859.4,
+        "errorRate": 0.3024,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 150,
+        "virtualTimeMs": 30000,
+        "rps": 7575.9,
+        "avgLatencyMs": 299.3,
+        "p95LatencyMs": 607.2,
+        "p99LatencyMs": 858.8,
+        "errorRate": 0.3023,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 155,
+        "virtualTimeMs": 31000,
+        "rps": 7563.8,
+        "avgLatencyMs": 299.1,
+        "p95LatencyMs": 606.7,
+        "p99LatencyMs": 858.1,
+        "errorRate": 0.3022,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 160,
+        "virtualTimeMs": 32000,
+        "rps": 7538.9,
+        "avgLatencyMs": 298.7,
+        "p95LatencyMs": 605.8,
+        "p99LatencyMs": 856.6,
+        "errorRate": 0.3018,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 165,
+        "virtualTimeMs": 33000,
+        "rps": 7557.4,
+        "avgLatencyMs": 299.0,
+        "p95LatencyMs": 606.5,
+        "p99LatencyMs": 857.7,
+        "errorRate": 0.3021,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 170,
+        "virtualTimeMs": 34000,
+        "rps": 7536.8,
+        "avgLatencyMs": 298.7,
+        "p95LatencyMs": 605.7,
+        "p99LatencyMs": 856.5,
+        "errorRate": 0.3018,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 175,
+        "virtualTimeMs": 35000,
+        "rps": 7503.2,
+        "avgLatencyMs": 298.2,
+        "p95LatencyMs": 604.5,
+        "p99LatencyMs": 854.6,
+        "errorRate": 0.3014,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 180,
+        "virtualTimeMs": 36000,
+        "rps": 7526.4,
+        "avgLatencyMs": 298.5,
+        "p95LatencyMs": 605.3,
+        "p99LatencyMs": 855.9,
+        "errorRate": 0.3017,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 185,
+        "virtualTimeMs": 37000,
+        "rps": 7490.3,
+        "avgLatencyMs": 297.9,
+        "p95LatencyMs": 604.0,
+        "p99LatencyMs": 853.8,
+        "errorRate": 0.3012,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 190,
+        "virtualTimeMs": 38000,
+        "rps": 7495.6,
+        "avgLatencyMs": 298.0,
+        "p95LatencyMs": 604.2,
+        "p99LatencyMs": 854.1,
+        "errorRate": 0.3013,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 195,
+        "virtualTimeMs": 39000,
+        "rps": 7475.2,
+        "avgLatencyMs": 297.7,
+        "p95LatencyMs": 603.3,
+        "p99LatencyMs": 852.8,
+        "errorRate": 0.3011,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 200,
+        "virtualTimeMs": 40000,
+        "rps": 7496.4,
+        "avgLatencyMs": 298.1,
+        "p95LatencyMs": 604.2,
+        "p99LatencyMs": 854.2,
+        "errorRate": 0.3013,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 205,
+        "virtualTimeMs": 41000,
+        "rps": 7495.7,
+        "avgLatencyMs": 287.6,
+        "p95LatencyMs": 578.3,
+        "p99LatencyMs": 813.6,
+        "errorRate": 0.2967,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 210,
+        "virtualTimeMs": 42000,
+        "rps": 7482.4,
+        "avgLatencyMs": 261.2,
+        "p95LatencyMs": 514.2,
+        "p99LatencyMs": 714.3,
+        "errorRate": 0.2729,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 215,
+        "virtualTimeMs": 43000,
+        "rps": 7465.1,
+        "avgLatencyMs": 234.5,
+        "p95LatencyMs": 451.3,
+        "p99LatencyMs": 618.9,
+        "errorRate": 0.2204,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 220,
+        "virtualTimeMs": 44000,
+        "rps": 7459.4,
+        "avgLatencyMs": 208.4,
+        "p95LatencyMs": 392.2,
+        "p99LatencyMs": 530.9,
+        "errorRate": 0.1184,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 225,
+        "virtualTimeMs": 45000,
+        "rps": 7499.1,
+        "avgLatencyMs": 133.3,
+        "p95LatencyMs": 235.6,
+        "p99LatencyMs": 308.2,
+        "errorRate": 0.007,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 230,
+        "virtualTimeMs": 46000,
+        "rps": 7480.1,
+        "avgLatencyMs": 102.7,
+        "p95LatencyMs": 175.2,
+        "p99LatencyMs": 224.8,
+        "errorRate": 0.0002,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 235,
+        "virtualTimeMs": 47000,
+        "rps": 7482.3,
+        "avgLatencyMs": 100.9,
+        "p95LatencyMs": 171.8,
+        "p99LatencyMs": 220.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 240,
+        "virtualTimeMs": 48000,
+        "rps": 7478.8,
+        "avgLatencyMs": 100.8,
+        "p95LatencyMs": 171.7,
+        "p99LatencyMs": 219.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 245,
+        "virtualTimeMs": 49000,
+        "rps": 7496.9,
+        "avgLatencyMs": 101.0,
+        "p95LatencyMs": 172.0,
+        "p99LatencyMs": 220.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 250,
+        "virtualTimeMs": 50000,
+        "rps": 7481.8,
+        "avgLatencyMs": 100.9,
+        "p95LatencyMs": 171.8,
+        "p99LatencyMs": 220.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 255,
+        "virtualTimeMs": 51000,
+        "rps": 7479.2,
+        "avgLatencyMs": 100.9,
+        "p95LatencyMs": 171.8,
+        "p99LatencyMs": 220.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 260,
+        "virtualTimeMs": 52000,
+        "rps": 7476.4,
+        "avgLatencyMs": 100.9,
+        "p95LatencyMs": 171.7,
+        "p99LatencyMs": 220.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 265,
+        "virtualTimeMs": 53000,
+        "rps": 7497.6,
+        "avgLatencyMs": 101.0,
+        "p95LatencyMs": 172.0,
+        "p99LatencyMs": 220.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 270,
+        "virtualTimeMs": 54000,
+        "rps": 7460.7,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.5,
+        "p99LatencyMs": 219.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 275,
+        "virtualTimeMs": 55000,
+        "rps": 7481.7,
+        "avgLatencyMs": 100.9,
+        "p95LatencyMs": 171.8,
+        "p99LatencyMs": 220.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 280,
+        "virtualTimeMs": 56000,
+        "rps": 7466.8,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.5,
+        "p99LatencyMs": 219.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 285,
+        "virtualTimeMs": 57000,
+        "rps": 7460.3,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.4,
+        "p99LatencyMs": 219.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 290,
+        "virtualTimeMs": 58000,
+        "rps": 7447.0,
+        "avgLatencyMs": 100.5,
+        "p95LatencyMs": 171.1,
+        "p99LatencyMs": 219.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 295,
+        "virtualTimeMs": 59000,
+        "rps": 7428.8,
+        "avgLatencyMs": 100.4,
+        "p95LatencyMs": 170.9,
+        "p99LatencyMs": 218.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 300,
+        "virtualTimeMs": 60000,
+        "rps": 7443.8,
+        "avgLatencyMs": 100.5,
+        "p95LatencyMs": 171.1,
+        "p99LatencyMs": 219.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 305,
+        "virtualTimeMs": 61000,
+        "rps": 7430.2,
+        "avgLatencyMs": 100.4,
+        "p95LatencyMs": 170.9,
+        "p99LatencyMs": 218.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 310,
+        "virtualTimeMs": 62000,
+        "rps": 7446.2,
+        "avgLatencyMs": 100.5,
+        "p95LatencyMs": 171.1,
+        "p99LatencyMs": 219.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 315,
+        "virtualTimeMs": 63000,
+        "rps": 7442.4,
+        "avgLatencyMs": 100.5,
+        "p95LatencyMs": 171.1,
+        "p99LatencyMs": 219.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 320,
+        "virtualTimeMs": 64000,
+        "rps": 7447.2,
+        "avgLatencyMs": 100.5,
+        "p95LatencyMs": 171.1,
+        "p99LatencyMs": 219.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 325,
+        "virtualTimeMs": 65000,
+        "rps": 7451.4,
+        "avgLatencyMs": 100.6,
+        "p95LatencyMs": 171.2,
+        "p99LatencyMs": 219.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 330,
+        "virtualTimeMs": 66000,
+        "rps": 7456.6,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.4,
+        "p99LatencyMs": 219.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5360.3
+      },
+      {
+        "tick": 335,
+        "virtualTimeMs": 67000,
+        "rps": 7386.1,
+        "avgLatencyMs": 100.6,
+        "p95LatencyMs": 171.2,
+        "p99LatencyMs": 219.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5301.6
+      },
+      {
+        "tick": 340,
+        "virtualTimeMs": 68000,
+        "rps": 7111.4,
+        "avgLatencyMs": 100.4,
+        "p95LatencyMs": 170.9,
+        "p99LatencyMs": 219.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5026.1
+      },
+      {
+        "tick": 345,
+        "virtualTimeMs": 69000,
+        "rps": 6654.8,
+        "avgLatencyMs": 100.2,
+        "p95LatencyMs": 170.6,
+        "p99LatencyMs": 218.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 4557.8
+      },
+      {
+        "tick": 350,
+        "virtualTimeMs": 70000,
+        "rps": 6077.8,
+        "avgLatencyMs": 100.1,
+        "p95LatencyMs": 170.4,
+        "p99LatencyMs": 218.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 3952.7
+      },
+      {
+        "tick": 355,
+        "virtualTimeMs": 71000,
+        "rps": 5391.0,
+        "avgLatencyMs": 99.8,
+        "p95LatencyMs": 169.6,
+        "p99LatencyMs": 217.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 3267.8
+      },
+      {
+        "tick": 360,
+        "virtualTimeMs": 72000,
+        "rps": 4682.0,
+        "avgLatencyMs": 99.4,
+        "p95LatencyMs": 169.0,
+        "p99LatencyMs": 216.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 2560.1
+      },
+      {
+        "tick": 365,
+        "virtualTimeMs": 73000,
+        "rps": 4004.6,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.3,
+        "p99LatencyMs": 215.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1886.5
+      },
+      {
+        "tick": 370,
+        "virtualTimeMs": 74000,
+        "rps": 3435.2,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 168.1,
+        "p99LatencyMs": 215.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1304.2
+      },
+      {
+        "tick": 375,
+        "virtualTimeMs": 75000,
+        "rps": 2994.4,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 870.2
+      },
+      {
+        "tick": 380,
+        "virtualTimeMs": 76000,
+        "rps": 2790.5,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 641.4
+      },
+      {
+        "tick": 385,
+        "virtualTimeMs": 77000,
+        "rps": 2769.7,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 610.1
+      },
+      {
+        "tick": 390,
+        "virtualTimeMs": 78000,
+        "rps": 2775.5,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.2
+      },
+      {
+        "tick": 395,
+        "virtualTimeMs": 79000,
+        "rps": 2762.6,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 400,
+        "virtualTimeMs": 80000,
+        "rps": 2754.2,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.3,
+        "p99LatencyMs": 214.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 405,
+        "virtualTimeMs": 81000,
+        "rps": 2745.0,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 410,
+        "virtualTimeMs": 82000,
+        "rps": 2746.2,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 415,
+        "virtualTimeMs": 83000,
+        "rps": 2749.5,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 420,
+        "virtualTimeMs": 84000,
+        "rps": 2742.3,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 167.0,
+        "p99LatencyMs": 213.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 609.1
+      },
+      {
+        "tick": 425,
+        "virtualTimeMs": 85000,
+        "rps": 2732.9,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 597.5
+      },
+      {
+        "tick": 430,
+        "virtualTimeMs": 86000,
+        "rps": 2696.5,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.8,
+        "p99LatencyMs": 214.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 544.3
+      },
+      {
+        "tick": 435,
+        "virtualTimeMs": 87000,
+        "rps": 2606.0,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.4,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 457.0
+      },
+      {
+        "tick": 440,
+        "virtualTimeMs": 88000,
+        "rps": 2499.8,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.9,
+        "p99LatencyMs": 216.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 349.7
+      },
+      {
+        "tick": 445,
+        "virtualTimeMs": 89000,
+        "rps": 2398.3,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.8,
+        "p99LatencyMs": 216.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 236.8
+      },
+      {
+        "tick": 450,
+        "virtualTimeMs": 90000,
+        "rps": 2306.4,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.4,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 132.4
+      },
+      {
+        "tick": 455,
+        "virtualTimeMs": 91000,
+        "rps": 2231.7,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 50.8
+      },
+      {
+        "tick": 460,
+        "virtualTimeMs": 92000,
+        "rps": 2178.8,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 6.4
+      },
+      {
+        "tick": 465,
+        "virtualTimeMs": 93000,
+        "rps": 2207.3,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.2
+      },
+      {
+        "tick": 470,
+        "virtualTimeMs": 94000,
+        "rps": 2202.0,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 475,
+        "virtualTimeMs": 95000,
+        "rps": 2214.3,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 480,
+        "virtualTimeMs": 96000,
+        "rps": 2214.0,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 485,
+        "virtualTimeMs": 97000,
+        "rps": 2211.9,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 490,
+        "virtualTimeMs": 98000,
+        "rps": 2218.1,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 495,
+        "virtualTimeMs": 99000,
+        "rps": 2237.0,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 500,
+        "virtualTimeMs": 100000,
+        "rps": 2241.7,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 505,
+        "virtualTimeMs": 101000,
+        "rps": 2239.7,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 510,
+        "virtualTimeMs": 102000,
+        "rps": 2227.3,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 515,
+        "virtualTimeMs": 103000,
+        "rps": 2227.0,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 520,
+        "virtualTimeMs": 104000,
+        "rps": 2246.0,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 525,
+        "virtualTimeMs": 105000,
+        "rps": 2192.7,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 530,
+        "virtualTimeMs": 106000,
+        "rps": 2222.7,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.2,
+        "p99LatencyMs": 214.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 535,
+        "virtualTimeMs": 107000,
+        "rps": 2180.6,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.6,
+        "p99LatencyMs": 213.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 540,
+        "virtualTimeMs": 108000,
+        "rps": 2202.9,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 545,
+        "virtualTimeMs": 109000,
+        "rps": 2207.3,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 167.0,
+        "p99LatencyMs": 213.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 550,
+        "virtualTimeMs": 110000,
+        "rps": 2206.5,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 555,
+        "virtualTimeMs": 111000,
+        "rps": 2213.1,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 167.0,
+        "p99LatencyMs": 213.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 560,
+        "virtualTimeMs": 112000,
+        "rps": 2203.7,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 565,
+        "virtualTimeMs": 113000,
+        "rps": 2222.4,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.2,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 570,
+        "virtualTimeMs": 114000,
+        "rps": 2203.4,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 167.0,
+        "p99LatencyMs": 213.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 575,
+        "virtualTimeMs": 115000,
+        "rps": 2230.3,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 580,
+        "virtualTimeMs": 116000,
+        "rps": 2204.7,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.1,
+        "p99LatencyMs": 213.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 585,
+        "virtualTimeMs": 117000,
+        "rps": 2217.9,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.3,
+        "p99LatencyMs": 214.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 590,
+        "virtualTimeMs": 118000,
+        "rps": 2245.3,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 595,
+        "virtualTimeMs": 119000,
+        "rps": 2243.5,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 600,
+        "virtualTimeMs": 120000,
+        "rps": 2217.6,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 605,
+        "virtualTimeMs": 121000,
+        "rps": 2234.9,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 610,
+        "virtualTimeMs": 122000,
+        "rps": 2233.0,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 615,
+        "virtualTimeMs": 123000,
+        "rps": 2220.9,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 620,
+        "virtualTimeMs": 124000,
+        "rps": 2227.8,
+        "avgLatencyMs": 98.5,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 625,
+        "virtualTimeMs": 125000,
+        "rps": 2198.0,
+        "avgLatencyMs": 98.4,
+        "p95LatencyMs": 167.0,
+        "p99LatencyMs": 213.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 630,
+        "virtualTimeMs": 126000,
+        "rps": 2193.9,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 635,
+        "virtualTimeMs": 127000,
+        "rps": 2179.3,
+        "avgLatencyMs": 98.2,
+        "p95LatencyMs": 166.8,
+        "p99LatencyMs": 213.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 640,
+        "virtualTimeMs": 128000,
+        "rps": 2173.2,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.6,
+        "p99LatencyMs": 213.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 645,
+        "virtualTimeMs": 129000,
+        "rps": 2161.4,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.5,
+        "p99LatencyMs": 213.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 650,
+        "virtualTimeMs": 130000,
+        "rps": 2156.5,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.5,
+        "p99LatencyMs": 213.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 655,
+        "virtualTimeMs": 131000,
+        "rps": 2145.1,
+        "avgLatencyMs": 98.0,
+        "p95LatencyMs": 166.4,
+        "p99LatencyMs": 213.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 660,
+        "virtualTimeMs": 132000,
+        "rps": 2134.6,
+        "avgLatencyMs": 97.9,
+        "p95LatencyMs": 166.3,
+        "p99LatencyMs": 212.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 665,
+        "virtualTimeMs": 133000,
+        "rps": 2149.0,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.5,
+        "p99LatencyMs": 213.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 670,
+        "virtualTimeMs": 134000,
+        "rps": 2145.4,
+        "avgLatencyMs": 98.0,
+        "p95LatencyMs": 166.5,
+        "p99LatencyMs": 213.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 675,
+        "virtualTimeMs": 135000,
+        "rps": 2134.7,
+        "avgLatencyMs": 98.0,
+        "p95LatencyMs": 166.5,
+        "p99LatencyMs": 213.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 680,
+        "virtualTimeMs": 136000,
+        "rps": 2143.5,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.6,
+        "p99LatencyMs": 213.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 685,
+        "virtualTimeMs": 137000,
+        "rps": 2127.9,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.6,
+        "p99LatencyMs": 213.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 690,
+        "virtualTimeMs": 138000,
+        "rps": 2145.2,
+        "avgLatencyMs": 98.2,
+        "p95LatencyMs": 166.8,
+        "p99LatencyMs": 213.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 695,
+        "virtualTimeMs": 139000,
+        "rps": 2156.4,
+        "avgLatencyMs": 98.3,
+        "p95LatencyMs": 166.9,
+        "p99LatencyMs": 213.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 700,
+        "virtualTimeMs": 140000,
+        "rps": 2123.5,
+        "avgLatencyMs": 98.1,
+        "p95LatencyMs": 166.7,
+        "p99LatencyMs": 213.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      }
+    ]
+  },
+  "variant": {
+    "recording": {
+      "id": "platforms-with-the-files",
+      "name": "DDoS Surge, on Helios Commerce",
+      "description": "Run of a comparison of platforms on helios-commerce with seed 42.",
+      "topologyId": "helios-commerce",
+      "seed": 42,
+      "durationMs": 140000,
+      "commands": [
+        {
+          "atMs": 4000,
+          "command": {
+            "type": "startScenario",
+            "scenarioId": "ddos-surge"
+          }
+        }
+      ]
+    },
+    "report": {
+      "schemaVersion": "1.0",
+      "dataSource": "synthetic",
+      "incidentId": "inc-001",
+      "scenarioId": "ddos-surge",
+      "title": "DDoS Surge",
+      "severity": "critical",
+      "status": "resolved",
+      "startedAtMs": 4200,
+      "resolvedAtMs": 100200,
+      "resolution": "The scenario ran to completion.",
+      "recoveredAtMs": 132200,
+      "observedUntilMs": 132200,
+      "origin": {
+        "nodeId": "use-gateway",
+        "basis": "declared"
+      },
+      "baseline": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 168.7
+      },
+      "phases": [
+        {
+          "index": 0,
+          "name": "Probing",
+          "status": "active",
+          "description": "Low-rate probes map the public API surface.",
+          "atMs": 4200,
+          "sinceStartMs": 0,
+          "endedAtMs": 12200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 876 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "seq": 5,
+              "nodeId": "use-order-worker",
+              "atMs": 6400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            }
+          ],
+          "events": [
+            {
+              "seq": 4,
+              "atMs": 6200,
+              "severity": "notice",
+              "title": "Unusual request pattern at the edge",
+              "scripted": true
+            },
+            {
+              "seq": 6,
+              "atMs": 6600,
+              "severity": "warning",
+              "title": "Suspicious traffic surge",
+              "scripted": false
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 5000
+          },
+          "peakP95LatencyMs": {
+            "value": 202.8,
+            "atMs": 9000
+          }
+        },
+        {
+          "index": 1,
+          "name": "Volumetric surge",
+          "status": "active",
+          "description": "Request volume climbs to several times the gateway's capacity. Latency rises and requests are shed.",
+          "atMs": 12200,
+          "sinceStartMs": 8000,
+          "endedAtMs": 40200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 16060 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "seq": 10,
+              "nodeId": "use-catalog",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-catalog"
+              }
+            },
+            {
+              "seq": 11,
+              "nodeId": "use-search",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-search"
+              }
+            },
+            {
+              "seq": 12,
+              "nodeId": "use-cart",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cart"
+              }
+            },
+            {
+              "seq": 13,
+              "nodeId": "use-orders",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-orders"
+              }
+            },
+            {
+              "seq": 14,
+              "nodeId": "use-customers",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-customers"
+              }
+            },
+            {
+              "seq": 15,
+              "nodeId": "use-inventory",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 16,
+              "nodeId": "use-loyalty",
+              "atMs": 12800,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-loyalty"
+              }
+            },
+            {
+              "seq": 17,
+              "nodeId": "use-gateway",
+              "atMs": 13200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+              }
+            },
+            {
+              "seq": 18,
+              "nodeId": "use-order-events",
+              "atMs": 13200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "use-order-worker",
+                "edgeId": "use-order-events->use-order-worker"
+              }
+            },
+            {
+              "seq": 19,
+              "nodeId": "use-orders-db",
+              "atMs": 13200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 20,
+              "nodeId": "use-auth",
+              "atMs": 13400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-auth"
+              }
+            },
+            {
+              "seq": 21,
+              "nodeId": "use-customer-db",
+              "atMs": 13400,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 23,
+              "nodeId": "clients-na",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-na->edge-router"
+              }
+            },
+            {
+              "seq": 24,
+              "nodeId": "clients-eu",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-eu->edge-router"
+              }
+            },
+            {
+              "seq": 25,
+              "nodeId": "clients-apac",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-apac->edge-router"
+              }
+            },
+            {
+              "seq": 26,
+              "nodeId": "partner-api",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "partner-api->edge-router"
+              }
+            },
+            {
+              "seq": 27,
+              "nodeId": "edge-router",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+              }
+            },
+            {
+              "seq": 28,
+              "nodeId": "use-cedar",
+              "atMs": 13600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cedar"
+              }
+            },
+            {
+              "seq": 30,
+              "nodeId": "use-catalog",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-catalog"
+              }
+            },
+            {
+              "seq": 31,
+              "nodeId": "use-search",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-search"
+              }
+            },
+            {
+              "seq": 32,
+              "nodeId": "use-cart",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cart"
+              }
+            },
+            {
+              "seq": 33,
+              "nodeId": "use-orders",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-orders"
+              }
+            },
+            {
+              "seq": 34,
+              "nodeId": "use-customers",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-customers"
+              }
+            },
+            {
+              "seq": 35,
+              "nodeId": "use-loyalty",
+              "atMs": 13800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-loyalty"
+              }
+            },
+            {
+              "seq": 36,
+              "nodeId": "use-gateway",
+              "atMs": 14000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+              }
+            },
+            {
+              "seq": 37,
+              "nodeId": "use-auth",
+              "atMs": 14200,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-auth"
+              }
+            },
+            {
+              "seq": 38,
+              "nodeId": "use-cedar",
+              "atMs": 14200,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cedar"
+              }
+            },
+            {
+              "seq": 39,
+              "nodeId": "use-ledger",
+              "atMs": 14200,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-ledger"
+              }
+            },
+            {
+              "seq": 40,
+              "nodeId": "clients-na",
+              "atMs": 14600,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-na->edge-router"
+              }
+            },
+            {
+              "seq": 41,
+              "nodeId": "clients-eu",
+              "atMs": 14600,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-eu->edge-router"
+              }
+            },
+            {
+              "seq": 42,
+              "nodeId": "clients-apac",
+              "atMs": 14600,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "clients-apac->edge-router"
+              }
+            },
+            {
+              "seq": 43,
+              "nodeId": "partner-api",
+              "atMs": 14600,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "edge-router",
+                "edgeId": "partner-api->edge-router"
+              }
+            },
+            {
+              "seq": 44,
+              "nodeId": "edge-router",
+              "atMs": 14600,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "prescribed",
+                "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+              }
+            },
+            {
+              "seq": 45,
+              "nodeId": "use-ledger",
+              "atMs": 15000,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-ledger"
+              }
+            },
+            {
+              "seq": 50,
+              "nodeId": "use-order-events",
+              "atMs": 25800,
+              "from": "degraded",
+              "to": "critical",
+              "cause": {
+                "kind": "dependency",
+                "viaNodeId": "use-order-worker",
+                "edgeId": "use-order-events->use-order-worker"
+              }
+            }
+          ],
+          "events": [
+            {
+              "seq": 22,
+              "atMs": 13400,
+              "severity": "warning",
+              "title": "Error budget burning",
+              "scripted": false
+            },
+            {
+              "seq": 29,
+              "atMs": 13600,
+              "severity": "warning",
+              "title": "Latency objective breached",
+              "scripted": false
+            },
+            {
+              "seq": 47,
+              "atMs": 19200,
+              "severity": "critical",
+              "title": "Volumetric attack detected",
+              "scripted": true
+            },
+            {
+              "seq": 51,
+              "atMs": 26200,
+              "severity": "warning",
+              "title": "Downstream services saturating",
+              "scripted": true
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.753,
+            "atMs": 26000
+          },
+          "peakP95LatencyMs": {
+            "value": 2398.3,
+            "atMs": 26000
+          }
+        },
+        {
+          "index": 2,
+          "name": "Edge mitigation",
+          "status": "mitigating",
+          "description": "Rate-based rules at the edge router drop traffic from the offending sources before it reaches the gateway.",
+          "atMs": 40200,
+          "sinceStartMs": 36000,
+          "endedAtMs": 66200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 16060 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            },
+            {
+              "description": "94% of “Volumetric flood” turned away",
+              "nodeIds": [
+                "edge-router"
+              ],
+              "edgeIds": []
+            }
+          ],
+          "transitions": [
+            {
+              "seq": 86,
+              "nodeId": "use-catalog",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-catalog"
+              }
+            },
+            {
+              "seq": 87,
+              "nodeId": "use-search",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-search"
+              }
+            },
+            {
+              "seq": 88,
+              "nodeId": "use-cart",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-cart"
+              }
+            },
+            {
+              "seq": 89,
+              "nodeId": "use-orders",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-orders"
+              }
+            },
+            {
+              "seq": 90,
+              "nodeId": "use-customers",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-customers"
+              }
+            },
+            {
+              "seq": 91,
+              "nodeId": "use-inventory",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway"
+              }
+            },
+            {
+              "seq": 92,
+              "nodeId": "use-loyalty",
+              "atMs": 50600,
+              "from": "healthy",
+              "to": "degraded",
+              "cause": {
+                "kind": "load",
+                "viaNodeId": "use-gateway",
+                "edgeId": "use-gateway->use-loyalty"
+              }
+            }
+          ],
+          "events": [
+            {
+              "seq": 57,
+              "atMs": 40200,
+              "severity": "notice",
+              "title": "Edge filtering engaged",
+              "scripted": true
+            },
+            {
+              "seq": 59,
+              "atMs": 46000,
+              "severity": "info",
+              "title": "Error rate back within objective",
+              "scripted": false
+            },
+            {
+              "seq": 60,
+              "atMs": 46200,
+              "severity": "info",
+              "title": "Latency back within objective",
+              "scripted": false
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.7443,
+            "atMs": 41000
+          },
+          "peakP95LatencyMs": {
+            "value": 2373.4,
+            "atMs": 41000
+          }
+        },
+        {
+          "index": 3,
+          "name": "Attack subsides",
+          "status": "recovering",
+          "description": "The flood loses intensity while filtering stays in place.",
+          "atMs": 66200,
+          "sinceStartMs": 62000,
+          "endedAtMs": 84200,
+          "prescribed": [
+            {
+              "description": "injected traffic “Volumetric flood” at 1825 req/s",
+              "nodeIds": [
+                "edge-router",
+                "use-gateway"
+              ],
+              "edgeIds": [
+                "unknown-sources->edge-router",
+                "edge-router->use-gateway"
+              ]
+            },
+            {
+              "description": "94% of “Volumetric flood” turned away",
+              "nodeIds": [
+                "edge-router"
+              ],
+              "edgeIds": []
+            }
+          ],
+          "transitions": [],
+          "events": [],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 67000
+          },
+          "peakP95LatencyMs": {
+            "value": 202.1,
+            "atMs": 67000
+          }
+        },
+        {
+          "index": 4,
+          "name": "Recovery",
+          "status": "recovering",
+          "description": "Traffic returns to its normal shape and services recover.",
+          "atMs": 84200,
+          "sinceStartMs": 80000,
+          "endedAtMs": 100200,
+          "prescribed": [],
+          "transitions": [],
+          "events": [
+            {
+              "seq": 112,
+              "atMs": 90200,
+              "severity": "info",
+              "title": "Traffic back to baseline",
+              "scripted": true
+            },
+            {
+              "seq": 113,
+              "atMs": 91200,
+              "severity": "info",
+              "title": "Suspicious traffic subsided",
+              "scripted": false
+            }
+          ],
+          "peakErrorRate": {
+            "value": 0.0,
+            "atMs": 85000
+          },
+          "peakP95LatencyMs": {
+            "value": 175.9,
+            "atMs": 88000
+          }
+        }
+      ],
+      "propagation": [
+        {
+          "seq": 5,
+          "nodeId": "use-order-worker",
+          "atMs": 6400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 10,
+          "nodeId": "use-catalog",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-catalog"
+          }
+        },
+        {
+          "seq": 11,
+          "nodeId": "use-search",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-search"
+          }
+        },
+        {
+          "seq": 12,
+          "nodeId": "use-cart",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-cart"
+          }
+        },
+        {
+          "seq": 13,
+          "nodeId": "use-orders",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-orders"
+          }
+        },
+        {
+          "seq": 14,
+          "nodeId": "use-customers",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-customers"
+          }
+        },
+        {
+          "seq": 15,
+          "nodeId": "use-inventory",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 16,
+          "nodeId": "use-loyalty",
+          "atMs": 12800,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-loyalty"
+          }
+        },
+        {
+          "seq": 17,
+          "nodeId": "use-gateway",
+          "atMs": 13200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+          }
+        },
+        {
+          "seq": 18,
+          "nodeId": "use-order-events",
+          "atMs": 13200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "use-order-worker",
+            "edgeId": "use-order-events->use-order-worker"
+          }
+        },
+        {
+          "seq": 19,
+          "nodeId": "use-orders-db",
+          "atMs": 13200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 20,
+          "nodeId": "use-auth",
+          "atMs": 13400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-auth"
+          }
+        },
+        {
+          "seq": 21,
+          "nodeId": "use-customer-db",
+          "atMs": 13400,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway"
+          }
+        },
+        {
+          "seq": 23,
+          "nodeId": "clients-na",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-na->edge-router"
+          }
+        },
+        {
+          "seq": 24,
+          "nodeId": "clients-eu",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-eu->edge-router"
+          }
+        },
+        {
+          "seq": 25,
+          "nodeId": "clients-apac",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "clients-apac->edge-router"
+          }
+        },
+        {
+          "seq": 26,
+          "nodeId": "partner-api",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "dependency",
+            "viaNodeId": "edge-router",
+            "edgeId": "partner-api->edge-router"
+          }
+        },
+        {
+          "seq": 27,
+          "nodeId": "edge-router",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "prescribed",
+            "effect": "injected traffic “Volumetric flood” at 16060 req/s"
+          }
+        },
+        {
+          "seq": 28,
+          "nodeId": "use-cedar",
+          "atMs": 13600,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-cedar"
+          }
+        },
+        {
+          "seq": 39,
+          "nodeId": "use-ledger",
+          "atMs": 14200,
+          "from": "healthy",
+          "to": "degraded",
+          "cause": {
+            "kind": "load",
+            "viaNodeId": "use-gateway",
+            "edgeId": "use-gateway->use-ledger"
+          }
+        }
+      ],
+      "recovery": [
+        {
+          "seq": 61,
+          "nodeId": "use-ledger",
+          "atMs": 46800,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 62,
+          "nodeId": "use-catalog",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 63,
+          "nodeId": "use-search",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 64,
+          "nodeId": "use-cart",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 65,
+          "nodeId": "use-orders",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 66,
+          "nodeId": "use-customers",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 67,
+          "nodeId": "use-loyalty",
+          "atMs": 47000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 68,
+          "nodeId": "clients-na",
+          "atMs": 47200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 69,
+          "nodeId": "clients-eu",
+          "atMs": 47200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 70,
+          "nodeId": "clients-apac",
+          "atMs": 47200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 71,
+          "nodeId": "partner-api",
+          "atMs": 47200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 72,
+          "nodeId": "edge-router",
+          "atMs": 47200,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 73,
+          "nodeId": "use-cedar",
+          "atMs": 47400,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 74,
+          "nodeId": "use-orders-db",
+          "atMs": 47400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 75,
+          "nodeId": "use-customer-db",
+          "atMs": 47400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 76,
+          "nodeId": "use-gateway",
+          "atMs": 47600,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 77,
+          "nodeId": "use-auth",
+          "atMs": 47600,
+          "from": "critical",
+          "to": "healthy"
+        },
+        {
+          "seq": 79,
+          "nodeId": "use-catalog",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 80,
+          "nodeId": "use-search",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 81,
+          "nodeId": "use-cart",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 82,
+          "nodeId": "use-orders",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 83,
+          "nodeId": "use-customers",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 84,
+          "nodeId": "use-inventory",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 85,
+          "nodeId": "use-loyalty",
+          "atMs": 50200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 94,
+          "nodeId": "use-catalog",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 95,
+          "nodeId": "use-search",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 96,
+          "nodeId": "use-cart",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 97,
+          "nodeId": "use-orders",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 98,
+          "nodeId": "use-customers",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 99,
+          "nodeId": "use-inventory",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 100,
+          "nodeId": "use-loyalty",
+          "atMs": 54200,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 120,
+          "nodeId": "use-order-events",
+          "atMs": 109000,
+          "from": "critical",
+          "to": "degraded"
+        },
+        {
+          "seq": 125,
+          "nodeId": "use-order-events",
+          "atMs": 127400,
+          "from": "degraded",
+          "to": "healthy"
+        },
+        {
+          "seq": 128,
+          "nodeId": "use-order-worker",
+          "atMs": 132200,
+          "from": "degraded",
+          "to": "healthy"
+        }
+      ],
+      "decisions": [],
+      "impactedNodeIds": [
+        "clients-na",
+        "clients-eu",
+        "clients-apac",
+        "partner-api",
+        "edge-router",
+        "use-gateway",
+        "use-auth",
+        "use-cedar",
+        "use-catalog",
+        "use-search",
+        "use-cart",
+        "use-orders",
+        "use-customers",
+        "use-ledger",
+        "use-inventory",
+        "use-order-events",
+        "use-order-worker",
+        "use-orders-db",
+        "use-customer-db",
+        "use-loyalty"
+      ],
+      "stillUnhealthyNodeIds": [],
+      "peakErrorRate": {
+        "value": 0.753,
+        "atMs": 26000
+      },
+      "peakP95LatencyMs": {
+        "value": 2398.3,
+        "atMs": 26000
+      },
+      "peakUnhealthy": {
+        "value": 20.0,
+        "atMs": 14200
+      },
+      "meanErrorRate": 0.1686,
+      "objectives": [
+        {
+          "kind": "error-rate",
+          "threshold": 0.05,
+          "breachedMs": 32000,
+          "firstBreachedAtMs": 14000
+        },
+        {
+          "kind": "latency-p95",
+          "threshold": 419.7,
+          "breachedMs": 32000,
+          "firstBreachedAtMs": 14000
+        }
+      ],
+      "truncated": false
+    },
+    "samples": [
+      {
+        "tick": 0,
+        "virtualTimeMs": 0,
+        "rps": 2160.0,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 167.9,
+        "p99LatencyMs": 214.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 5,
+        "virtualTimeMs": 1000,
+        "rps": 2200.9,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.3,
+        "p99LatencyMs": 215.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 10,
+        "virtualTimeMs": 2000,
+        "rps": 2218.2,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.4,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 15,
+        "virtualTimeMs": 3000,
+        "rps": 2230.4,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 20,
+        "virtualTimeMs": 4000,
+        "rps": 2243.6,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 25,
+        "virtualTimeMs": 5000,
+        "rps": 2288.2,
+        "avgLatencyMs": 99.7,
+        "p95LatencyMs": 169.3,
+        "p99LatencyMs": 216.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 62.3
+      },
+      {
+        "tick": 30,
+        "virtualTimeMs": 6000,
+        "rps": 2556.2,
+        "avgLatencyMs": 102.0,
+        "p95LatencyMs": 173.7,
+        "p99LatencyMs": 222.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 312.2
+      },
+      {
+        "tick": 35,
+        "virtualTimeMs": 7000,
+        "rps": 2846.4,
+        "avgLatencyMs": 106.8,
+        "p95LatencyMs": 182.7,
+        "p99LatencyMs": 234.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 626.6
+      },
+      {
+        "tick": 40,
+        "virtualTimeMs": 8000,
+        "rps": 3084.8,
+        "avgLatencyMs": 115.0,
+        "p95LatencyMs": 198.3,
+        "p99LatencyMs": 255.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 842.3
+      },
+      {
+        "tick": 45,
+        "virtualTimeMs": 9000,
+        "rps": 3134.8,
+        "avgLatencyMs": 117.3,
+        "p95LatencyMs": 202.8,
+        "p99LatencyMs": 262.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 874.9
+      },
+      {
+        "tick": 50,
+        "virtualTimeMs": 10000,
+        "rps": 3126.7,
+        "avgLatencyMs": 117.0,
+        "p95LatencyMs": 202.1,
+        "p99LatencyMs": 261.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 876.0
+      },
+      {
+        "tick": 55,
+        "virtualTimeMs": 11000,
+        "rps": 3106.0,
+        "avgLatencyMs": 116.2,
+        "p95LatencyMs": 200.7,
+        "p99LatencyMs": 259.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 876.0
+      },
+      {
+        "tick": 60,
+        "virtualTimeMs": 12000,
+        "rps": 3103.5,
+        "avgLatencyMs": 116.1,
+        "p95LatencyMs": 200.5,
+        "p99LatencyMs": 258.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 876.0
+      },
+      {
+        "tick": 65,
+        "virtualTimeMs": 13000,
+        "rps": 3392.0,
+        "avgLatencyMs": 158.5,
+        "p95LatencyMs": 285.7,
+        "p99LatencyMs": 377.6,
+        "errorRate": 0.0094,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1164.9
+      },
+      {
+        "tick": 70,
+        "virtualTimeMs": 14000,
+        "rps": 4703.7,
+        "avgLatencyMs": 298.6,
+        "p95LatencyMs": 607.8,
+        "p99LatencyMs": 862.0,
+        "errorRate": 0.1879,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 2492.0
+      },
+      {
+        "tick": 75,
+        "virtualTimeMs": 15000,
+        "rps": 6904.7,
+        "avgLatencyMs": 565.3,
+        "p95LatencyMs": 1368.6,
+        "p99LatencyMs": 2175.3,
+        "errorRate": 0.3184,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 4667.7
+      },
+      {
+        "tick": 80,
+        "virtualTimeMs": 16000,
+        "rps": 9562.3,
+        "avgLatencyMs": 764.0,
+        "p95LatencyMs": 1992.6,
+        "p99LatencyMs": 3338.4,
+        "errorRate": 0.4825,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 7341.5
+      },
+      {
+        "tick": 85,
+        "virtualTimeMs": 17000,
+        "rps": 12389.6,
+        "avgLatencyMs": 816.6,
+        "p95LatencyMs": 2135.4,
+        "p99LatencyMs": 3584.3,
+        "errorRate": 0.6161,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 10157.7
+      },
+      {
+        "tick": 90,
+        "virtualTimeMs": 18000,
+        "rps": 14952.9,
+        "avgLatencyMs": 860.1,
+        "p95LatencyMs": 2249.3,
+        "p99LatencyMs": 3775.7,
+        "errorRate": 0.6905,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 12760.3
+      },
+      {
+        "tick": 95,
+        "virtualTimeMs": 19000,
+        "rps": 16994.8,
+        "avgLatencyMs": 894.9,
+        "p95LatencyMs": 2340.2,
+        "p99LatencyMs": 3928.3,
+        "errorRate": 0.7319,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 14793.6
+      },
+      {
+        "tick": 100,
+        "virtualTimeMs": 20000,
+        "rps": 18106.9,
+        "avgLatencyMs": 913.9,
+        "p95LatencyMs": 2389.9,
+        "p99LatencyMs": 4011.6,
+        "errorRate": 0.7502,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 15901.5
+      },
+      {
+        "tick": 105,
+        "virtualTimeMs": 21000,
+        "rps": 18257.7,
+        "avgLatencyMs": 916.5,
+        "p95LatencyMs": 2396.9,
+        "p99LatencyMs": 4023.3,
+        "errorRate": 0.7525,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16055.0
+      },
+      {
+        "tick": 110,
+        "virtualTimeMs": 22000,
+        "rps": 18274.3,
+        "avgLatencyMs": 916.8,
+        "p95LatencyMs": 2397.6,
+        "p99LatencyMs": 4024.5,
+        "errorRate": 0.7528,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16059.8
+      },
+      {
+        "tick": 115,
+        "virtualTimeMs": 23000,
+        "rps": 18252.4,
+        "avgLatencyMs": 916.6,
+        "p95LatencyMs": 2396.9,
+        "p99LatencyMs": 4023.4,
+        "errorRate": 0.7525,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 120,
+        "virtualTimeMs": 24000,
+        "rps": 18251.3,
+        "avgLatencyMs": 916.6,
+        "p95LatencyMs": 2397.0,
+        "p99LatencyMs": 4023.6,
+        "errorRate": 0.7525,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 125,
+        "virtualTimeMs": 25000,
+        "rps": 18268.3,
+        "avgLatencyMs": 916.8,
+        "p95LatencyMs": 2397.5,
+        "p99LatencyMs": 4024.4,
+        "errorRate": 0.7527,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 130,
+        "virtualTimeMs": 26000,
+        "rps": 18291.4,
+        "avgLatencyMs": 917.1,
+        "p95LatencyMs": 2398.3,
+        "p99LatencyMs": 4025.8,
+        "errorRate": 0.753,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 135,
+        "virtualTimeMs": 27000,
+        "rps": 18286.9,
+        "avgLatencyMs": 917.1,
+        "p95LatencyMs": 2398.2,
+        "p99LatencyMs": 4025.6,
+        "errorRate": 0.7529,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 140,
+        "virtualTimeMs": 28000,
+        "rps": 18258.6,
+        "avgLatencyMs": 916.7,
+        "p95LatencyMs": 2397.3,
+        "p99LatencyMs": 4024.0,
+        "errorRate": 0.7526,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 145,
+        "virtualTimeMs": 29000,
+        "rps": 18287.3,
+        "avgLatencyMs": 917.1,
+        "p95LatencyMs": 2398.2,
+        "p99LatencyMs": 4025.6,
+        "errorRate": 0.753,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 150,
+        "virtualTimeMs": 30000,
+        "rps": 18275.6,
+        "avgLatencyMs": 916.9,
+        "p95LatencyMs": 2397.9,
+        "p99LatencyMs": 4025.0,
+        "errorRate": 0.7528,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 155,
+        "virtualTimeMs": 31000,
+        "rps": 18263.6,
+        "avgLatencyMs": 916.8,
+        "p95LatencyMs": 2397.4,
+        "p99LatencyMs": 4024.2,
+        "errorRate": 0.7526,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 160,
+        "virtualTimeMs": 32000,
+        "rps": 18238.6,
+        "avgLatencyMs": 916.5,
+        "p95LatencyMs": 2396.6,
+        "p99LatencyMs": 4022.9,
+        "errorRate": 0.7523,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 165,
+        "virtualTimeMs": 33000,
+        "rps": 18257.1,
+        "avgLatencyMs": 916.6,
+        "p95LatencyMs": 2397.1,
+        "p99LatencyMs": 4023.7,
+        "errorRate": 0.7525,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 170,
+        "virtualTimeMs": 34000,
+        "rps": 18236.6,
+        "avgLatencyMs": 916.4,
+        "p95LatencyMs": 2396.4,
+        "p99LatencyMs": 4022.5,
+        "errorRate": 0.7523,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 175,
+        "virtualTimeMs": 35000,
+        "rps": 18202.9,
+        "avgLatencyMs": 916.0,
+        "p95LatencyMs": 2395.3,
+        "p99LatencyMs": 4020.8,
+        "errorRate": 0.7518,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 180,
+        "virtualTimeMs": 36000,
+        "rps": 18226.2,
+        "avgLatencyMs": 916.2,
+        "p95LatencyMs": 2396.0,
+        "p99LatencyMs": 4021.9,
+        "errorRate": 0.7521,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 185,
+        "virtualTimeMs": 37000,
+        "rps": 18190.1,
+        "avgLatencyMs": 915.7,
+        "p95LatencyMs": 2394.8,
+        "p99LatencyMs": 4019.8,
+        "errorRate": 0.7516,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 190,
+        "virtualTimeMs": 38000,
+        "rps": 18195.4,
+        "avgLatencyMs": 915.8,
+        "p95LatencyMs": 2394.9,
+        "p99LatencyMs": 4020.1,
+        "errorRate": 0.7517,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 195,
+        "virtualTimeMs": 39000,
+        "rps": 18174.9,
+        "avgLatencyMs": 915.6,
+        "p95LatencyMs": 2394.3,
+        "p99LatencyMs": 4019.0,
+        "errorRate": 0.7514,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 200,
+        "virtualTimeMs": 40000,
+        "rps": 18196.2,
+        "avgLatencyMs": 915.9,
+        "p95LatencyMs": 2395.1,
+        "p99LatencyMs": 4020.4,
+        "errorRate": 0.7517,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 205,
+        "virtualTimeMs": 41000,
+        "rps": 18195.5,
+        "avgLatencyMs": 907.6,
+        "p95LatencyMs": 2373.4,
+        "p99LatencyMs": 3984.0,
+        "errorRate": 0.7443,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 210,
+        "virtualTimeMs": 42000,
+        "rps": 18182.1,
+        "avgLatencyMs": 870.9,
+        "p95LatencyMs": 2277.5,
+        "p99LatencyMs": 3823.0,
+        "errorRate": 0.7052,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 215,
+        "virtualTimeMs": 43000,
+        "rps": 18164.8,
+        "avgLatencyMs": 815.5,
+        "p95LatencyMs": 2132.5,
+        "p99LatencyMs": 3579.6,
+        "errorRate": 0.6153,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 220,
+        "virtualTimeMs": 44000,
+        "rps": 18159.2,
+        "avgLatencyMs": 726.8,
+        "p95LatencyMs": 1878.2,
+        "p99LatencyMs": 3125.5,
+        "errorRate": 0.4247,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 225,
+        "virtualTimeMs": 45000,
+        "rps": 18198.9,
+        "avgLatencyMs": 362.7,
+        "p95LatencyMs": 780.7,
+        "p99LatencyMs": 1150.3,
+        "errorRate": 0.237,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 230,
+        "virtualTimeMs": 46000,
+        "rps": 18179.9,
+        "avgLatencyMs": 157.4,
+        "p95LatencyMs": 286.7,
+        "p99LatencyMs": 382.0,
+        "errorRate": 0.0189,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 235,
+        "virtualTimeMs": 47000,
+        "rps": 18182.0,
+        "avgLatencyMs": 120.3,
+        "p95LatencyMs": 208.8,
+        "p99LatencyMs": 270.3,
+        "errorRate": 0.0006,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 240,
+        "virtualTimeMs": 48000,
+        "rps": 18178.5,
+        "avgLatencyMs": 119.0,
+        "p95LatencyMs": 206.1,
+        "p99LatencyMs": 266.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 245,
+        "virtualTimeMs": 49000,
+        "rps": 18196.6,
+        "avgLatencyMs": 119.8,
+        "p95LatencyMs": 207.6,
+        "p99LatencyMs": 268.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 250,
+        "virtualTimeMs": 50000,
+        "rps": 18181.6,
+        "avgLatencyMs": 119.2,
+        "p95LatencyMs": 206.3,
+        "p99LatencyMs": 266.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 255,
+        "virtualTimeMs": 51000,
+        "rps": 18178.9,
+        "avgLatencyMs": 119.1,
+        "p95LatencyMs": 206.2,
+        "p99LatencyMs": 266.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 260,
+        "virtualTimeMs": 52000,
+        "rps": 18176.1,
+        "avgLatencyMs": 119.0,
+        "p95LatencyMs": 205.9,
+        "p99LatencyMs": 266.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 265,
+        "virtualTimeMs": 53000,
+        "rps": 18197.4,
+        "avgLatencyMs": 119.9,
+        "p95LatencyMs": 207.7,
+        "p99LatencyMs": 268.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 270,
+        "virtualTimeMs": 54000,
+        "rps": 18160.4,
+        "avgLatencyMs": 118.3,
+        "p95LatencyMs": 204.7,
+        "p99LatencyMs": 264.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 275,
+        "virtualTimeMs": 55000,
+        "rps": 18181.4,
+        "avgLatencyMs": 119.2,
+        "p95LatencyMs": 206.3,
+        "p99LatencyMs": 266.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 280,
+        "virtualTimeMs": 56000,
+        "rps": 18166.5,
+        "avgLatencyMs": 118.5,
+        "p95LatencyMs": 205.1,
+        "p99LatencyMs": 265.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 285,
+        "virtualTimeMs": 57000,
+        "rps": 18160.0,
+        "avgLatencyMs": 118.2,
+        "p95LatencyMs": 204.5,
+        "p99LatencyMs": 264.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 290,
+        "virtualTimeMs": 58000,
+        "rps": 18146.7,
+        "avgLatencyMs": 117.7,
+        "p95LatencyMs": 203.5,
+        "p99LatencyMs": 262.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 295,
+        "virtualTimeMs": 59000,
+        "rps": 18128.5,
+        "avgLatencyMs": 117.0,
+        "p95LatencyMs": 202.2,
+        "p99LatencyMs": 261.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 300,
+        "virtualTimeMs": 60000,
+        "rps": 18143.6,
+        "avgLatencyMs": 117.6,
+        "p95LatencyMs": 203.3,
+        "p99LatencyMs": 262.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 305,
+        "virtualTimeMs": 61000,
+        "rps": 18130.0,
+        "avgLatencyMs": 117.0,
+        "p95LatencyMs": 202.3,
+        "p99LatencyMs": 261.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 310,
+        "virtualTimeMs": 62000,
+        "rps": 18146.0,
+        "avgLatencyMs": 117.6,
+        "p95LatencyMs": 203.4,
+        "p99LatencyMs": 262.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 315,
+        "virtualTimeMs": 63000,
+        "rps": 18142.1,
+        "avgLatencyMs": 117.5,
+        "p95LatencyMs": 203.1,
+        "p99LatencyMs": 262.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 320,
+        "virtualTimeMs": 64000,
+        "rps": 18147.0,
+        "avgLatencyMs": 117.7,
+        "p95LatencyMs": 203.5,
+        "p99LatencyMs": 262.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 325,
+        "virtualTimeMs": 65000,
+        "rps": 18151.2,
+        "avgLatencyMs": 117.9,
+        "p95LatencyMs": 203.9,
+        "p99LatencyMs": 263.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 330,
+        "virtualTimeMs": 66000,
+        "rps": 18156.3,
+        "avgLatencyMs": 118.1,
+        "p95LatencyMs": 204.3,
+        "p99LatencyMs": 264.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 16060.0
+      },
+      {
+        "tick": 335,
+        "virtualTimeMs": 67000,
+        "rps": 17968.8,
+        "avgLatencyMs": 117.0,
+        "p95LatencyMs": 202.1,
+        "p99LatencyMs": 261.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 15884.4
+      },
+      {
+        "tick": 340,
+        "virtualTimeMs": 68000,
+        "rps": 17144.2,
+        "avgLatencyMs": 114.0,
+        "p95LatencyMs": 196.5,
+        "p99LatencyMs": 253.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 15058.9
+      },
+      {
+        "tick": 345,
+        "virtualTimeMs": 69000,
+        "rps": 15752.8,
+        "avgLatencyMs": 110.6,
+        "p95LatencyMs": 189.9,
+        "p99LatencyMs": 244.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 13655.8
+      },
+      {
+        "tick": 350,
+        "virtualTimeMs": 70000,
+        "rps": 13967.9,
+        "avgLatencyMs": 107.7,
+        "p95LatencyMs": 184.5,
+        "p99LatencyMs": 237.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 11842.8
+      },
+      {
+        "tick": 355,
+        "virtualTimeMs": 71000,
+        "rps": 11913.9,
+        "avgLatencyMs": 105.0,
+        "p95LatencyMs": 179.4,
+        "p99LatencyMs": 230.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 9790.7
+      },
+      {
+        "tick": 360,
+        "virtualTimeMs": 72000,
+        "rps": 9792.2,
+        "avgLatencyMs": 103.0,
+        "p95LatencyMs": 175.7,
+        "p99LatencyMs": 225.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 7670.2
+      },
+      {
+        "tick": 365,
+        "virtualTimeMs": 73000,
+        "rps": 7770.4,
+        "avgLatencyMs": 101.6,
+        "p95LatencyMs": 172.9,
+        "p99LatencyMs": 221.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 5652.3
+      },
+      {
+        "tick": 370,
+        "virtualTimeMs": 74000,
+        "rps": 6038.6,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.3,
+        "p99LatencyMs": 219.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 3907.6
+      },
+      {
+        "tick": 375,
+        "virtualTimeMs": 75000,
+        "rps": 4731.4,
+        "avgLatencyMs": 99.9,
+        "p95LatencyMs": 169.9,
+        "p99LatencyMs": 217.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 2607.1
+      },
+      {
+        "tick": 380,
+        "virtualTimeMs": 76000,
+        "rps": 4070.7,
+        "avgLatencyMs": 99.8,
+        "p95LatencyMs": 169.6,
+        "p99LatencyMs": 217.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1921.6
+      },
+      {
+        "tick": 385,
+        "virtualTimeMs": 77000,
+        "rps": 3987.6,
+        "avgLatencyMs": 99.8,
+        "p95LatencyMs": 169.6,
+        "p99LatencyMs": 217.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1828.0
+      },
+      {
+        "tick": 390,
+        "virtualTimeMs": 78000,
+        "rps": 3991.4,
+        "avgLatencyMs": 99.8,
+        "p95LatencyMs": 169.7,
+        "p99LatencyMs": 217.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.1
+      },
+      {
+        "tick": 395,
+        "virtualTimeMs": 79000,
+        "rps": 3978.5,
+        "avgLatencyMs": 99.7,
+        "p95LatencyMs": 169.4,
+        "p99LatencyMs": 216.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 400,
+        "virtualTimeMs": 80000,
+        "rps": 3970.1,
+        "avgLatencyMs": 99.6,
+        "p95LatencyMs": 169.2,
+        "p99LatencyMs": 216.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 405,
+        "virtualTimeMs": 81000,
+        "rps": 3960.9,
+        "avgLatencyMs": 99.5,
+        "p95LatencyMs": 169.1,
+        "p99LatencyMs": 216.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 410,
+        "virtualTimeMs": 82000,
+        "rps": 3962.0,
+        "avgLatencyMs": 99.5,
+        "p95LatencyMs": 169.1,
+        "p99LatencyMs": 216.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 415,
+        "virtualTimeMs": 83000,
+        "rps": 3965.4,
+        "avgLatencyMs": 99.5,
+        "p95LatencyMs": 169.1,
+        "p99LatencyMs": 216.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 420,
+        "virtualTimeMs": 84000,
+        "rps": 3958.2,
+        "avgLatencyMs": 99.4,
+        "p95LatencyMs": 169.0,
+        "p99LatencyMs": 216.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1825.0
+      },
+      {
+        "tick": 425,
+        "virtualTimeMs": 85000,
+        "rps": 3925.6,
+        "avgLatencyMs": 99.6,
+        "p95LatencyMs": 169.4,
+        "p99LatencyMs": 216.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1790.3
+      },
+      {
+        "tick": 430,
+        "virtualTimeMs": 86000,
+        "rps": 3783.0,
+        "avgLatencyMs": 100.7,
+        "p95LatencyMs": 171.4,
+        "p99LatencyMs": 219.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1630.8
+      },
+      {
+        "tick": 435,
+        "virtualTimeMs": 87000,
+        "rps": 3518.3,
+        "avgLatencyMs": 102.1,
+        "p95LatencyMs": 174.0,
+        "p99LatencyMs": 223.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1369.3
+      },
+      {
+        "tick": 440,
+        "virtualTimeMs": 88000,
+        "rps": 3197.9,
+        "avgLatencyMs": 103.2,
+        "p95LatencyMs": 175.9,
+        "p99LatencyMs": 225.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 1047.9
+      },
+      {
+        "tick": 445,
+        "virtualTimeMs": 89000,
+        "rps": 2870.9,
+        "avgLatencyMs": 102.8,
+        "p95LatencyMs": 175.3,
+        "p99LatencyMs": 224.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 709.4
+      },
+      {
+        "tick": 450,
+        "virtualTimeMs": 90000,
+        "rps": 2570.7,
+        "avgLatencyMs": 101.4,
+        "p95LatencyMs": 172.7,
+        "p99LatencyMs": 221.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 396.6
+      },
+      {
+        "tick": 455,
+        "virtualTimeMs": 91000,
+        "rps": 2333.1,
+        "avgLatencyMs": 100.0,
+        "p95LatencyMs": 169.9,
+        "p99LatencyMs": 217.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 152.2
+      },
+      {
+        "tick": 460,
+        "virtualTimeMs": 92000,
+        "rps": 2191.5,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.3,
+        "p99LatencyMs": 215.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 19.0
+      },
+      {
+        "tick": 465,
+        "virtualTimeMs": 93000,
+        "rps": 2207.7,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.6
+      },
+      {
+        "tick": 470,
+        "virtualTimeMs": 94000,
+        "rps": 2202.0,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 475,
+        "virtualTimeMs": 95000,
+        "rps": 2214.3,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 480,
+        "virtualTimeMs": 96000,
+        "rps": 2214.0,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 485,
+        "virtualTimeMs": 97000,
+        "rps": 2211.9,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 490,
+        "virtualTimeMs": 98000,
+        "rps": 2218.1,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 495,
+        "virtualTimeMs": 99000,
+        "rps": 2237.0,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 500,
+        "virtualTimeMs": 100000,
+        "rps": 2241.7,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 505,
+        "virtualTimeMs": 101000,
+        "rps": 2239.7,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 510,
+        "virtualTimeMs": 102000,
+        "rps": 2227.3,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 515,
+        "virtualTimeMs": 103000,
+        "rps": 2227.0,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.4,
+        "p99LatencyMs": 215.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 520,
+        "virtualTimeMs": 104000,
+        "rps": 2246.0,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 525,
+        "virtualTimeMs": 105000,
+        "rps": 2192.7,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 167.9,
+        "p99LatencyMs": 214.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 530,
+        "virtualTimeMs": 106000,
+        "rps": 2222.7,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.3,
+        "p99LatencyMs": 215.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 535,
+        "virtualTimeMs": 107000,
+        "rps": 2180.6,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 540,
+        "virtualTimeMs": 108000,
+        "rps": 2202.9,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 168.0,
+        "p99LatencyMs": 214.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 545,
+        "virtualTimeMs": 109000,
+        "rps": 2207.3,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.1,
+        "p99LatencyMs": 215.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 550,
+        "virtualTimeMs": 110000,
+        "rps": 2206.5,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.1,
+        "p99LatencyMs": 215.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 555,
+        "virtualTimeMs": 111000,
+        "rps": 2213.1,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.1,
+        "p99LatencyMs": 215.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 560,
+        "virtualTimeMs": 112000,
+        "rps": 2203.7,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 168.0,
+        "p99LatencyMs": 215.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 565,
+        "virtualTimeMs": 113000,
+        "rps": 2222.4,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.3,
+        "p99LatencyMs": 215.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 570,
+        "virtualTimeMs": 114000,
+        "rps": 2203.4,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.1,
+        "p99LatencyMs": 215.1,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 575,
+        "virtualTimeMs": 115000,
+        "rps": 2230.3,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 580,
+        "virtualTimeMs": 116000,
+        "rps": 2204.7,
+        "avgLatencyMs": 99.1,
+        "p95LatencyMs": 168.2,
+        "p99LatencyMs": 215.3,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 585,
+        "virtualTimeMs": 117000,
+        "rps": 2217.9,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.4,
+        "p99LatencyMs": 215.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 590,
+        "virtualTimeMs": 118000,
+        "rps": 2245.3,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 595,
+        "virtualTimeMs": 119000,
+        "rps": 2243.5,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.7,
+        "p99LatencyMs": 215.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 600,
+        "virtualTimeMs": 120000,
+        "rps": 2217.6,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 605,
+        "virtualTimeMs": 121000,
+        "rps": 2234.9,
+        "avgLatencyMs": 99.3,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 610,
+        "virtualTimeMs": 122000,
+        "rps": 2233.0,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.6,
+        "p99LatencyMs": 215.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 615,
+        "virtualTimeMs": 123000,
+        "rps": 2220.9,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 620,
+        "virtualTimeMs": 124000,
+        "rps": 2227.8,
+        "avgLatencyMs": 99.2,
+        "p95LatencyMs": 168.5,
+        "p99LatencyMs": 215.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 625,
+        "virtualTimeMs": 125000,
+        "rps": 2198.0,
+        "avgLatencyMs": 99.0,
+        "p95LatencyMs": 168.2,
+        "p99LatencyMs": 215.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 630,
+        "virtualTimeMs": 126000,
+        "rps": 2193.9,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 168.0,
+        "p99LatencyMs": 215.0,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 635,
+        "virtualTimeMs": 127000,
+        "rps": 2179.3,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 167.9,
+        "p99LatencyMs": 214.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 640,
+        "virtualTimeMs": 128000,
+        "rps": 2173.2,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.8,
+        "p99LatencyMs": 214.7,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 645,
+        "virtualTimeMs": 129000,
+        "rps": 2161.4,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 650,
+        "virtualTimeMs": 130000,
+        "rps": 2156.5,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 655,
+        "virtualTimeMs": 131000,
+        "rps": 2145.1,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 660,
+        "virtualTimeMs": 132000,
+        "rps": 2134.6,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.4,
+        "p99LatencyMs": 214.2,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 665,
+        "virtualTimeMs": 133000,
+        "rps": 2149.0,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 670,
+        "virtualTimeMs": 134000,
+        "rps": 2145.4,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 675,
+        "virtualTimeMs": 135000,
+        "rps": 2134.7,
+        "avgLatencyMs": 98.6,
+        "p95LatencyMs": 167.5,
+        "p99LatencyMs": 214.4,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 680,
+        "virtualTimeMs": 136000,
+        "rps": 2143.5,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 685,
+        "virtualTimeMs": 137000,
+        "rps": 2127.9,
+        "avgLatencyMs": 98.7,
+        "p95LatencyMs": 167.6,
+        "p99LatencyMs": 214.5,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 690,
+        "virtualTimeMs": 138000,
+        "rps": 2145.2,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.8,
+        "p99LatencyMs": 214.8,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 695,
+        "virtualTimeMs": 139000,
+        "rps": 2156.4,
+        "avgLatencyMs": 98.9,
+        "p95LatencyMs": 168.0,
+        "p99LatencyMs": 214.9,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      },
+      {
+        "tick": 700,
+        "virtualTimeMs": 140000,
+        "rps": 2123.5,
+        "avgLatencyMs": 98.8,
+        "p95LatencyMs": 167.7,
+        "p99LatencyMs": 214.6,
+        "errorRate": 0.0,
+        "authzDenialRate": 0.07,
+        "suspiciousRps": 0.0
+      }
+    ]
+  }
+}

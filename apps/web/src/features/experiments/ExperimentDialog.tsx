@@ -39,88 +39,20 @@ import {
 } from '@/lib/experiment';
 import { formatClock, formatMs, formatPercent } from '@/lib/format';
 import { nodeLabel } from '@/lib/names';
-import { COLOR } from '@/lib/palette';
 import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
+import { RunsChart, RunStroke } from './RunsChart';
+
 /** How long the fault takes to ease in, as one placed from a service's card does. */
 const RAMP_MS = 2000;
-const CHART_W = 560;
-const CHART_H = 96;
 
-/**
- * One figure over the two runs. The run as it is is the dashed line and the
- * run with the change the solid one: told apart by the stroke, so neither
- * needs a colour. The tick is where the change was placed.
- */
-function RunsChart({
-  experiment,
-  label,
-  value,
-  format,
-}: {
-  experiment: Experiment;
-  label: string;
-  value: (sample: MetricSample) => number;
-  format: (value: number) => string;
-}) {
-  const a = experiment.baseline.samples;
-  const b = experiment.variant.samples;
-  const end = Math.max(1, experiment.durationMs);
-  let top = 0;
-  for (const sample of a) top = Math.max(top, value(sample));
-  for (const sample of b) top = Math.max(top, value(sample));
-  const peak = top;
-  // Headroom, so a line at its highest does not run along the frame.
-  top = top > 0 ? top * 1.12 : 1;
-  const x = (ms: number) => (ms / end) * CHART_W;
-  const y = (v: number) => CHART_H - 3 - (v / top) * (CHART_H - 12);
-  const line = (samples: MetricSample[]) =>
-    samples.map((s) => `${x(s.virtualTimeMs).toFixed(1)},${y(value(s)).toFixed(1)}`).join(' ');
-  const placed = x(placedAtMs(experiment));
-  const started = x(experiment.incidentStartedAtMs);
-  return (
-    <figure className="min-w-0">
-      <figcaption className="caption mb-1 flex items-baseline justify-between gap-2">
-        <span>{label}</span>
-        <span className="numeric">{t('up to {peak}', { peak: format(peak) })}</span>
-      </figcaption>
-      <svg
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        preserveAspectRatio="none"
-        className="h-24 w-full rounded-control border border-line bg-sunken"
-        role="img"
-        aria-label={t(
-          '{measure} over both runs. As it is: up to {a}. With the change: up to {b}.',
-          {
-            measure: label,
-            a: format(Math.max(0, ...a.map(value))),
-            b: format(Math.max(0, ...b.map(value))),
-          },
-        )}
-      >
-        <rect x={started} y={0} width={1} height={CHART_H} fill={COLOR.inkFaint} />
-        <rect x={placed - 0.75} y={0} width={1.5} height={CHART_H} fill={COLOR.ink} />
-        <polyline
-          points={line(a)}
-          fill="none"
-          stroke={COLOR.inkDim}
-          strokeWidth={1.4}
-          strokeDasharray="5 4"
-          vectorEffect="non-scaling-stroke"
-        />
-        <polyline
-          points={line(b)}
-          fill="none"
-          stroke={COLOR.ink}
-          strokeWidth={1.6}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    </figure>
-  );
-}
+/** The two figures drawn over the runs. */
+const MEASURES: [string, (sample: MetricSample) => number, (value: number) => string][] = [
+  [t('Error rate'), (sample) => sample.errorRate, formatPercent],
+  [t('Latency p95'), (sample) => sample.p95LatencyMs, formatMs],
+];
 
 function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () => void }) {
   const topology = useTelemetry((state) => state.topology);
@@ -239,38 +171,34 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
 
       <section>
         <div className="grid gap-3 sm:grid-cols-2">
-          <RunsChart
-            experiment={experiment}
-            label={t('Error rate')}
-            value={(sample) => sample.errorRate}
-            format={formatPercent}
-          />
-          <RunsChart
-            experiment={experiment}
-            label={t('Latency p95')}
-            value={(sample) => sample.p95LatencyMs}
-            format={formatMs}
-          />
+          {MEASURES.map(([label, value, format]) => (
+            <RunsChart
+              key={label}
+              a={experiment.baseline.samples}
+              b={experiment.variant.samples}
+              durationMs={experiment.durationMs}
+              startedAtMs={experiment.incidentStartedAtMs}
+              placedAtMs={placedAtMs(experiment)}
+              label={label}
+              value={value}
+              format={format}
+              summary={(a, b) =>
+                t('{measure} over both runs. As it is: up to {a}. With the change: up to {b}.', {
+                  measure: label,
+                  a,
+                  b,
+                })
+              }
+            />
+          ))}
         </div>
         <p className="caption mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="inline-flex items-center gap-1.5">
-            <svg width="22" height="6" aria-hidden>
-              <line
-                x1="0"
-                y1="3"
-                x2="22"
-                y2="3"
-                stroke={COLOR.inkDim}
-                strokeWidth="1.4"
-                strokeDasharray="5 4"
-              />
-            </svg>
+            <RunStroke run="a" />
             {t('A, as it is')}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <svg width="22" height="6" aria-hidden>
-              <line x1="0" y1="3" x2="22" y2="3" stroke={COLOR.ink} strokeWidth="1.6" />
-            </svg>
+            <RunStroke run="b" />
             {t('B, with the change')}
           </span>
           <span>
@@ -853,6 +781,22 @@ export function ExperimentDialog() {
           </Button>
         </form>
       )}
+      <p className="caption mt-3" data-testid="experiment-to-files">
+        {tr(
+          'A change this form cannot make, such as another service or another connection, is a change to the files: stage them under <a>Platform files</a> and the same incident is run on both platforms.',
+          {
+            a: (children) => (
+              <button
+                type="button"
+                className="underline decoration-line-strong underline-offset-2 hover:text-ink hover:decoration-ink"
+                onClick={() => useUi.getState().setPanel('workspace')}
+              >
+                {children}
+              </button>
+            ),
+          },
+        )}
+      </p>
       {result && <Results experiment={result} onWatch={() => useUi.getState().setPanel(null)} />}
       {sweep && choice.unit !== null && <SweepResults sweep={sweep} unit={choice.unit} />}
     </Dialog>

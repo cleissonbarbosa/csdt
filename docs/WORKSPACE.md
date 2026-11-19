@@ -78,6 +78,10 @@ same without a restart.
   and every request the tracer can build that goes from allow to deny or
   back. It is [`diff-workspace`](#comparing-two-workspaces) with the files
   in use as the base, and applies nothing.
+- Under it, **How would an incident go on each?** runs one scenario on the
+  platform in use and on the one the files describe, and lays the two runs
+  side by side. It is how a change of architecture is tried before it is
+  applied: see [An incident on both platforms](#an-incident-on-both-platforms).
 - An import is laid over **what the server was started with**, not over an
   earlier import: each kind of file you add replaces that part, and the rest
   stays. One scenario file is the whole list of scenarios. To add to what is
@@ -95,14 +99,15 @@ There is one simulation, so applying an import starts a new timeline for
 everyone connected. `AEGIS_IMPORT=off` switches importing off; the dialog then
 only saves. The API behind it:
 
-| Route                                |                                                                |
-| ------------------------------------ | -------------------------------------------------------------- |
-| `GET /api/v1/workspace`              | where the files in use came from and what they amount to       |
-| `GET /api/v1/workspace/export`       | the files in use, as a bundle                                  |
-| `POST /api/v1/demo/workspace/check`  | what `{ "files": [{ "path", "text" }] }` would give; no change |
-| `POST /api/v1/demo/workspace/diff`   | what Cedar would decide differently under them; no change      |
-| `POST /api/v1/demo/workspace/import` | the same, applied; 422 with the file and reason if invalid     |
-| `POST /api/v1/demo/workspace/reset`  | back to what the server started with                           |
+| Route                                     |                                                                |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| `GET /api/v1/workspace`                   | where the files in use came from and what they amount to       |
+| `GET /api/v1/workspace/export`            | the files in use, as a bundle                                  |
+| `POST /api/v1/demo/workspace/check`       | what `{ "files": [{ "path", "text" }] }` would give; no change |
+| `POST /api/v1/demo/workspace/diff`        | what Cedar would decide differently under them; no change      |
+| `POST /api/v1/demo/experiments/platforms` | one scenario on the platform in use and on theirs; no change   |
+| `POST /api/v1/demo/workspace/import`      | the same, applied; 422 with the file and reason if invalid     |
+| `POST /api/v1/demo/workspace/reset`       | back to what the server started with                           |
 
 ## Layout
 
@@ -623,6 +628,66 @@ a check:
 aegis-server diff-workspace ./main-policies ./branch-policies --exit-code
 ```
 
+## An incident on both platforms
+
+A capacity, a service or a connection that would have made an incident go
+differently is a change to a topology file. The interface tries one before
+it is applied: stage the changed files in **Import or export files** (**Save
+as one file** gives you the ones in use to edit), choose a scenario under
+**How would an incident go on each?** and press **Run both**. The engine
+runs the scenario twice, on timelines of its own and from the same seed:
+once on the platform in use (run A) and once on the platform the files
+describe (run B). Nothing is applied and the timeline in use is not touched.
+
+The answer has four parts.
+
+- **What differs** is what the two descriptions state differently, matched
+  by id and written as each file wrote it: services, connections and regions
+  added, removed or described differently (`capacityRps` not stated → 7300),
+  and roles that name something else.
+- **What follows without being stated** is the part to read before the
+  figures. A service whose file states no `capacityRps` is sized from its
+  load at rest, so adding a caller gives it more capacity without any file
+  saying so; each such service is listed with both figures. And a scenario
+  is one file, but it can prescribe something else on the other platform: a
+  role may name another service there, and a rate written as a share of a
+  service's capacity (`"rate": { "ofCapacity": … }`) is another rate where
+  that capacity is another. The bundled DDoS surge is written as 2.2 times
+  what the gateway can take, so a gateway three times the size is sent three
+  times the flood, and the answer says so, phase by phase. To put the same
+  attack to both platforms, write its rate in requests a second
+  (`"rate": { "rps": 5400 }`).
+- **The two runs**, figure by figure and over time: highest and mean error
+  rate, highest latency, services affected, how long each objective was not
+  met, when everything was back to normal, and the services only one run
+  affected. The latency objective is a multiple of each platform's own
+  latency at rest, so where the two differ each run states its own.
+- **Watch run A** puts the run in use on the timeline. **Apply these files
+  and watch run B** applies the files, as **Apply** does, and puts run B on
+  the timeline of the platform they describe, to follow on the model.
+
+Two runs do not say which difference an outcome follows from, and AEGIS does
+not say it for them. To see what one change does, change that one alone.
+
+The scenario has to be the same incident on both sides: in use, among the
+files, written the same in both and able to run on each platform. Staging
+only a topology keeps the scenarios the server was started with, so after an
+import of scenarios of your own, start from **Start from the files in use**.
+When the files describe several platforms, run B is on the one with the id
+in use, or the one they open on, unless another is chosen.
+
+```http
+POST /api/v1/demo/experiments/platforms
+{ "files": [{ "path": "topologies/shop.json", "text": "…" }], "scenarioId": "ddos-surge", "topologyId": "shop" }
+```
+
+`topologyId` is optional. The answer holds both runs, each with the
+recording that reproduces it, `changes` (what differs), `prescribed` (the
+phases the scenario resolves differently) and `decisionsChanged` (whether
+Cedar answers the simulation differently under the files). The files are
+built exactly as an import builds them and are bounded the same way; with
+`AEGIS_IMPORT=off` the route answers 403.
+
 ## What a workspace cannot do
 
 - It cannot make the server open anything. A directory is read once, before
@@ -680,6 +745,14 @@ what is on show.
   the bundled policies rewritten in Cedar syntax with annotations are no
   change; unrelated workspaces compare without a shared request; and the
   command's report, JSON and exit statuses are checked through the binary.
+- An incident on both platforms (`apps/server/tests/platforms.rs`): the files
+  in use compared with themselves give one run twice and no difference; a
+  changed field is reported as the file wrote it, an added service with the
+  capacities that follow from it, and a flood sized from capacity as another
+  flood; the run on the files is the run seen once they are applied; what
+  cannot be the same incident on both sides is refused with the reason; and
+  nothing is applied or placed on the timeline. An end-to-end test stages a
+  changed platform, runs both and watches run B.
 - Each kind of mistake (malformed JSON, an unknown field, a number out of
   range, a cycle, a duplicate id, a forged recording, an oversized file, a
   policy that fails the schema) is refused with the file or the id it is in.

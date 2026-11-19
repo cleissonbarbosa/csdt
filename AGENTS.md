@@ -85,7 +85,7 @@ pnpm e2e:static       # Playwright against the static build, no server
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight,platforms}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -186,8 +186,10 @@ domain`.
   nothing itself. `access` puts questions to Cedar that are recorded nowhere (one request
   policy by policy, every request of the catalogue). `experiment` runs one
   scenario twice on timelines of its own, the second time with one fault
-  placed, and `trial` does the same to the platform at rest; `session` writes the timeline
-  in use out as a recording. `Loaded` pairs a set of sources with the `Assets` built
+  placed, and `trial` does the same to the platform at rest; `platforms`
+  runs one scenario on the topology in use and on one a set of uploaded
+  files describes, and lists what the two descriptions state differently;
+  `session` writes the timeline in use out as a recording. `Loaded` pairs a set of sources with the `Assets` built
   from it; `SimulationService` keeps the one it started with (what a reset
   returns to and an import is laid over) and the one in use.
   `SimulationService` owns the single mutable timeline behind one mutex, is
@@ -229,10 +231,24 @@ Things that are easy to break:
   why it did not apply. A test holds the standings of every catalogued
   request to the decision Cedar gave; keep it passing when Cedar is
   upgraded.
-- **Asking is not recording.** `explain`, `matrix` and `trial` place nothing
-  on the timeline: no command, no event, no decision. They are bounded
-  (`MATRIX_LIMIT`, `MAX_DISABLED_POLICIES`, `TRIAL_MS`), and the matrix and
-  the trial run through `off_the_workers`.
+- **Asking is not recording.** `explain`, `matrix`, `trial` and the
+  comparison of platforms place nothing on the timeline: no command, no
+  event, no decision. They are bounded (`MATRIX_LIMIT`,
+  `MAX_DISABLED_POLICIES`, `TRIAL_MS`, an import's limits), and the matrix,
+  the trial and the comparison run through `off_the_workers`.
+- **A comparison of platforms lists differences; it explains nothing.**
+  `application/platforms.rs` runs the same scenario definition on both sides
+  (the service refuses one written differently in the files) and reports
+  what the two topology files state differently, matched by id and written
+  as the files wrote it. Two things follow without being stated and must
+  stay in the answer, or two runs are read as one attack on two sizes of
+  platform: a capacity no file states is sized from load at rest
+  (`derivedCapacity`), and a rate written as a share of a capacity resolves
+  to another rate (`prescribed`, read from the two reports). It never says
+  which difference an outcome follows from, and the interface
+  (`features/workspace/PlatformRuns.tsx`) says that it does not. The
+  candidate is built by `build_import`, exactly what Apply would give, and
+  is never put in use by the route.
 - **An objective is an alert rule's threshold.** `ERROR_OBJECTIVE` and
   `LATENCY_OBJECTIVE_FACTOR` in `simulation/engine.rs` are what the
   detection rules alert on and what `report::objectives_over` counts the

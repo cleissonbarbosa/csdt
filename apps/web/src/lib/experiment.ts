@@ -2,7 +2,8 @@
  * Two runs of one incident, laid side by side.
  *
  * The server runs a scenario twice from the same seed, the second time with
- * one fault placed, and reports both (`/demo/experiments/compare`). These
+ * one fault placed (`/demo/experiments/compare`) or on the platform a set of
+ * files describes (`/demo/experiments/platforms`), and reports both. These
  * helpers line the two reports up and say by how much each figure differs.
  * Every figure is read from the reports; nothing is computed about the
  * platform here.
@@ -12,6 +13,12 @@ import type { Experiment, ExperimentRun, FaultEffect, MetricSample } from '@aegi
 import { formatClock, formatMs, formatPercent } from './format';
 
 import { t } from '@/i18n';
+
+/** Two runs of one incident: `variant` is read against `baseline`. */
+export interface Runs {
+  baseline: ExperimentRun;
+  variant: ExperimentRun;
+}
 
 export interface ComparedRow {
   id: string;
@@ -44,9 +51,9 @@ function recovery(run: ExperimentRun): { text: string; ms: number | null } {
 }
 
 /** The figures of the two runs, row by row. */
-export function comparedRows(experiment: Experiment): ComparedRow[] {
-  const a = experiment.baseline.report;
-  const b = experiment.variant.report;
+export function comparedRows(runs: Runs): ComparedRow[] {
+  const a = runs.baseline.report;
+  const b = runs.variant.report;
   const rows: ComparedRow[] = [];
   const peak = (value: { value: number } | null) => value?.value ?? null;
 
@@ -100,23 +107,37 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
     const other = b.objectives.find((entry) => entry.kind === objective.kind);
     if (!other) continue;
     const time = (ms: number) => (ms === 0 ? t('met throughout') : formatClock(ms));
+    const figure = objective.kind === 'error-rate' ? formatPercent : formatMs;
+    // An objective on latency is a multiple of the platform's own latency at
+    // rest, so two platforms may each have theirs: then each run says which.
+    const shared = other.threshold === objective.threshold;
+    const cell = (entry: typeof objective) =>
+      shared
+        ? time(entry.breachedMs)
+        : t('{time} (objective {threshold})', {
+            time: time(entry.breachedMs),
+            threshold: figure(entry.threshold),
+          });
     rows.push({
       id: `objective-${objective.kind}`,
-      label:
-        objective.kind === 'error-rate'
+      label: !shared
+        ? objective.kind === 'error-rate'
+          ? t('Error rate at its objective or over for')
+          : t('Latency p95 at its objective or over for')
+        : objective.kind === 'error-rate'
           ? t('Error rate at {threshold} or over for', {
               threshold: formatPercent(objective.threshold),
             })
           : t('Latency p95 at {threshold} or over for', {
               threshold: formatMs(objective.threshold),
             }),
-      a: time(objective.breachedMs),
-      b: time(other.breachedMs),
+      a: cell(objective),
+      b: cell(other),
       delta: signed(other.breachedMs - objective.breachedMs, (v) => formatClock(v)),
     });
   }
-  const backA = recovery(experiment.baseline);
-  const backB = recovery(experiment.variant);
+  const backA = recovery(runs.baseline);
+  const backB = recovery(runs.variant);
   rows.push({
     id: 'recovered',
     label: t('All back to normal'),
@@ -131,9 +152,9 @@ export function comparedRows(experiment: Experiment): ComparedRow[] {
 }
 
 /** Services one run affected and the other did not. */
-export function affectedOnlyIn(experiment: Experiment): { a: string[]; b: string[] } {
-  const a = experiment.baseline.report.impactedNodeIds;
-  const b = experiment.variant.report.impactedNodeIds;
+export function affectedOnlyIn(runs: Runs): { a: string[]; b: string[] } {
+  const a = runs.baseline.report.impactedNodeIds;
+  const b = runs.variant.report.impactedNodeIds;
   return {
     a: a.filter((id) => !b.includes(id)),
     b: b.filter((id) => !a.includes(id)),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { experiment as sampleExperiment } from '@/test/fixtures';
+import { experiment as sampleExperiment, platformComparison } from '@/test/fixtures';
 
 import {
   affectedOnlyIn,
@@ -14,7 +14,7 @@ import {
   sameUntilPlaced,
   sweepOf,
 } from './experiment';
-import { formatPercent } from './format';
+import { formatClock, formatMs, formatPercent } from './format';
 
 const experiment = sampleExperiment();
 
@@ -61,6 +61,24 @@ describe('two runs of one incident', () => {
         experiment.baseline.report.peakErrorRate!.value,
     ).toBe(true);
     expect(peak.delta).toMatch(/^−\d+\.\d+ pts$/);
+  });
+
+  it("say each run's own objective where two platforms have each their own", () => {
+    // An objective on latency is a multiple of the platform's latency at
+    // rest, which a platform with another service does not share.
+    const comparison = platformComparison();
+    const objective = (run: typeof comparison.baseline) =>
+      run.report.objectives.find((entry) => entry.kind === 'latency-p95')!;
+    const [a, b] = [objective(comparison.baseline), objective(comparison.variant)];
+    expect(a.threshold).not.toBe(b.threshold);
+    const row = comparedRows(comparison).find((entry) => entry.id === 'objective-latency-p95')!;
+    expect(row.label).toBe('Latency p95 at its objective or over for');
+    expect(row.a).toBe(`${formatClock(a.breachedMs)} (objective ${formatMs(a.threshold)})`);
+    expect(row.b).toBe(`${formatClock(b.breachedMs)} (objective ${formatMs(b.threshold)})`);
+    // The error objective is one constant: said once, in the label.
+    const errors = comparedRows(comparison).find((entry) => entry.id === 'objective-error-rate')!;
+    expect(errors.label).toBe('Error rate at 5.00% or over for');
+    expect(errors.a).not.toContain('objective');
   });
 
   it('say which services only one of them affected', () => {
