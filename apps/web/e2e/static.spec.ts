@@ -946,7 +946,7 @@ test('a capture speaks Portuguese with the interface, and keeps the words its fi
 
   await fromMenu(page, 'capture');
   const dialog = page.getByRole('dialog', { name: 'Abrir uma captura de incidente' });
-  await expect(dialog).toContainText('Capturas que vêm com o AEGIS');
+  await expect(dialog).toContainText('Capturas incluídas no AEGIS');
   const entry = dialog.getByTestId(`capture-open-${GOOGLE}`);
   // The title is the file's; the window around it is the interface's.
   await expect(entry).toContainText(google.title);
@@ -956,12 +956,14 @@ test('a capture speaks Portuguese with the interface, and keeps the words its fi
 
   const status = page.getByTestId('capture-status');
   await expect(status).toContainText('Às 17:45 UTC');
-  await expect(status).toContainText('12 serviços, nenhum informado ainda no relatório');
+  await expect(status).toContainText(
+    'O relatório ainda não informa o estado de nenhum dos 12 serviços',
+  );
   const chip = page.getByTestId('capture-chip');
   await expect(chip).toContainText('Do relatório do provedor, não simulado');
   await expect(chip).toHaveAttribute(
     'aria-label',
-    `Do relatório do provedor, não simulado: ${google.title}. Mostrar o que é a captura.`,
+    `Do relatório do provedor, não simulado: ${google.title}. Mostrar detalhes da captura.`,
   );
   const back = page.getByTestId('capture-back');
   await expect(back).toHaveAccessibleName('Voltar à simulação');
@@ -984,10 +986,10 @@ test('a capture speaks Portuguese with the interface, and keeps the words its fi
   await expect(card.getByTestId('capture-card-title')).toHaveText('Cloud IAM');
   await expect(card.getByTestId('capture-card-state')).toHaveText('Não informado neste momento');
   await expect(card.getByTestId('capture-type-source')).toHaveText(
-    'Tipo presumido: a fonte não diz',
+    'Tipo presumido (a fonte não informa)',
   );
   await expect(card.getByTestId('capture-colour-note')).toHaveText(
-    'O impacto relatado é desenhado como crítico e uma recuperação relatada como degradada; o relatório não classifica a gravidade do impacto.',
+    'O relatório não indica a gravidade do impacto. Serviços afetados aparecem como críticos e serviços em recuperação aparecem como degradados.',
   );
 
   // An event's title is the file's, in English; what it does to the
@@ -1004,8 +1006,8 @@ test('a capture speaks Portuguese with the interface, and keeps the words its fi
   );
   await expect(status).toHaveAttribute('data-level', '2');
   await expect(status).toContainText('Às 17:49 UTC');
-  await expect(status).toContainText('6 serviços relatados como afetados; 6 sem informação');
-  await expect(card.getByTestId('capture-card-state')).toHaveText('Relatado como afetado');
+  await expect(status).toContainText('6 serviços afetados segundo o relatório, 6 sem informação');
+  await expect(card.getByTestId('capture-card-state')).toHaveText('Afetado segundo o relatório');
   await expect(page.getByTestId('capture-offset')).toHaveText('+4:00 desde o início da captura');
 
   // The names on the model are the file's, whole, and none lies under a sheet.
@@ -1018,7 +1020,9 @@ test('a capture speaks Portuguese with the interface, and keeps the words its fi
   await page.keyboard.press('t');
   const table = page.getByTestId('capture-table');
   await expect(table).toBeVisible();
-  await expect(table.getByTestId('capture-table-state-iam')).toHaveText('Relatado como afetado');
+  await expect(table.getByTestId('capture-table-state-iam')).toHaveText(
+    'Afetado segundo o relatório',
+  );
   await expect(table.getByTestId('capture-table-state-dataflow')).toHaveText(
     'Não informado neste momento',
   );

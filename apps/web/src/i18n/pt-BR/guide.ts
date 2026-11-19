@@ -9,283 +9,284 @@ export default {
   // The orientation of a first visit.
   'Where to start': 'Por onde começar',
   'A fictional cloud platform, simulated, to take apart':
-    'Uma plataforma de nuvem fictícia, simulada, para desmontar',
+    'Uma plataforma de nuvem fictícia para explorar em detalhes',
   'Each piece is a kind of service. Select one to see what it does and how it is doing; everything you see is computed by the simulation, and Cedar decides every authorization. Where would you like to start?':
-    'Cada peça é um tipo de serviço. Selecione uma para ver o que esse tipo faz e como está; tudo o que você vê é calculado pela simulação, e o Cedar decide cada autorização. Por onde você quer começar?',
-  'Dismiss; this does not come back': 'Dispensar; isto não volta mais',
+    'Cada peça representa um tipo de serviço. Selecione uma para conhecer sua função e ver seu estado. A simulação calcula os dados exibidos e o Cedar decide quais requisições são autorizadas. Por onde você quer começar?',
+  'Dismiss; this does not come back': 'Fechar esta apresentação sem exibi-la novamente',
   'Understand the platform': 'Entender a plataforma',
   'Its {n} kinds of service, the path a request takes through them, and the signals that say how it is doing.':
-    'Seus {n} tipos de serviço, o caminho que uma requisição faz por eles e os sinais que dizem como ela está.',
+    'Conheça os {n} tipos de serviço, o caminho das requisições e os sinais que indicam o estado da plataforma.',
   'Its services, the path a request takes through them, and the signals that say how it is doing.':
-    'Seus serviços, o caminho que uma requisição faz por eles e os sinais que dizem como ela está.',
+    'Conheça os serviços, o caminho das requisições e os sinais que indicam o estado da plataforma.',
   'Investigate a failure': 'Investigar uma falha',
   'Start an incident, watch it spread, and read back where it began and why each service followed.':
-    'Iniciar um incidente, vê-lo se espalhar e ler no registro onde ele começou e por que cada serviço o seguiu.',
+    'Inicie um incidente, acompanhe sua propagação e consulte o registro para descobrir onde começou e por que cada serviço foi afetado.',
   'Ask Cedar who may do what, see which policy decides, and follow the request across the model.':
-    'Perguntar ao Cedar quem pode fazer o quê, ver qual política decide e seguir a requisição pelo modelo.',
+    'Pergunte ao Cedar quem pode fazer o quê, veja qual política determina a decisão e acompanhe a requisição pelo modelo.',
   'Or <guide>take a guided challenge</guide>: a question about the platform, checked against the model. All of this stays in the menu at the end of the bar.':
-    'Ou <guide>faça um desafio guiado</guide>: uma pergunta sobre a plataforma, conferida com o modelo. Tudo isso continua no menu no fim da barra.',
+    'Ou <guide>faça um desafio guiado</guide> e responda a uma pergunta usando o modelo. Essas opções continuam disponíveis no menu no fim da barra.',
 
   // The guide card: the list of challenges and the one under way.
   'Close the guide': 'Fechar o guia',
   "Each asks one question about the platform. Your answer is checked against the model itself: the record of the incident, or Cedar's own decision.":
-    'Cada um faz uma pergunta sobre a plataforma. Sua resposta é conferida com o próprio modelo: o registro do incidente ou a própria decisão do Cedar.',
+    'Cada desafio traz uma pergunta sobre a plataforma. O guia confere sua resposta com base no registro do incidente ou na decisão do Cedar.',
   '{n} of {total} solved': '{n} de {total} resolvidos',
   'Start over': 'Recomeçar',
-  'The one you were sent': 'O que enviaram para você',
+  'The one you were sent': 'Desafio compartilhado com você',
   solved: 'resolvido',
   Again: 'Refazer',
   'All challenges': 'Todos os desafios',
   'Next: {title}': 'Próximo: {title}',
-  'Copy a link to this challenge': 'Copiar um link para este desafio',
+  'Copy a link to this challenge': 'Copiar link do desafio',
   'Link copied': 'Link copiado',
   'Read from the events and figures the engine recorded in this run.':
-    'Lido dos eventos e dos números que o motor registrou nesta execução.',
+    'Com base nos eventos e nos dados que o motor registrou nesta execução.',
   'What the Cedar policy engine answered, or the text of a policy it holds.':
-    'O que o motor de políticas Cedar respondeu, ou o texto de uma política que ele guarda.',
+    'Resposta do motor de políticas Cedar ou texto de uma das políticas carregadas.',
 
   // What every challenge says before and while it is answered.
   'The platform in use cannot run the scenario this challenge needs.':
-    'A plataforma em uso não pode rodar o cenário de que este desafio precisa.',
+    'A plataforma atual não consegue executar o cenário necessário para este desafio.',
   'Answer: {service}': 'Responder: {service}',
   'That is a kind of service. Open it and select one service.':
-    'Isso é um tipo de serviço. Abra-o e selecione um serviço.',
+    'Você selecionou um tipo de serviço. Abra o grupo e escolha um dos serviços.',
   'Select a service on the model to answer with it.':
-    'Selecione um serviço no modelo para responder com ele.',
-  'There is no incident to answer about yet.': 'Ainda não há incidente sobre o qual responder.',
-  'There is no incident to answer about.': 'Não há incidente sobre o qual responder.',
+    'Para responder, selecione um serviço no modelo.',
+  'There is no incident to answer about yet.': 'Ainda não há um incidente para analisar.',
+  'There is no incident to answer about.': 'Nenhum incidente disponível para analisar.',
   'Start the challenge again and let the incident run.':
-    'Comece o desafio de novo e deixe o incidente correr.',
+    'Reinicie o desafio e deixe o incidente avançar.',
   'Not {service}.': 'Não é {service}.',
 
   // Where a cascade begins.
-  'Find where the cascade begins': 'Encontrar onde a cascata começa',
+  'Find where the cascade begins': 'Encontrar a origem da falha em cascata',
   'Services start failing one after another. One of them is where it began; the rest follow from it.':
-    'Serviços começam a falhar um após o outro. Um deles é onde tudo começou; os demais decorrem dele.',
+    'Os serviços começam a falhar um após o outro. A falha começa em um deles e se propaga para os demais.',
   'Starts the cascading failure scenario from a clean simulation.':
-    'Inicia o cenário de falha em cascata a partir de uma simulação limpa.',
+    'Reinicia a simulação e inicia o cenário de falha em cascata.',
   'Watch which services leave their normal state, and in what order. Then select the service you think it began at.':
-    'Observe quais serviços saem do estado normal, e em que ordem. Depois selecione o serviço em que você acha que tudo começou.',
+    'Observe quais serviços saem do estado normal e em que ordem. Depois, selecione o serviço que você considera a origem da falha.',
   'In its first phase the scenario holds it to {effect}.':
-    'Na primeira fase, o cenário o submete a {effect}.',
+    'Na primeira fase, o cenário prescreve {effect}.',
   '{service} became {health} at {at} because {why}.':
     '{service} ficou {health} em {at} porque {why}.',
   '{service} became {health} at {at}.': '{service} ficou {health} em {at}.',
   '{service} became {health} at {at} because of nothing the report can point to.':
-    '{service} ficou {health} em {at} sem causa que o relatório consiga apontar.',
-  'Yes: it begins at {service}.': 'Sim: começa em {service}.',
+    '{service} ficou {health} em {at}. O relatório não identificou a causa.',
+  'Yes: it begins at {service}.': 'Sim, a falha começa em {service}.',
   'No service has left its normal state yet. Let the incident run a little longer.':
-    'Nenhum serviço saiu do estado normal ainda. Deixe o incidente correr um pouco mais.',
+    'Nenhum serviço saiu do estado normal até agora. Deixe o incidente avançar um pouco mais.',
   '{service} has stayed normal so far: the incident has not reached it. Look at the services whose lamp is lit.':
-    '{service} continua normal até agora: o incidente não chegou a ele. Olhe os serviços com a luz acesa.',
+    '{service} continua normal, pois o incidente ainda não o atingiu. Observe os serviços com a luz acesa.',
   '{n} service left the normal state before it did. Follow what it depends on.':
-    '{n} serviço saiu do estado normal antes dele. Siga aquilo de que ele depende.',
+    '{n} serviço saiu do estado normal antes dele. Verifique suas dependências.',
   '{n} services left the normal state before it did. Follow what it depends on.':
-    '{n} serviços saíram do estado normal antes dele. Siga aquilo de que ele depende.',
+    '{n} serviços saíram do estado normal antes dele. Verifique suas dependências.',
   'Nothing was seen to fail before it, but the run says something acts on another service first. Follow what it calls.':
-    'Nada foi visto falhar antes dele, mas a execução diz que algo age primeiro sobre outro serviço. Siga o que ele chama.',
-  'Not {service}: it is a consequence.': 'Não é {service}: é uma consequência.',
+    'Nenhuma falha anterior foi observada. O registro aponta um efeito inicial em outro serviço. Verifique os serviços chamados pelo que você selecionou.',
+  'Not {service}: it is a consequence.': '{service} foi afetado pela propagação da falha.',
 
   // Where injected traffic is stopped: the flood, and the contractor.
-  'Nothing is stopping it yet.': 'Nada o está barrando ainda.',
+  'Nothing is stopping it yet.': 'O tráfego ainda não está sendo bloqueado.',
   'Right now {share} of “{flow}” still gets through.':
     'Neste momento, {share} de “{flow}” ainda passa.',
   'The injected traffic has not started or has already ended.':
     'O tráfego injetado ainda não começou ou já terminou.',
   "The scenario's mitigation phase, “{phase}”, began at {at}; it takes a few seconds to ease in.":
-    'A fase de mitigação do cenário, “{phase}”, começou em {at}; leva alguns segundos para fazer efeito por completo.',
+    'A fase de mitigação “{phase}” começou em {at}. Ela leva alguns segundos para fazer efeito por completo.',
   'The scenario has not reached its mitigation phase. Let it run.':
-    'O cenário ainda não chegou à fase de mitigação. Deixe-o correr.',
-  'Yes: it is stopped at {service}.': 'Sim: é barrado em {service}.',
+    'Deixe a simulação avançar até a fase de mitigação.',
+  'Yes: it is stopped at {service}.': 'Sim, o tráfego é bloqueado em {service}.',
   'Of {total} req/s of “{flow}”, {passed} req/s get past it (turned away by: {reason}).':
-    'De {total} req/s de “{flow}”, {passed} req/s passam por ele (recusadas por: {reason}).',
+    'Das {total} req/s de “{flow}”, {passed} req/s passam pelo serviço. As demais são rejeitadas ({reason}).',
   'Of {total} req/s of “{flow}”, {passed} req/s get past it.':
-    'De {total} req/s de “{flow}”, {passed} req/s passam por ele.',
+    'Das {total} req/s de “{flow}”, {passed} req/s passam pelo serviço.',
   '{service} is on the route, but it is not where most of this traffic is turned away.':
-    '{service} está na rota, mas não é onde a maior parte desse tráfego é recusada.',
+    '{service} está na rota. A maior parte do tráfego é bloqueada em outro serviço.',
   'This traffic does not pass through {service}. Its route is the one drawn on the model.':
-    'Esse tráfego não passa por {service}. A rota dele é a que está desenhada no modelo.',
+    'Esse tráfego não passa por {service}. Siga a rota desenhada no modelo.',
   "Only {share} of “{flow}” is still delivered: look for where the route's beads stop.":
-    'Só {share} de “{flow}” ainda é entregue: procure onde os pontos de tráfego da rota param.',
-  'Find where the flood is stopped': 'Encontrar onde a enxurrada é barrada',
+    'Só {share} de “{flow}” ainda chega ao destino. Procure onde os pontos de tráfego param ao longo da rota.',
+  'Find where the flood is stopped': 'Encontrar onde o pico de tráfego é bloqueado',
   'Hostile traffic pours in from outside. After a while a mitigation engages and most of it is turned away at one service.':
-    'Tráfego hostil chega em massa de fora. Depois de um tempo, uma mitigação entra em ação e a maior parte dele é recusada em um serviço.',
+    'Um volume alto de tráfego hostil chega de fora da plataforma. Quando a mitigação entra em ação, um dos serviços bloqueia a maior parte desse tráfego.',
   'Starts the DDoS surge scenario from a clean simulation.':
-    'Inicia o cenário de onda de DDoS a partir de uma simulação limpa.',
+    'Reinicia a simulação e inicia o cenário de pico de tráfego DDoS.',
   'Follow the incident’s route across the model. When the mitigation has engaged, select the service the flood is being stopped at.':
-    'Siga a rota do incidente pelo modelo. Quando a mitigação tiver entrado em ação, selecione o serviço em que a enxurrada está sendo barrada.',
+    'Siga a rota do incidente no modelo. Quando a mitigação entrar em ação, selecione o serviço que está bloqueando o pico de tráfego.',
   'The scenario prescribes the rejection at this service; how much load that takes off what lies behind it is the model’s doing.':
-    'O cenário prescreve a rejeição neste serviço; quanto de carga isso tira do que está atrás dele é obra do modelo.',
-  'Find where the contractor is stopped': 'Encontrar onde o terceirizado é barrado',
+    'O cenário prescreve a rejeição neste serviço. O modelo calcula quanto isso reduz a carga nos serviços seguintes.',
+  'Find where the contractor is stopped':
+    'Encontrar onde as requisições do terceirizado são bloqueadas',
   'A contractor of another tenant is signed in, and asks for things that are not theirs to have. None of it reaches the data.':
-    'Um terceirizado de outro locatário está autenticado e pede coisas que não lhe cabem. Nada disso chega aos dados.',
+    'Um terceirizado de outro locatário está autenticado e solicita acesso a recursos sem ter permissão. Nenhuma dessas requisições chega aos dados.',
   'Starts the Cedar authorization denial scenario from a clean simulation.':
-    'Inicia o cenário de negação de autorização do Cedar a partir de uma simulação limpa.',
+    'Reinicia a simulação e inicia o cenário de autorização negada pelo Cedar.',
   'Follow the route of the contractor’s requests. Once they ask for what they may not have, select the service they are stopped at.':
-    'Siga a rota das requisições do terceirizado. Quando elas pedirem o que não podem ter, selecione o serviço em que são barradas.',
+    'Siga a rota das requisições do terceirizado. Quando ele fizer uma requisição sem autorização, selecione o serviço que a bloqueia.',
   'No scenario can write a denial. This traffic stops at the authorizer because Cedar, asked the request it is made of, denies it under the policies in force.':
-    'Nenhum cenário pode escrever uma negação. Este tráfego para no autorizador porque o Cedar, consultado sobre a requisição de que ele é feito, a nega pelas políticas em vigor.',
+    'Cabe ao Cedar decidir sobre a autorização. O tráfego para no autorizador porque o Cedar avalia a requisição e a nega com base nas políticas em vigor.',
 
   // The region that went dark.
-  'Find the region that went dark': 'Encontrar a região que se apagou',
+  'Find the region that went dark': 'Encontrar a região que ficou fora do ar',
   'A whole cloud region stops answering. Traffic that went to it is sent elsewhere, and what stands there is out of reach.':
-    'Uma região de nuvem inteira para de responder. O tráfego que ia para ela é enviado a outro lugar, e o que fica lá está fora de alcance.',
+    'Uma região inteira da nuvem para de responder. O tráfego é redirecionado e os serviços daquela região ficam inacessíveis.',
   'Starts the regional outage scenario from a clean simulation.':
-    'Inicia o cenário de queda regional a partir de uma simulação limpa.',
+    'Reinicia a simulação e inicia o cenário de queda regional.',
   'Watch the model, by region if you like. When a region has gone dark, select any service that stands in it.':
-    'Observe o modelo, por região se quiser. Quando uma região tiver se apagado, selecione qualquer serviço que fique nela.',
-  'No region is dark yet.': 'Nenhuma região se apagou ainda.',
+    'Observe o modelo. Se preferir, organize os serviços por região. Quando uma região ficar fora do ar, selecione qualquer serviço dela.',
+  'No region is dark yet.': 'Nenhuma região ficou fora do ar até agora.',
   '{region} has {n} of {total} services out of their normal state, and still answers {share} of what it is asked.':
-    '{region} tem {n} de {total} serviços fora do estado normal e ainda responde a {share} do que lhe pedem.',
+    '{region} tem {n} de {total} serviços fora do estado normal e ainda responde a {share} das requisições.',
   'Every region is still serving. Let the incident run a little longer.':
-    'Todas as regiões ainda estão atendendo. Deixe o incidente correr um pouco mais.',
+    'Todas as regiões ainda respondem a requisições. Deixe o incidente avançar um pouco mais.',
   '{n} of the {total} services that stand in {region} are out of their normal state.':
     '{n} dos {total} serviços que ficam em {region} estão fora do estado normal.',
-  '{regions} is still serving.': '{regions} ainda está atendendo.',
-  '{regions} are still serving.': '{regions} ainda estão atendendo.',
-  'Yes: {region} is dark.': 'Sim: {region} está apagada.',
+  '{regions} is still serving.': '{regions} ainda responde a requisições.',
+  '{regions} are still serving.': '{regions} ainda respondem a requisições.',
+  'Yes: {region} is dark.': 'Sim, {region} está fora do ar.',
   'It stands in {region}, where {n} of {total} services are out of their normal state: that region still answers.':
-    'Ele fica em {region}, onde {n} de {total} serviços estão fora do estado normal: essa região ainda responde.',
+    'Esse serviço fica em {region}. Lá, {n} de {total} serviços estão fora do estado normal, e a região ainda responde.',
   'It stands in {region}, where no service is out of their normal state: that region still answers.':
-    'Ele fica em {region}, onde nenhum serviço está fora do estado normal: essa região ainda responde.',
+    'Esse serviço fica em {region}, que ainda responde e tem todos os serviços no estado normal.',
   'One region has {n} of its {total} services out at once. Arranged by region, its plate is the one that has gone dark.':
-    'Uma região tem {n} dos seus {total} serviços fora do normal ao mesmo tempo. Na disposição por região, a placa dela é a que se apagou.',
+    'Uma região tem {n} de {total} serviços fora do normal ao mesmo tempo. Na disposição por região, procure a placa apagada.',
 
   // A request Cedar denies, and the one circumstance under which it is allowed.
   'Opens the request tracer with the request. The simulation is left as it is.':
-    'Abre o rastreador de requisições com a requisição. A simulação fica como está.',
+    'Abre a requisição no rastreador sem interferir na simulação.',
   'Evaluate the request and read the policies. Then change one thing about the circumstances of the request (not who asks, nor for what) so that Cedar allows it, and evaluate again.':
-    'Avalie a requisição e leia as políticas. Depois mude uma coisa nas circunstâncias da requisição (não quem pede, nem o quê) para que o Cedar a permita, e avalie de novo.',
+    'Avalie a requisição e leia as políticas. Mantenha o principal, a ação e o recurso. Altere uma das condições da avaliação para que o Cedar permita a requisição e avalie novamente.',
   'The policies in use do not know this request.':
-    'As políticas em uso não conhecem esta requisição.',
+    'A requisição deste desafio não está disponível no catálogo atual.',
   'Check my latest result': 'Conferir meu último resultado',
-  'Evaluate the request in the tracer first.': 'Avalie a requisição no rastreador primeiro.',
+  'Evaluate the request in the tracer first.': 'Primeiro, avalie a requisição no rastreador.',
   'Nothing has been evaluated yet.': 'Nada foi avaliado ainda.',
   'Press “Evaluate with Cedar” in the tracer.': 'Clique em “Avaliar com o Cedar” no rastreador.',
   'That is another request.': 'Essa é outra requisição.',
   'Cedar answered for {principal} asking to {action} {resource}. {keep}':
-    'O Cedar respondeu ao pedido de {principal} para {action} em {resource}. {keep}',
+    'O Cedar avaliou a requisição de {principal} com a ação {action} e o recurso {resource}. {keep}',
   'Cedar allows it under {context}, and names {policies} as the policy that decides.':
-    'O Cedar permite a requisição com {context} e aponta {policies} como a política que decide.',
-  'Yes: now it is allowed.': 'Sim: agora ela é permitida.',
-  'Still denied.': 'Ainda negada.',
+    'Com {context}, o Cedar permite a requisição com base em {policies}.',
+  'Yes: now it is allowed.': 'Sim, agora a requisição é permitida.',
+  'Still denied.': 'A requisição continua negada.',
   'Under {context} no policy decided this: nothing permits it, and Cedar denies by default. The decision lists, policy by policy, the permit that came closest; read its “when”.':
-    'Com {context}, nenhuma política decidiu isto: nada a permite, e o Cedar nega por padrão. A decisão lista, política por política, o permit que chegou mais perto; leia o “when” dele.',
+    'Com {context}, nenhuma política permite a requisição, por isso o Cedar a nega por padrão. Na lista de políticas da decisão, encontre o permit que quase se aplicou e leia sua condição “when”.',
   'Cedar names {policies}: a forbid, which no permit overrides. Read what it makes an exception for.':
-    'O Cedar aponta {policies}: um forbid, que nenhum permit anula. Leia a exceção que ele abre.',
+    'O Cedar indica {policies}. Um forbid sempre prevalece sobre qualquer permit. Leia em que caso o forbid abre uma exceção.',
   'Cedar names {policies}.': 'O Cedar aponta {policies}.',
   '{policies} was switched off for this evaluation; the answer asked for is the one under every policy.':
-    '{policies} foi desligada nesta avaliação; a resposta pedida é a que vale com todas as políticas.',
+    '{policies} estava desativada nesta avaliação. Para responder ao desafio, avalie com todas as políticas ativas.',
   '{policies} were switched off for this evaluation; the answer asked for is the one under every policy.':
-    '{policies} foram desligadas nesta avaliação; a resposta pedida é a que vale com todas as políticas.',
+    '{policies} estavam desativadas nesta avaliação. Para responder ao desafio, avalie com todas as políticas ativas.',
   'Explain why this export was denied': 'Explicar por que esta exportação foi negada',
   'Alice is a finance analyst of the tenant that owns the ledger. She asks to export it, and Cedar says no.':
-    'Alice é analista financeira do locatário dono do livro-razão. Ela pede para exportá-lo, e o Cedar diz não.',
+    'Alice é analista financeira do locatário ao qual pertence o livro-razão. Ela solicita a exportação do livro-razão e o Cedar nega a requisição.',
   'Keep Alice, the export and the Acme ledger; change only the context or the policies.':
-    'Mantenha Alice, a exportação e o livro-razão da Acme; mude só o contexto ou as políticas.',
+    'Mantenha Alice, a ação de exportação e o livro-razão da Acme. Altere apenas o contexto ou as políticas.',
   'So the first answer was no for want of a permit, not because anything forbade it: Cedar denies whatever no policy permits.':
-    'Então a primeira resposta foi não por falta de um permit, e não porque algo a proibisse: o Cedar nega tudo o que nenhuma política permite.',
+    'O Cedar negou a primeira requisição por padrão. Para aquela requisição, não se aplicava nenhum permit nem forbid.',
   'Find when a customer may be deleted': 'Descobrir quando um cliente pode ser excluído',
   'Carol administers her tenant and may do anything in it. She asks to delete one of its customers, and Cedar says no.':
-    'Carol administra o locatário dela e pode fazer qualquer coisa nele. Ela pede para excluir um dos clientes dele, e o Cedar diz não.',
+    'Carol administra seu locatário e tem permissão para realizar qualquer ação nele. Ela solicita a exclusão de um cliente e o Cedar nega a requisição.',
   'Keep Carol, the deletion and the Acme customer; change only the context.':
-    'Mantenha Carol, a exclusão e o cliente da Acme; mude só o contexto.',
+    'Mantenha Carol, a ação de exclusão e o cliente da Acme. Altere apenas o contexto.',
   'So the first answer was no although a permit held: a forbid held too, and a forbid is never overridden. What changed is the one thing that forbid makes an exception for.':
-    'Então a primeira resposta foi não, embora um permit valesse: um forbid também valia, e um forbid nunca é anulado. O que mudou é a única coisa para a qual esse forbid abre exceção.',
+    'Na primeira avaliação, um permit e um forbid se aplicavam à requisição. O Cedar deu prioridade ao forbid e negou a requisição. A alteração no contexto atende à única exceção prevista nesse forbid.',
 
   // The help and legend: how the model is read and moved around.
-  'How to read the model and move around it.': 'Como ler o modelo e se mover por ele.',
+  'How to read the model and move around it.': 'Como interpretar o modelo e navegar por ele.',
   'Two levels': 'Dois níveis',
   'The <ink>overview</ink> shows the platform as its kinds of service, in the four layers a request crosses: entry, identity, compute, data. A piece there stands for every service of its kind and says how many; its figures are theirs, added up. The two detailed arrangements show every service on its own, by region or by dependency tier. Opening a service from a list or from a kind takes you to it there.':
-    'A <ink>visão geral</ink> mostra a plataforma como os seus tipos de serviço, nas quatro camadas que uma requisição atravessa: entrada, identidade, computação, dados. Ali, uma peça representa todos os serviços do seu tipo e diz quantos são; os números dela são os deles, somados. As duas disposições detalhadas mostram cada serviço por si, por região ou por camada de dependência. Abrir um serviço a partir de uma lista ou de um tipo leva você até ele lá.',
+    'A <ink>visão geral</ink> agrupa os serviços por tipo nas quatro camadas que uma requisição atravessa (entrada, identidade, computação e dados). Cada peça representa um tipo, mostra quantos serviços há nele e agrega seus dados. As duas disposições detalhadas mostram cada serviço individualmente, por região ou por camada de dependência. Abra um serviço na lista ou no grupo para vê-lo em detalhe.',
   Camera: 'Câmera',
   '<ink>Drag</ink> to orbit': '<ink>Arrastar</ink> para orbitar',
   '<ink>Right-drag</ink> or <ink>two-finger drag</ink> to pan':
     '<ink>Arrastar com o botão direito</ink> ou <ink>arrastar com dois dedos</ink> para deslocar a vista',
   '<ink>Scroll</ink> or <ink>pinch</ink> to zoom toward the pointer':
-    '<ink>Rolar</ink> ou <ink>pinçar</ink> para dar zoom na direção do ponteiro',
+    '<ink>Rolar</ink> ou <ink>fazer o gesto de pinça</ink> para ajustar o zoom na direção do ponteiro',
   '<ink>Click</ink> a service or a connection to inspect it':
-    '<ink>Clicar</ink> em um serviço ou em uma conexão para inspecionar',
+    '<ink>Clicar</ink> em um serviço ou em uma conexão para ver os detalhes',
   '<ink>Double-click</ink> a service to move in on it, or a plate to move in on its region':
-    '<ink>Clique duplo</ink> em um serviço para se aproximar dele, ou em uma placa para se aproximar da sua região',
+    '<ink>Clicar duas vezes</ink> em um serviço ou na placa de uma região para aproximar a câmera',
   '<ink>Point</ink> at a service to see what it is connected to; selecting it keeps that neighbourhood in front while the rest recedes':
-    '<ink>Apontar</ink> para um serviço para ver a que ele está conectado; selecioná-lo mantém essa vizinhança à frente enquanto o resto se afasta',
+    '<ink>Passar o ponteiro</ink> sobre um serviço para ver suas conexões. Ao selecionar o serviço, as conexões ficam em destaque',
   'Tracing a request, or an incident among every service, takes the camera to its path; taking the camera yourself stops that':
-    'Rastrear uma requisição, ou um incidente entre todos os serviços, leva a câmera até o seu caminho; mover a câmera você mesmo interrompe isso',
+    'A câmera acompanha o caminho de uma requisição ou de um incidente na visualização detalhada. Para interromper esse acompanhamento, mova a câmera',
   Keyboard: 'Teclado',
   Space: 'Espaço',
   'Play or pause the simulation': 'Reproduzir ou pausar a simulação',
   'Reset the camera': 'Redefinir a câmera',
-  'Move in on what is selected': 'Aproximar do que está selecionado',
+  'Move in on what is selected': 'Aproximar a câmera da seleção',
   'Let go of the selection, then put the panels away':
-    'Desfazer a seleção, depois guardar os painéis',
+    'Limpar a seleção e, em seguida, fechar os painéis',
   'Go to anything: a service, a region, a scenario, an action':
-    'Ir para qualquer coisa: um serviço, uma região, um cenário, uma ação',
+    'Buscar um serviço, uma região, um cenário ou uma ação',
   'Search services': 'Buscar serviços',
   'Next arrangement: overview, by region, by dependency':
     'Próxima disposição: visão geral, por região, por dependência',
-  'Switch between the 3D view and the table': 'Alternar entre a vista 3D e a tabela',
+  'Switch between the 3D view and the table': 'Alternar entre o modelo 3D e a tabela',
   'Toggle the performance overlay': 'Mostrar ou ocultar o painel de desempenho',
   'Open this help': 'Abrir esta ajuda',
   'On the timeline: step 5 s (hold Shift for 30 s)':
-    'Na linha do tempo: passo de 5 s (segure Shift para 30 s)',
+    'Mover 5 s na linha do tempo (mantenha Shift pressionado para mover 30 s)',
 
   // The help and legend: the state of a service, traffic, time.
   'State of a service': 'Estado de um serviço',
   'Colour is an answer. <blue>Blue</blue> answers you: what you selected, the request you are following. The other colours answer the data: something is not normal. A service that is well is neutral, and has no mark in any list.':
-    'A cor é uma resposta. O <blue>azul</blue> responde a você: o que você selecionou, a requisição que está acompanhando. As outras cores respondem aos dados: algo não está normal. Um serviço que está bem é neutro e não tem marca em nenhuma lista.',
-  'Neutral piece, no mark; its part runs evenly':
-    'Peça neutra, sem marca; sua parte móvel trabalha de modo regular',
-  'Amber piece and a lamp; its part hesitates': 'Peça âmbar e uma luz; sua parte móvel hesita',
+    'O <blue>azul</blue> destaca sua seleção e a requisição que você acompanha. As outras cores indicam que algo está fora do normal. Serviços saudáveis têm cor neutra e aparecem sem marca nas listas.',
+  'Neutral piece, no mark; its part runs evenly': 'Peça neutra e sem marca, com movimento regular',
+  'Amber piece and a lamp; its part hesitates':
+    'Peça âmbar com uma luz acesa e movimento irregular',
   'Red piece and a lamp; its part is jammed':
-    'Peça vermelha e uma luz; sua parte móvel está travada',
+    'Peça vermelha com uma luz acesa e o mecanismo emperrado',
   'Pale piece; its part hangs crooked and still':
-    'Peça pálida; sua parte móvel pende torta e parada',
+    'Peça esmaecida com a parte móvel inclinada e parada',
   'In the overview a lamp under a neutral piece means some of that kind are affected, and its part hesitates; the piece itself takes the colour, and the manner, when all of them are. A red badge with a cross marks where a request was stopped.':
-    'Na visão geral, uma luz sob uma peça neutra significa que alguns serviços daquele tipo estão afetados, e sua parte móvel hesita; a própria peça assume a cor, e o jeito, quando todos estão. Um selo vermelho com uma cruz marca onde uma requisição foi barrada.',
+    'Na visão geral, quando apenas alguns serviços de um tipo são afetados, uma luz acende sob a peça neutra e seu mecanismo se move de forma irregular. Quando todos são afetados, a cor e o movimento da peça indicam o estado do grupo. Um selo vermelho com uma cruz marca onde a requisição foi bloqueada.',
   'Every bead is a share of the requests on a connection; how many there are follows the request rate. Ordinary traffic is told apart by shape. Traffic that went wrong takes a colour once it amounts to something: errors above one request in a hundred, rejections above one in ten. Below that it keeps its shape and stays ink. Rejected requests stop short of their target.':
-    'Cada ponto de tráfego é uma parcela das requisições em uma conexão; quantos há acompanha a taxa de requisições. O tráfego comum se distingue pela forma. O tráfego que deu errado ganha cor quando passa a ser relevante: erros acima de uma requisição em cem, rejeições acima de uma em dez. Abaixo disso, mantém a forma e fica na cor do texto. Requisições rejeitadas param antes do destino.',
+    'Cada ponto representa uma parcela das requisições de uma conexão. Quanto maior a taxa de requisições, mais pontos aparecem. A forma distingue o tráfego comum. O tráfego com problemas ganha cor quando os erros passam de 1 em cada 100 requisições ou as rejeições passam de 1 em cada 10. Abaixo desses limites, os pontos mantêm a forma e a cor do texto. Requisições rejeitadas param antes do destino.',
   Time: 'Tempo',
   "The clock is the simulation's own. The cursor is either at the <ink>simulation's now</ink>, where new history is being made, or in its <ink>history</ink>, which is re-simulated exactly as it happened; either can be <ink>paused</ink>. A phase of an incident is timed from the start of that incident (<n>+0:14</n>); an event shows both that and the simulation clock, which differ by when the incident began.":
-    'O relógio é o da própria simulação. O cursor está ou no <ink>agora da simulação</ink>, onde um novo histórico está sendo feito, ou no seu <ink>histórico</ink>, que é simulado de novo exatamente como aconteceu; qualquer um dos dois pode estar <ink>pausado</ink>. Uma fase de um incidente é cronometrada a partir do início desse incidente (<n>+0:14</n>); um evento mostra tanto isso quanto o relógio da simulação, que diferem pelo momento em que o incidente começou.',
+    'A simulação tem seu próprio relógio. No <ink>agora da simulação</ink>, o tempo avança e acrescenta novos dados ao histórico. No <ink>histórico</ink>, a simulação reproduz o que aconteceu com exatidão. O relógio pode estar <ink>pausado</ink> em ambos. O horário de cada fase é contado a partir do início do incidente (<n>+0:14</n>). Cada evento mostra o tempo desde o início do incidente e a posição no relógio da simulação.',
 
   // The help and legend: what kind of statement a line of a report is.
   'Why something happened': 'Por que algo aconteceu',
   'An incident can be read back from its own record: select a phase, an event or the summary. Each line says what kind of statement it is.':
-    'Um incidente pode ser relido a partir do seu próprio registro: selecione uma fase, um evento ou o resumo. Cada linha diz que tipo de afirmação ela é.',
+    'Selecione uma fase, um evento ou o resumo para consultar o registro do incidente. Cada linha indica o tipo de informação que apresenta.',
   '{term}: written in the scenario file. The scenario does this by itself.':
     '{term}: escrito no arquivo do cenário. O cenário faz isso por conta própria.',
   '{term}: a relation of the topology the model follows. A dependency carries failures back to its callers; added traffic flows on to what is called.':
-    '{term}: uma relação da topologia que o modelo segue. Uma dependência leva falhas de volta a quem a chama; o tráfego adicionado segue adiante para o que é chamado.',
+    '{term}. O modelo usa as relações da topologia. As falhas de uma dependência afetam os serviços que a chamam. O tráfego adicional segue para os serviços chamados.',
   '{term}: an event or a figure the engine recorded during the run.':
     '{term}: um evento ou um número que o motor registrou durante a execução.',
   '{term}: none of the relations the report knows accounts for it, and it does not guess.':
-    '{term}: nenhuma das relações que o relatório conhece dá conta disso, e ele não adivinha.',
+    '{term}. As relações analisadas pelo relatório não explicam o que aconteceu.',
 
   // The help and legend: the pieces, one per kind of service.
   'Kinds of service': 'Tipos de serviço',
   'A gate; its door turns as requests pass':
-    'Um portão; sua porta gira conforme passam requisições',
-  'A shield; its lock turns for each sign-in': 'Um escudo; sua fechadura gira a cada login',
+    'Um portão com uma porta que gira quando passam requisições',
+  'A shield; its lock turns for each sign-in': 'Um escudo com uma fechadura que gira a cada login',
   'A cedar; its tiers turn a notch for each decision':
-    'Um cedro; seus andares giram um passo a cada decisão',
+    'Um cedro cujos níveis giram um passo a cada decisão',
   'A hexagonal cell; its lid turns one side on':
-    'Uma célula hexagonal; sua tampa gira um lado adiante',
+    'Uma célula hexagonal cuja tampa gira uma face por vez',
   'A shipping container; its doors open to take work in':
-    'Um contêiner de carga; suas portas se abrem para receber trabalho',
-  'A lightning bolt; it strikes once for each call': 'Um raio; ele cai uma vez a cada chamada',
+    'Um contêiner de carga cujas portas se abrem para receber tarefas',
+  'A lightning bolt; it strikes once for each call': 'Um raio que cai a cada chamada',
   'Slabs standing in line; the line moves up as they are taken':
-    'Blocos em pé, em fila; a fila avança conforme eles são retirados',
-  'A stack of platters, turning': 'Uma pilha de discos, girando',
-  'A bucket; objects are lifted out and put back': 'Um balde; objetos são tirados e devolvidos',
-  'A desk globe, turning': 'Um globo de mesa, girando',
-  'A lighthouse above the edge; its lamp sweeps round':
-    'Um farol acima da borda; sua luz varre em volta',
-  'A pawn; its head lifts as it asks': 'Um peão; sua cabeça se ergue quando ele pede',
+    'Uma fila de blocos verticais que avança à medida que eles são retirados',
+  'A stack of platters, turning': 'Uma pilha de discos giratórios',
+  'A bucket; objects are lifted out and put back':
+    'Um balde de onde os objetos saem e para onde voltam',
+  'A desk globe, turning': 'Um globo de mesa giratório',
+  'A lighthouse above the edge; its lamp sweeps round': 'Um farol acima da borda cuja luz gira',
+  'A pawn; its head lifts as it asks': 'Um peão que ergue a cabeça quando faz uma requisição',
   "The part of a piece that moves runs at the pace of its service's traffic: faster under a surge, slower as traffic thins, and still when nothing passes.":
-    'A parte de uma peça que se move anda no ritmo do tráfego do seu serviço: mais rápida num pico, mais lenta quando o tráfego diminui, e parada quando nada passa.',
+    'O mecanismo de cada peça acompanha o ritmo do tráfego do serviço. Ele acelera nos picos, desacelera quando o tráfego diminui e fica parado quando não há tráfego.',
   'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is scanned or attacked.':
-    'O AEGIS é uma simulação. A plataforma, suas métricas e todos os incidentes são sintéticos e determinísticos; nenhum sistema real é escaneado ou atacado.',
+    'O AEGIS é uma simulação. A plataforma, suas métricas e todos os incidentes simulados são sintéticos e determinísticos. A simulação não faz varreduras nem ataques em sistemas reais.',
 
   // The command palette. A title and its hint are what a search matches.
   'Go to a service or run a command': 'Ir para um serviço ou executar um comando',
@@ -293,11 +294,11 @@ export default {
   'Orders DB, frame EU West, start a scenario…':
     'Orders DB, enquadrar EU West, iniciar um cenário…',
   'Nothing matches. Try the name of a service, a region or a scenario.':
-    'Nada corresponde. Tente o nome de um serviço, de uma região ou de um cenário.',
+    'Nenhum resultado. Tente buscar pelo nome de um serviço, uma região ou um cenário.',
   Results: 'Resultados',
   'Pause the simulation': 'Pausar a simulação',
   'Resume the simulation': 'Retomar a simulação',
-  'Show the table view': 'Mostrar a vista em tabela',
+  'Show the table view': 'Mostrar a visualização em tabela',
   'Show the 3D model': 'Mostrar o modelo 3D',
   'Show the overview': 'Mostrar a visão geral',
   'Show every service, by region': 'Mostrar todos os serviços, por região',
@@ -324,20 +325,20 @@ export default {
   // Saving a session, sharing it, and opening one.
   Session: 'Sessão',
   'What reproduces the experiment on screen: the platform, the seed, the commands issued, the moment and the view. Opening a session simulates it again; no figure travels with it.':
-    'O que reproduz o experimento na tela: a plataforma, a semente, os comandos dados, o momento e a vista. Abrir uma sessão a simula de novo; nenhum número vai junto.',
+    'A sessão guarda a plataforma, a semente, os comandos enviados, o momento e a visualização. Ao abrir a sessão, a simulação recalcula os valores para reproduzir o experimento na tela.',
   'The link you followed carries a session. Nothing has been changed yet.':
-    'O link que você seguiu traz uma sessão. Nada foi alterado ainda.',
+    'Este link contém uma sessão que será carregada quando você confirmar.',
   'This session': 'Esta sessão',
   'Reading the timeline…': 'Lendo a linha do tempo…',
   Platform: 'Plataforma',
-  ', as bundled with AEGIS': ', como incluída no AEGIS',
-  ', with its {n} file': ', com seu {n} arquivo',
-  ', with its {n} files': ', com seus {n} arquivos',
+  ', as bundled with AEGIS': ', incluída no AEGIS',
+  ', with its {n} file': ', com {n} arquivo',
+  ', with its {n} files': ', com {n} arquivos',
   Seed: 'Semente',
   Length: 'Duração',
-  ', opened paused at {time}': ', abre pausada em {time}',
+  ', opened paused at {time}': ', pausa em {time} ao abrir',
   Commands: 'Comandos',
-  View: 'Vista',
+  View: 'Visualização',
   'arranged by layers': 'disposta por camadas',
   'arranged by regions': 'disposta por regiões',
   'arranged by dependencies': 'disposta por dependências',
@@ -348,54 +349,55 @@ export default {
   'with {selection} selected': 'com {selection} selecionado',
   'the overview': 'a visão geral',
   'This platform is not the bundled one, so the file carries its files too. A link cannot.':
-    'Esta plataforma não é a incluída, então o arquivo leva também os arquivos dela. Um link não pode.',
+    'Para compartilhar esta plataforma personalizada, salve a sessão como arquivo. Assim você inclui os arquivos da plataforma.',
   'This session omits {items}.': 'Esta sessão deixa de fora {items}.',
-  '{n} authorization decision evaluated by hand': '{n} decisão de autorização avaliada à mão',
-  '{n} authorization decisions evaluated by hand': '{n} decisões de autorização avaliadas à mão',
+  '{n} authorization decision evaluated by hand': '{n} decisão de autorização avaliada manualmente',
+  '{n} authorization decisions evaluated by hand':
+    '{n} decisões de autorização avaliadas manualmente',
   'This timeline cannot be reproduced from a session: {reason}.':
     'Esta linha do tempo não pode ser reproduzida a partir de uma sessão: {reason}.',
   'part of it is missing': 'falta uma parte dela',
   'Save as a file': 'Salvar como arquivo',
-  'Copy a link': 'Copiar um link',
+  'Copy a link': 'Copiar link',
   'The session travels in the part of the address after #, which is not sent to any server':
-    'A sessão vai na parte do endereço depois do #, que não é enviada a nenhum servidor',
+    'A sessão fica no trecho do endereço após o #. O navegador não envia esse trecho ao servidor',
   'The session could not be read.': 'A sessão não pôde ser lida.',
   'Link to this session copied.': 'Link para esta sessão copiado.',
   'The link could not be copied to the clipboard.':
     'O link não pôde ser copiado para a área de transferência.',
   'Open a session': 'Abrir uma sessão',
   'Choose a session file': 'Escolher um arquivo de sessão',
-  'Session file to open': 'Arquivo de sessão a abrir',
+  'Session file to open': 'Selecionar o arquivo de sessão',
   'The file could not be read.': 'O arquivo não pôde ser lido.',
   'This session holds:': 'Esta sessão contém:',
   'Open this session': 'Abrir esta sessão',
-  'Simulating it again…': 'Simulando de novo…',
+  'Simulating it again…': 'Reproduzindo a sessão…',
   'Not now': 'Agora não',
   'Opening replaces the timeline in use for everyone connected.':
-    'Abrir substitui a linha do tempo em uso para todos os conectados.',
+    'Ao abrir a sessão, você substitui a linha do tempo atual para todas as pessoas conectadas.',
   'Opening replaces the timeline in use and the platform files for everyone connected.':
-    'Abrir substitui a linha do tempo em uso e os arquivos da plataforma para todos os conectados.',
+    'Ao abrir a sessão, você substitui a linha do tempo atual e os arquivos da plataforma para todas as pessoas conectadas.',
   'Session opened: its timeline was simulated again.':
-    'Sessão aberta: a linha do tempo dela foi simulada de novo.',
+    'Sessão aberta com a linha do tempo reconstruída pela simulação.',
 
   // What a session holds, line by line, and why one cannot be read.
   '{at} starts {scenario}': '{at} inicia {scenario}',
   '{at} stops the running scenario': '{at} interrompe o cenário em execução',
-  '{at} places a fault by hand ({effect})': '{at} aplica uma falha à mão ({effect})',
-  '{at} lifts a fault placed by hand': '{at} remove uma falha aplicada à mão',
-  '{at} lifts every fault placed by hand': '{at} remove todas as falhas aplicadas à mão',
-  'No command: time simply passes.': 'Nenhum comando: o tempo simplesmente passa.',
+  '{at} places a fault by hand ({effect})': '{at} aplica uma falha manualmente ({effect})',
+  '{at} lifts a fault placed by hand': '{at} remove uma falha aplicada manualmente',
+  '{at} lifts every fault placed by hand': '{at} remove todas as falhas aplicadas manualmente',
+  'No command: time simply passes.': 'O tempo avança sem executar comandos.',
   'This platform was imported; a link cannot carry its files. Save the file.':
-    'Esta plataforma foi importada; um link não pode levar os arquivos dela. Salve o arquivo.',
+    'Salve a sessão como arquivo para incluir os arquivos da plataforma importada.',
   'This session holds too many commands for a link. Save the file.':
-    'Esta sessão tem comandos demais para um link. Salve o arquivo.',
+    'A sessão tem mais comandos do que cabem em um link. Salve-a como arquivo.',
   'This is not a session file: it is not JSON.': 'Este não é um arquivo de sessão: não é JSON.',
   'This session file is not in a format this version reads: {problem}':
-    'Este arquivo de sessão não está num formato que esta versão lê: {problem}',
+    'O formato deste arquivo de sessão é incompatível com esta versão. {problem}',
   'This is not a session file. One is saved from “{command}”.':
-    'Este não é um arquivo de sessão. Um arquivo de sessão é salvo em “{command}”.',
+    'Este arquivo não é uma sessão do AEGIS. Para salvar uma sessão, use “{command}”.',
   'The session in this link is damaged and cannot be read.':
     'A sessão deste link está danificada e não pode ser lida.',
   'Its platform could not be imported. {reason}':
-    'A plataforma dela não pôde ser importada. {reason}',
+    'Não foi possível importar a plataforma desta sessão. {reason}',
 } as const satisfies Record<string, string>;

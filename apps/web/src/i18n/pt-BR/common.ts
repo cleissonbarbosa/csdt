@@ -23,8 +23,8 @@
  * The plural of principal is "principais", as in "6 principais, 6 ações".
  *
  * Health is saudável, degradado, crítico, fora do ar; a platform is "normal"
- * or "fora do normal". A fault is "aplicada à mão". Cedar allows and denies:
- * Permitido, Negado; a policy permits or forbids: Permite, Proíbe.
+ * or "fora do normal". A fault is "aplicada manualmente". Cedar allows and
+ * denies: Permitido, Negado; a policy permits or forbids: Permite, Proíbe.
  *
  * An incident capture ("captura de incidente") is a real incident read in
  * the browser, from a provider's report or a system's measurements. It is
@@ -75,7 +75,7 @@ export default {
   Saturation: 'Saturação',
   'Highest error rate': 'Maior taxa de erro',
   'Highest latency p95': 'Maior latência p95',
-  'Mean error rate': 'Taxa de erro média',
+  'Mean error rate': 'Taxa média de erro',
   'Not normal at once': 'Fora do normal ao mesmo tempo',
   'All back to normal': 'Tudo de volta ao normal',
 
@@ -94,7 +94,7 @@ export default {
   'Test an authorization': 'Testar uma autorização',
   'Trace a request': 'Rastrear uma requisição',
   'Who may do what': 'Quem pode fazer o quê',
-  'Edit the Cedar policies': 'Editar as políticas Cedar',
+  'Edit the Cedar policies': 'Editar as políticas do Cedar',
   'Compare an intervention': 'Comparar uma intervenção',
   'Write a scenario': 'Escrever um cenário',
   'Save or share this session': 'Salvar ou compartilhar esta sessão',
@@ -109,9 +109,9 @@ export default {
   'Checking…': 'Verificando…',
   'Starting…': 'Iniciando…',
   'Loading topology': 'Carregando a topologia',
-  'No services match': 'Nenhum serviço corresponde',
-  'Loosen the filters to see services again.': 'Afrouxe os filtros para ver os serviços de novo.',
+  'No services match': 'Nenhum serviço encontrado',
+  'Loosen the filters to see services again.': 'Ajuste os filtros para ampliar a busca.',
   'Something went wrong.': 'Algo deu errado.',
   'The session could not be loaded.': 'A sessão não pôde ser carregada.',
-  'Find where the platform gives': 'Encontrar onde a plataforma cede',
+  'Find where the platform gives': 'Testar os limites da plataforma',
 } as const satisfies Record<string, string>;

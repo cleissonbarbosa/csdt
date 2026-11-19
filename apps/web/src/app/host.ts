@@ -19,7 +19,7 @@ export const HOST = IN_BROWSER
       asking: t('Asking the engine…'),
       /** While the stream is not open, in the top bar. */
       connecting: t('Loading the engine'),
-      reconnecting: 'Engine stopped',
+      reconnecting: t('Engine stopped'),
       /** How synthetic data came to be. */
       synthetic: t('Produced by the simulation engine, which runs in this tab.'),
       /** The files everything started from, as the object of a sentence. */
@@ -38,8 +38,8 @@ export const HOST = IN_BROWSER
   : {
       unreachable: t('The server could not be reached.'),
       asking: t('Asking the server…'),
-      connecting: 'Connecting',
-      reconnecting: 'Reconnecting',
+      connecting: t('Connecting'),
+      reconnecting: t('Reconnecting'),
       synthetic: t('Produced by the built-in simulation engine.'),
       started: t('what the server started with'),
       imported: t(

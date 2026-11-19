@@ -37,7 +37,7 @@ export default {
   Database: 'Banco de dados',
   databases: 'bancos de dados',
   Storage: 'Armazenamento',
-  'object stores': 'armazenamentos de objetos',
+  'object stores': 'repositórios de objetos',
   'Network gateway': 'Gateway de rede',
   Network: 'Rede',
   'network gateways': 'gateways de rede',
@@ -49,13 +49,13 @@ export default {
 
   // How one service relates to another.
   'Routes to': 'Encaminha para',
-  'Authenticates with': 'Autentica com',
-  'Authorizes with': 'Autoriza com',
+  'Authenticates with': 'Autentica por meio de',
+  'Authorizes with': 'Autoriza por meio de',
   'Reads / writes': 'Lê / grava',
   'Publishes to': 'Publica em',
   'Consumed by': 'Consumido por',
   'Replicates to': 'Replica para',
-  'Reports to': 'Reporta a',
+  'Reports to': 'Envia telemetria para',
 
   // Where data comes from.
   Synthetic: 'Sintético',
@@ -63,9 +63,9 @@ export default {
   Live: 'Ao vivo',
   'Produced by the built-in simulation engine.': 'Produzido pelo motor de simulação embutido.',
   "Not produced by the simulation: an incident capture read in this browser from a file, either a real system's measurements or a provider's report transcribed by hand.":
-    'Não produzido pela simulação: uma captura de incidente lida neste navegador a partir de um arquivo, sejam medições de um sistema real ou o relatório de um provedor transcrito à mão.',
+    'O navegador lê esta captura de incidente de um arquivo. Os dados vêm de medições de um sistema real ou da transcrição manual do relatório de um provedor.',
   'Measured from an explicitly connected local instance.':
-    'Medido de uma instância local conectada explicitamente.',
+    'Medições de uma instância local conectada por você.',
   'Produced by the simulation engine, which runs in this tab.':
     'Produzido pelo motor de simulação, que roda nesta aba.',
 
@@ -96,43 +96,45 @@ export default {
   Hide: 'Ocultar',
   '{label}: not enough data': '{label}: dados insuficientes',
   'The 3D renderer could not start on this device. Showing the table view instead.':
-    'O renderizador 3D não pôde iniciar neste dispositivo. Mostrando a vista em tabela.',
+    'Não foi possível iniciar o renderizador 3D neste dispositivo. A topologia é exibida em tabela.',
   'This browser offers neither WebGPU nor WebGL 2, so the 3D scene is unavailable. Showing the table view instead.':
-    'Este navegador não oferece WebGPU nem WebGL 2, então a cena 3D não está disponível. Mostrando a vista em tabela.',
+    'Este navegador não é compatível com WebGPU nem com WebGL 2. A topologia é exibida em tabela.',
 
   // When nothing answers.
-  'The simulation engine is not running': 'O motor de simulação não está rodando',
+  'The simulation engine is not running': 'O motor de simulação está inativo',
   'On this page the simulation runs in the browser, from a WebAssembly module. Nothing is shown in its place: AEGIS does not invent data.':
-    'Nesta página a simulação roda no navegador, a partir de um módulo WebAssembly. Nada é mostrado no lugar dela: o AEGIS não inventa dados.',
+    'Nesta página, a simulação roda no navegador com um módulo WebAssembly. Sem o motor, a página não exibe dados da simulação.',
   'Reload the page': 'Recarregar a página',
   'The AEGIS server is not answering': 'O servidor do AEGIS não está respondendo',
-  'Start it with:': 'Inicie-o com:',
+  'Start it with:': 'Use este comando para iniciar o servidor:',
   'The interface reconnects by itself as soon as the server is up. Nothing is shown in the meantime: AEGIS does not invent data.':
-    'A interface se reconecta sozinha assim que o servidor estiver no ar. Nada é mostrado enquanto isso: o AEGIS não inventa dados.',
-  'Retry now': 'Tentar agora',
-  'The simulation engine is not running.': 'O motor de simulação não está rodando.',
-  'The server could not be reached.': 'Não foi possível alcançar o servidor.',
-  'Asking the engine…': 'Perguntando ao motor…',
-  'Asking the server…': 'Perguntando ao servidor…',
+    'A interface volta a exibir dados assim que se reconectar automaticamente ao servidor.',
+  'Retry now': 'Tentar novamente',
+  'The simulation engine is not running.': 'O motor de simulação está inativo.',
+  'The server could not be reached.': 'Não foi possível conectar ao servidor.',
+  'Asking the engine…': 'Consultando o motor…',
+  'Asking the server…': 'Consultando o servidor…',
   'Loading the engine': 'Carregando o motor',
+  'Engine stopped': 'Motor parado',
+  Reconnecting: 'Reconectando',
   'The topology could not be loaded.': 'A topologia não pôde ser carregada.',
   'The simulation engine could not be loaded.': 'O motor de simulação não pôde ser carregado.',
   'This browser could not start the simulation engine.':
     'Este navegador não conseguiu iniciar o motor de simulação.',
-  'The engine is not running.': 'O motor não está rodando.',
+  'The engine is not running.': 'O motor está inativo.',
   'The simulation engine did not answer in time.': 'O motor de simulação não respondeu a tempo.',
   'The module is not the AEGIS engine.': 'O módulo não é o motor do AEGIS.',
   'The engine module speaks version {module} of its boundary and this page version {page}. Rebuild it.':
-    'O módulo do motor fala a versão {module} da sua interface e esta página, a versão {page}. Compile-o de novo.',
+    'O módulo do motor usa a versão {module} da interface, mas esta página espera a versão {page}. Recompile o módulo.',
   'The simulation engine stopped: {reason}': 'O motor de simulação parou: {reason}',
   'The simulation engine could not start: {reason}':
     'O motor de simulação não pôde iniciar: {reason}',
-  'the engine module answered {status}': 'o módulo do motor respondeu {status}',
+  'the engine module answered {status}': 'o módulo do motor retornou o código {status}',
   'The simulation engine could not be loaded: {reason}':
     'O motor de simulação não pôde ser carregado: {reason}',
   'The AEGIS server did not answer in time.': 'O servidor do AEGIS não respondeu a tempo.',
-  'The AEGIS server is unreachable.': 'Não é possível alcançar o servidor do AEGIS.',
-  'The server sent a non-JSON response.': 'O servidor enviou uma resposta que não é JSON.',
+  'The AEGIS server is unreachable.': 'Não foi possível conectar ao servidor do AEGIS.',
+  'The server sent a non-JSON response.': 'O servidor respondeu em um formato diferente de JSON.',
   'Request failed with HTTP {status}.': 'A requisição falhou com HTTP {status}.',
   'The response for {path} does not match contract v1.0.':
     'A resposta de {path} não corresponde ao contrato v1.0.',
@@ -141,35 +143,37 @@ export default {
 
   // What an action that failed, or did something, says.
   'Playback could not be changed.': 'A reprodução não pôde ser alterada.',
-  'The scenario did not start.': 'O cenário não iniciou.',
+  'The scenario did not start.': 'Não foi possível iniciar o cenário.',
   'The fault could not be placed.': 'A falha não pôde ser aplicada.',
   'The fault could not be lifted.': 'A falha não pôde ser retirada.',
   'The scenario could not be stopped.': 'O cenário não pôde ser parado.',
   'The simulation could not be reset.': 'A simulação não pôde ser reiniciada.',
-  'Simulation reset to a clean baseline.': 'Simulação reiniciada, do zero.',
+  'Simulation reset to a clean baseline.': 'A simulação voltou ao estado inicial.',
   'The topology could not be switched.': 'A topologia não pôde ser trocada.',
   'The recording could not be loaded.': 'A gravação não pôde ser carregada.',
   'The integration could not be connected.': 'A integração não pôde ser conectada.',
   'The integration could not be disconnected.': 'A integração não pôde ser desconectada.',
-  'Now showing the imported files.': 'Mostrando agora os arquivos importados.',
+  'Now showing the imported files.': 'Os arquivos importados estão em uso.',
   '{title}. Its summary is ready.': '{title}. O resumo está pronto.',
   'Open the summary': 'Abrir o resumo',
 
   // Where the simulation runs: in this tab, or on a server.
-  'what this page opened with': 'o que esta página abriu',
-  'what the server started with': 'o que o servidor carregou ao iniciar',
+  'what this page opened with': 'os arquivos iniciais da página',
+  'what the server started with': 'os arquivos iniciais do servidor',
   'Files imported into this page. They are held in its memory and are gone when it is reloaded.':
-    'Arquivos importados nesta página. Ficam na memória dela e somem quando ela é recarregada.',
+    'Os arquivos importados ficam na memória até a página ser recarregada.',
   'Files imported since this server started. They are held in its memory and are gone when it restarts.':
-    'Arquivos importados desde que este servidor iniciou. Ficam na memória dele e somem quando ele reinicia.',
-  'Back to the files this page opened with.': 'De volta aos arquivos com que esta página abriu.',
-  'Back to the files the server started with.': 'De volta aos arquivos com que o servidor iniciou.',
+    'Os arquivos importados ficam na memória até o servidor ser reiniciado.',
+  'Back to the files this page opened with.':
+    'Os arquivos iniciais da página voltaram a ser usados.',
+  'Back to the files the server started with.':
+    'Os arquivos iniciais do servidor voltaram a ser usados.',
   'This page runs the simulation in the browser. The live adapters (a local cedar-agent, a load-test target) need the AEGIS server.':
-    'Esta página roda a simulação no navegador. Os adaptadores ao vivo (um cedar-agent local, um alvo de teste de carga) precisam do servidor do AEGIS.',
+    'A simulação roda no navegador. As integrações com um cedar-agent local ou um alvo de teste de carga dependem do servidor do AEGIS.',
   'Live adapters only accept loopback targets (or hosts explicitly allow-listed on the server), use short timeouts and never follow redirects.':
-    'Os adaptadores ao vivo só aceitam alvos de loopback (ou hosts liberados explicitamente no servidor), usam tempos limite curtos e nunca seguem redirecionamentos.',
+    'As integrações só aceitam endereços de loopback ou hosts autorizados no servidor. As requisições têm um tempo limite curto e não seguem redirecionamentos.',
   'Evaluating with a local cedar-agent needs the AEGIS server. This page has the embedded engine only.':
-    'Avaliar com um cedar-agent local precisa do servidor do AEGIS. Esta página tem só o motor embutido.',
+    'Para avaliar com um cedar-agent local, é preciso usar o servidor do AEGIS. Esta página usa apenas o motor embutido.',
   'Connect a local cedar-agent under Integrations to evaluate with it instead.':
     'Conecte um cedar-agent local em Integrações para avaliar com ele.',
   'not timed in the browser': 'não cronometrado no navegador',
