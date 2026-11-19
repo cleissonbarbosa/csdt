@@ -20,7 +20,9 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  timeout: 60_000,
+  // As in the main suite: software rendering makes a test long, by as much
+  // as the runner's CPU decides (`playwright.config.ts`).
+  timeout: 120_000,
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {

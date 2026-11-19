@@ -18,7 +18,12 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  timeout: 60_000,
+  // Under software WebGL a frame takes 150 ms or more and every action waits
+  // on frames, so a test is long, and how long depends on the runner's CPU:
+  // the same tests took a third longer on one CI run than on the one before
+  // it, and a test that had used 50 s of a 60 s budget ran out. A failing
+  // condition is still caught by the expect timeout below.
+  timeout: 120_000,
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
