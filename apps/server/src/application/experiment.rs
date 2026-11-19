@@ -251,7 +251,7 @@ fn rank(health: Health) -> u8 {
 }
 
 /// The services that left their normal state on a timeline, from `since`.
-fn left_normal(timeline: &Timeline, since: u64) -> Vec<TrialEffect> {
+pub(super) fn left_normal(timeline: &Timeline, since: u64) -> Vec<TrialEffect> {
     let mut effects: Vec<TrialEffect> = Vec::new();
     for event in timeline.events() {
         if event.kind != EventKind::HealthTransition || event.virtual_time_ms < since {

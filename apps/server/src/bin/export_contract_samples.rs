@@ -235,6 +235,16 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
+    // Where the platform gives: how much demand it takes, and what each
+    // service takes with it. Runs of their own again.
+    save(
+        "headroom",
+        post("/demo/experiments/headroom", json!({})).await?,
+    )?;
+    save(
+        "weak-points",
+        post("/demo/experiments/weak-points", json!({})).await?,
+    )?;
     let events = state.service.events(0, 5, None, None);
     save(
         "stream-events",
@@ -312,6 +322,8 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         .await?,
     )?;
     save("workspace-export", get("/workspace/export").await?)?;
+    // The imported platform states what its door does about load.
+    save("topology-mitigated", get("/topology").await?)?;
     save(
         "stream-timeline-workspace",
         serde_json::from_str(
@@ -412,7 +424,8 @@ fn tiny_workspace() -> Vec<Value> {
         "roles": { "primaryGateway": "door" },
         "nodes": [
             { "id": "visitors", "name": "Visitors", "type": "external-client", "region": "lobby", "tier": 0, "baseLatencyMs": 0, "baseRps": 40 },
-            { "id": "door", "name": "Door", "type": "api-gateway", "region": "lobby", "tier": 1, "baseLatencyMs": 3 }
+            { "id": "door", "name": "Door", "type": "api-gateway", "region": "lobby", "tier": 1, "baseLatencyMs": 3,
+              "rateLimitRps": 90, "suspiciousFilter": 0.9, "autoscale": { "maxFactor": 3, "seconds": 20 } }
         ],
         "edges": [
             { "source": "visitors", "target": "door", "protocol": "https", "relationship": "route", "weight": 1.0 }

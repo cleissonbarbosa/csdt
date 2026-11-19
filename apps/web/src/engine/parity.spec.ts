@@ -100,6 +100,9 @@ function tinyWorkspace(): { path: string; text: string }[] {
         region: 'lobby',
         tier: 1,
         baseLatencyMs: 3,
+        rateLimitRps: 90,
+        suspiciousFilter: 0.9,
+        autoscale: { maxFactor: 3, seconds: 20 },
       },
     ],
     edges: [
@@ -307,6 +310,8 @@ describe('the engine built for the browser', () => {
       post('/demo/experiments/platforms', { files: [largerGateway()], scenarioId: 'ddos-surge' })
         .body,
     );
+    produced.set('headroom', post('/demo/experiments/headroom', {}).body);
+    produced.set('weak-points', post('/demo/experiments/weak-points', {}).body);
     produced.set('stream-snapshot', message(engine.open(clock)[1]!));
     const [replay] = engine.message('{"type":"resync","afterSeq":0}', clock);
     produced.set('stream-events', message(replay!));
@@ -340,6 +345,7 @@ describe('the engine built for the browser', () => {
     const imported = post('/demo/workspace/import', { files: tinyWorkspace() });
     produced.set('workspace-response', imported.body);
     produced.set('workspace-export', get('/workspace/export'));
+    produced.set('topology-mitigated', get('/topology'));
     produced.set('stream-timeline-workspace', message(imported.stream[0]!));
   });
 
@@ -365,6 +371,8 @@ describe('the engine built for the browser', () => {
     'experiment',
     'trial',
     'platform-comparison',
+    'headroom',
+    'weak-points',
     'stream-snapshot',
     'stream-timeline',
     'topology-stress-summary',
@@ -374,6 +382,7 @@ describe('the engine built for the browser', () => {
     'workspace-diff',
     'workspace-response',
     'workspace-export',
+    'topology-mitigated',
     'stream-timeline-workspace',
   ])('answers %s exactly as the server does', (name) => {
     const actual = produced.get(name);
@@ -479,6 +488,8 @@ describe('every route, in the module', () => {
         '/demo/experiments/platforms',
         { files: [largerGateway()], scenarioId: 'regional-outage' },
       ],
+      ['POST', '/demo/experiments/headroom', {}],
+      ['POST', '/demo/experiments/weak-points', {}],
       ['POST', '/demo/playback/control', { action: 'setSpeed', speed: 4 }],
       ['POST', '/demo/playback/control', { action: 'pause' }],
       ['POST', '/demo/playback/control', { action: 'step' }],

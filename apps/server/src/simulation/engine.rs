@@ -105,6 +105,12 @@ pub struct SimState {
     pub rng: Rng,
     pub queue_depth: Vec<f64>,
     pub prev_err_eff: Vec<f64>,
+    /// How far each autoscaled service has grown, in times its capacity at
+    /// rest; 1 for a service that does not scale.
+    pub scale: Vec<f64>,
+    /// The share of what arrived that each service's rate limit let in on
+    /// the last tick; 1 for a service with no limit.
+    pub admit: Vec<f64>,
     // Displayed (smoothed) node metrics.
     pub node_latency: Vec<f64>,
     pub node_error: Vec<f64>,
@@ -138,14 +144,17 @@ impl SimState {
         let m = topo.edge_count();
         let neutral = Modifiers::neutral(topo);
         let mut queue_depth = vec![0.0; n];
+        let mut scale = vec![1.0; n];
         let zero = vec![0.0; n];
-        let flow = propagate(topo, &neutral, &mut queue_depth, &zero, DT);
+        let flow = propagate(topo, &neutral, &mut queue_depth, &mut scale, &zero, DT);
         let mut state = Self {
             tick: 0,
             seq: 0,
             rng: Rng::seeded(seed),
             queue_depth,
             prev_err_eff: flow.err_eff.clone(),
+            scale,
+            admit: flow.admit.clone(),
             node_latency: flow.lat_eff.clone(),
             node_error: flow.err_eff.clone(),
             node_load: flow.load.clone(),
@@ -372,6 +381,16 @@ impl EdgeTraffic {
                 out.authz_checks += ordinary;
                 out.authz_denials += denied;
             }
+            // Ordinary traffic the service at the far end turned away at its
+            // door. Nothing where it has no rate limit.
+            let limited = if flow.admit[dst] < 1.0 {
+                ordinary * (1.0 - flow.admit[dst])
+            } else {
+                0.0
+            };
+            if limited > 0.0 {
+                rejected += limited;
+            }
             let total = ordinary + injected.traffic[e];
             out.traffic[e] = total;
             out.latency[e] = topo.edge_latency[e] * m.edge_lat_factor[e].max(0.0);
@@ -383,9 +402,16 @@ impl EdgeTraffic {
             out.rejected[e] = rejected;
 
             let share = |x: f64| if total > 1e-9 { x / total } else { 0.0 };
-            out.security[e] = if share(injected.rejected[e]) > 0.25 {
+            let turned_away = if limited > 0.0 {
+                injected.rejected[e] + limited
+            } else {
+                injected.rejected[e]
+            };
+            out.security[e] = if share(turned_away) > 0.25 {
                 match injected.reason[e] {
                     Some(RejectReason::Waf | RejectReason::RateLimit) => SecurityStatus::Throttled,
+                    // Only the rate limit turned anything away here.
+                    None => SecurityStatus::Throttled,
                     _ => SecurityStatus::Denied,
                 }
             } else if share(injected.suspicious[e]) > 0.2 {
@@ -826,6 +852,41 @@ fn inject_flows(ctx: &StepContext, state: &SimState, m: &mut Modifiers) -> Injec
             if flow.suspicious {
                 injected.suspicious[edge] += remaining;
             }
+            // What the service does at its door whatever the scenario says:
+            // a filter that is always on takes its share of suspicious
+            // traffic, then a rate limit admits the share it admitted a tick
+            // ago. The scenario's own rejection applies to what got in.
+            let filtered = if flow.suspicious {
+                topo.filter[dst]
+            } else {
+                0.0
+            };
+            let turned = 1.0 - state.admit[dst];
+            if filtered > 0.0 || turned > 0.0 || topo.rate_limit[dst].is_finite() {
+                let dropped = remaining * filtered;
+                let at_door = remaining - dropped;
+                m.arriving[dst] += at_door;
+                let limited = at_door * turned;
+                for (volume, reason) in [
+                    (dropped, RejectReason::Waf),
+                    (limited, RejectReason::RateLimit),
+                ] {
+                    if volume <= 0.0 {
+                        continue;
+                    }
+                    injected.rejected[edge] += volume;
+                    if injected.reason[edge]
+                        .is_none_or(|current| rejection_cost(reason) >= rejection_cost(current))
+                    {
+                        injected.reason[edge] = Some(reason);
+                    }
+                    if blocked.is_none_or(|(_, _, most)| volume > most) {
+                        blocked = Some((dst, reason, volume));
+                    }
+                    m.path_load[dst] += volume * rejection_cost(reason);
+                }
+                remaining = at_door - limited;
+            }
             let mut reject = state
                 .channels
                 .value(ChannelKey::FlowReject(index as u16, dst as u32))
@@ -1150,10 +1211,12 @@ pub fn step(ctx: &StepContext, state: &mut SimState, commands: &[Command]) -> Ve
         topo,
         &modifiers,
         &mut state.queue_depth,
+        &mut state.scale,
         &state.prev_err_eff,
         DT,
     );
     state.prev_err_eff.clone_from(&flow.err_eff);
+    state.admit.clone_from(&flow.admit);
     let traffic = EdgeTraffic::derive(topo, ctx.decisions, &modifiers, &flow, &injected);
 
     smooth(&mut state.node_latency, &flow.lat_eff);

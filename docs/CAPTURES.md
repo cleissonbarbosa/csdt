@@ -5,9 +5,11 @@ a system recorded it, read in the browser from a file. Apart from what a
 connected local instance reports (labelled _live_), it is the one thing AEGIS
 shows that is not simulated. It opens inside the application, in place of the
 simulation, labelled _Captured, not simulated_ (or _From the
-provider's report, not simulated_), and it never reaches the server, a
-workspace or the simulation's timeline. The simulation goes on untouched
-behind it, and **Back to the simulation** returns to it as it was.
+provider's report, not simulated_), and it never reaches the server or the
+simulation's timeline. The simulation goes on untouched behind it, and
+**Back to the simulation** returns to it as it was. A platform file can be
+[drafted from a capture](#drafting-a-platform-from-a-capture) when you ask
+for one; that file is the simulation's, not the capture's.
 
 Two captures come with AEGIS:
 
@@ -210,6 +212,46 @@ says which under its measurements, in a capture that counts errors at all. A
 CloudWatch capture's connections are those Application Signals found in its
 discovery window, which the card states: a connection that was found may
 not have carried requests at every moment.
+
+## Drafting a platform from a capture
+
+A capture shows what happened. To ask what would have happened with another
+capacity, another connection or a filter in front, the incident has to be
+on a platform the simulation computes. **⋯ → Draft a platform from this
+capture** writes that platform's files in the page, leaves the capture and
+stages them in **Import or export files**, with a list of what was measured
+and what was not. Nothing is applied until you apply it, and the server
+checks the draft as it checks any file.
+
+The draft is a starting point to edit, labelled `synthetic` like every
+platform: what it shows once applied is computed. Every rule it was written
+by is in its own description:
+
+| In the draft             | Where it comes from                                                                                                                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| services and their kinds | the capture's nodes, as written                                                                                                                                                                                            |
+| connections              | the calls the capture saw, busiest first; one that would close a circle is left out and listed, since a topology runs one way                                                                                              |
+| a connection's weight    | calls seen on it over the requests its caller handled, both as medians _at rest_ (before the capture's first event); 1 where the calls were not measured                                                                   |
+| a service's own latency  | its median p95 at rest less that of what it calls, weighted by calls; a placeholder of 5 ms where p95 was not measured                                                                                                     |
+| demand                   | one client added in front of every service nothing calls, sending the median those services handled at rest; 100 requests a second when the capture measured no calls                                                      |
+| an entry's own rate      | where a service counted no requests of its own (traces begin there), it is taken to be as busy as its busiest call. A convention, said as one: the calls it makes downstream come out as measured whatever figure is taken |
+| capacity                 | not given. No capture states one: each service has the model's default headroom over its load at rest                                                                                                                      |
+| roles                    | the first API gateway, database, authentication service, authorizer and monitor, as the Compose reader names them                                                                                                          |
+
+**Give `capacityRps` to the services whose limits you know before reading
+what breaks.** Capacity decides what fails under load, and it is the one
+figure a capture cannot give.
+
+Where the capture measured traffic at its entry, the draft comes with a
+scenario that repeats it: each period's demand as a multiple of its level at
+rest, at most 32 phases, compressed in time when the capture is longer than
+the 30 minutes a scenario may last (its summary says by how much). It
+prescribes load and nothing else. What fails under that load is the model's
+to compute, and comparing that with what the capture recorded is how the
+draft's figures are judged.
+
+A capture of a provider's report measures nothing, so its draft holds the
+services and connections the report names and defaults for every figure.
 
 ## The format
 

@@ -88,7 +88,16 @@ topologically and derives capacities and baselines from nominal load.
 Each tick runs one propagation pass (`simulation/model.rs`):
 
 1. **Forward (load).** Demand enters at external clients and fans out along
-   edges. A node handles at most its capacity and sheds the rest. Queues are
+   edges. A node handles at most its capacity and sheds the rest. Three
+   optional figures of a topology file change what a node does about load
+   (`docs/WORKSPACE.md`): a rate limit admits at most so much and turns the
+   rest away at the door, before it uses capacity or reaches anything
+   behind; a filter turns away a stated share of the traffic a scenario
+   marks suspicious, as it arrives; an autoscaled node's capacity follows
+   its load with a lag, up to a stated multiple. A node that states none
+   takes the arithmetic path it always took, bit for bit. How far each node
+   has scaled and the share its limit admitted are part of `SimState`, so
+   they are in every checkpoint. Queues are
    pull-based: consumers drain them as fast as their own capacity and health
    allow, and what they cannot take accumulates as backlog.
 2. **Reverse (experience).** A node's own latency follows an M/M/1-shaped
@@ -240,6 +249,13 @@ samples already produced.
   (`POST /demo/experiments/compare`). The answer holds both runs, each with
   its recording, so what differs between them is one command and is said as
   such. The timeline in use is not touched.
+- **The platform's limits** (`application/limits.rs`) are two more questions
+  put to the platform at rest. `POST /demo/experiments/headroom` multiplies
+  every external client's demand along a fixed ladder until an objective is
+  missed and halves the gap five times; every multiple tried is in the
+  answer. `POST /demo/experiments/weak-points` takes every service out in
+  turn, as a trial of `down` does, and ranks them by how many others left
+  normal. Both are bounded (the ladder is fixed; at most 250 services).
 - **A comparison of platforms** runs one scenario on the topology in use and
   on one a set of uploaded files describes, again on timelines of its own
   from the server's seed (`POST /demo/experiments/platforms`,
@@ -320,6 +336,8 @@ are mirrored in `packages/contracts`.
 | `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed    |
 | `POST /demo/experiments/trial`                         | one fault on the platform at rest            |
 | `POST /demo/experiments/platforms`                     | one scenario in use and on uploaded files    |
+| `POST /demo/experiments/headroom`                      | how much demand the platform takes at rest   |
+| `POST /demo/experiments/weak-points`                   | every service taken out in turn              |
 | `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
 | `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
 | `POST /demo/workspace/diff`                            | what Cedar would decide differently          |
@@ -587,9 +605,16 @@ and lets nothing of the simulation through: no snapshot, selection, filter,
 route or trace. The simulation goes on behind it (on the server, or in the
 engine's worker), and is drawn again as it stands when the capture closes.
 
-A capture never reaches the server, a workspace or the simulation's
-timeline, and nothing in capture mode calls the API's mutations or writes
-the telemetry store. Its state colours use `lib/thresholds.ts`, a copy of
+A capture never reaches the server or the simulation's timeline, and nothing
+in capture mode calls the API's mutations or writes the telemetry store. The
+one way out of a capture is asked for: **Draft a platform from this
+capture** (`features/capture/draft.ts`) writes a topology, and where the
+capture measured traffic a scenario of that load, from the capture in the
+page, leaves the capture and stages the two files in the import dialog.
+From there they are files like any other: `synthetic`, checked by the
+server and applied or not. The draft's description says which figures were
+measured, which follow from a stated rule and which are defaults, and gives
+no capacity, since no capture states one. Its state colours use `lib/thresholds.ts`, a copy of
 the error levels of the engine's `classify` that a test holds to
 `engine.rs`. A state the capture does not give is a column of its own in
 the scene's frame (`known`), drawn as an upright, fainter piece on a dashed

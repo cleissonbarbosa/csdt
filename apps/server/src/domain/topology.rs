@@ -195,6 +195,25 @@ pub struct Region {
     pub location: String,
 }
 
+/// A service that adds capacity when its load asks for it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Autoscale {
+    /// The most it grows to, in times its capacity at rest.
+    #[schemars(range(min = 1, max = MAX_SCALE_FACTOR))]
+    pub max_factor: f64,
+    /// How fast it follows: the time, in seconds, in which it closes about
+    /// two thirds of the gap between the capacity it has and the one the
+    /// load asks for.
+    #[schemars(range(min = 1, max = MAX_SCALE_SECONDS))]
+    pub seconds: f64,
+}
+
+/// Most times its capacity at rest a service may be told to scale to.
+pub const MAX_SCALE_FACTOR: f64 = 100.0;
+/// Slowest an autoscaler may be told to follow.
+pub const MAX_SCALE_SECONDS: f64 = 3600.0;
+
 /// Static description of a node as authored in a topology fixture.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -223,6 +242,19 @@ pub struct NodeSpec {
     #[serde(default)]
     #[schemars(range(min = 0))]
     pub base_rps: Option<f64>,
+    /// The most requests a second the service admits. The rest are turned
+    /// away at its door, whoever sent them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("exclusiveMinimum" = 0))]
+    pub rate_limit_rps: Option<f64>,
+    /// The share of traffic a scenario marks as suspicious that the service
+    /// turns away as it arrives, from the first request (0..1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 0, max = 1))]
+    pub suspicious_filter: Option<f64>,
+    /// Capacity that follows the load. Absent: the capacity is fixed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autoscale: Option<Autoscale>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -299,6 +331,14 @@ pub struct InfrastructureNode {
     pub data_source: DataSource,
     pub capacity_rps: f64,
     pub baseline_latency_ms: f64,
+    /// What the topology file states the service does about load, each
+    /// absent when the file states none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit_rps: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suspicious_filter: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autoscale: Option<Autoscale>,
     pub connected_services: Vec<String>,
     pub metrics: NodeMetrics,
 }

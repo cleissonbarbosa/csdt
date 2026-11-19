@@ -321,6 +321,28 @@ function NodeInspector({
                   ? t('Capacity {n} req/s', { n: formatRate(node.capacityRps) })
                   : t('No capacity limit')}
             </p>
+            {/* What the platform's file states this service does about load. */}
+            {node.autoscale && (
+              <p className="caption" data-testid="node-autoscale">
+                {t('Grows with its load, up to ×{max} that capacity', {
+                  max: node.autoscale.maxFactor,
+                })}
+              </p>
+            )}
+            {node.rateLimitRps !== undefined && (
+              <p className="caption" data-testid="node-rate-limit">
+                {t('Admits {n} req/s at most; the rest is turned away', {
+                  n: formatRate(node.rateLimitRps),
+                })}
+              </p>
+            )}
+            {node.suspiciousFilter !== undefined && (
+              <p className="caption" data-testid="node-filter">
+                {t('Turns away {share} of suspicious traffic as it arrives', {
+                  share: formatPercent(node.suspiciousFilter),
+                })}
+              </p>
+            )}
           </div>
         </dl>
         <p className="caption mt-2.5">

@@ -9,7 +9,7 @@ use crate::integrations::{CedarAgentConfig, IntegrationConfig, RinhaConfig};
 const DEFAULT_BIND: &str = "127.0.0.1:8787";
 const DEFAULT_ORIGINS: &str =
     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173";
-const DEFAULT_SEED: u64 = 42;
+pub const DEFAULT_SEED: u64 = 42;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ConfigError {

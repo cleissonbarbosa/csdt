@@ -9,6 +9,7 @@ import {
   FileClock,
   Flag,
   FolderOpen,
+  Gauge,
   GitCompareArrows,
   Grid3x3,
   History,
@@ -32,6 +33,8 @@ import { Select } from '@/components/ui/Field';
 import { Menu } from '@/components/ui/Menu';
 import { BUNDLED } from '@/features/capture/bundled';
 import { isReport } from '@/features/capture/capture';
+import { draftOf } from '@/features/capture/draft';
+import { draftNotes, draftRefusal } from '@/features/capture/draftNotes';
 import { provenanceOf } from '@/features/capture/CaptureCard';
 import { CaptureStatus } from '@/features/capture/CaptureStatus';
 import { Deviations } from '@/features/hud/Hud';
@@ -42,6 +45,7 @@ import { COLOR, DATA_SOURCE_HINT, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { selectOpen, useCapture } from '@/stores/capture';
 import { useGuide } from '@/stores/guide';
+import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
@@ -326,6 +330,27 @@ function Bar({ children }: { children: ReactNode }) {
 const openCaptures = () => useUi.getState().setPanel('capture');
 
 /**
+ * Writes a platform file from the capture on show and hands it to the import
+ * dialog, staged. The capture is left first: from here on it is a file for
+ * the simulation, checked and applied like any other, or not at all.
+ */
+const draftPlatform = () => {
+  const { capture, id } = useCapture.getState();
+  if (!capture) return;
+  const draft = draftOf(capture, id ?? 'capture');
+  if ('refused' in draft) {
+    useNotices.getState().push('error', draftRefusal(draft.refused));
+    return;
+  }
+  const topology = JSON.parse(draft.files[0]?.text ?? '{}') as {
+    nodes?: { type: string; baseRps?: number }[];
+  };
+  const demand = topology.nodes?.find((node) => node.type === 'external-client')?.baseRps ?? null;
+  leaveCapture();
+  useUi.getState().offerImport(draft.files, draftNotes(capture, draft, demand));
+};
+
+/**
  * The bar: what this is, how it is, and the things to do first: find
  * something, ask Cedar, follow an incident. The rest of the application is
  * one step away, in the menu at its end and in the model itself. While an
@@ -436,6 +461,12 @@ function SimulationNav() {
               label: t('Compare an intervention'),
               icon: <GitCompareArrows size={14} />,
               onSelect: () => useUi.getState().openExperiment(),
+            },
+            {
+              id: 'limits',
+              label: t('Find where the platform gives'),
+              icon: <Gauge size={14} />,
+              onSelect: () => useUi.getState().setPanel('limits'),
             },
             {
               id: 'guide',
@@ -656,6 +687,13 @@ function CaptureNav() {
               label: t('Open another capture'),
               icon: <FileClock size={14} />,
               onSelect: openCaptures,
+            },
+            {
+              // Leaves the capture: what it becomes is a file for the simulation.
+              id: 'draft',
+              label: t('Draft a platform from this capture'),
+              icon: <FolderOpen size={14} />,
+              onSelect: draftPlatform,
             },
             {
               id: 'settings',

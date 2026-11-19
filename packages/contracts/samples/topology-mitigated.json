@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1.0",
+  "id": "front-desk",
+  "name": "Front Desk",
+  "description": "Fictional two-service platform used for the contract samples.",
+  "dataSource": "synthetic",
+  "regions": [
+    {
+      "id": "lobby",
+      "name": "Lobby",
+      "kind": "cloud",
+      "location": "Ground floor"
+    }
+  ],
+  "roles": {
+    "primaryGateway": "door"
+  },
+  "nodes": [
+    {
+      "id": "visitors",
+      "name": "Visitors",
+      "serviceType": "external-client",
+      "region": "lobby",
+      "environment": "demo",
+      "tier": 0,
+      "description": "",
+      "dataSource": "synthetic",
+      "capacityRps": 0.0,
+      "baselineLatencyMs": 4.6,
+      "connectedServices": [
+        "door"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 4.6,
+        "throughputRps": 40.0,
+        "errorRate": 0.0,
+        "saturation": 0.0,
+        "queueDepth": 0.0
+      }
+    },
+    {
+      "id": "door",
+      "name": "Door",
+      "serviceType": "api-gateway",
+      "region": "lobby",
+      "environment": "demo",
+      "tier": 1,
+      "description": "",
+      "dataSource": "synthetic",
+      "capacityRps": 96.0,
+      "baselineLatencyMs": 3.4,
+      "rateLimitRps": 90.0,
+      "suspiciousFilter": 0.9,
+      "autoscale": {
+        "maxFactor": 3.0,
+        "seconds": 20.0
+      },
+      "connectedServices": [
+        "visitors"
+      ],
+      "metrics": {
+        "health": "healthy",
+        "latencyMs": 3.4,
+        "throughputRps": 40.0,
+        "errorRate": 0.0,
+        "saturation": 0.417,
+        "queueDepth": 0.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "visitors->door",
+      "source": "visitors",
+      "target": "door",
+      "protocol": "https",
+      "relationship": "route",
+      "weight": 1.0,
+      "crossRegion": false,
+      "metrics": {
+        "trafficRps": 40.0,
+        "latencyMs": 1.2,
+        "errorRate": 0.0,
+        "rejectedRps": 0.0,
+        "suspiciousRps": 0.0,
+        "securityStatus": "secure"
+      }
+    }
+  ]
+}

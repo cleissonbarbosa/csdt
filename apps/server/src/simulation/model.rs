@@ -12,7 +12,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::domain::{is_valid_id, Relationship, ServiceType, TopologySpec};
+use crate::domain::{
+    is_valid_id, Autoscale, Relationship, ServiceType, TopologySpec, MAX_SCALE_FACTOR,
+    MAX_SCALE_SECONDS,
+};
 
 use super::math::LogNormalMixture;
 
@@ -25,6 +28,9 @@ pub use crate::domain::{MAX_EDGES, MAX_NODES};
 /// Virtual seconds per simulation tick.
 pub const DT: f64 = TICK_MS as f64 / 1000.0;
 
+/// How much of a service's capacity a request turned away at its door still
+/// uses: the same small share a scenario's own rate limit costs.
+pub const TURNED_AWAY_COST: f64 = 0.05;
 /// Latency ceiling of a single service (a caller-side timeout).
 pub const TIMEOUT_MS: f64 = 2500.0;
 /// Latency a caller observes against an unreachable node (fast failure).
@@ -62,6 +68,10 @@ pub enum TopologyError {
     InvalidEdge(String),
     #[error("node `{0}` has invalid numeric parameters")]
     InvalidNode(String),
+    #[error(
+        "node `{0}` is an external client: it cannot have a rate limit, a filter or autoscaling"
+    )]
+    ClientMitigation(String),
     #[error("dependency cycle detected involving `{0}`")]
     Cycle(String),
 }
@@ -92,6 +102,12 @@ pub struct SimTopology {
     pub capacity: Vec<f64>,
     pub queue_capacity: Vec<f64>,
     pub nominal_load: Vec<f64>,
+    /// The most each node admits a second; infinite where none is stated.
+    pub rate_limit: Vec<f64>,
+    /// Share of suspicious traffic each node turns away as it arrives.
+    pub filter: Vec<f64>,
+    /// How each node's capacity follows its load, where it does.
+    pub autoscale: Vec<Option<Autoscale>>,
     /// Effective latency of every node at nominal load.
     pub baseline_latency: Vec<f64>,
     pub baseline_p95: f64,
@@ -138,9 +154,25 @@ impl SimTopology {
                 && node.base_latency_ms >= 0.0
                 && node.capacity_rps.is_none_or(|c| c.is_finite() && c > 0.0)
                 && node.headroom.is_none_or(|h| h.is_finite() && h > 1.0)
-                && node.base_rps.is_none_or(|r| r.is_finite() && r >= 0.0);
+                && node.base_rps.is_none_or(|r| r.is_finite() && r >= 0.0)
+                && node.rate_limit_rps.is_none_or(|l| l.is_finite() && l > 0.0)
+                && node
+                    .suspicious_filter
+                    .is_none_or(|f| (0.0..=1.0).contains(&f))
+                && node.autoscale.is_none_or(|auto| {
+                    (1.0..=MAX_SCALE_FACTOR).contains(&auto.max_factor)
+                        && (1.0..=MAX_SCALE_SECONDS).contains(&auto.seconds)
+                });
             if !numeric_ok {
                 return Err(TopologyError::InvalidNode(node.id.clone()));
+            }
+            // A client is where traffic comes from: it has no door to hold
+            // traffic at and no capacity to grow.
+            let mitigates = node.rate_limit_rps.is_some()
+                || node.suspicious_filter.is_some()
+                || node.autoscale.is_some();
+            if node.service_type.is_client() && mitigates {
+                return Err(TopologyError::ClientMitigation(node.id.clone()));
             }
         }
         let n = spec.nodes.len();
@@ -252,6 +284,17 @@ impl SimTopology {
             })
             .collect();
         let clients = (0..n).filter(|i| node_type[*i].is_client()).collect();
+        let rate_limit = spec
+            .nodes
+            .iter()
+            .map(|x| x.rate_limit_rps.unwrap_or(f64::INFINITY))
+            .collect();
+        let filter = spec
+            .nodes
+            .iter()
+            .map(|x| x.suspicious_filter.unwrap_or(0.0))
+            .collect();
+        let autoscale = spec.nodes.iter().map(|x| x.autoscale).collect();
         let authorizers = (0..n)
             .filter(|i| node_type[*i] == ServiceType::CedarAuthorizer)
             .collect();
@@ -279,6 +322,9 @@ impl SimTopology {
             capacity: vec![f64::INFINITY; n],
             queue_capacity: vec![f64::INFINITY; n],
             nominal_load: vec![0.0; n],
+            rate_limit,
+            filter,
+            autoscale,
             baseline_latency: vec![0.0; n],
             baseline_p95: 0.0,
             clients,
@@ -289,7 +335,9 @@ impl SimTopology {
         let neutral = Modifiers::neutral(&topo);
         let mut depth = vec![0.0; n];
         let zero = vec![0.0; n];
-        let unlimited = propagate(&topo, &neutral, &mut depth, &zero, DT);
+        // At rest nothing has scaled: every service is the size it was given.
+        let mut scale = vec![1.0; n];
+        let unlimited = propagate(&topo, &neutral, &mut depth, &mut scale, &zero, DT);
         topo.nominal_load = unlimited.load.clone();
         for i in 0..n {
             let node = &topo.spec.nodes[i];
@@ -309,7 +357,8 @@ impl SimTopology {
 
         // Pass 2: baselines at nominal load with real capacities.
         let mut depth = vec![0.0; n];
-        let nominal = propagate(&topo, &neutral, &mut depth, &zero, DT);
+        let mut scale = vec![1.0; n];
+        let nominal = propagate(&topo, &neutral, &mut depth, &mut scale, &zero, DT);
         topo.baseline_latency = nominal.lat_eff.clone();
         topo.baseline_p95 = topo
             .latency_mixture(&neutral.demand, &nominal.lat_eff)
@@ -427,6 +476,8 @@ pub struct Modifiers {
     pub path_load: Vec<f64>,
     /// Injected load that joins a node's ordinary fan-out.
     pub spill_in: Vec<f64>,
+    /// Injected load that arrived at a node's door, before its rate limit.
+    pub arriving: Vec<f64>,
 }
 
 impl Modifiers {
@@ -444,6 +495,7 @@ impl Modifiers {
             edge_err_inject: vec![0.0; m],
             path_load: vec![0.0; n],
             spill_in: vec![0.0; n],
+            arriving: vec![0.0; n],
         }
     }
 }
@@ -463,6 +515,9 @@ pub struct Flow {
     pub lat_eff: Vec<f64>,
     /// Ordinary (non-injected) traffic on each edge.
     pub edge_flow: Vec<f64>,
+    /// Share of what arrived at each node that its rate limit let in: 1
+    /// where there is no limit or the limit was not reached.
+    pub admit: Vec<f64>,
 }
 
 /// Combines two independent failure probabilities.
@@ -470,10 +525,14 @@ pub fn combine_failures(a: f64, b: f64) -> f64 {
     1.0 - (1.0 - a.clamp(0.0, 1.0)) * (1.0 - b.clamp(0.0, 1.0))
 }
 
+/// One pass of the model. `queue_depth` and `scale` are what carries over
+/// from one tick to the next: the backlog of every queue, and how far every
+/// autoscaled service has grown (1 where it has not, or cannot).
 pub fn propagate(
     topo: &SimTopology,
     m: &Modifiers,
     queue_depth: &mut [f64],
+    scale: &mut [f64],
     prev_err_eff: &[f64],
     dt: f64,
 ) -> Flow {
@@ -485,6 +544,7 @@ pub fn propagate(
         err_eff: vec![0.0; n],
         lat_eff: vec![0.0; n],
         edge_flow: vec![0.0; topo.edge_count()],
+        admit: vec![1.0; n],
     };
     let mut queue_latency = vec![0.0; n];
 
@@ -495,8 +555,45 @@ pub fn propagate(
                 .iter()
                 .map(|e| flow.edge_flow[*e])
                 .sum::<f64>();
-        let load = ordinary_in + m.path_load[node] + m.spill_in[node];
-        let capacity = topo.capacity[node] * m.cap_factor[node].max(0.0);
+        // A rate limit holds traffic at the door: what arrives beyond it is
+        // turned away before it uses capacity or reaches anything behind.
+        // Injected traffic was already held to the share admitted a tick
+        // ago (`engine::inject_flows`); ordinary traffic is held to this
+        // tick's. A node with no limit takes the path it always took.
+        let limit = topo.rate_limit[node];
+        let (admitted_in, load) = if limit.is_finite() {
+            let arriving = ordinary_in + m.arriving[node];
+            let admit = if arriving > limit {
+                limit / arriving
+            } else {
+                1.0
+            };
+            flow.admit[node] = admit;
+            let admitted = ordinary_in * admit;
+            let turned = ordinary_in - admitted;
+            (
+                admitted,
+                admitted + turned * TURNED_AWAY_COST + m.path_load[node] + m.spill_in[node],
+            )
+        } else {
+            (
+                ordinary_in,
+                ordinary_in + m.path_load[node] + m.spill_in[node],
+            )
+        };
+        let mut capacity = topo.capacity[node] * m.cap_factor[node].max(0.0);
+        if let Some(auto) = topo.autoscale[node] {
+            capacity *= scale[node];
+            // Next tick's size: toward the capacity that would give this
+            // load the headroom the service has at rest.
+            let nominal = topo.nominal_load[node];
+            let wanted = if nominal > f64::EPSILON {
+                (load / nominal).clamp(1.0, auto.max_factor)
+            } else {
+                1.0
+            };
+            scale[node] += (wanted - scale[node]) * (dt / auto.seconds).min(1.0);
+        }
         let down = m.down[node];
         let (handled, rho) = if down {
             (0.0, if load > 0.0 { 2.0 } else { 0.0 })
@@ -507,8 +604,13 @@ pub fn propagate(
         } else {
             ((capacity / load).min(1.0), load / capacity)
         };
-        let mut shed = 1.0 - handled;
-        let mut through = (ordinary_in + m.spill_in[node]) * handled;
+        let mut shed = if limit.is_finite() && ordinary_in > f64::EPSILON {
+            // Of what callers sent: turned away at the door, or not handled.
+            1.0 - admitted_in / ordinary_in * handled
+        } else {
+            1.0 - handled
+        };
+        let mut through = (admitted_in + m.spill_in[node]) * handled;
 
         if topo.node_type[node].is_queue() && !down {
             // Consumers pull from the queue: how fast can they drain it?
@@ -520,8 +622,16 @@ pub fn propagate(
                     if m.down[consumer] {
                         0.0
                     } else {
+                        // A consumer's size a tick ago, since consumers
+                        // come later in the pass; 1 unless it scales.
+                        let size = if topo.autoscale[consumer].is_some() {
+                            scale[consumer]
+                        } else {
+                            1.0
+                        };
                         topo.capacity[consumer]
                             * m.cap_factor[consumer].max(0.0)
+                            * size
                             * (1.0 - prev_err_eff[consumer]).clamp(0.0, 1.0)
                     }
                 })
@@ -646,6 +756,9 @@ mod tests {
             capacity_rps: None,
             headroom: None,
             base_rps: if ty.is_client() { Some(100.0) } else { None },
+            rate_limit_rps: None,
+            suspicious_filter: None,
+            autoscale: None,
         }
     }
 
@@ -745,7 +858,14 @@ mod tests {
         m.demand[client] = 600.0; // 2.5× the gateway capacity of 240 rps.
         let mut depth = vec![0.0; topo.node_count()];
         let zero = vec![0.0; topo.node_count()];
-        let flow = propagate(&topo, &m, &mut depth, &zero, DT);
+        let flow = propagate(
+            &topo,
+            &m,
+            &mut depth,
+            &mut vec![1.0; topo.node_count()],
+            &zero,
+            DT,
+        );
         assert!((flow.rho[gw] - 2.5).abs() < 1e-9);
         assert!((flow.own_err[gw] - 0.6).abs() < 1e-9, "sheds 60 %");
         assert!(flow.lat_eff[gw] > topo.baseline_latency[gw] * 3.0);
@@ -765,7 +885,14 @@ mod tests {
         m.err_inject[db] = 0.5;
         let mut depth = vec![0.0; topo.node_count()];
         let zero = vec![0.0; topo.node_count()];
-        let flow = propagate(&topo, &m, &mut depth, &zero, DT);
+        let flow = propagate(
+            &topo,
+            &m,
+            &mut depth,
+            &mut vec![1.0; topo.node_count()],
+            &zero,
+            DT,
+        );
         // svc → db is a data edge: criticality 0.9, called on every request.
         assert!((flow.err_eff[svc] - 0.45).abs() < 1e-9);
         // gw → svc is a call edge: criticality 0.8, probability 0.5.
@@ -780,7 +907,14 @@ mod tests {
         m.down[svc] = true;
         let mut depth = vec![0.0; topo.node_count()];
         let zero = vec![0.0; topo.node_count()];
-        let flow = propagate(&topo, &m, &mut depth, &zero, DT);
+        let flow = propagate(
+            &topo,
+            &m,
+            &mut depth,
+            &mut vec![1.0; topo.node_count()],
+            &zero,
+            DT,
+        );
         assert_eq!(flow.err_eff[svc], 1.0);
         assert_eq!(flow.load[db], 0.0);
     }
@@ -813,7 +947,14 @@ mod tests {
         slow.cap_factor[worker] = 0.1;
         let mut last = Flow::default();
         for _ in 0..50 {
-            last = propagate(&topo, &slow, &mut depth, &zero, DT);
+            last = propagate(
+                &topo,
+                &slow,
+                &mut depth,
+                &mut vec![1.0; topo.node_count()],
+                &zero,
+                DT,
+            );
         }
         assert!(depth[queue] > 500.0, "backlog grew to {}", depth[queue]);
         // Publishing is asynchronous: the producer is unaffected.
@@ -821,7 +962,14 @@ mod tests {
 
         let healthy = Modifiers::neutral(&topo);
         for _ in 0..400 {
-            propagate(&topo, &healthy, &mut depth, &zero, DT);
+            propagate(
+                &topo,
+                &healthy,
+                &mut depth,
+                &mut vec![1.0; topo.node_count()],
+                &zero,
+                DT,
+            );
         }
         assert!(depth[queue] < 1.0, "backlog drained to {}", depth[queue]);
     }

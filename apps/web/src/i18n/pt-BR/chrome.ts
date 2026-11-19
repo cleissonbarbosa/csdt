@@ -156,4 +156,6 @@ export default {
   'Frame rate, frame time, draw calls, bead count and backend.':
     'Taxa de quadros, tempo de quadro, chamadas de desenho, número de pontos de tráfego e API gráfica.',
   'Restore defaults': 'Restaurar os padrões',
+  'headroom, single points of failure': 'margem, pontos únicos de falha',
+  'Draft a platform from this capture': 'Rascunhar uma plataforma a partir desta captura',
 } as const satisfies Record<string, string>;

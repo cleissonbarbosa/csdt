@@ -548,6 +548,9 @@ impl Timeline {
                         0.0
                     },
                     baseline_latency_ms: round_to(topo.baseline_latency[i], 1),
+                    rate_limit_rps: node.rate_limit_rps,
+                    suspicious_filter: node.suspicious_filter,
+                    autoscale: node.autoscale,
                     connected_services: connected,
                     metrics: NodeMetrics {
                         health: s.health[i],

@@ -3,8 +3,10 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use aegis_server::application::diff::compare;
-use aegis_server::application::Assets;
-use aegis_server::config::Config;
+use aegis_server::application::platforms::across;
+use aegis_server::application::{Assets, Loaded, Sources};
+use aegis_server::config::{Config, DEFAULT_SEED};
+use aegis_server::domain::WorkspaceOrigin;
 use aegis_server::{api, build_state, workspace};
 use tracing_subscriber::EnvFilter;
 
@@ -19,6 +21,10 @@ usage: aegis-server                          run the server
        aegis-server diff-workspace <base> <candidate> [--json] [--exit-code]
                                              what Cedar decides differently under the
                                              candidate; @bundled names the bundled set
+       aegis-server compare-incident <base> <candidate> <scenario>
+                    [--topology=<id>] [--seed=<n>] [--json]
+                                             one scenario on the platform each describes,
+                                             from the same seed, side by side
        aegis-server healthcheck              probe the running server
        aegis-server --version";
 
@@ -247,6 +253,76 @@ fn diff_workspace(args: &[&str]) -> ExitCode {
     }
 }
 
+/// One side of an incident comparison, with the sources it was built from.
+fn load_whole(side: &str) -> Result<Loaded, String> {
+    let sources = if side == BUNDLED {
+        Sources::bundled().map_err(|e| e.to_string())?
+    } else {
+        workspace::load(Path::new(side))
+            .map_err(|e| e.to_string())?
+            .sources
+    };
+    Loaded::build(sources, WorkspaceOrigin::Startup, Vec::new(), Vec::new())
+        .map_err(|e| format!("{side}: {e}"))
+}
+
+/// `aegis-server compare-incident <base> <candidate> <scenario>`: runs one
+/// scenario on the platform the base opens on and on the candidate's, each
+/// on a timeline of its own from the same seed, and prints what differs
+/// between the two descriptions and the two runs. Exit status 2 when it
+/// cannot be run.
+fn compare_incident(args: &[&str]) -> ExitCode {
+    const EXPECTED: &str =
+        "expected <base> <candidate> <scenario> [--topology=<id>] [--seed=<n>] [--json]";
+    let (flags, rest): (Vec<&str>, Vec<&str>) = args.iter().partition(|arg| arg.starts_with("--"));
+    let mut json = false;
+    let mut topology = None;
+    let mut seed = DEFAULT_SEED;
+    for flag in &flags {
+        let known = if let Some(id) = flag.strip_prefix("--topology=") {
+            topology = Some(id);
+            !id.is_empty()
+        } else if let Some(text) = flag.strip_prefix("--seed=") {
+            text.parse().map(|parsed| seed = parsed).is_ok()
+        } else {
+            json = true;
+            *flag == "--json"
+        };
+        if !known {
+            eprintln!("aegis-server compare-incident: {EXPECTED}\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    }
+    let [base, candidate, scenario] = rest[..] else {
+        eprintln!("aegis-server compare-incident: {EXPECTED}\n{USAGE}");
+        return ExitCode::from(2);
+    };
+    let compared = load_whole(base).and_then(|before| {
+        let after = load_whole(candidate)?;
+        let in_use = before.assets.default_topology.clone();
+        across(&before, &in_use, &after, scenario, topology, seed).map_err(|e| e.to_string())
+    });
+    let comparison = match compared {
+        Ok(comparison) => comparison,
+        Err(error) => {
+            eprintln!("aegis-server compare-incident: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if json {
+        match serde_json::to_string_pretty(&comparison) {
+            Ok(text) => println!("{text}"),
+            Err(error) => {
+                eprintln!("aegis-server compare-incident: {error}");
+                return ExitCode::from(2);
+            }
+        }
+    } else {
+        print!("{}", comparison.render(base, candidate));
+    }
+    ExitCode::SUCCESS
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -264,6 +340,7 @@ async fn main() -> ExitCode {
         ["export-workspace", dir] => return export_workspace(Path::new(dir)),
         ["check-workspace", dir] => return check_workspace(Path::new(dir)),
         ["diff-workspace", rest @ ..] => return diff_workspace(rest),
+        ["compare-incident", rest @ ..] => return compare_incident(rest),
         [] | ["healthcheck"] => {}
         _ => {
             eprintln!("aegis-server: unexpected arguments\n{USAGE}");

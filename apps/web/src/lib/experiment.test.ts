@@ -5,6 +5,7 @@ import { experiment as sampleExperiment, platformComparison } from '@/test/fixtu
 import {
   affectedOnlyIn,
   comparedRows,
+  experimentText,
   INTERVENTIONS,
   interventionEffect,
   lowestAt,
@@ -91,6 +92,22 @@ describe('two runs of one incident', () => {
       a: [],
       b: [],
     });
+  });
+
+  it('are written out as text that says what changed and where the figures come from', () => {
+    const lines = experimentText(experiment, null).split('\n');
+    expect(lines[0]).toBe('Credential Stuffing: the same incident twice, with one change');
+    expect(lines[1]).toContain('Every figure comes from the AEGIS simulation engine');
+    expect(lines).toContain(
+      '  In run B, capacity ×3 on use-auth, placed +0:12 into the incident and eased in over 1.00 s.',
+    );
+    const rows = lines.filter((line) => line.includes(': A '));
+    expect(rows).toHaveLength(comparedRows(experiment).length);
+    expect(rows[0]).toMatch(
+      /^ {2}Highest error rate: A [\d.]+%; B [\d.]+%; B against A −[\d.]+ pts$/,
+    );
+    // A figure that does not differ is not given a difference.
+    expect(rows.find((row) => row.includes('Latency p95 at'))).toMatch(/B met throughout$/);
   });
 
   it('are one run until the change is placed', () => {

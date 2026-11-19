@@ -192,6 +192,19 @@ second where the one in use is sent 5 360, and everything behind it is the
 size it was. **Apply these files and watch run B** puts that run on the
 model.
 
+The same dialog answers the question the surge raises. In the saved file,
+give `edge-router` a `"suspiciousFilter": 0.94` in place of the larger
+gateway: a filter that is on from the first request, where the scenario's
+own begins 36 seconds in. Run both again. Run B leaves one service out of
+normal where run A leaves seventeen, and its error rate stays under the
+objective throughout.
+
+For the platform's limits without any scenario, open **⋯ → Find where the
+platform gives**. **Find the limit** raises every client's demand until an
+objective is missed: Helios holds at ×2 and gives at ×2.04. **Try every
+service** takes each one out in turn and puts first the one that takes the
+most others with it.
+
 To see what a fault would do before placing it, open a service, open
 **Faults** on its card and choose one under **Try one first, without placing
 it**. The card lists the services that would leave normal and when, and the

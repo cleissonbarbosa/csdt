@@ -238,6 +238,9 @@ The same format as
 | `nodes[].baseLatencyMs`           | The service's own latency when idle.                                                                                                                                         |
 | `nodes[].baseRps`                 | For an `external-client`: the demand it generates. Everything else's load follows from the connections.                                                                      |
 | `nodes[].capacityRps`, `headroom` | Optional. Without them capacity is the node's load at nominal demand times a headroom that depends on its kind.                                                              |
+| `nodes[].rateLimitRps`            | Optional. The most requests a second the service admits; the rest are turned away at its door. See [What a service does about load](#what-a-service-does-about-load).        |
+| `nodes[].suspiciousFilter`        | Optional, 0 to 1: the share of traffic a scenario marks as suspicious that the service turns away as it arrives.                                                             |
+| `nodes[].autoscale`               | Optional `{ "maxFactor", "seconds" }`: capacity that follows the load.                                                                                                       |
 | `edges[].weight`                  | Calls made on the connection per request the source handles.                                                                                                                 |
 | `edges[].relationship`            | `route` (each request takes exactly one), `call`, `auth`, `authz`, `data` (all synchronous: a failure reaches the caller), `publish`, `consume`, `replication`, `telemetry`. |
 | `edges[].criticality`             | Optional, 0 to 1: how strongly a failure of the target fails the caller. Defaults by relationship.                                                                           |
@@ -258,6 +261,47 @@ Constraints, each reported with the id involved:
 - Ids are 1 to 64 letters, digits, `-`, `_` or `.`, and unique.
 - Every connection joins two declared nodes; every node sits in a declared
   region; every role points at a node or a region.
+
+### What a service does about load
+
+Three optional fields say what a service does when more arrives than it was
+built for. Each is a figure the file states and the model follows; none is
+on unless the file gives it, and a platform that gives none runs exactly as
+it did before these existed. An external client can have none of them.
+
+```json
+{ "id": "edge", "type": "network-gateway", "suspiciousFilter": 0.94, … },
+{ "id": "gateway", "type": "api-gateway", "rateLimitRps": 2000,
+  "autoscale": { "maxFactor": 3, "seconds": 20 }, … }
+```
+
+- **`rateLimitRps`** is a limit on everything that arrives, whoever sent it.
+  Beyond it the service turns requests away at its door: they fail for the
+  caller, fast, and use a twentieth of the capacity a request would. What
+  it admits it handles as before, so it stays within its capacity and at
+  its usual latency, and what is behind it is sent what it admits, not what
+  arrives. It does not tell hostile traffic from ordinary traffic: under a
+  flood it turns away callers in the same proportion. The connections into
+  it are shown as throttled.
+- **`suspiciousFilter`** is a filter that is always on: that share of any
+  traffic a scenario injects and marks `suspicious` is turned away as it
+  arrives, from the first request, with reason `waf`. It is the file saying
+  how much of an attack the service recognises; the model does not work
+  that share out. Ordinary traffic is not touched. The bundled DDoS surge
+  begins to be filtered 36 seconds in, by the scenario's own phase; a
+  platform that states the same filter takes it from the start, and
+  comparing the two is how the cost of those 36 seconds is seen.
+- **`autoscale`** lets capacity follow the load: the service aims at the
+  capacity that would give its present load the headroom it has at rest,
+  up to `maxFactor` times its capacity at rest (1 to 100), and closes about
+  two thirds of the gap every `seconds` (1 to 3600). It shrinks back the
+  same way. A load that rises faster than that is shed in the meantime,
+  which is the point of stating the figure.
+
+Where a service has more than one, traffic meets them in this order: the
+filter, then the rate limit, then whatever a scenario's own phase rejects,
+then capacity. A scenario's effects compose with them: `capacity ×0.5` on
+an autoscaled service halves whatever size it has grown to.
 
 ### From a Compose file
 
@@ -669,6 +713,17 @@ The answer has four parts.
 Two runs do not say which difference an outcome follows from, and AEGIS does
 not say it for them. To see what one change does, change that one alone.
 
+The same comparison runs from a terminal, for a pipeline or a review:
+
+```bash
+aegis-server compare-incident <base> <candidate> <scenario> [--topology=<id>] [--seed=<n>] [--json]
+```
+
+Either side is a workspace directory, a bundle file or `@bundled`. It prints
+what differs, what follows without being stated and the two runs side by
+side, or the whole answer with `--json`; it exits 2 when the comparison
+cannot be run.
+
 The scenario has to be the same incident on both sides: in use, among the
 files, written the same in both and able to run on each platform. Staging
 only a topology keeps the scenarios the server was started with, so after an
@@ -687,6 +742,30 @@ phases the scenario resolves differently) and `decisionsChanged` (whether
 Cedar answers the simulation differently under the files). The files are
 built exactly as an import builds them and are bounded the same way; with
 `AEGIS_IMPORT=off` the route answers 403.
+
+## Where the platform gives
+
+**⋯ → Find where the platform gives** asks two things of the platform in
+use, at rest. Both are runs of the engine on timelines of their own, and the
+timeline in use is not touched.
+
+- **How much traffic it takes.** The demand of every external client is
+  multiplied by the same figure and held for a minute, at ×1.25, ×1.5, ×2,
+  ×3, ×4, ×6, ×8, ×12 and ×16, stopping at the first figure at which an
+  objective is missed; the gap between that one and the last that held is
+  then halved five times. The answer is those two figures, the objective
+  that was missed, the first service to leave its normal state (which can
+  be well before any objective is missed), and a row for every figure
+  tried. Nothing is said of the figures between two rows.
+- **What each service takes with it.** Every service is made unreachable in
+  turn, exactly as **Try one first** on its card does, and the others that
+  left their normal state are counted. The one that takes the most with it
+  is first. A platform of more than 250 services is not ranked.
+
+```http
+POST /api/v1/demo/experiments/headroom      {}
+POST /api/v1/demo/experiments/weak-points   {}
+```
 
 ## What a workspace cannot do
 
@@ -745,6 +824,19 @@ what is on show.
   the bundled policies rewritten in Cedar syntax with annotations are no
   change; unrelated workspaces compare without a shared request; and the
   command's report, JSON and exit statuses are checked through the binary.
+- What a service does about load (`apps/server/tests/mitigations.rs`): a
+  rate limit keeps the gateway within its capacity and spares what is behind
+  it while callers are turned away with the flood; a filter that is always
+  on takes the flood from the first request and nothing at rest; an
+  autoscaled service grows to what its load asks for, never past its limit,
+  and shrinks back; a platform with all three seeks and replays to the same
+  state digest; a figure out of range, or any of the three on a client, is
+  refused with the service. The contract samples of the bundled platform do
+  not change with any of it.
+- Where the platform gives (`apps/server/tests/limits.rs`): the two figures
+  of the headroom are among the runs listed and nothing tried lies between
+  them; every service is taken out once and each row is what a trial of
+  that service gives.
 - An incident on both platforms (`apps/server/tests/platforms.rs`): the files
   in use compared with themselves give one run twice and no difference; a
   changed field is reported as the file wrote it, an added service with the

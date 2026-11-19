@@ -191,6 +191,36 @@
           "format": "double",
           "minimum": 0,
           "default": null
+        },
+        "rateLimitRps": {
+          "description": "The most requests a second the service admits. The rest are turned\naway at its door, whoever sent them.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "exclusiveMinimum": 0
+        },
+        "suspiciousFilter": {
+          "description": "The share of traffic a scenario marks as suspicious that the service\nturns away as it arrives, from the first request (0..1).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "autoscale": {
+          "description": "Capacity that follows the load. Absent: the capacity is fixed.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Autoscale"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -226,6 +256,31 @@
         "production",
         "staging",
         "demo"
+      ]
+    },
+    "Autoscale": {
+      "description": "A service that adds capacity when its load asks for it.",
+      "type": "object",
+      "properties": {
+        "maxFactor": {
+          "description": "The most it grows to, in times its capacity at rest.",
+          "type": "number",
+          "format": "double",
+          "minimum": 1,
+          "maximum": 100.0
+        },
+        "seconds": {
+          "description": "How fast it follows: the time, in seconds, in which it closes about\ntwo thirds of the gap between the capacity it has and the one the\nload asks for.",
+          "type": "number",
+          "format": "double",
+          "minimum": 1,
+          "maximum": 3600.0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "maxFactor",
+        "seconds"
       ]
     },
     "EdgeSpec": {

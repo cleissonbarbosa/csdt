@@ -32,12 +32,14 @@ import {
   type ControlAction,
   type EvaluateRequest,
   type ExperimentRequest,
+  HeadroomSchema,
   type PlatformComparisonRequest,
   PlatformComparisonSchema,
   type FaultEffect,
   type Recording,
   type WorkspaceFile,
   TrialSchema,
+  WeakPointsSchema,
   type TrialRequest,
 } from '@aegis/contracts';
 import { transport } from '@transport';
@@ -187,6 +189,11 @@ export const api = {
   /** One fault tried on the platform at rest. The timeline in use is not touched. */
   tryFault: (body: TrialRequest) =>
     request(TrialSchema, '/demo/experiments/trial', body, LONG_TIMEOUT_MS),
+  /** How many times its ordinary demand the platform in use takes before an objective is missed. */
+  findHeadroom: () => request(HeadroomSchema, '/demo/experiments/headroom', {}, LONG_TIMEOUT_MS),
+  /** Every service taken out in turn, with what left normal each time. */
+  findWeakPoints: () =>
+    request(WeakPointsSchema, '/demo/experiments/weak-points', {}, LONG_TIMEOUT_MS),
   /** One scenario on the platform in use and on the one the files describe. Nothing is applied. */
   comparePlatforms: (body: PlatformComparisonRequest) =>
     request(PlatformComparisonSchema, '/demo/experiments/platforms', body, LONG_TIMEOUT_MS),

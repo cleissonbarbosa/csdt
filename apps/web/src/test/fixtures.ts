@@ -9,6 +9,7 @@ import {
   AuthorizationExplanationSchema,
   EventsResponseSchema,
   ExperimentSchema,
+  HeadroomSchema,
   IncidentReportSchema,
   IncidentsResponseSchema,
   IntegrationStatusSchema,
@@ -21,6 +22,7 @@ import {
   TopologiesResponseSchema,
   TopologySchema,
   TrialSchema,
+  WeakPointsSchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
   WorkspaceDiffSchema,
@@ -71,6 +73,9 @@ export const incidentReport = () => sample('incident-report', IncidentReportSche
 export const session = () => sample('session', SessionExportSchema);
 export const experiment = () => sample('experiment', ExperimentSchema);
 /** The surge on the bundled platform and on one with a larger gateway and one more service. */
+/** How much demand the bundled platform takes, and what each of its services takes with it. */
+export const headroom = () => sample('headroom', HeadroomSchema);
+export const weakPoints = () => sample('weak-points', WeakPointsSchema);
 export const platformComparison = () => sample('platform-comparison', PlatformComparisonSchema);
 
 /** A snapshot taken mid-incident (credential stuffing). */

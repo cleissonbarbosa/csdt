@@ -172,6 +172,19 @@ function Import() {
     };
   }, [staged]);
 
+  // Files written in the page (a draft from a capture) are staged as they
+  // are handed over, with what the page says of them shown above the list.
+  const offer = useUi((state) => state.importOffer);
+  const [offered, setOffered] = useState<string[]>([]);
+  useEffect(() => {
+    if (!offer) return;
+    setStaged(offer.files);
+    setOffered(offer.notes);
+    setSkipped([]);
+    setFailure(null);
+    useUi.getState().takeImportOffer();
+  }, [offer]);
+
   const outcome = checked?.files === staged ? checked.outcome : null;
   const valid = typeof outcome === 'object' && outcome?.valid === true;
 
@@ -186,6 +199,7 @@ function Import() {
     setStaged([]);
     setSkipped([]);
     setFailure(null);
+    setOffered([]);
   };
   const drop = (event: DragEvent) => {
     event.preventDefault();
@@ -308,6 +322,17 @@ function Import() {
             )),
           })}
         </p>
+      )}
+
+      {staged.length > 0 && offered.length > 0 && (
+        <ul
+          className="mt-3 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-ink-dim"
+          data-testid="workspace-offer"
+        >
+          {offered.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
       )}
 
       {staged.length > 0 && (

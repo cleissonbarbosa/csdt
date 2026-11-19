@@ -203,4 +203,15 @@ export default {
   Disconnect: 'Desconectar',
   'Working…': 'Trabalhando…',
   Connect: 'Conectar',
+
+  // A comparison of platforms as text, to take away.
+  '{scenario}: one incident on two platforms': '{scenario}: um incidente em duas plataformas',
+  'A is {base}, in use ({services}). B is {candidate}, as the files describe it ({others}). Both runs are {scenario} with seed {seed}.':
+    'A é {base}, em uso ({services}). B é {candidate}, como os arquivos a descrevem ({others}). As duas execuções são {scenario} com a semente {seed}.',
+  'Cedar also answers the simulation differently under these files.':
+    'O Cedar também responde à simulação de outra forma com estes arquivos.',
+  '{service}: {base} req/s in A, {candidate} req/s in B':
+    '{service}: {base} req/s em A, {candidate} req/s em B',
+  'The two runs (A in use, B with these files)':
+    'As duas execuções (A em uso, B com estes arquivos)',
 } as const satisfies Record<string, string>;

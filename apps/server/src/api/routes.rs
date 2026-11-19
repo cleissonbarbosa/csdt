@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::application::access;
 use crate::application::diff::{compare, Diff};
 use crate::application::experiment::{Experiment, Trial};
+use crate::application::limits::{Headroom, WeakPoints};
 use crate::application::platforms::PlatformComparison;
 use crate::application::session::SessionExport;
 use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
@@ -492,6 +493,42 @@ pub async fn experiment_trial(
         .await
         .map_err(|()| internal("the trial could not be run"))??;
     Ok(Json(trial))
+}
+
+/// A question that takes no figures: it is asked of the platform in use.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NothingBody {}
+
+/// How many times its ordinary demand the platform in use takes before an
+/// objective is missed: a fixed ladder of multiples, narrowed between the
+/// last that held and the first that did not, each a run of its own. The
+/// timeline in use is not touched.
+pub async fn experiment_headroom(
+    State(state): State<AppState>,
+    body: Result<Json<NothingBody>, JsonRejection>,
+) -> ApiResult<Headroom> {
+    let Json(NothingBody {}) = body?;
+    let service = state.service.clone();
+    let headroom = off_the_workers(move || service.find_headroom())
+        .await
+        .map_err(|()| internal("the limit could not be looked for"))??;
+    Ok(Json(headroom))
+}
+
+/// Every service of the platform in use taken out in turn, as a trial takes
+/// one out, with what left normal each time. The timeline in use is not
+/// touched.
+pub async fn experiment_weak_points(
+    State(state): State<AppState>,
+    body: Result<Json<NothingBody>, JsonRejection>,
+) -> ApiResult<WeakPoints> {
+    let Json(NothingBody {}) = body?;
+    let service = state.service.clone();
+    let points = off_the_workers(move || service.find_weak_points())
+        .await
+        .map_err(|()| internal("the services could not be tried"))??;
+    Ok(Json(points))
 }
 
 // -- workspace --------------------------------------------------------------

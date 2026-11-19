@@ -100,6 +100,9 @@ impl Builder {
             capacity_rps: None,
             headroom: None,
             base_rps,
+            rate_limit_rps: None,
+            suspicious_filter: None,
+            autoscale: None,
         });
         id
     }

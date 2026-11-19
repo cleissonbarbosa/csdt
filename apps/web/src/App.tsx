@@ -23,6 +23,7 @@ import { CaptureList } from '@/features/capture/CaptureList';
 import { CaptureTable } from '@/features/capture/CaptureTable';
 import { CommandPalette } from '@/features/command/CommandPalette';
 import { ExperimentDialog } from '@/features/experiments/ExperimentDialog';
+import { LimitsDialog } from '@/features/experiments/LimitsDialog';
 import { Explorer } from '@/features/explorer/Explorer';
 import { GuideCard } from '@/features/guide/GuideCard';
 import { Orientation } from '@/features/guide/Orientation';
@@ -879,6 +880,7 @@ export function App() {
       <SettingsDialog />
       <WorkspaceDialog />
       <ExperimentDialog />
+      <LimitsDialog />
       <AccessMatrixDialog />
       <PolicyEditorDialog />
       <SessionDialog />

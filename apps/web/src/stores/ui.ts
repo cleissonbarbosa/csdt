@@ -1,5 +1,11 @@
 /** Interface state: selection, filters, panels and persisted settings. */
-import type { AuthorizationDecision, EvaluateRequest, Health, ServiceType } from '@aegis/contracts';
+import type {
+  AuthorizationDecision,
+  EvaluateRequest,
+  Health,
+  ServiceType,
+  WorkspaceFile,
+} from '@aegis/contracts';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -44,6 +50,8 @@ export type PanelId =
   | 'workspace'
   /** The same incident twice, with one thing changed. */
   | 'experiment'
+  /** Where the platform gives: how much demand it takes, what each service takes with it. */
+  | 'limits'
   /** Saving, sharing and opening a session. */
   | 'session'
   /** Writing a scenario by hand. */
@@ -120,6 +128,12 @@ export interface UiState {
   /** The scenario a comparison is opened on. */
   experimentScenarioId: string | null;
   /**
+   * Files written in the page for the import dialog to stage, with a line
+   * saying where they came from. The dialog takes them up once; nothing is
+   * applied until the viewer applies them there.
+   */
+  importOffer: { files: WorkspaceFile[]; notes: string[] } | null;
+  /**
    * The services a trial of a fault reached, while its result is on show:
    * the model keeps them in front. Nothing about them is a state of the
    * timeline in use; it is the answer to a question the viewer asked.
@@ -154,6 +168,9 @@ export interface UiState {
   setLastDecision: (decision: AuthorizationDecision | null) => void;
   /** Opens the comparison of an intervention, on a scenario if one is named. */
   openExperiment: (scenarioId?: string) => void;
+  /** Opens the import dialog on files written in the page, staged and not applied. */
+  offerImport: (files: WorkspaceFile[], notes: string[]) => void;
+  takeImportOffer: () => void;
   setReach: (nodeIds: string[] | null) => void;
   acknowledgeIncident: (id: string | null) => void;
   setCommandOpen: (open: boolean) => void;
@@ -198,6 +215,7 @@ export const useUi = create<UiState>((set) => ({
   authorizationPreset: null,
   lastDecision: null,
   experimentScenarioId: null,
+  importOffer: null,
   reach: null,
   acknowledgedIncidentId: null,
   commandOpen: false,
@@ -318,6 +336,13 @@ export const useUi = create<UiState>((set) => ({
       openPanel: 'experiment',
       experimentScenarioId: scenarioId ?? null,
     })),
+  offerImport: (files, notes) =>
+    set((s) => ({
+      ...leavingTracer(s, 'workspace'),
+      openPanel: 'workspace',
+      importOffer: { files, notes },
+    })),
+  takeImportOffer: () => set({ importOffer: null }),
   setReach: (reach) => set({ reach }),
   acknowledgeIncident: (acknowledgedIncidentId) => set({ acknowledgedIncidentId }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),

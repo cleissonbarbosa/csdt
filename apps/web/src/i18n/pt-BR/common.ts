@@ -113,4 +113,5 @@ export default {
   'Loosen the filters to see services again.': 'Afrouxe os filtros para ver os serviços de novo.',
   'Something went wrong.': 'Algo deu errado.',
   'The session could not be loaded.': 'A sessão não pôde ser carregada.',
+  'Find where the platform gives': 'Encontrar onde a plataforma cede',
 } as const satisfies Record<string, string>;

@@ -461,6 +461,9 @@ pub fn topology_from_compose(file: &str, text: &str) -> Result<TopologySpec, Str
         capacity_rps: None,
         headroom: None,
         base_rps: Some(DEFAULT_CLIENT_RPS),
+        rate_limit_rps: None,
+        suspicious_filter: None,
+        autoscale: None,
     }];
     for name in &names {
         let kind = kinds[name];
@@ -483,6 +486,9 @@ pub fn topology_from_compose(file: &str, text: &str) -> Result<TopologySpec, Str
             capacity_rps: None,
             headroom: None,
             base_rps: None,
+            rate_limit_rps: None,
+            suspicious_filter: None,
+            autoscale: None,
         });
     }
 

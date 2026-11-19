@@ -19,7 +19,8 @@ use crate::simulation::model::SimTopology;
 use crate::simulation::{Command, Timeline, TICK_MS};
 
 use super::experiment::{self, Experiment, Trial};
-use super::platforms::{self, PlatformComparison, Side};
+use super::limits::{self, Headroom, WeakPoints};
+use super::platforms::{self, PlatformComparison, Refusal};
 use super::session::{self, SessionExport};
 use super::{Assets, Loaded};
 
@@ -655,6 +656,38 @@ impl SimulationService {
         .map_err(ServiceError::InvalidExperiment)
     }
 
+    /// The topology in use and what it runs on, taken together.
+    fn in_use(&self) -> (Arc<Assets>, String) {
+        let rt = self.lock();
+        (
+            Arc::clone(&rt.loaded.assets),
+            rt.timeline.topology().spec.id.clone(),
+        )
+    }
+
+    /// How many times its ordinary demand the topology in use takes before
+    /// an objective is missed, found on timelines of its own with the
+    /// server's seed. The timeline in use is not touched.
+    pub fn find_headroom(&self) -> Result<Headroom, ServiceError> {
+        let (assets, topology_id) = self.in_use();
+        let world = assets
+            .world(&topology_id)
+            .ok_or(ServiceError::UnknownTopology(topology_id))?;
+        limits::headroom(world, &assets.decisions, self.seed)
+            .map_err(ServiceError::InvalidExperiment)
+    }
+
+    /// Every service of the topology in use taken out in turn, on timelines
+    /// of its own with the server's seed. The timeline in use is not touched.
+    pub fn find_weak_points(&self) -> Result<WeakPoints, ServiceError> {
+        let (assets, topology_id) = self.in_use();
+        let world = assets
+            .world(&topology_id)
+            .ok_or(ServiceError::UnknownTopology(topology_id))?;
+        limits::weak_points(world, &assets.decisions, self.seed)
+            .map_err(ServiceError::InvalidExperiment)
+    }
+
     /// Runs a scenario on the topology in use and on a topology of
     /// `candidate`, a set of files that is not in use, each on a timeline of
     /// its own with the server's seed. The candidate's topology is the one
@@ -670,76 +703,20 @@ impl SimulationService {
             let rt = self.lock();
             (rt.loaded.clone(), rt.timeline.topology().spec.id.clone())
         };
-        let world = base
-            .assets
-            .world(&in_use)
-            .ok_or_else(|| ServiceError::UnknownTopology(in_use.clone()))?;
-        let scenario = world
-            .scenarios
-            .iter()
-            .find(|scenario| scenario.info.id == scenario_id)
-            .ok_or_else(|| ServiceError::UnknownScenario(scenario_id.to_string()))?;
-        if !scenario.info.available {
-            return Err(ServiceError::ScenarioUnavailable(scenario_id.to_string()));
-        }
-
-        let files = &candidate.assets;
-        let other_id = match topology_id {
-            Some(id) => id,
-            None if files.world(&in_use).is_some() => &in_use,
-            None => &files.default_topology,
-        };
-        let other_world = files.world(other_id).ok_or_else(|| {
-            ServiceError::InvalidExperiment(format!("the files have no topology `{other_id}`"))
-        })?;
-        let other = other_world
-            .scenarios
-            .iter()
-            .find(|scenario| scenario.info.id == scenario_id)
-            .ok_or_else(|| {
-                ServiceError::InvalidExperiment(format!(
-                    "the files have no scenario `{scenario_id}`; a comparison needs the incident on both sides"
-                ))
-            })?;
-        if !other.info.available {
-            return Err(ServiceError::InvalidExperiment(format!(
-                "scenario `{scenario_id}` cannot run on `{other_id}` as the files describe it: {}",
-                other
-                    .info
-                    .unavailable_reason
-                    .as_deref()
-                    .unwrap_or("not available")
-            )));
-        }
-        // The same incident on both sides, or the comparison is of two
-        // things at once.
-        let written = |loaded: &Loaded| {
-            loaded
-                .sources
-                .scenarios
-                .iter()
-                .find(|def| def.id == scenario_id)
-                .cloned()
-        };
-        if written(&base) != written(candidate) {
-            return Err(ServiceError::InvalidExperiment(format!(
-                "scenario `{scenario_id}` is written differently in the files than in use; a comparison needs the same incident on both sides"
-            )));
-        }
-        platforms::compare(
-            &Side {
-                world,
-                decisions: &base.assets.decisions,
-                scenario,
-            },
-            &Side {
-                world: other_world,
-                decisions: &files.decisions,
-                scenario: other,
-            },
+        platforms::across(
+            &base,
+            &in_use,
+            candidate,
+            scenario_id,
+            topology_id,
             self.seed,
         )
-        .map_err(ServiceError::InvalidExperiment)
+        .map_err(|refusal| match refusal {
+            Refusal::UnknownTopology(id) => ServiceError::UnknownTopology(id),
+            Refusal::UnknownScenario(id) => ServiceError::UnknownScenario(id),
+            Refusal::Unavailable(id) => ServiceError::ScenarioUnavailable(id),
+            Refusal::Invalid(why) => ServiceError::InvalidExperiment(why),
+        })
     }
 
     // -- authorization ------------------------------------------------------

@@ -35,6 +35,8 @@ import {
   AuthorizationExplanationSchema,
   TrialSchema,
   PlatformComparisonSchema,
+  HeadroomSchema,
+  WeakPointsSchema,
 } from './index';
 
 const SAMPLES = join(dirname(fileURLToPath(import.meta.url)), '..', 'samples');
@@ -60,6 +62,9 @@ const CASES: Record<string, z.ZodType> = {
   experiment: ExperimentSchema,
   trial: TrialSchema,
   'platform-comparison': PlatformComparisonSchema,
+  headroom: HeadroomSchema,
+  'weak-points': WeakPointsSchema,
+  'topology-mitigated': TopologySchema,
   scenarios: ScenariosResponseSchema,
   'scenarios-unavailable': ScenariosResponseSchema,
   recordings: z.array(RecordingSummarySchema),

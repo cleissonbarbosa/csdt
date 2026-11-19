@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   API,
+  BOUTIQUE,
   captureFile,
   clockSeconds,
   collectErrors,
@@ -12,6 +13,7 @@ import {
   KINDS,
   namesOnModel,
   openApp,
+  openCapture,
   openExplorer,
   openOverview,
   overlappingNames,
@@ -1181,6 +1183,152 @@ test('a changed platform is put through the same incident before it is applied, 
     nodes: { id: string; capacityRps: number }[];
   };
   expect(applied.nodes.find((node) => node.id === 'use-gateway')?.capacityRps).toBe(7300);
+});
+
+test('the platform is asked how much demand it takes and what each service takes with it', async ({
+  page,
+}) => {
+  await openApp(page);
+  await fromMenu(page, 'limits');
+  const dialog = page.getByRole('dialog', { name: 'Where the platform gives' });
+
+  // How much traffic: the last multiple that held and the first that did not.
+  await dialog.getByTestId('headroom-ask').click();
+  const headroom = dialog.getByTestId('headroom-result');
+  await expect(headroom.getByTestId('headroom-answer')).toHaveText(
+    /^Every objective is met at ×[\d.]+ the ordinary demand\. At ×[\d.]+ one is missed: latency p95 at \d+ ms or over\.$/,
+  );
+  // Every multiple on show is a run, and the two in the sentence are among them.
+  const steps = headroom.getByTestId('headroom-table').locator('tbody tr');
+  expect(await steps.count()).toBeGreaterThanOrEqual(4);
+  await expect(headroom.locator('[data-gave="true"]').first()).toContainText('missed: latency p95');
+  await expect(headroom.locator('[data-gave="false"]').last()).toContainText('met throughout');
+  // A service leaves normal before any objective is missed, and it is said.
+  await expect(headroom.getByTestId('headroom-first')).toContainText(
+    'The first service to leave its normal state is Fulfilment Worker',
+  );
+
+  // What each service takes with it: every service, the worst first.
+  await dialog.getByTestId('weak-points-ask').click();
+  const points = dialog.getByTestId('weak-points-result');
+  const rows = points.getByTestId('weak-points-table').locator('tbody tr');
+  await expect(rows).toHaveCount(10);
+  const taken = async (row: number) =>
+    Number(await rows.nth(row).locator('td').first().innerText());
+  expect(await taken(0)).toBeGreaterThanOrEqual(await taken(1));
+  expect(await taken(0)).toBeGreaterThan(3);
+  await points.getByTestId('weak-points-all').click();
+  await expect(rows).toHaveCount(46);
+
+  // Asking placed nothing on the timeline.
+  await expect(page.getByTestId('timeline')).toHaveCount(0);
+  const { incidents } = (await (await page.request.get(`${API}/incidents`)).json()) as {
+    incidents: unknown[];
+  };
+  expect(incidents).toEqual([]);
+
+  // A row leads to the service on the model.
+  const worst = (await rows.first().getAttribute('data-testid'))!.replace('weak-point-', '');
+  await rows.first().getByRole('button').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('node-inspector')).toHaveAttribute('data-node-id', worst);
+});
+
+test('what a platform file says a service does about load is on its card and in its incident', async ({
+  page,
+}) => {
+  await openApp(page);
+  const bundle = (await (await page.request.get(`${API}/workspace/export`)).json()) as {
+    files: { path: string; text: string }[];
+  };
+  const topology = bundle.files
+    .filter((file) => file.path.startsWith('topologies/'))
+    .map((file) => JSON.parse(file.text) as { id: string; nodes: Record<string, unknown>[] })
+    .find((entry) => entry.id === 'helios-commerce')!;
+  const service = (id: string) => topology.nodes.find((node) => node.id === id)!;
+  // A filter that is always on at the edge; a gateway that admits so much and grows.
+  service('edge-router').suspiciousFilter = 0.94;
+  service('use-gateway').rateLimitRps = 2000;
+  service('use-gateway').autoscale = { maxFactor: 3, seconds: 20 };
+
+  await fromMenu(page, 'workspace');
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  await dialog.getByTestId('workspace-files').setInputFiles({
+    name: 'helios-commerce.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(topology)),
+  });
+  await expect(dialog.getByTestId('workspace-check')).toContainText('These files are valid');
+
+  // Before applying: the same surge on both. The filter spares callers.
+  const runs = dialog.getByTestId('platform-runs');
+  await runs.getByTestId('platform-runs-scenario').selectOption('ddos-surge');
+  await runs.getByTestId('platform-runs-run').click();
+  const result = runs.getByTestId('platform-runs-result');
+  await expect(result.getByTestId('platform-changed')).toContainText('suspiciousFilter not stated');
+  const peak = result.getByTestId('platform-row-peak-error').getByRole('cell');
+  const share = async (cell: number) => Number.parseFloat(await peak.nth(cell).innerText());
+  expect(await share(0)).toBeGreaterThan(20);
+  expect(await share(1)).toBeLessThan(1);
+
+  await dialog.getByTestId('workspace-apply').click();
+  await expect(dialog).toBeHidden();
+  const applied = (await (await page.request.get(`${API}/topology`)).json()) as {
+    nodes: { id: string; rateLimitRps?: number; suspiciousFilter?: number }[];
+  };
+  expect(applied.nodes.find((node) => node.id === 'use-gateway')?.rateLimitRps).toBe(2000);
+  expect(applied.nodes.find((node) => node.id === 'edge-router')?.suspiciousFilter).toBe(0.94);
+
+  // On the gateway's card, as the file wrote it.
+  await openExplorer(page);
+  await page.getByTestId('service-use-gateway').click();
+  const card = page.getByTestId('node-inspector');
+  await expect(card.getByTestId('node-rate-limit')).toHaveText(
+    'Admits 2.00k req/s at most; the rest is turned away',
+  );
+  await expect(card.getByTestId('node-autoscale')).toHaveText(
+    'Grows with its load, up to ×3 that capacity',
+  );
+  await expect(card.getByTestId('node-filter')).toHaveCount(0);
+});
+
+test('a capture is drafted into a platform file, staged with what was measured and what was not', async ({
+  page,
+}) => {
+  await openApp(page);
+  await openCapture(page, BOUTIQUE);
+  await fromMenu(page, 'draft');
+
+  // The capture is left; what it became is a file waiting in the import dialog.
+  await expect(page.getByTestId('capture-toggle')).toHaveCount(0);
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  const offer = dialog.getByTestId('workspace-offer');
+  await expect(offer).toContainText('Drafted in this page from the capture “Online Boutique');
+  await expect(offer).toContainText('Connection weights: 9 read from the capture');
+  await expect(offer).toContainText('by convention');
+  await expect(offer).toContainText('No capture states a capacity');
+  await expect(dialog.getByTestId('workspace-staged').getByRole('listitem')).toHaveCount(2);
+  // The server checks it as it checks any file, and nothing is applied yet.
+  const check = dialog.getByTestId('workspace-check');
+  await expect(check).toContainText('These files are valid');
+  await expect(check).toContainText('(draft) (12 services)');
+  await expect(check).toContainText('online-boutique-rcaeval-draft-load');
+  await expect(dialog.getByTestId('workspace-in-use').locator('[data-origin]')).toHaveAttribute(
+    'data-origin',
+    'bundled',
+  );
+
+  // Applied, it is a simulated platform like any other, and says so.
+  await dialog.getByTestId('workspace-apply').click();
+  await expect(dialog).toBeHidden();
+  const applied = (await (await page.request.get(`${API}/topology`)).json()) as {
+    id: string;
+    dataSource: string;
+    description: string;
+  };
+  expect(applied.id).toBe('online-boutique-rcaeval-draft');
+  expect(applied.dataSource).toBe('synthetic');
+  expect(applied.description).toContain('No capture states a capacity');
 });
 
 test('a denial is taken policy by policy, everyone is asked at once, and edited policies change the answers', async ({

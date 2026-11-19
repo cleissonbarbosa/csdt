@@ -8,9 +8,16 @@
  * Every figure is read from the reports; nothing is computed about the
  * platform here.
  */
-import type { Experiment, ExperimentRun, FaultEffect, MetricSample } from '@aegis/contracts';
+import type {
+  Experiment,
+  ExperimentRun,
+  FaultEffect,
+  MetricSample,
+  Topology,
+} from '@aegis/contracts';
 
 import { formatClock, formatMs, formatPercent } from './format';
+import { listNames, nodeLabel } from './names';
 
 import { t } from '@/i18n';
 
@@ -159,6 +166,83 @@ export function affectedOnlyIn(runs: Runs): { a: string[]; b: string[] } {
     a: a.filter((id) => !b.includes(id)),
     b: b.filter((id) => !a.includes(id)),
   };
+}
+
+/** The figures of two runs as lines of text, one a figure. */
+export function runsLines(runs: Runs): string[] {
+  return comparedRows(runs).map(({ label, a, b, delta }) =>
+    delta
+      ? t('{label}: A {a}; B {b}; B against A {delta}', { label, a, b, delta })
+      : t('{label}: A {a}; B {b}', { label, a, b }),
+  );
+}
+
+/** The services only one of two runs affected, as lines of text. */
+export function onlyLines(runs: Runs, name: (id: string, run: 'a' | 'b') => string): string[] {
+  const only = affectedOnlyIn(runs);
+  const lines: string[] = [];
+  if (only.a.length > 0) {
+    lines.push(
+      t('Affected only in A: {services}.', {
+        services: listNames(only.a.map((id) => name(id, 'a'))),
+      }),
+    );
+  }
+  if (only.b.length > 0) {
+    lines.push(
+      t('Affected only in B: {services}.', {
+        services: listNames(only.b.map((id) => name(id, 'b'))),
+      }),
+    );
+  }
+  return lines;
+}
+
+/** Where the figures of a text come from, since away from the page nothing else says. */
+export function provenanceLine(platform: string): string {
+  return t(
+    'Simulated on {platform}. Every figure comes from the AEGIS simulation engine; none is measured from a real system.',
+    { platform },
+  );
+}
+
+/**
+ * A comparison of an intervention as plain text, to paste into a review of
+ * the incident: what was changed, and the two runs figure by figure.
+ */
+export function experimentText(experiment: Experiment, topology: Topology | null): string {
+  const { intervention } = experiment;
+  const indent = (line: string) => `  ${line}`;
+  return [
+    t('{scenario}: the same incident twice, with one change', {
+      scenario: experiment.scenarioName,
+    }),
+    provenanceLine(topology?.name ?? experiment.topologyId),
+    '',
+    t('What changed'),
+    indent(
+      t(
+        'In run B, {change} on {services}, placed +{at} into the incident and eased in over {ramp}.',
+        {
+          change: intervention.description,
+          services: listNames(intervention.nodeIds.map((id) => nodeLabel(topology, id))),
+          at: formatClock(intervention.atMs),
+          ramp: formatMs(intervention.rampMs),
+        },
+      ),
+    ),
+    indent(
+      t('Nothing else differs: both runs are {scenario} on {topology} with seed {seed}.', {
+        scenario: experiment.scenarioName,
+        topology: experiment.topologyId,
+        seed: experiment.seed,
+      }),
+    ),
+    '',
+    t('The two runs (A as it is, B with the change)'),
+    ...runsLines(experiment).map(indent),
+    ...onlyLines(experiment, (id) => nodeLabel(topology, id)).map(indent),
+  ].join('\n');
 }
 
 /** When the intervention is placed, on the clock of the runs. */

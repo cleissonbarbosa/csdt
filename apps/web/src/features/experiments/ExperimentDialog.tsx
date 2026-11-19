@@ -25,6 +25,7 @@ import { tr } from '@/i18n/rich';
 import {
   affectedOnlyIn,
   comparedRows,
+  experimentText,
   INTERVENTIONS,
   interventionEffect,
   placedAtMs,
@@ -43,6 +44,7 @@ import { api, ApiError } from '@/providers/api';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
 
+import { CopyText } from './CopyText';
 import { RunsChart, RunStroke } from './RunsChart';
 
 /** How long the fault takes to ease in, as one placed from a service's card does. */
@@ -236,6 +238,7 @@ function Results({ experiment, onWatch }: { experiment: Experiment; onWatch: () 
           {t('Watch run A')}
         </Button>
         <span className="caption">{t('Watching a run replaces the timeline in use.')}</span>
+        <CopyText text={() => experimentText(experiment, topology)} testId="experiment-copy" />
       </section>
     </div>
   );

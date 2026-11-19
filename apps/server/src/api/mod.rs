@@ -85,6 +85,14 @@ fn route_table() -> Router<AppState> {
         )
         .route("/demo/experiments/trial", post(routes::experiment_trial))
         .route(
+            "/demo/experiments/headroom",
+            post(routes::experiment_headroom),
+        )
+        .route(
+            "/demo/experiments/weak-points",
+            post(routes::experiment_weak_points),
+        )
+        .route(
             "/demo/experiments/platforms",
             post(routes::experiment_platforms).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
         )

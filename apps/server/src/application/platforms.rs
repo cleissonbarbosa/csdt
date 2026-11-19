@@ -24,7 +24,7 @@ use crate::incidents::ResolvedScenario;
 use crate::simulation::{Command, DecisionTable, SimTopology, TICK_MS};
 
 use super::experiment::{frame, simulate, ExperimentRun};
-use super::World;
+use super::{Loaded, World};
 
 /// One field two descriptions of the same thing state differently, as each
 /// file wrote it. `null` is a field the file left out.
@@ -389,6 +389,307 @@ pub fn compare(
         baseline,
         variant,
     })
+}
+
+/// Why a comparison was not run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Refusal {
+    /// The base has no such topology.
+    UnknownTopology(String),
+    /// The base has no such scenario.
+    UnknownScenario(String),
+    /// The scenario cannot run on the base's topology.
+    Unavailable(String),
+    /// The two sides cannot be put to the same incident; the reason says why.
+    Invalid(String),
+}
+
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownTopology(id) => write!(f, "unknown topology `{id}`"),
+            Self::UnknownScenario(id) => write!(f, "unknown scenario `{id}`"),
+            Self::Unavailable(id) => {
+                write!(f, "scenario `{id}` cannot run on the base's topology")
+            }
+            Self::Invalid(why) => f.write_str(why),
+        }
+    }
+}
+
+/// Runs `scenario_id` on `in_use`, a topology of `base`, and on a topology
+/// of `candidate`: the one named, or the one with the same id, or the one
+/// the candidate opens on. The scenario has to be the same incident on both
+/// sides: in both, written the same, and able to run on each topology.
+pub fn across(
+    base: &Loaded,
+    in_use: &str,
+    candidate: &Loaded,
+    scenario_id: &str,
+    topology_id: Option<&str>,
+    seed: u64,
+) -> Result<PlatformComparison, Refusal> {
+    let world = base
+        .assets
+        .world(in_use)
+        .ok_or_else(|| Refusal::UnknownTopology(in_use.to_string()))?;
+    let scenario = world
+        .scenarios
+        .iter()
+        .find(|scenario| scenario.info.id == scenario_id)
+        .ok_or_else(|| Refusal::UnknownScenario(scenario_id.to_string()))?;
+    if !scenario.info.available {
+        return Err(Refusal::Unavailable(scenario_id.to_string()));
+    }
+
+    let files = &candidate.assets;
+    let other_id = match topology_id {
+        Some(id) => id,
+        None if files.world(in_use).is_some() => in_use,
+        None => &files.default_topology,
+    };
+    let other_world = files
+        .world(other_id)
+        .ok_or_else(|| Refusal::Invalid(format!("the files have no topology `{other_id}`")))?;
+    let other = other_world
+        .scenarios
+        .iter()
+        .find(|scenario| scenario.info.id == scenario_id)
+        .ok_or_else(|| {
+            Refusal::Invalid(format!(
+                "the files have no scenario `{scenario_id}`; a comparison needs the incident on both sides"
+            ))
+        })?;
+    if !other.info.available {
+        return Err(Refusal::Invalid(format!(
+            "scenario `{scenario_id}` cannot run on `{other_id}` as the files describe it: {}",
+            other
+                .info
+                .unavailable_reason
+                .as_deref()
+                .unwrap_or("not available")
+        )));
+    }
+    // The same incident on both sides, or the comparison is of two things
+    // at once.
+    let written = |loaded: &Loaded| {
+        loaded
+            .sources
+            .scenarios
+            .iter()
+            .find(|def| def.id == scenario_id)
+            .cloned()
+    };
+    if written(base) != written(candidate) {
+        return Err(Refusal::Invalid(format!(
+            "scenario `{scenario_id}` is written differently in the files than in use; a comparison needs the same incident on both sides"
+        )));
+    }
+    compare(
+        &Side {
+            world,
+            decisions: &base.assets.decisions,
+            scenario,
+        },
+        &Side {
+            world: other_world,
+            decisions: &files.decisions,
+            scenario: other,
+        },
+        seed,
+    )
+    .map_err(Refusal::Invalid)
+}
+
+fn seconds(ms: u64) -> String {
+    format!("{} s", ms as f64 / 1000.0)
+}
+
+fn percent(fraction: f64) -> String {
+    format!("{:.1} %", fraction * 100.0)
+}
+
+impl PlatformComparison {
+    /// The comparison as text, for a terminal: what differs, what follows
+    /// without being stated, and the two runs figure by figure.
+    pub fn render(&self, base: &str, candidate: &str) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let side = |summary: &TopologySummary| {
+            format!("{} ({} services)", summary.name, summary.node_count)
+        };
+        // Writing to a String cannot fail.
+        let _ = writeln!(out, "base       {base}  {}", side(&self.base));
+        let _ = writeln!(out, "candidate  {candidate}  {}", side(&self.candidate));
+        let _ = writeln!(
+            out,
+            "scenario   {} ({}), seed {}",
+            self.scenario_id, self.scenario_name, self.seed
+        );
+
+        let changes = &self.changes;
+        let value = |value: &Value| match value {
+            Value::Null => "not stated".to_string(),
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        };
+        let fields = |fields: &[FieldChange]| {
+            fields
+                .iter()
+                .map(|f| format!("{}: {} -> {}", f.field, value(&f.base), value(&f.candidate)))
+                .collect::<Vec<_>>()
+                .join("; ")
+        };
+        let mut lines: Vec<String> = Vec::new();
+        for (what, list) in [
+            ("service added", &changes.services_added),
+            ("service removed", &changes.services_removed),
+            ("region added", &changes.regions_added),
+            ("region removed", &changes.regions_removed),
+        ] {
+            for entry in list {
+                lines.push(format!("{what}  {}  {}", entry.id, entry.name));
+            }
+        }
+        for (what, list) in [
+            ("service changed", &changes.services_changed),
+            ("region changed", &changes.regions_changed),
+        ] {
+            for entry in list {
+                lines.push(format!("{what}  {}  {}", entry.id, fields(&entry.fields)));
+            }
+        }
+        for (what, list) in [
+            ("connection added", &changes.connections_added),
+            ("connection removed", &changes.connections_removed),
+        ] {
+            for entry in list {
+                lines.push(format!("{what}  {} -> {}", entry.source, entry.target));
+            }
+        }
+        for entry in &changes.connections_changed {
+            lines.push(format!(
+                "connection changed  {} -> {}  {}",
+                entry.source,
+                entry.target,
+                fields(&entry.fields)
+            ));
+        }
+        for entry in &changes.roles {
+            let names =
+                |target: &Option<String>| target.clone().unwrap_or_else(|| "nothing".into());
+            lines.push(format!(
+                "role  {}  {} -> {}",
+                entry.role,
+                names(&entry.base),
+                names(&entry.candidate)
+            ));
+        }
+        let _ = writeln!(out, "\nWhat differs");
+        if lines.is_empty() {
+            let _ = writeln!(out, "  the two files describe the same platform");
+        }
+        for line in lines {
+            let _ = writeln!(out, "  {line}");
+        }
+        if self.decisions_changed {
+            let _ = writeln!(out, "  Cedar answers the simulation differently");
+        }
+
+        if !changes.derived_capacity.is_empty() || !self.prescribed.is_empty() {
+            let _ = writeln!(out, "\nWhat follows without being stated");
+            for entry in &changes.derived_capacity {
+                let _ = writeln!(
+                    out,
+                    "  capacity sized from load  {}  {:.1} -> {:.1} req/s",
+                    entry.id, entry.base, entry.candidate
+                );
+            }
+            for change in &self.prescribed {
+                let _ = writeln!(out, "  the scenario prescribes, in {}", change.phase);
+                for (label, effects) in [("base", &change.base), ("candidate", &change.candidate)] {
+                    let said = if effects.is_empty() {
+                        "nothing".to_string()
+                    } else {
+                        effects
+                            .iter()
+                            .map(|effect| effect.description.as_str())
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    };
+                    let _ = writeln!(out, "    {label:<9}  {said}");
+                }
+            }
+        }
+
+        let (a, b) = (&self.baseline.report, &self.variant.report);
+        let mut rows: Vec<(String, String, String)> = Vec::new();
+        let peak = |peak: &Option<crate::domain::Peak>, text: fn(f64) -> String| {
+            peak.map_or_else(|| "n/a".to_string(), |peak| text(peak.value))
+        };
+        rows.push((
+            "highest error rate".into(),
+            peak(&a.peak_error_rate, percent),
+            peak(&b.peak_error_rate, percent),
+        ));
+        let mean = |mean: Option<f64>| mean.map_or_else(|| "n/a".to_string(), percent);
+        rows.push((
+            "mean error rate".into(),
+            mean(a.mean_error_rate),
+            mean(b.mean_error_rate),
+        ));
+        let latency = |ms: f64| format!("{ms:.0} ms");
+        rows.push((
+            "highest latency p95".into(),
+            peak(&a.peak_p95_latency_ms, latency),
+            peak(&b.peak_p95_latency_ms, latency),
+        ));
+        rows.push((
+            "services affected".into(),
+            a.impacted_node_ids.len().to_string(),
+            b.impacted_node_ids.len().to_string(),
+        ));
+        for objective in &a.objectives {
+            let Some(other) = b.objectives.iter().find(|o| o.kind == objective.kind) else {
+                continue;
+            };
+            let (name, figure): (&str, fn(f64) -> String) = match objective.kind {
+                crate::domain::ObjectiveKind::ErrorRate => ("error rate", percent),
+                crate::domain::ObjectiveKind::LatencyP95 => ("latency p95", latency),
+            };
+            let cell = |o: &crate::domain::ReportObjective| {
+                format!(
+                    "{} (objective {})",
+                    seconds(o.breached_ms),
+                    figure(o.threshold)
+                )
+            };
+            rows.push((
+                format!("{name} at its objective or over for"),
+                cell(objective),
+                cell(other),
+            ));
+        }
+        let back = |report: &IncidentReport| {
+            if report.impacted_node_ids.is_empty() {
+                "nothing was affected".to_string()
+            } else {
+                report.recovered_at_ms.map_or_else(
+                    || "not within the run".to_string(),
+                    |at| format!("+{}", seconds(at.saturating_sub(report.started_at_ms))),
+                )
+            }
+        };
+        rows.push(("all back to normal".into(), back(a), back(b)));
+        let wide = rows.iter().map(|row| row.0.len()).max().unwrap_or(0);
+        let middle = rows.iter().map(|row| row.1.len()).max().unwrap_or(0).max(4);
+        let _ = writeln!(out, "\nThe two runs");
+        let _ = writeln!(out, "  {:<wide$}  {:<middle$}  candidate", "", "base");
+        for (label, base, candidate) in rows {
+            let _ = writeln!(out, "  {label:<wide$}  {base:<middle$}  {candidate}");
+        }
+        out
+    }
 }
 
 #[cfg(test)]

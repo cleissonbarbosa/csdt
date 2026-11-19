@@ -142,6 +142,17 @@ export const InfrastructureNodeSchema = z.object({
   /** 0 for external clients, which have no capacity limit. */
   capacityRps: rate,
   baselineLatencyMs: rate,
+  /**
+   * What the topology file states the service does about load; each is
+   * absent when the file states none. `rateLimitRps`: the most it admits a
+   * second, the rest turned away at its door. `suspiciousFilter`: the share
+   * of traffic a scenario marks suspicious that it turns away on arrival.
+   * `autoscale`: capacity that follows the load, up to `maxFactor` times
+   * what it is at rest, closing the gap with a time constant of `seconds`.
+   */
+  rateLimitRps: z.number().positive().optional(),
+  suspiciousFilter: fraction.optional(),
+  autoscale: z.object({ maxFactor: z.number().min(1), seconds: z.number().positive() }).optional(),
   connectedServices: z.array(z.string()),
   metrics: NodeMetricsSchema,
 });
@@ -925,6 +936,81 @@ export const PlatformComparisonSchema = z.object({
   variant: ExperimentRunSchema,
 });
 export type PlatformComparison = z.infer<typeof PlatformComparisonSchema>;
+
+/** A platform objective and the figure it holds the platform under. */
+const ObjectiveSchema = z.object({
+  kind: z.enum(['error-rate', 'latency-p95']),
+  threshold: z.number().nonnegative(),
+});
+const FiguresSchema = z.object({ errorRate: fraction, p95LatencyMs: z.number().nonnegative() });
+/** A service that left its normal state, timed from what was done to the platform. */
+const LeftNormalSchema = z.object({
+  nodeId: z.string(),
+  atMs: count,
+  health: HealthSchema,
+  worst: HealthSchema,
+});
+
+/**
+ * How many times its ordinary demand the platform takes before one of its
+ * objectives is missed. Every multiple in `steps` is a run the engine made;
+ * `holdsAt` and `givesAt` are two of them, and nothing is said of the
+ * multiples between.
+ */
+export const HeadroomSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  topologyId: z.string(),
+  seed: count,
+  durationMs: count,
+  /** The external clients whose demand was multiplied. */
+  clientIds: z.array(z.string()),
+  objectives: z.array(ObjectiveSchema),
+  atRest: FiguresSchema,
+  /** Every multiple tried, lowest first. */
+  steps: z.array(
+    z.object({
+      factor: z.number().positive(),
+      peak: FiguresSchema,
+      /** The objectives missed at any sample once the demand was raised. */
+      missed: z.array(ObjectiveSchema.shape.kind),
+      /** The first service to leave its normal state, if any did. */
+      first: LeftNormalSchema.nullable(),
+      affected: count,
+    }),
+  ),
+  /** The highest multiple tried at which every objective was met. */
+  holdsAt: z.number().positive().nullable(),
+  /** The lowest multiple tried at which one was missed. */
+  givesAt: z.number().positive().nullable(),
+  /** What reproduces the run at `givesAt`. */
+  recording: RecordingSchema.nullable(),
+});
+export type Headroom = z.infer<typeof HeadroomSchema>;
+
+/**
+ * Every service of the platform taken out in turn, as a trial takes one
+ * out: the one that takes the most others with it first.
+ */
+export const WeakPointsSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  dataSource: DataSourceSchema,
+  topologyId: z.string(),
+  seed: count,
+  durationMs: count,
+  objectives: z.array(ObjectiveSchema),
+  atRest: FiguresSchema,
+  points: z.array(
+    z.object({
+      nodeId: z.string(),
+      /** The other services that left normal, in the order they did. */
+      affected: z.array(LeftNormalSchema),
+      peak: FiguresSchema,
+      missed: z.array(ObjectiveSchema.shape.kind),
+    }),
+  ),
+});
+export type WeakPoints = z.infer<typeof WeakPointsSchema>;
 
 export interface PlatformComparisonRequest {
   files: WorkspaceFile[];

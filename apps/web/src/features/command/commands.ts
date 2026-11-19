@@ -139,6 +139,13 @@ export function buildCommands(context: CommandContext): Command[] {
       run: () => act.openPanel('experiment'),
     },
     {
+      id: 'limits',
+      group: 'Actions',
+      title: t('Find where the platform gives'),
+      hint: t('headroom, single points of failure'),
+      run: () => act.openPanel('limits'),
+    },
+    {
       id: 'guide',
       group: 'Actions',
       title: t('Take a guided challenge'),

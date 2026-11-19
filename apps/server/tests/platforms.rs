@@ -468,3 +468,110 @@ async fn a_comparison_of_platforms_is_off_where_importing_is() {
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     assert_eq!(reply.body["error"]["code"], "import_disabled");
 }
+
+// -- from a terminal ----------------------------------------------------------
+
+fn command(args: &[&str]) -> (Option<i32>, String, String) {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_aegis-server"))
+        .args(args)
+        .output()
+        .unwrap();
+    (
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+#[tokio::test]
+async fn the_command_runs_the_same_comparison_the_route_does() {
+    // A filter that is always on at the edge, written into the bundled platform.
+    let filtered =
+        helios_with(|topology| node(topology, "edge-router")["suspiciousFilter"] = json!(0.94));
+    let dir = common::TempDir::new();
+    dir.write("topologies/helios.json", filtered["text"].as_str().unwrap());
+    let candidate = dir.path().to_str().unwrap();
+
+    let (status, report, _) = command(&["compare-incident", "@bundled", candidate, "ddos-surge"]);
+    assert_eq!(status, Some(0), "{report}");
+    assert!(report.contains("service changed  edge-router  suspiciousFilter: not stated -> 0.94"));
+    assert!(report.contains("The two runs"));
+    assert!(
+        !report.contains("What follows without being stated"),
+        "{report}"
+    );
+
+    // As JSON it is the answer the route gives for the same files and seed.
+    let (status, text, _) = command(&[
+        "compare-incident",
+        "@bundled",
+        candidate,
+        "ddos-surge",
+        "--json",
+    ]);
+    assert_eq!(status, Some(0));
+    let printed: Value = serde_json::from_str(&text).unwrap();
+    let state = state();
+    let served = compare(&state, json!([filtered]), "ddos-surge").await.body;
+    assert_eq!(printed, served);
+    // The filter spares callers: that is the run's figure, not a claim.
+    assert!(peak_error(&printed, "variant") < peak_error(&printed, "baseline") / 10.0);
+
+    // Another seed is another run of the same comparison.
+    let (_, other, _) = command(&[
+        "compare-incident",
+        "@bundled",
+        candidate,
+        "ddos-surge",
+        "--json",
+        "--seed=7",
+    ]);
+    let other: Value = serde_json::from_str(&other).unwrap();
+    assert_eq!(other["seed"], 7);
+    assert_eq!(other["changes"], printed["changes"]);
+
+    // What cannot be run says why and exits 2.
+    for (args, says) in [
+        (
+            vec!["compare-incident", "@bundled", candidate, "nope"],
+            "unknown scenario `nope`",
+        ),
+        (
+            vec![
+                "compare-incident",
+                "@bundled",
+                "/nonexistent/workspace",
+                "ddos-surge",
+            ],
+            "/nonexistent/workspace",
+        ),
+        (
+            vec!["compare-incident", "@bundled", candidate],
+            "expected <base> <candidate> <scenario>",
+        ),
+        (
+            vec![
+                "compare-incident",
+                "@bundled",
+                candidate,
+                "ddos-surge",
+                "--seed=x",
+            ],
+            "expected",
+        ),
+        (
+            vec![
+                "compare-incident",
+                "@bundled",
+                candidate,
+                "ddos-surge",
+                "--topology=elsewhere",
+            ],
+            "the files have no topology `elsewhere`",
+        ),
+    ] {
+        let (status, _, stderr) = command(&args);
+        assert_eq!(status, Some(2), "{args:?}");
+        assert!(stderr.contains(says), "{args:?}: {stderr}");
+    }
+}

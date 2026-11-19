@@ -192,6 +192,23 @@ of a gateway's capacity grows with the gateway. Then it lays the two runs
 side by side, and **Apply these files and watch run B** puts the second on
 the model.
 
+A platform file can also say what a service does about load, and the model
+follows it: a rate limit that turns the excess away at the door
+(`rateLimitRps`), a filter that is always on for traffic a scenario marks
+suspicious (`suspiciousFilter`), capacity that follows the load with a lag
+(`autoscale`). The bundled surge leaves seventeen services out of normal on
+the platform as it ships; with `"suspiciousFilter": 0.94` on its edge router
+it leaves one, and `aegis-server compare-incident` prints the two runs side
+by side in a terminal.
+
+**Where the platform gives.** Without any scenario, **Find where the
+platform gives** multiplies the demand of every client until an objective is
+missed (the bundled platform holds at ×2 and gives at ×2.04, where its p95
+passes the objective) and takes every service out in turn to rank them by
+how many others they take with them. Every figure is a run; nothing between
+two runs is estimated. A comparison can be copied as text for a review of
+the incident.
+
 A fault can be tried before it is placed. **Try one first** simulates the
 platform at rest twice, once with the fault, and lists the services that
 would leave normal and when, with the rest of the model set back; nothing is
@@ -321,7 +338,13 @@ by hand from its public report, ten minutes of the RCAEval Online Boutique
 benchmark, or a file of your own written from CloudWatch Application Signals
 or from Tempo and Prometheus by the scripts in `scripts/`. It is read in the
 tab, labelled as not simulated (_Captured_, or _From the provider's report_
-for a report), and never reaches the server or the simulation's timeline. A
+for a report), and never reaches the server or the simulation's timeline.
+**Draft a platform from this capture** is the way from what happened to
+what would have: it writes a platform file from the capture's services, the
+calls it saw and the traffic it measured, with a scenario that repeats the
+measured load, and stages it for you to check, edit and apply. The draft
+says which of its figures were measured and gives no capacity, because no
+capture states one. A
 service whose state the source does not give is drawn as unknown, upright
 on a dashed ring, never as normal; on measurements a colour is the
 simulation's own error levels applied to each sample, and the card says so.

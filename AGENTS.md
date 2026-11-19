@@ -40,6 +40,7 @@ The server also runs on an operator's own files (`docs/WORKSPACE.md`):
 cargo run -p aegis-server -- export-workspace <dir>   # the bundled files, to edit
 cargo run -p aegis-server -- check-workspace <dir>    # validate one; try examples/corner-shop
 cargo run -p aegis-server -- diff-workspace <base> <candidate>   # what Cedar decides differently; @bundled is the bundled set
+cargo run -p aegis-server -- compare-incident <base> <candidate> <scenario>   # one scenario on each side's platform, side by side
 AEGIS_WORKSPACE=<dir> cargo run -p aegis-server
 ```
 
@@ -85,7 +86,7 @@ pnpm e2e:static       # Playwright against the static build, no server
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight,platforms}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight,platforms,mitigations,limits}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -189,7 +190,9 @@ domain`.
   placed, and `trial` does the same to the platform at rest; `platforms`
   runs one scenario on the topology in use and on one a set of uploaded
   files describes, and lists what the two descriptions state differently;
-  `session` writes the timeline in use out as a recording. `Loaded` pairs a set of sources with the `Assets` built
+  `limits` asks the platform at rest how much demand it takes and what each
+  service takes with it; `session` writes the timeline in use out as a
+  recording. `Loaded` pairs a set of sources with the `Assets` built
   from it; `SimulationService` keeps the one it started with (what a reset
   returns to and an import is laid over) and the one in use.
   `SimulationService` owns the single mutable timeline behind one mutex, is
@@ -216,6 +219,18 @@ Things that are easy to break:
   `spec.rs` refuses the event kinds, and `recordings.rs` the command, that
   would put a decision or an event of the engine's own on the timeline. An
   incident capture never reaches the timeline at all.
+- **A draft from a capture is a file, and says what it is made of.**
+  `features/capture/draft.ts` (pure, in the page) writes a topology and,
+  where traffic was measured, a scenario of that load. Only what a capture
+  measured is given as measured; a rule that is a convention (an entry that
+  counted no requests is taken to be as busy as its busiest call) is called
+  one; capacity is never given, because no capture states one; and the
+  scenario prescribes demand and nothing else, so no outcome of the capture
+  is put on a timeline. Every rule is written into the topology's own
+  description and into the notes the import dialog shows
+  (`draftNotes.ts`). `engine/draft.spec.ts` hands the drafts of the bundled
+  captures to the real engine: keep it passing when the file formats
+  change.
 - **A report says what kind of statement each line is.**
   `simulation/report.rs` reads an incident back from events, metric samples,
   the topology and the resolved scenario; it steps nothing and estimates
@@ -231,11 +246,29 @@ Things that are easy to break:
   why it did not apply. A test holds the standings of every catalogued
   request to the decision Cedar gave; keep it passing when Cedar is
   upgraded.
-- **Asking is not recording.** `explain`, `matrix`, `trial` and the
-  comparison of platforms place nothing on the timeline: no command, no
-  event, no decision. They are bounded (`MATRIX_LIMIT`,
-  `MAX_DISABLED_POLICIES`, `TRIAL_MS`, an import's limits), and the matrix,
-  the trial and the comparison run through `off_the_workers`.
+- **Asking is not recording.** `explain`, `matrix`, `trial`, the comparison
+  of platforms, `headroom` and `weak-points` place nothing on the timeline:
+  no command, no event, no decision. They are bounded (`MATRIX_LIMIT`,
+  `MAX_DISABLED_POLICIES`, `TRIAL_MS`, an import's limits,
+  `HEADROOM_LADDER` and `HEADROOM_REFINEMENTS`, `WEAK_POINTS_MAX`), and all
+  but `explain` run through `off_the_workers`.
+- **A limit is two runs, never a figure between them.**
+  `application/limits.rs` reports the highest multiple of demand it ran at
+  which every objective was met and the lowest at which one was missed,
+  with every multiple it tried. Do not interpolate, and do not report a
+  figure that was not a run. A weak point is exactly a trial of `down` on
+  that service: a test holds each row to the trial route's answer.
+- **What a service does about load is stated by the file, and a platform
+  that states nothing runs bit for bit as before.** `rateLimitRps`,
+  `suspiciousFilter` and `autoscale` on a node (`domain/topology.rs`,
+  `simulation/model.rs`, `engine::inject_flows`) each take a branch of
+  their own; the path without them is the arithmetic it always was, and the
+  contract samples of the bundled platform must not change when that code
+  is touched. A filter's share is the file's statement, never worked out.
+  What scales and what a limit admitted change over time, so they live in
+  `SimState` (`scale`, `admit`): a test seeks and replays a platform with
+  all three. Injected flows are held to the share a limit admitted on the
+  previous tick, ordinary traffic to this tick's.
 - **A comparison of platforms lists differences; it explains nothing.**
   `application/platforms.rs` runs the same scenario definition on both sides
   (the service refuses one written differently in the files) and reports
@@ -277,8 +310,9 @@ Things that are easy to break:
   with every swap. The browser never decides what a workspace file is:
   classification is `workspace::from_files`, on the server. An incident
   capture is the one file the browser reads itself
-  (`features/capture/capture.ts`); it never reaches the server, a workspace
-  or the simulation's timeline.
+  (`features/capture/capture.ts`); it never reaches the server or the
+  simulation's timeline. A platform drafted from one, when the viewer asks
+  for it, is a workspace file like any other from then on.
 - **The library also builds for the browser.** `aegis-server` compiles for
   `wasm32-unknown-unknown` and `apps/wasm` serves `api::offline_router` from
   it. There, `std::time::Instant::now()`, threads, sockets and a Tokio

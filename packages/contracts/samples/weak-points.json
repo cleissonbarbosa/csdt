@@ -1,0 +1,1805 @@
+{
+  "schemaVersion": "1.0",
+  "dataSource": "synthetic",
+  "topologyId": "helios-commerce",
+  "seed": 42,
+  "durationMs": 64000,
+  "objectives": [
+    {
+      "kind": "error-rate",
+      "threshold": 0.05
+    },
+    {
+      "kind": "latency-p95",
+      "threshold": 417.0
+    }
+  ],
+  "atRest": {
+    "errorRate": 0.0,
+    "p95LatencyMs": 167.7
+  },
+  "points": [
+    {
+      "nodeId": "use-ledger-db",
+      "affected": [
+        {
+          "nodeId": "use-payments",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-ledger",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-payments",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 2800,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0503,
+        "p95LatencyMs": 411.3
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-sessions",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-auth",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-cart",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-payments",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-fraud",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-orders",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-orders",
+          "atMs": 1400,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.1995,
+        "p95LatencyMs": 1243.1
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-orders-db",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-cart",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-orders",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-inventory",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-order-worker",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-order-events",
+          "atMs": 4800,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0522,
+        "p95LatencyMs": 448.7
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-catalog-db",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-catalog",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-search",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-catalog",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.1273,
+        "p95LatencyMs": 865.7
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-sessions",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-auth",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-cart",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.1423,
+        "p95LatencyMs": 809.2
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "aps-sessions",
+      "affected": [
+        {
+          "nodeId": "aps-auth",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-edge-fn",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0677,
+        "p95LatencyMs": 483.5
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-customer-db",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-auth",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-customers",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0608,
+        "p95LatencyMs": 375.2
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-inventory",
+      "affected": [
+        {
+          "nodeId": "use-cart",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-orders",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0442,
+        "p95LatencyMs": 389.9
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-catalog-db",
+      "affected": [
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-catalog",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0627,
+        "p95LatencyMs": 413.1
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-cedar",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.282,
+        "p95LatencyMs": 1261.3
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-cedar",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.198,
+        "p95LatencyMs": 836.9
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-auth",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.188,
+        "p95LatencyMs": 781.5
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-catalog",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.1579,
+        "p95LatencyMs": 813.4
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-auth",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.132,
+        "p95LatencyMs": 562.3
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-catalog",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.1267,
+        "p95LatencyMs": 654.7
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "aps-cedar",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.12,
+        "p95LatencyMs": 524.8
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "aps-auth",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.08,
+        "p95LatencyMs": 387.6
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "aps-catalog",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.08,
+        "p95LatencyMs": 437.2
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "use-cart",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0752,
+        "p95LatencyMs": 430.6
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-cart",
+      "affected": [
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0581,
+        "p95LatencyMs": 365.2
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-orders",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0526,
+        "p95LatencyMs": 329.5
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-search",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-na",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0526,
+        "p95LatencyMs": 339.9
+      },
+      "missed": [
+        "error-rate"
+      ]
+    },
+    {
+      "nodeId": "use-gateway",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.47,
+        "p95LatencyMs": 2192.0
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-gateway",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.33,
+        "p95LatencyMs": 1463.3
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "aps-gateway",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "edge-router",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.2,
+        "p95LatencyMs": 792.2
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "edge-router",
+      "affected": [
+        {
+          "nodeId": "clients-na",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-eu",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "clients-apac",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "partner-api",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 1.0,
+        "p95LatencyMs": 4252.7
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ]
+    },
+    {
+      "nodeId": "euw-orders-db",
+      "affected": [
+        {
+          "nodeId": "euw-orders",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-order-worker",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-order-events",
+          "atMs": 5400,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0356,
+        "p95LatencyMs": 298.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-payments",
+      "affected": [
+        {
+          "nodeId": "use-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 1600,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0319,
+        "p95LatencyMs": 290.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-fraud",
+      "affected": [
+        {
+          "nodeId": "use-payments",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-orders",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0256,
+        "p95LatencyMs": 298.4
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "aps-orders-db",
+      "affected": [
+        {
+          "nodeId": "aps-orders",
+          "atMs": 600,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0202,
+        "p95LatencyMs": 239.3
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-payments",
+      "affected": [
+        {
+          "nodeId": "euw-orders",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 1200,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0174,
+        "p95LatencyMs": 229.3
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-assets",
+      "affected": [
+        {
+          "nodeId": "use-catalog",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        },
+        {
+          "nodeId": "use-gateway",
+          "atMs": 1000,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0118,
+        "p95LatencyMs": 295.8
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-assets",
+      "affected": [
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        },
+        {
+          "nodeId": "euw-catalog",
+          "atMs": 800,
+          "health": "critical",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0095,
+        "p95LatencyMs": 268.9
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-orders",
+      "affected": [
+        {
+          "nodeId": "euw-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0396,
+        "p95LatencyMs": 285.8
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "aps-edge-fn",
+      "affected": [
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 600,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.024,
+        "p95LatencyMs": 328.4
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-customers",
+      "affected": [
+        {
+          "nodeId": "use-gateway",
+          "atMs": 1400,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0226,
+        "p95LatencyMs": 238.5
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "aps-orders",
+      "affected": [
+        {
+          "nodeId": "aps-gateway",
+          "atMs": 800,
+          "health": "degraded",
+          "worst": "degraded"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0224,
+        "p95LatencyMs": 231.1
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-order-worker",
+      "affected": [
+        {
+          "nodeId": "euw-order-events",
+          "atMs": 3000,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-notify",
+      "affected": [
+        {
+          "nodeId": "use-notify-queue",
+          "atMs": 3000,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-order-worker",
+      "affected": [
+        {
+          "nodeId": "use-order-events",
+          "atMs": 3000,
+          "health": "degraded",
+          "worst": "critical"
+        }
+      ],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-ledger",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0075,
+        "p95LatencyMs": 190.5
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "euw-order-events",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "threat-monitor",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-audit",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-notify-queue",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    },
+    {
+      "nodeId": "use-order-events",
+      "affected": [],
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 167.7
+      },
+      "missed": []
+    }
+  ]
+}

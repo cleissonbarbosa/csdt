@@ -28,6 +28,7 @@ import { SourceBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { CopyText } from '@/features/experiments/CopyText';
 import { RunsChart, RunStroke } from '@/features/experiments/RunsChart';
 import { t } from '@/i18n';
 import { tr } from '@/i18n/rich';
@@ -36,6 +37,7 @@ import { formatClock, formatMs, formatPercent, formatRate } from '@/lib/format';
 import {
   namesInFiles,
   platformOfFiles,
+  platformsText,
   runnableOnBoth,
   sameOnBothSides,
   statedDifferently,
@@ -452,6 +454,7 @@ function Results({
         <span className="caption">
           {t('Either replaces the timeline in use, for everyone connected.')}
         </span>
+        <CopyText text={() => platformsText(comparison, topology)} testId="platform-copy" />
       </section>
     </div>
   );

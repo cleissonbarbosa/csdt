@@ -776,7 +776,7 @@ pub fn build(input: &ReportInput<'_>, incident_id: &str) -> Option<IncidentRepor
 /// How long each of the platform's objectives was not met over the samples
 /// of an incident. A sample is a second of the simulation; one at or over
 /// the threshold is a second the objective was not met.
-fn objectives_over(topo: &SimTopology, during: &[MetricSample]) -> Vec<ReportObjective> {
+pub fn objectives_over(topo: &SimTopology, during: &[MetricSample]) -> Vec<ReportObjective> {
     let second = METRIC_INTERVAL * TICK_MS;
     let over = |kind: ObjectiveKind, threshold: f64, figure: fn(&MetricSample) -> f64| {
         let mut breached = during.iter().filter(|sample| figure(sample) >= threshold);

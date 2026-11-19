@@ -1,0 +1,233 @@
+{
+  "schemaVersion": "1.0",
+  "dataSource": "synthetic",
+  "topologyId": "helios-commerce",
+  "seed": 42,
+  "durationMs": 66000,
+  "clientIds": [
+    "clients-na",
+    "clients-eu",
+    "clients-apac",
+    "partner-api"
+  ],
+  "objectives": [
+    {
+      "kind": "error-rate",
+      "threshold": 0.05
+    },
+    {
+      "kind": "latency-p95",
+      "threshold": 417.0
+    }
+  ],
+  "atRest": {
+    "errorRate": 0.0,
+    "p95LatencyMs": 167.7
+  },
+  "steps": [
+    {
+      "factor": 1.25,
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 175.8
+      },
+      "missed": [],
+      "first": null,
+      "affected": 0
+    },
+    {
+      "factor": 1.5,
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 189.8
+      },
+      "missed": [],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 2000,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 1
+    },
+    {
+      "factor": 2.0,
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 399.7
+      },
+      "missed": [],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1400,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 19
+    },
+    {
+      "factor": 2.04,
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 445.0
+      },
+      "missed": [
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1400,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 24
+    },
+    {
+      "factor": 2.07,
+      "peak": {
+        "errorRate": 0.0,
+        "p95LatencyMs": 459.9
+      },
+      "missed": [
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1400,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 25
+    },
+    {
+      "factor": 2.13,
+      "peak": {
+        "errorRate": 0.0092,
+        "p95LatencyMs": 488.8
+      },
+      "missed": [
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1400,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 27
+    },
+    {
+      "factor": 2.25,
+      "peak": {
+        "errorRate": 0.0436,
+        "p95LatencyMs": 583.6
+      },
+      "missed": [
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1400,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 32
+    },
+    {
+      "factor": 2.5,
+      "peak": {
+        "errorRate": 0.1284,
+        "p95LatencyMs": 636.3
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1200,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 32
+    },
+    {
+      "factor": 3.0,
+      "peak": {
+        "errorRate": 0.2547,
+        "p95LatencyMs": 710.9
+      },
+      "missed": [
+        "error-rate",
+        "latency-p95"
+      ],
+      "first": {
+        "nodeId": "use-order-worker",
+        "atMs": 1200,
+        "health": "degraded",
+        "worst": "degraded"
+      },
+      "affected": 32
+    }
+  ],
+  "holdsAt": 2.0,
+  "givesAt": 2.04,
+  "recording": {
+    "id": "headroom",
+    "name": "The platform under ×2.04 its ordinary demand",
+    "description": "Every external client of helios-commerce at ×2.04 its demand, with seed 42.",
+    "topologyId": "helios-commerce",
+    "seed": 42,
+    "durationMs": 66000,
+    "commands": [
+      {
+        "atMs": 4000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "demand",
+            "node": "node:clients-na",
+            "factor": 2.04
+          },
+          "rampMs": 2000
+        }
+      },
+      {
+        "atMs": 4000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "demand",
+            "node": "node:clients-eu",
+            "factor": 2.04
+          },
+          "rampMs": 2000
+        }
+      },
+      {
+        "atMs": 4000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "demand",
+            "node": "node:clients-apac",
+            "factor": 2.04
+          },
+          "rampMs": 2000
+        }
+      },
+      {
+        "atMs": 4000,
+        "command": {
+          "type": "injectFault",
+          "effect": {
+            "type": "demand",
+            "node": "node:partner-api",
+            "factor": 2.04
+          },
+          "rampMs": 2000
+        }
+      }
+    ]
+  }
+}

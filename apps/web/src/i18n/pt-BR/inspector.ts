@@ -152,4 +152,12 @@ export default {
   '{share} of traffic moved': '{share} do tráfego desviado',
   'Unknown service': 'Serviço desconhecido',
   'Unknown connection': 'Conexão desconhecida',
+
+  // What the platform's file states a service does about load.
+  'Grows with its load, up to ×{max} that capacity':
+    'Cresce com a carga, até ×{max} essa capacidade',
+  'Admits {n} req/s at most; the rest is turned away':
+    'Admite no máximo {n} req/s; o resto é recusado',
+  'Turns away {share} of suspicious traffic as it arrives':
+    'Recusa {share} do tráfego suspeito logo na chegada',
 } as const satisfies Record<string, string>;

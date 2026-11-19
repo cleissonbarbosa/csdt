@@ -193,4 +193,34 @@ export default {
   'The start or the end of the capture': 'O início ou o fim da captura',
   'Apart from what a connected local instance reports (labelled Live), an incident capture is the one exception: a real incident as its source gave it, read in this browser, labelled as not simulated and never mixed into the simulation.':
     'Além do que uma instância local conectada informa (marcado como Ao vivo), uma captura de incidente é a única exceção: um incidente real como a fonte o deu, lido neste navegador, marcado como não simulado e nunca misturado à simulação.',
+
+  // A draft of a platform written from a capture, as the import dialog says it.
+  'Drafted in this page from the capture “{title}”: {services} of its services and {connections} of the connections it saw. A starting point to edit; nothing is applied until you apply it.':
+    'Rascunhado nesta página a partir da captura “{title}”: {services} dos serviços dela e {connections} das conexões que ela viu. Um ponto de partida para editar; nada é aplicado até você aplicar.',
+  'Connection weights: {measured} read from the capture (calls seen over requests the caller handled, at rest), {assumed} left at 1.':
+    'Pesos das conexões: {measured} lidos da captura (chamadas vistas sobre as requisições que o chamador atendeu, em repouso), {assumed} deixados em 1.',
+  'Latency at rest: {measured} read from the capture (median p95 less that of what each service calls), {assumed} at a placeholder of {ms} ms.':
+    'Latência em repouso: {measured} lidas da captura (mediana do p95 menos a do que cada serviço chama), {assumed} em um valor provisório de {ms} ms.',
+  'Demand: {rate} req/s, the median the entry was seen to receive at rest, from one client added in front of it.':
+    'Demanda: {rate} req/s, a mediana do que a entrada recebeu em repouso, vinda de um cliente acrescentado à frente dela.',
+  'Demand: a default of {rate} req/s. The capture measured no requests at its entry.':
+    'Demanda: um valor padrão de {rate} req/s. A captura não mediu requisições na entrada.',
+  'Left out so that calls run one way, as a topology has to: {connections}.':
+    'Deixadas de fora para que as chamadas corram em um só sentido, como uma topologia exige: {connections}.',
+  'No capture states a capacity. Each service has the model’s default headroom over its load at rest: give capacityRps to the services whose limits you know before reading what breaks.':
+    'Nenhuma captura informa capacidade. Cada serviço tem a folga padrão do modelo sobre a carga em repouso: informe capacityRps nos serviços cujos limites você conhece antes de ler o que quebra.',
+  'A scenario repeats the load the capture measured, from ×{low} to ×{high} of its level at rest. It prescribes load and nothing else. One second of it is {n} seconds of the capture.':
+    'Um cenário repete a carga que a captura mediu, de ×{low} a ×{high} do nível em repouso. Ele prescreve carga e nada mais. Um segundo dele são {n} segundos da captura.',
+  'A scenario repeats the load the capture measured, from ×{low} to ×{high} of its level at rest. It prescribes load and nothing else.':
+    'Um cenário repete a carga que a captura mediu, de ×{low} a ×{high} do nível em repouso. Ele prescreve carga e nada mais.',
+  'No draft can be written: a service of this capture has an id longer than a platform file takes (64 characters).':
+    'Não é possível escrever um rascunho: um serviço desta captura tem um id mais longo do que um arquivo de plataforma aceita (64 caracteres).',
+  'No draft can be written: this capture holds no service, only clients.':
+    'Não é possível escrever um rascunho: esta captura não tem nenhum serviço, só clientes.',
+  'Demand: {rate} req/s, by convention. The capture did not count the requests its entry handled, so the entry is taken to be as busy as its busiest call. The calls it makes downstream come out as measured; its own load rests on that convention.':
+    'Demanda: {rate} req/s, por convenção. A captura não contou as requisições que a entrada atendeu, então a entrada é considerada tão ocupada quanto a chamada mais movimentada dela. As chamadas que ela faz adiante saem como medidas; a carga dela própria depende dessa convenção.',
+  '{n} service was seen in no call: it is in the platform, connected to nothing.':
+    '{n} serviço não foi visto em nenhuma chamada: está na plataforma, ligado a nada.',
+  '{n} services were seen in no call: they are in the platform, connected to nothing.':
+    '{n} serviços não foram vistos em nenhuma chamada: estão na plataforma, ligados a nada.',
 } as const satisfies Record<string, string>;

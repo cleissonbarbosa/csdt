@@ -105,4 +105,72 @@ export default {
     '{measure} por valor: {points}; como está, {baseline}',
   'A dot is a run; the line only joins them. The dashed line is the incident as it is.':
     'Um ponto é uma execução; a linha só os liga. A linha tracejada é o incidente como está.',
+
+  // Where the platform gives: how much demand it takes.
+  'Where the platform gives': 'Onde a plataforma cede',
+  'Asked of the platform at rest, on timelines of their own. Every figure is a run of the engine; the timeline in use is not touched.':
+    'Perguntado à plataforma em repouso, em linhas do tempo próprias. Cada número é uma execução do motor; a linha do tempo em uso não é tocada.',
+  'The platform could not be tried.': 'Não foi possível testar a plataforma.',
+  'How much traffic it takes': 'Quanto tráfego ela aguenta',
+  'The demand of every external client is multiplied by the same figure and held, at higher and higher figures until an objective is missed, then between the last that held and the first that did not.':
+    'A demanda de todos os clientes externos é multiplicada pelo mesmo valor e mantida, em valores cada vez maiores até um objetivo deixar de ser cumprido, e depois entre o último que se sustentou e o primeiro que não.',
+  'Find the limit': 'Encontrar o limite',
+  'Find it again': 'Encontrar de novo',
+  'Running…': 'Executando…',
+  'Every objective is met up to <n>{holds}</n> the ordinary demand, the most that was tried.':
+    'Todos os objetivos são cumpridos até <n>{holds}</n> a demanda normal, o máximo que foi testado.',
+  'An objective is missed with the demand as it is: there is no room above it.':
+    'Um objetivo já não é cumprido com a demanda como está: não há margem acima dela.',
+  'Every objective is met at <n>{holds}</n> the ordinary demand. At <n>{gives}</n> one is missed: {missed}.':
+    'Todos os objetivos são cumpridos em <n>{holds}</n> a demanda normal. Em <n>{gives}</n> um deixa de ser cumprido: {missed}.',
+  'The first service to leave its normal state is {service}, at <n>{factor}</n>: it became {health} <n>{at}</n> after the demand began to rise.':
+    'O primeiro serviço a sair do estado normal é {service}, em <n>{factor}</n>: ficou {health} <n>{at}</n> depois de a demanda começar a subir.',
+  Demand: 'Demanda',
+  'Services not normal': 'Serviços fora do normal',
+  Objectives: 'Objetivos',
+  'missed: {objectives}': 'não cumpridos: {objectives}',
+  'error rate': 'taxa de erro',
+  'latency p95': 'latência p95',
+  'error rate at {threshold} or over': 'taxa de erro de {threshold} ou mais',
+  'latency p95 at {threshold} or over': 'latência p95 de {threshold} ou mais',
+  'Each row is a run of <n>{duration}</n> from seed <n>{seed}</n>, with the demand of {clients} external client multiplied and held. Nothing is said of the multiples between two rows.':
+    'Cada linha é uma execução de <n>{duration}</n> a partir da semente <n>{seed}</n>, com a demanda de {clients} cliente externo multiplicada e mantida. Nada é dito sobre os múltiplos entre duas linhas.',
+  'Each row is a run of <n>{duration}</n> from seed <n>{seed}</n>, with the demand of {clients} external clients multiplied and held. Nothing is said of the multiples between two rows.':
+    'Cada linha é uma execução de <n>{duration}</n> a partir da semente <n>{seed}</n>, com a demanda de {clients} clientes externos multiplicada e mantida. Nada é dito sobre os múltiplos entre duas linhas.',
+  'Replaces the timeline in use with that run, to play back and scrub':
+    'Substitui a linha do tempo em uso por essa execução, para reproduzir e percorrer',
+  'Watch the run at {factor} on the timeline': 'Ver a execução em {factor} na linha do tempo',
+
+  // Where the platform gives: what each service takes with it.
+  'What each service takes with it': 'O que cada serviço leva consigo',
+  'Every service is made unreachable in turn, as trying that fault on its card does, and the others that leave their normal state are counted.':
+    'Cada serviço é tornado inalcançável, um de cada vez, como faz experimentar essa falha no cartão dele, e os outros que saem do estado normal são contados.',
+  'Try every service': 'Experimentar cada serviço',
+  'Try them again': 'Experimentar de novo',
+  'No service takes another out of its normal state when it is out.':
+    'Nenhum serviço tira outro do estado normal quando fica fora do ar.',
+  '<e>{n} service</e> was taken out in turn, the platform otherwise at rest. The one that takes the most others with it is first.':
+    '<e>{n} serviço</e> foi tirado do ar, com a plataforma em repouso no resto. O que leva mais serviços consigo vem primeiro.',
+  '<e>{n} services</e> were taken out in turn, the platform otherwise at rest. The one that takes the most others with it is first.':
+    '<e>{n} serviços</e> foram tirados do ar, um de cada vez, com a plataforma em repouso no resto. O que leva mais serviços consigo vem primeiro.',
+  'With this service out': 'Com este serviço fora do ar',
+  'Others not normal': 'Outros fora do normal',
+  'Show this service on the model': 'Mostrar este serviço no modelo',
+  'first {service}, <n>{at}</n> later': 'primeiro {service}, <n>{at}</n> depois',
+  'Show the first {n} only': 'Mostrar só os {n} primeiros',
+  'Each row is what trying that one fault gives: a run of <n>{duration}</n> from seed <n>{seed}</n> with the service unreachable. A service is counted because the engine recorded it leaving its normal state.':
+    'Cada linha é o que experimentar essa única falha dá: uma execução de <n>{duration}</n> a partir da semente <n>{seed}</n> com o serviço inalcançável. Um serviço é contado porque o motor registrou a saída dele do estado normal.',
+
+  // A comparison as text, to take away.
+  'Copy this comparison as plain text': 'Copiar esta comparação como texto simples',
+  '{label}: A {a}; B {b}; B against A {delta}': '{label}: A {a}; B {b}; B em relação a A {delta}',
+  '{label}: A {a}; B {b}': '{label}: A {a}; B {b}',
+  '{scenario}: the same incident twice, with one change':
+    '{scenario}: o mesmo incidente duas vezes, com uma mudança',
+  'In run B, {change} on {services}, placed +{at} into the incident and eased in over {ramp}.':
+    'Na execução B, {change} em {services}, aplicada em +{at} do incidente e introduzida aos poucos ao longo de {ramp}.',
+  'Nothing else differs: both runs are {scenario} on {topology} with seed {seed}.':
+    'Nada mais difere: as duas execuções são {scenario} sobre {topology} com a semente {seed}.',
+  'The two runs (A as it is, B with the change)':
+    'As duas execuções (A como está, B com a mudança)',
 } as const satisfies Record<string, string>;

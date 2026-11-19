@@ -45,6 +45,17 @@ must be `https` and is a link the viewer follows, not a request the page
 makes. A capture can name a real system (service names, and in a CloudWatch
 capture an ARN with an account ID), so it is shared as the operator decides.
 
+**A draft is the one thing that leaves a capture, and only when asked.**
+**Draft a platform from this capture** writes a topology in the page from
+the capture's service names, the calls between them and the rates it
+measured, leaves the capture and stages the file in the import dialog.
+Staging sends it to the server to be checked, as it does any file, and
+applying it shows it to everyone connected, as any import does. Nothing
+else of the capture goes with it: no sample series, no event, no note, no
+source link, no ARN. On a server other people reach, draft a capture of a
+real system only if its service names may be seen there; the static site
+keeps the draft in the tab.
+
 AEGIS collects no telemetry about its users and stores nothing outside the
 browser's `localStorage` (display preferences).
 
@@ -150,6 +161,12 @@ takes an outcome, and what each can make the server do is bounded.
   of a workspace) and simulates one scenario on what is in use and on what
   they describe. Nothing is applied, and the route is off where importing
   is (`AEGIS_IMPORT=off`).
+- **Nor do the questions about its limits.**
+  `POST /demo/experiments/headroom` makes at most fifteen runs of 66
+  virtual seconds (the platform at rest, nine multiples and five halvings)
+  and `POST /demo/experiments/weak-points` one run of 64 virtual seconds
+  per service, on a platform of at most 250 services. Neither takes a
+  figure from the caller.
 - **A trial touches nothing either.** `POST /demo/experiments/trial`
   simulates the platform at rest twice, sixty seconds each, once with one
   fault, and answers with what the engine recorded. The fault is held to
