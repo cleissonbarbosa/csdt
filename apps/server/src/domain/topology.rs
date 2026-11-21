@@ -35,6 +35,16 @@ pub enum ServiceType {
     NetworkGateway,
     SecurityMonitor,
     ExternalClient,
+    // Spreads what it is sent over the services behind it.
+    LoadBalancer,
+    // A virtual machine, or a group of them that scales as one.
+    VirtualMachine,
+    // A Kubernetes cluster, drawn as one piece for the containers it runs.
+    KubernetesCluster,
+    // An in-memory store of what is asked for often.
+    Cache,
+    // A topic or a stream: events written in order, read by whoever subscribes.
+    EventStream,
 }
 
 impl ServiceType {
@@ -53,6 +63,11 @@ impl ServiceType {
             Self::NetworkGateway => 3.6,
             Self::SecurityMonitor => 6.0,
             Self::ExternalClient => f64::INFINITY,
+            Self::LoadBalancer => 3.0,
+            Self::VirtualMachine => 2.2,
+            Self::KubernetesCluster => 2.4,
+            Self::Cache => 3.0,
+            Self::EventStream => 4.0,
         }
     }
 
@@ -60,8 +75,15 @@ impl ServiceType {
         matches!(self, Self::ExternalClient)
     }
 
+    /// What buffers what it is sent: a queue, and a topic or stream, which
+    /// keeps events until they are read.
     pub fn is_queue(self) -> bool {
-        matches!(self, Self::MessageQueue)
+        matches!(self, Self::MessageQueue | Self::EventStream)
+    }
+
+    /// What a region's traffic enters by: an API gateway or a load balancer.
+    pub fn is_gateway(self) -> bool {
+        matches!(self, Self::ApiGateway | Self::LoadBalancer)
     }
 }
 

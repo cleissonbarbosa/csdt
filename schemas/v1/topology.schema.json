@@ -247,7 +247,12 @@
         "storage",
         "network-gateway",
         "security-monitor",
-        "external-client"
+        "external-client",
+        "load-balancer",
+        "virtual-machine",
+        "kubernetes-cluster",
+        "cache",
+        "event-stream"
       ]
     },
     "Environment": {

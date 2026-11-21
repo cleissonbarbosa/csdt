@@ -204,6 +204,23 @@ export const SERVICE_TYPE: Record<ServiceType, ServiceTypeInfo> = {
     short: t('Client'),
     plural: t('external clients'),
   },
+  'load-balancer': {
+    label: t('Load balancer'),
+    short: t('Balancer'),
+    plural: t('load balancers'),
+  },
+  'virtual-machine': {
+    label: t('Virtual machine'),
+    short: t('VM'),
+    plural: t('virtual machines'),
+  },
+  'kubernetes-cluster': {
+    label: t('Kubernetes cluster'),
+    short: t('Cluster'),
+    plural: t('Kubernetes clusters'),
+  },
+  cache: { label: t('Cache'), short: t('Cache'), plural: t('caches') },
+  'event-stream': { label: t('Event stream'), short: t('Stream'), plural: t('event streams') },
 };
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {

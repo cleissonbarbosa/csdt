@@ -724,6 +724,186 @@ def external_client():
     return p
 
 
+def load_balancer():
+    """A distributor: work comes down its column and goes out each way in turn."""
+    p = Piece("load-balancer")
+    p.lathe([(0, 0), (0.8, 0), (0.8, 0.09), (0.74, 0.14), (0, 0.14)], BODY)
+    # The ways out, three spouts round the foot.
+    outlets = (270, 30, 150)
+    for angle in outlets:
+        p.prism(
+            rect(0.5, 0.24, 0.66, 0),
+            0.14,
+            0.4,
+            DETAIL,
+            bevel=0.03,
+            matrix=Matrix.Rotation(math.radians(angle), 4, "Z"),
+        )
+    # The one way in: a column with a hopper on top.
+    p.lathe(
+        [(0, 0.14), (0.2, 0.14), (0.2, 1.08), (0.36, 1.3), (0.36, 1.38), (0.28, 1.38), (0.14, 1.16), (0, 1.16)],
+        BODY,
+    )
+    # A collar on the column carries an arm, which turns to the next spout
+    # for each request: a third of a turn at a time. Down, the collar has
+    # slipped on the column and the arm sticks up crooked.
+    arm = p.mechanism(
+        INDEX,
+        pivot=(0, 0, 0.42),
+        period=2,
+        amount=len(outlets),
+        extra=0.35,
+        slump=((1, 0.6, 0), -22),
+    )
+    p.lathe([(0.19, 0.42), (0.3, 0.42), (0.3, 0.62), (0.19, 0.62)], DETAIL, closed=True, moves=arm)
+    p.prism(
+        rect(0.44, 0.16, 0.5, 0),
+        0.44,
+        0.6,
+        MARK,
+        bevel=0.02,
+        matrix=Matrix.Rotation(math.radians(outlets[0]), 4, "Z"),
+        moves=arm,
+    )
+    return p
+
+
+def virtual_machine():
+    """A server in its case: bays down the front and a fan at work."""
+    p = Piece("virtual-machine")
+    width, depth, foot, height = 1.12, 0.86, 0.06, 1.24
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p.box((sx * (width / 2 - 0.1), sy * (depth / 2 - 0.1), foot / 2), (0.14, 0.14, foot), DETAIL, bevel=0.012)
+    p.box((0, 0, foot + height / 2), (width, depth, height), BODY, bevel=0.04)
+    front = -depth / 2
+    # Three bays, each a slot with its handle.
+    for k in range(3):
+        z = foot + height - 0.2 - k * 0.17
+        p.box((0, front - 0.012, z), (width - 0.24, 0.03, 0.12), DETAIL, bevel=0.01)
+        p.box((width / 2 - 0.24, front - 0.03, z), (0.12, 0.03, 0.035), MARK, bevel=0)
+    # The fan, behind a ring at the foot of the front: it turns while the
+    # machine works. Down, the rotor has come loose and hangs crooked.
+    ring = Matrix.Translation((0.0, front - 0.035, foot + 0.32)) @ UPRIGHT
+    p.lathe([(0.27, -0.035), (0.34, -0.035), (0.34, 0.035), (0.27, 0.035)], DETAIL, closed=True, matrix=ring)
+    centre = (0.0, front - 0.07, foot + 0.32)
+    face = Matrix.Translation(centre) @ UPRIGHT
+    fan = p.mechanism(SPIN, pivot=centre, axis=(0, -1, 0), period=4, slump=((1, 0, 0.2), 14))
+    p.lathe([(0, -0.03), (0.06, -0.03), (0.06, 0.03), (0, 0.03)], MARK, segments=16, matrix=face, moves=fan)
+    for k in range(6):
+        p.box(
+            (0.16, 0, 0),
+            (0.2, 0.016, 0.08),
+            MARK,
+            bevel=0,
+            matrix=Matrix.Translation(centre)
+            @ Matrix.Rotation(TAU * k / 6, 4, "Y")
+            @ Matrix.Rotation(math.radians(28), 4, "X"),
+            moves=fan,
+        )
+    return p
+
+
+def kubernetes_cluster():
+    """A ship's wheel: what steers the containers, turning a spoke at a time."""
+    p = Piece("kubernetes-cluster")
+    p.plinth(0.6)
+    centre = (0.0, -0.2, 1.18)
+    # The pedestal behind the wheel, and the bearing its axle turns in.
+    p.lathe([(0, 0.12), (0.16, 0.12), (0.12, 0.3), (0.11, 1.0), (0, 1.0)], BODY, segments=24)
+    p.box((0, -0.02, 1.08), (0.26, 0.2, 0.24), BODY, bevel=0.04)
+    face = Matrix.Translation(centre) @ UPRIGHT
+    spokes = 8
+    # The wheel turns one spoke for each change it makes to what runs.
+    # Down, it has come off true and leans on its axle.
+    wheel = p.mechanism(
+        INDEX,
+        pivot=centre,
+        axis=(0, -1, 0),
+        period=2.5,
+        amount=spokes,
+        extra=0.3,
+        slump=((1, 0, 0), -18),
+    )
+    p.lathe([(0.48, -0.045), (0.58, -0.045), (0.58, 0.045), (0.48, 0.045)], BODY, closed=True, matrix=face, moves=wheel)
+    p.lathe([(0, -0.09), (0.13, -0.09), (0.13, 0.09), (0, 0.09)], DETAIL, segments=24, matrix=face, moves=wheel)
+    for k in range(spokes):
+        turn = Matrix.Translation(centre) @ Matrix.Rotation(TAU * k / spokes, 4, "Y")
+        p.box((0.34, 0, 0), (0.44, 0.05, 0.055), DETAIL, bevel=0.012, matrix=turn, moves=wheel)
+        p.box((0.69, 0, 0), (0.16, 0.075, 0.075), MARK, bevel=0.022, matrix=turn, moves=wheel)
+    return p
+
+
+def cache():
+    """A rotary card file: what is asked for often is kept close to hand."""
+    p = Piece("cache")
+    p.box((0, 0, 0.06), (1.16, 0.7, 0.12), BODY)
+    axle, wheel = 0.78, 0.5
+    for side in (-1, 1):
+        p.box((side * 0.47, 0, 0.2), (0.12, 0.3, 0.18), BODY, bevel=0.03)
+        end = Matrix.Translation((side * 0.47, 0, axle)) @ Matrix.Rotation(math.radians(90), 4, "Y")
+        p.lathe([(0, -0.04), (wheel, -0.04), (wheel, 0.04), (0, 0.04)], BODY, segments=40, matrix=end)
+    along = Matrix.Translation((0, 0, axle)) @ Matrix.Rotation(math.radians(90), 4, "Y")
+    cards = 18
+    # The drum turns a card for each lookup. One card is marked, so that
+    # its turning shows. Down, the drum has slipped askew on its axle.
+    drum = p.mechanism(
+        INDEX,
+        pivot=(0, 0, axle),
+        axis=(1, 0, 0),
+        period=2,
+        amount=cards,
+        extra=0.3,
+        slump=((0, 1, 0), 8),
+    )
+    p.lathe([(0, -0.38), (0.1, -0.38), (0.1, 0.38), (0, 0.38)], DETAIL, segments=16, matrix=along, moves=drum)
+    for k in range(cards):
+        turn = Matrix.Translation((0, 0, axle)) @ Matrix.Rotation(TAU * k / cards, 4, "X")
+        part = MARK if k == 4 else DETAIL
+        p.box((0, 0, 0.29), (0.72, 0.02, 0.34), part, bevel=0.006, matrix=turn, moves=drum)
+    return p
+
+
+def event_stream():
+    """Two reels: events are written to the tape in order and kept to be read again."""
+    p = Piece("event-stream")
+    p.box((0, 0, 0.07), (1.92, 0.7, 0.14), BODY)
+    # The panel the reels are mounted on.
+    p.box((0, 0.3, 0.52), (1.92, 0.08, 0.76), BODY, bevel=0.03)
+    # The head the tape runs past, between the reels.
+    p.box((0, -0.06, 0.25), (0.26, 0.2, 0.22), DETAIL, bevel=0.03)
+    p.box((0, -0.17, 0.25), (0.14, 0.02, 0.1), MARK, bevel=0)
+    reels = ((-0.5, 0.36, 4, 14), (0.5, 0.22, 3, -10))
+    for x, wound, period, lean in reels:
+        centre = (x, 0.0, 0.66)
+        face = Matrix.Translation(centre) @ UPRIGHT
+        # The spindle each reel turns on, out of the panel.
+        spindle = Matrix.Translation((x, 0.13, 0.66)) @ UPRIGHT
+        p.lathe([(0, -0.13), (0.045, -0.13), (0.045, 0.13), (0, 0.13)], DETAIL, segments=12, matrix=spindle)
+        # Both reels turn as the tape runs from one to the other: the full
+        # one gives it, the other takes it up. Down, each hangs off its spindle.
+        reel = p.mechanism(SPIN, pivot=centre, axis=(0, -1, 0), period=period, slump=((0, 0, 1), lean))
+        for flange in (-0.1, 0.1):
+            p.lathe(
+                [(0, flange - 0.018), (0.42, flange - 0.018), (0.42, flange + 0.018), (0, flange + 0.018)],
+                BODY,
+                matrix=face,
+                moves=reel,
+            )
+        p.lathe([(0, -0.085), (wound, -0.085), (wound, 0.085), (0, 0.085)], DETAIL, matrix=face, moves=reel)
+        # Three windows in the front flange, so that its turning shows.
+        for turn in (0, 120, 240):
+            p.box(
+                (0.29, -0.122, 0),
+                (0.1, 0.012, 0.1),
+                MARK,
+                bevel=0,
+                matrix=Matrix.Translation(centre) @ Matrix.Rotation(math.radians(turn), 4, "Y"),
+                moves=reel,
+            )
+    return p
+
+
 BUILDERS = (
     api_gateway,
     auth_service,
@@ -737,6 +917,11 @@ BUILDERS = (
     network_gateway,
     security_monitor,
     external_client,
+    load_balancer,
+    virtual_machine,
+    kubernetes_cluster,
+    cache,
+    event_stream,
 )
 
 

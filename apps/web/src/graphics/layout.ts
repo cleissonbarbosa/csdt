@@ -146,6 +146,7 @@ export const ARRIVAL: Partial<Record<ServiceType, readonly [number, number]>> = 
   'auth-service': [0, 1],
   container: [-1, 0],
   'message-queue': [-1, 0],
+  'event-stream': [-1, 0],
 };
 
 /** Clear space between two neighbours in a line, and two lines of one tier. */
@@ -199,6 +200,12 @@ const TYPE_ORDER: Record<ServiceType, number> = {
   'message-queue': 9,
   database: 10,
   storage: 11,
+  // Beside the kind each is nearest, without moving any of the first twelve.
+  'load-balancer': 3.5,
+  'virtual-machine': 5.5,
+  'kubernetes-cluster': 7.5,
+  'event-stream': 9.5,
+  cache: 10.5,
 };
 
 const TYPE_SCALE: Record<ServiceType, number> = {
@@ -214,6 +221,11 @@ const TYPE_SCALE: Record<ServiceType, number> = {
   serverless: 1.14,
   'message-queue': 1.2,
   storage: 1.14,
+  'load-balancer': 1.5,
+  'virtual-machine': 1.14,
+  'kubernetes-cluster': 1.32,
+  cache: 1.2,
+  'event-stream': 1.2,
 };
 
 interface Indexed {

@@ -116,6 +116,7 @@ only saves. The API behind it:
   workspace.json           optional format version; omitted means version 1
   topologies/*.json         the platforms on offer
   topologies/*.yml          … or a Compose file, read as one (see below)
+                            (a .json that is a cloud inventory is read as one too)
   scenarios/*.json          incident scenarios
   recordings/*.json         prerecorded incidents
   cedar/policies.json       policies as a JSON list …
@@ -233,7 +234,7 @@ The same format as
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `dataSource`                      | Must be `synthetic`. The figures come from the simulation, whatever the platform.                                                                                            |
 | `regions[].kind`                  | `cloud`, or `edge` for a global edge drawn as the hub the regions stand around. A topology needs no edge region.                                                             |
-| `nodes[].type`                    | One of the twelve kinds below. It decides the piece that is drawn and how the model treats the node.                                                                         |
+| `nodes[].type`                    | One of the seventeen kinds below. It decides the piece that is drawn and how the model treats the node.                                                                      |
 | `nodes[].tier`                    | How far along a request's path the service is, from 0. Used by the layout only.                                                                                              |
 | `nodes[].baseLatencyMs`           | The service's own latency when idle.                                                                                                                                         |
 | `nodes[].baseRps`                 | For an `external-client`: the demand it generates. Everything else's load follows from the connections.                                                                      |
@@ -247,11 +248,19 @@ The same format as
 | `edges[].latencyMs`               | Optional network latency of the hop. Defaults to 1.2 ms inside a region and 60 ms across regions.                                                                            |
 | `edges[].protocol`                | `https`, `grpc`, `amqp`, `sql`, `redis`, `s3`, `tcp` or `otlp`. Shown, not simulated.                                                                                        |
 
-Service kinds: `external-client`, `network-gateway`, `api-gateway`,
-`auth-service`, `cedar-authorizer`, `security-monitor`, `microservice`,
-`container`, `serverless`, `message-queue`, `database`, `storage`. There are
-twelve because each has a modelled piece; a service of another kind has to be
-filed under the nearest one.
+Service kinds: `external-client`, `network-gateway`, `load-balancer`,
+`api-gateway`, `auth-service`, `cedar-authorizer`, `security-monitor`,
+`virtual-machine`, `microservice`, `container`, `kubernetes-cluster`,
+`serverless`, `message-queue`, `event-stream`, `database`, `cache`, `storage`.
+There are seventeen because each has a modelled piece; a service of another
+kind has to be filed under the nearest one.
+
+Five of them describe what a cloud account holds and the bundled platform
+does not use: a `load-balancer` routes like a gateway and is one a region's
+traffic enters by (an outage fails over to the next region with a gateway or
+a balancer); a `virtual-machine` and a `kubernetes-cluster` are compute; a
+`cache` is read and written like a database; an `event-stream`, a topic or a
+stream, buffers what it is sent as a queue does.
 
 Constraints, each reported with the id involved:
 
@@ -333,25 +342,46 @@ on a service it does not declare, is refused with the reason; so is one
 whose YAML nests more than 64 deep or whose aliases would write out to more
 than 100 000 values.
 
+### From a cloud inventory
+
+A cloud inventory is a file a script of yours writes from what AWS, Google
+Cloud or Oracle Cloud lists of an account: its resources and the connections
+the provider states between them. Put one in `topologies/` (or drop it on the
+import dialog) and it is read as a topology, as a Compose file is: the shape
+is the account's, and the traffic, the latencies and the capacities, which no
+inventory states, are defaults that say so. The file may carry a `selection`
+that brings part of it (a region, a network, a tag, a kind, what is
+connected), and the import dialog writes one as you choose.
+
+```bash
+python3 scripts/export-cloud-inventory.py aws --region sa-east-1 --output inventory.json
+cargo run -p aegis-server -- check-workspace examples/cloud-inventory
+```
+
+Nothing in AEGIS reaches a cloud: the script is run by you, with your own
+access, and only reads. [INVENTORY.md](INVENTORY.md) has the format, what a
+selection does, what each collector reads and the least access it needs, and
+what an inventory cannot say.
+
 ### Roles
 
 A role is a name for a place in a topology. The bundled scenarios and the
 request tracer use roles, not ids, which is what lets them run on any topology
 that declares them.
 
-| Role                             | Points at                        | Used by                                                                                                    |
-| -------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `primaryGateway`                 | an API gateway                   | request tracer, DDoS surge, credential stuffing, Cedar denial                                              |
-| `primaryAuth`                    | an authentication service        | request tracer, credential stuffing, Cedar denial                                                          |
-| `primaryAuthorizer`              | a Cedar authorizer               | request tracer, credential stuffing, Cedar denial                                                          |
-| `partnerClient`                  | an external client               | request tracer (where the request starts; without it, the first client), Cedar denial                      |
-| `resource:<EntityType>`          | a service or store               | request tracer: a request for `Order::"…"` ends at `resource:Order`; Cedar denial uses `resource:Customer` |
-| `protectedResource`              | a service or store               | request tracer (when no `resource:` role matches), Cedar denial                                            |
-| `edgeRouter`                     | the router of the global edge    | DDoS surge, credential stuffing, Cedar denial, regional outage                                             |
-| `attackSource`                   | an external client               | DDoS surge, credential stuffing                                                                            |
-| `primaryDatabase`                | a database                       | cascading failure                                                                                          |
-| `securityMonitor`                | a threat monitor                 | the node named on alerts the engine raises; events of all five bundled scenarios                           |
-| `outageRegion`, `failoverRegion` | regions with an API gateway each | regional outage                                                                                            |
+| Role                             | Points at                                           | Used by                                                                                                    |
+| -------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `primaryGateway`                 | an API gateway                                      | request tracer, DDoS surge, credential stuffing, Cedar denial                                              |
+| `primaryAuth`                    | an authentication service                           | request tracer, credential stuffing, Cedar denial                                                          |
+| `primaryAuthorizer`              | a Cedar authorizer                                  | request tracer, credential stuffing, Cedar denial                                                          |
+| `partnerClient`                  | an external client                                  | request tracer (where the request starts; without it, the first client), Cedar denial                      |
+| `resource:<EntityType>`          | a service or store                                  | request tracer: a request for `Order::"…"` ends at `resource:Order`; Cedar denial uses `resource:Customer` |
+| `protectedResource`              | a service or store                                  | request tracer (when no `resource:` role matches), Cedar denial                                            |
+| `edgeRouter`                     | the router of the global edge                       | DDoS surge, credential stuffing, Cedar denial, regional outage                                             |
+| `attackSource`                   | an external client                                  | DDoS surge, credential stuffing                                                                            |
+| `primaryDatabase`                | a database                                          | cascading failure                                                                                          |
+| `securityMonitor`                | a threat monitor                                    | the node named on alerts the engine raises; events of all five bundled scenarios                           |
+| `outageRegion`, `failoverRegion` | regions with an API gateway or a load balancer each | regional outage                                                                                            |
 
 A topology without `primaryGateway`, `primaryAuth` and `primaryAuthorizer`
 still evaluates requests; the tracer just has no path to draw, and says so.
@@ -845,6 +875,17 @@ what is on show.
   cannot be the same incident on both sides is refused with the reason; and
   nothing is applied or placed on the timeline. An end-to-end test stages a
   changed platform, runs both and watches run B.
+- A cloud inventory (`apps/server/tests/inventory.rs`): the file is read as
+  a topology the engine runs, with each connection drawn as what states it
+  and a bundled flood available where the account has what it asks for; a
+  selection brings what it asks for and the description counts what it
+  left; connections that would run in a circle are left out and named; a
+  file that cannot be a topology says why; the check surveys an inventory
+  whether or not its selection is one; an import keeps the topology and
+  nothing else of the file; and every file of `examples/cloud-inventory`,
+  which the collectors' own tests write, loads and carries traffic. An
+  end-to-end test narrows the example in the dialog, applies it and runs a
+  flood on it, on the server and on the static site.
 - Each kind of mistake (malformed JSON, an unknown field, a number out of
   range, a cycle, a duplicate id, a forged recording, an oversized file, a
   policy that fails the schema) is refused with the file or the id it is in.

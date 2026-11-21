@@ -14,6 +14,7 @@ import {
   type CaptureFile,
   clockSeconds,
   collectErrors,
+  exampleInventory,
   exampleWorkspace,
   frameSummary,
   fromMenu,
@@ -190,6 +191,31 @@ test('a platform is imported into the tab, and a reload returns to the bundled o
   await expect(page.getByTestId('connection-health')).toHaveAttribute('data-state', 'open');
   await waitForScene(page, KINDS);
   await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
+  expect(errors).toEqual([]);
+});
+
+test('a cloud inventory is read and narrowed in the tab, with no server', async ({ page }) => {
+  const errors = collectErrors(page);
+  await openStatic(page);
+  await waitForScene(page);
+
+  await fromMenu(page, 'workspace');
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  await dialog.getByTestId('workspace-files').setInputFiles(exampleInventory());
+  // The same reading as on a server, by the same code, in the tab.
+  const kept = dialog.getByTestId('inventory-kept');
+  await expect(kept).toContainText('21 of 21');
+  await dialog
+    .getByTestId('inventory-filters')
+    .getByRole('switch', { name: /Only what a connection touches/ })
+    .click();
+  await expect(kept).toContainText('19 of 21');
+  await expect(dialog.getByTestId('workspace-check')).toContainText('shop-prod (21 services)');
+
+  await dialog.getByTestId('workspace-apply').click();
+  await expect(dialog).toBeHidden();
+  await waitForScene(page, 14);
+  await expect(page.getByTestId('platform-status')).toContainText('21 services, all normal');
   expect(errors).toEqual([]);
 });
 

@@ -111,6 +111,11 @@ export function exampleWorkspace(): string[] {
   );
 }
 
+/** The example cloud inventory: what the AWS collector writes from its tests' answers. */
+export function exampleInventory(): string {
+  return join(process.cwd(), '../../examples/cloud-inventory/topologies/aws-shop.json');
+}
+
 /** How many pieces the overview of the bundled topology has: one per kind of service. */
 export const KINDS = 12;
 /** How many services the bundled topology has. */

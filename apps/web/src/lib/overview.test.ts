@@ -29,9 +29,15 @@ describe('the overview', () => {
   const overview = buildOverview(source);
 
   it('reduces the platform to its kinds of service, in four layers', () => {
-    // Fifty-one services, twelve kinds: one piece for each.
+    // Fifty-one services of twelve kinds: one piece for each kind there is.
     expect(source.nodes).toHaveLength(51);
-    expect(overview.topology.nodes).toHaveLength(SERVICE_TYPES.length);
+    const kinds = new Set(source.nodes.map((node) => node.serviceType));
+    expect(kinds.size).toBe(12);
+    expect(overview.topology.nodes).toHaveLength(kinds.size);
+    // Every kind there can be has its place in one of the layers.
+    expect(LAYERS.flatMap((layer) => layer.columns.flat()).sort()).toEqual(
+      [...SERVICE_TYPES].sort(),
+    );
     expect(overview.topology.regions.map((region) => region.name)).toEqual([
       '01 Entry',
       '02 Identity',

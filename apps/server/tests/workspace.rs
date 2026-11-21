@@ -1031,7 +1031,7 @@ fn a_compose_file_is_read_as_a_topology_the_engine_can_run() {
     assert_eq!(kind("web"), "container");
     assert_eq!(kind("worker"), "container");
     assert_eq!(kind("db"), "database");
-    assert_eq!(kind("cache"), "database");
+    assert_eq!(kind("cache"), "cache");
     assert_eq!(kind("queue"), "message-queue");
 
     // What depends on what, as the file declares it, and nothing more.

@@ -25,7 +25,8 @@ use crate::domain::{
 };
 use crate::incidents::recordings::Recording;
 use crate::incidents::Effect;
-use crate::workspace::{bundle_of, from_files, Bundle, SourceFile};
+use crate::workspace::inventory::Survey;
+use crate::workspace::{bundle_of, from_files, surveys, Bundle, SourceFile};
 
 use super::error::ApiError;
 use super::AppState;
@@ -629,26 +630,44 @@ async fn build_import(state: &AppState, files: Vec<SourceFile>) -> Result<Loaded
     .map_err(ImportFailure::Invalid)
 }
 
+/// A check, and beside it what each cloud inventory among the files holds
+/// to choose from. The survey is there whether or not the files are valid:
+/// a selection that is no platform is put right by choosing again.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceCheckResponse {
+    #[serde(flatten)]
+    check: WorkspaceCheck,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    inventories: Vec<Survey>,
+}
+
 /// Says what applying the files would give, or what is wrong with them.
 pub async fn workspace_check(
     State(state): State<AppState>,
     body: Result<Json<ImportBody>, JsonRejection>,
-) -> ApiResult<WorkspaceCheck> {
+) -> ApiResult<WorkspaceCheckResponse> {
     import_allowed(&state)?;
     let Json(body) = body?;
-    match build_import(&state, body.files).await {
-        Ok(loaded) => Ok(Json(WorkspaceCheck {
+    // Reading an inventory is CPU work like the rest of the check.
+    let files = body.files.clone();
+    let inventories = off_the_workers(move || surveys(&files))
+        .await
+        .map_err(|()| internal("the files could not be checked"))?;
+    let check = match build_import(&state, body.files).await {
+        Ok(loaded) => WorkspaceCheck {
             valid: true,
             workspace: Some(loaded.status(true)),
             problem: None,
-        })),
-        Err(ImportFailure::Invalid(problem)) => Ok(Json(WorkspaceCheck {
+        },
+        Err(ImportFailure::Invalid(problem)) => WorkspaceCheck {
             valid: false,
             workspace: None,
             problem: Some(problem),
-        })),
-        Err(ImportFailure::Api(error)) => Err(error),
-    }
+        },
+        Err(ImportFailure::Api(error)) => return Err(error),
+    };
+    Ok(Json(WorkspaceCheckResponse { check, inventories }))
 }
 
 #[derive(Serialize)]

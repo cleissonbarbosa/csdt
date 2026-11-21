@@ -17,7 +17,8 @@ nothing wrong, the screen is porcelain, graphite and grey.
 
 The model is read in three steps, and the interface is built around them:
 **overview first, then one path, then the detail.** It opens on the platform
-reduced to its twelve kinds of service in the four layers a request crosses.
+reduced to its kinds of service (twelve for the bundled platform) in the four
+layers a request crosses.
 Selecting a piece, tracing a request or starting an incident brings one path
 forward and lets the rest recede. Opening a service takes it to the
 arrangement where every service stands on its own.
@@ -96,7 +97,7 @@ is there. Everything it offers stays in the bar and its menu.
 
 **3. Overview first, then one path, then the detail.** The opening view is
 not the platform; it is a summary of it that cannot be outgrown. One piece
-per kind of service, twelve at most, whether the platform has fifty services
+per kind of service, seventeen at most, whether the platform has fifty services
 or five hundred. A piece that stands for several says how many, and its
 figures are theirs: rates added up, latency and error rate averaged by the
 traffic that saw them, state as bad as its worst member
@@ -132,7 +133,9 @@ its occlusion and its shadow are what draw it, and the mark that says what
 it is (a keyhole, a band, a lid) is the one dark thing on it.
 
 The pieces are modelled, one per kind of service, as turned and milled
-blocks with a single chamfer size: a gate, a shield, a cedar, a lighthouse.
+blocks with a single chamfer size: a gate, a shield, a cedar, a lighthouse,
+and for what a cloud account holds, a distributor, a server, a ship's
+wheel, a card file and two reels.
 Each is the plainest object that says what the service is, so the kind can
 be read from the silhouette at the size of a fingernail.
 
@@ -661,7 +664,7 @@ Text is set in sentence case throughout.
   weight, with no medium or semibold to hide behind.
 - **The pieces are a file.** They are built in Blender by
   [`apps/web/scripts/build-pieces.py`](../apps/web/scripts/build-pieces.py)
-  and shipped as one GLB of about two thirds of a megabyte, which also says
+  and shipped as one GLB of about one megabyte, which also says
   what moves on each piece and how. The script is the source,
   so the asset is reproducible and its decisions can be read; the price is
   one more request before the scene can start, and a step to run when a

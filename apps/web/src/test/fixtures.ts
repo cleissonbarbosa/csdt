@@ -65,6 +65,8 @@ export const decisionDeny = () => sample('decision-deny', AuthorizationDecisionS
 export const workspace = () => sample('workspace', WorkspaceStatusSchema);
 export const workspaceCheck = () => sample('workspace-check', WorkspaceCheckSchema);
 export const workspaceCheckInvalid = () => sample('workspace-check-invalid', WorkspaceCheckSchema);
+export const workspaceCheckInventory = () =>
+  sample('workspace-check-inventory', WorkspaceCheckSchema);
 export const workspaceResponse = () => sample('workspace-response', WorkspaceResponseSchema);
 export const workspaceExport = () => sample('workspace-export', WorkspaceBundleSchema);
 export const workspaceDiff = () => sample('workspace-diff', WorkspaceDiffSchema);

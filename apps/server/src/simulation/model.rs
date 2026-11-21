@@ -409,9 +409,8 @@ impl SimTopology {
     }
 
     pub fn gateway_of_region(&self, region: usize) -> Option<usize> {
-        (0..self.node_count()).find(|i| {
-            self.node_region[*i] == region && self.node_type[*i] == ServiceType::ApiGateway
-        })
+        (0..self.node_count())
+            .find(|i| self.node_region[*i] == region && self.node_type[*i].is_gateway())
     }
 
     /// Shortest path (as edge indices) over synchronous edges.

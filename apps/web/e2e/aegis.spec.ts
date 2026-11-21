@@ -6,6 +6,7 @@ import {
   captureFile,
   clockSeconds,
   collectErrors,
+  exampleInventory,
   exampleWorkspace,
   frameSummary,
   fromMenu,
@@ -563,6 +564,63 @@ test('a platform is imported from its files, runs its own incident, and is put b
   await page.keyboard.press('Escape');
   await waitForScene(page, KINDS);
   await expect(page.getByTestId('platform-status')).toContainText('51 services, all normal');
+  expect(errors).toEqual([]);
+});
+
+test('a cloud inventory is narrowed in the dialog and becomes the platform', async ({ page }) => {
+  const errors = collectErrors(page);
+  await openApp(page);
+  await waitForScene(page);
+
+  await fromMenu(page, 'workspace');
+  const dialog = page.getByRole('dialog', { name: 'Platform files' });
+  // How to get one is a click away. The page writes a line; it runs nothing.
+  await dialog.getByTestId('cloud-command-toggle').click();
+  await expect(dialog.getByTestId('cloud-command-copy')).toBeDisabled();
+  await dialog.getByLabel('Regions').fill('sa-east-1');
+  await expect(dialog.getByTestId('cloud-command-text')).toHaveText(
+    'python3 scripts/export-cloud-inventory.py aws --region sa-east-1 --output inventory.json',
+  );
+  await expect(dialog.getByTestId('cloud-command-copy')).toBeEnabled();
+
+  // The file a collector writes: the server reads it and says what is in it.
+  await dialog.getByTestId('workspace-files').setInputFiles(exampleInventory());
+  const filters = dialog.getByTestId('inventory-filters');
+  const kept = filters.getByTestId('inventory-kept');
+  await expect(filters).toContainText('aws-shop.json is an inventory of AWS');
+  await expect(kept).toContainText('21 of 21');
+  const check = dialog.getByTestId('workspace-check');
+  await expect(check).toContainText('shop-prod (23 services)');
+  // Checking changed nothing.
+  await expect(page.getByTestId('platform-status')).toContainText('51 services');
+
+  // By tag, the count is the server's of the file as the page rewrote it.
+  await filters.getByLabel('Tag', { exact: true }).selectOption('env');
+  await filters.getByRole('button', { name: /^prod/ }).click();
+  await expect(kept).toContainText('13 of 21');
+  await expect(kept).toContainText('8 that the filters do not ask for');
+  await filters.getByTestId('inventory-clear').click();
+  await expect(kept).toContainText('21 of 21');
+
+  // What no connection touches is left out, and the platform is two smaller.
+  await filters.getByRole('switch', { name: /Only what a connection touches/ }).click();
+  await expect(kept).toContainText('19 of 21');
+  await expect(kept).toContainText('2 that no connection touches');
+  await expect(check).toContainText('shop-prod (21 services)');
+
+  await dialog.getByTestId('workspace-apply').click();
+  await expect(dialog).toBeHidden();
+  // Fourteen kinds of service among them, the load balancer, the virtual
+  // machines, the cache and the stream included: the overview is fourteen pieces.
+  await waitForScene(page, 14);
+  await expect(page.getByTestId('platform-status')).toContainText('21 services, all normal');
+  await expect(page.getByTestId('topology-picker')).toHaveValue('shop-prod');
+
+  // A distribution, a balancer and a detector are what a flood asks for: the
+  // bundled scenario runs on the account as it was read.
+  await page.getByTestId('explore-incident').click();
+  await page.getByTestId('scenario-start-ddos-surge').click();
+  await expect(page.getByTestId('platform-status')).toHaveAttribute('data-incidents', '1');
   expect(errors).toEqual([]);
 });
 

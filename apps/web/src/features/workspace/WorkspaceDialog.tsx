@@ -6,7 +6,13 @@
  * what is wrong and in which file, before anything changes; it is the same
  * check a workspace directory gets when the server starts.
  */
-import type { WorkspaceCheck, WorkspaceFile, WorkspaceStatus } from '@aegis/contracts';
+import type {
+  InventorySelection,
+  InventorySurvey,
+  WorkspaceCheck,
+  WorkspaceFile,
+  WorkspaceStatus,
+} from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileUp, FolderUp, RotateCcw, X } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
@@ -23,6 +29,8 @@ import { formatPercent } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
+import { CloudCommand } from './CloudCommand';
+import { InventoryFilters } from './InventoryFilters';
 import { PlatformRuns } from './PlatformRuns';
 import { PolicyDiff } from './PolicyDiff';
 import {
@@ -34,6 +42,7 @@ import {
   type Picked,
   type Skipped,
 } from './files';
+import { withSelection } from './inventory';
 
 const ORIGIN: Record<WorkspaceStatus['origin'], string> = {
   bundled: t('The platform that ships with AEGIS.'),
@@ -188,6 +197,21 @@ function Import() {
   const outcome = checked?.files === staged ? checked.outcome : null;
   const valid = typeof outcome === 'object' && outcome?.valid === true;
 
+  // What the server last said of each cloud inventory among the files. It
+  // is kept while the next answer is on its way, so the filters stay under
+  // the hand that is using them, and dropped with the file it is about.
+  const [surveys, setSurveys] = useState<InventorySurvey[]>([]);
+  useEffect(() => {
+    if (outcome !== null && typeof outcome === 'object') setSurveys(outcome.inventories ?? []);
+  }, [outcome]);
+  const surveyed = surveys.filter((survey) => staged.some((file) => file.path === survey.path));
+  const select = (path: string, selection: InventorySelection) =>
+    setStaged((files) =>
+      files.map((file) =>
+        file.path === path ? { ...file, text: withSelection(file.text, selection) } : file,
+      ),
+    );
+
   const add = async (picked: Picked[]) => {
     if (picked.length === 0) return;
     const result = await stage(staged, picked);
@@ -310,6 +334,7 @@ function Import() {
       >
         {t('Start from the files in use, to add to them')}
       </button>
+      <CloudCommand />
 
       {skipped.length > 0 && (
         <p className="mt-2 text-[11px] text-ink-faint" data-testid="workspace-skipped">
@@ -360,6 +385,14 @@ function Import() {
               </li>
             ))}
           </ul>
+
+          {surveyed.map((survey) => (
+            <InventoryFilters
+              key={survey.path}
+              survey={survey}
+              onSelect={(selection) => select(survey.path, selection)}
+            />
+          ))}
 
           <div className="mt-3" role="status" aria-live="polite" data-testid="workspace-check">
             {outcome === null ? (

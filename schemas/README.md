@@ -7,7 +7,10 @@ files with any Draft 7 validator:
 - `workspace.json`: [workspace](v1/workspace.schema.json).
 - A whole workspace saved as one file from the interface:
   [bundle](v1/bundle.schema.json).
-- `topologies/*.json`: [topology](v1/topology.schema.json).
+- `topologies/*.json`: [topology](v1/topology.schema.json), or, for a file a
+  collector wrote from a cloud account, [inventory](v1/inventory.schema.json).
+  An inventory says what it is in its `kind`; match it by name in an editor
+  (`*.inventory.json`, or the folder you keep them in), since both are JSON.
 - `scenarios/*.json`: [scenario](v1/scenario.schema.json).
 - `recordings/*.json`: [recording](v1/recording.schema.json).
 - `cedar/catalog.json`: [catalogue](v1/catalog.schema.json).

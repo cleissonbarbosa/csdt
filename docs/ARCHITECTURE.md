@@ -54,6 +54,7 @@ apps/
     integrations/    live adapters, target guard
     application/     use cases; owns the single mutable timeline
     workspace.rs     reads an operator's own files from a directory at start-up
+    workspace/       a Compose file and a cloud inventory, each read as a topology
     api/             Axum routes, WebSocket, rate limiting, errors
   wasm/src/          the same routes and service as a WebAssembly module
   web/src/
@@ -343,6 +344,12 @@ are mirrored in `packages/contracts`.
 | `POST /demo/workspace/diff`                            | what Cedar would decide differently          |
 | `WS /stream`                                           | telemetry and events                         |
 
+A check also surveys each [cloud inventory](INVENTORY.md) among the files it
+is given: its answer carries, beside what applying would give, what each
+inventory holds to choose from and what the selection in it brings and
+leaves (`inventories`). It is there whether or not the files are valid,
+since a selection that is no platform is put right by choosing again.
+
 ### Stream protocol
 
 Server → client messages are tagged by `type`: `hello`, `snapshot`, `events`,
@@ -490,7 +497,7 @@ that travels toward the service's health code. The state reshapes the same
 cycle for every kind of motion (uneven when degraded, held near its start
 and pushing when critical) and, when the service is down, turns the part
 into the way it hangs, an axis and an angle declared with the mechanism.
-Twelve different motions in four manners are therefore one material and no
+Seventeen different motions in four manners are therefore one material and no
 extra draw calls, and working time wraps at a number of seconds every period
 divides, so the wrap is never seen.
 
@@ -549,7 +556,7 @@ per kind of service, in the four layers a request crosses (entry, identity,
 compute, data). `lib/overview.ts` derives it on the client, as a pure
 function of what the server sent:
 
-- `buildOverview(topology)` returns a `Topology` of at most twelve nodes,
+- `buildOverview(topology)` returns a `Topology` of at most seventeen nodes,
   with one edge for every pair of kinds whose services are connected, and
   the maps from each service and connection to the group that stands for it.
 - `projectSnapshot(overview, snapshot)` returns a columnar snapshot for that

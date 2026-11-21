@@ -1,0 +1,373 @@
+{
+  "$id": "https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/schemas/v1/inventory.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Inventory",
+  "description": "The file an inventory collector writes.",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "aegis-cloud-inventory"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "provider": {
+      "$ref": "#/definitions/Provider"
+    },
+    "name": {
+      "description": "The platform's name, and with it its id. Chosen by the operator: it\nneed not be the account's.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "collectedAt": {
+      "description": "When it was read, as the collector wrote it. Shown as written.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Resource"
+      },
+      "minItems": 1,
+      "maxItems": 10000
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Relation"
+      },
+      "maxItems": 50000,
+      "default": []
+    },
+    "selection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Selection"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "notes": {
+      "description": "What the collector could not read or left out, shown as written.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 40
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "provider",
+    "name",
+    "resources"
+  ],
+  "definitions": {
+    "Provider": {
+      "type": "string",
+      "enum": [
+        "aws",
+        "gcp",
+        "oci"
+      ]
+    },
+    "Resource": {
+      "description": "One thing the account holds that is drawn as a piece.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The id its node takes. The collector makes it from the name; it is\nnever the provider's own identifier, which can name the account.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "name": {
+          "description": "Shown as written.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "type": {
+          "description": "Which of the kinds of service it is drawn as. Never `external-client`:\na file lists what the account holds, not who uses it.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ServiceType"
+            }
+          ]
+        },
+        "native": {
+          "description": "What the provider calls it, such as `AWS::RDS::DBCluster`.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "region": {
+          "description": "The provider's region, or `global` for what is in none.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "network": {
+          "description": "The network it is placed in (a VPC, a VCN), where it is in one.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "tags": {
+          "description": "Its tags or labels, as the provider holds them. Used to select;\nnever copied into the topology.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "public": {
+          "description": "Whether the provider states it as reachable from outside.",
+          "type": "boolean"
+        },
+        "members": {
+          "description": "How many of them the one piece stands for: the instances of a group,\nthe tasks of a service.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type",
+        "native",
+        "region"
+      ]
+    },
+    "ServiceType": {
+      "type": "string",
+      "enum": [
+        "api-gateway",
+        "auth-service",
+        "cedar-authorizer",
+        "microservice",
+        "container",
+        "serverless",
+        "message-queue",
+        "database",
+        "storage",
+        "network-gateway",
+        "security-monitor",
+        "external-client",
+        "load-balancer",
+        "virtual-machine",
+        "kubernetes-cluster",
+        "cache",
+        "event-stream"
+      ]
+    },
+    "Relation": {
+      "description": "A connection the file states between two of its resources.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "basis": {
+          "$ref": "#/definitions/Basis"
+        },
+        "evidence": {
+          "description": "What states it, in the collector's words: `target group checkout`.",
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "basis"
+      ]
+    },
+    "Basis": {
+      "description": "What states a relation. In this order when two statements name the same\npair of resources: the first is how the connection is read.",
+      "oneOf": [
+        {
+          "description": "The provider sends requests from one to the other: a balancer's\ntarget, a distribution's origin, an API's integration.",
+          "type": "string",
+          "const": "routing"
+        },
+        {
+          "description": "The provider delivers from one to the other when something happens:\na queue a function reads, a topic's subscription.",
+          "type": "string",
+          "const": "event"
+        },
+        {
+          "description": "The resource's own configuration names the other, or the operator\ndeclared it when the file was written.",
+          "type": "string",
+          "const": "declared"
+        },
+        {
+          "description": "A network rule admits one to the other. A permission to reach, not a\ncall that was seen.",
+          "type": "string",
+          "const": "network"
+        }
+      ]
+    },
+    "Selection": {
+      "description": "Which part of an inventory is brought. Each thing left unsaid asks for\neverything; everything said must hold.",
+      "type": "object",
+      "properties": {
+        "regions": {
+          "description": "Only resources in these regions.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        },
+        "networks": {
+          "description": "Only resources in these networks; `null` among them stands for the\nresources that are in none.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default": null
+        },
+        "kinds": {
+          "description": "Only resources of these kinds.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ServiceType"
+          },
+          "default": null
+        },
+        "tags": {
+          "description": "Only resources that carry every one of these tags.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TagFilter"
+          },
+          "default": []
+        },
+        "name": {
+          "description": "Only resources whose name has this in it, whatever the case.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "bases": {
+          "description": "Only connections stated in these ways.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Basis"
+          },
+          "default": null
+        },
+        "alongPaths": {
+          "description": "Also what leads to the resources chosen above and what they lead to.",
+          "type": "boolean",
+          "default": false
+        },
+        "connectedOnly": {
+          "description": "Leave out what no connection touches. A security monitor stays: it\nwatches, and nothing calls it.",
+          "type": "boolean",
+          "default": false
+        },
+        "exclude": {
+          "description": "Resources left out by hand, by id.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "without": {
+          "description": "Connections left out by hand.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Pair"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "TagFilter": {
+      "description": "A tag a resource must carry: the key, with one of the values. With no\nvalue named, the key alone.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ]
+    },
+    "Pair": {
+      "description": "Two resources, in the direction a connection runs.",
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ]
+    }
+  }
+}

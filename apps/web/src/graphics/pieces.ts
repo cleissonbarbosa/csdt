@@ -23,7 +23,7 @@
  * and an axis, and the way the part hangs when its service is down, all
  * declared where the part is modelled), and the parser lays those mechanisms
  * out as a small table the piece material reads, one column each. `aPart.y`
- * is a vertex's column, so one material moves all twelve.
+ * is a vertex's column, so one material moves all seventeen.
  *
  * not-interface-text: whole file. What it throws is for whoever built a
  * file it cannot read, in the console; a viewer is told the scene could not

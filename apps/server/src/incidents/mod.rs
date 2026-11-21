@@ -125,7 +125,9 @@ impl Resolver<'_> {
                 .region(name)
                 .ok()
                 .and_then(|region| self.topo.gateway_of_region(region))
-                .ok_or_else(|| format!("no API gateway found for region `{name}`")),
+                .ok_or_else(|| {
+                    format!("no API gateway or load balancer found for region `{name}`")
+                }),
         }
     }
 

@@ -31,6 +31,11 @@ const SHAPES: Record<(typeof SERVICE_TYPES)[number], string> = {
   'network-gateway': t('A desk globe, turning'),
   'security-monitor': t('A lighthouse above the edge; its lamp sweeps round'),
   'external-client': t('A pawn; its head lifts as it asks'),
+  'load-balancer': t('A distributor; its arm turns to the next spout for each request'),
+  'virtual-machine': t('A server in its case; its fan turns while it works'),
+  'kubernetes-cluster': t('A ship’s wheel; it turns a spoke for each change it makes'),
+  cache: t('A rotary card file; it turns a card for each lookup'),
+  'event-stream': t('Two reels; the tape runs from one to the other as events are written'),
 };
 
 const KEYS: [string, string][] = [

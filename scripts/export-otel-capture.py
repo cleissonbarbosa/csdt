@@ -36,6 +36,11 @@ SERVICE_TYPES = (
     "network-gateway",
     "security-monitor",
     "external-client",
+    "load-balancer",
+    "virtual-machine",
+    "kubernetes-cluster",
+    "cache",
+    "event-stream",
 )
 # The service graph states no kind: each node not declared with --type is
 # assumed to be this kind.

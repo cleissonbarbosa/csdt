@@ -283,6 +283,16 @@ export default {
   'A desk globe, turning': 'Um globo de mesa giratório',
   'A lighthouse above the edge; its lamp sweeps round': 'Um farol acima da borda cuja luz gira',
   'A pawn; its head lifts as it asks': 'Um peão que ergue a cabeça quando faz uma requisição',
+  'A distributor; its arm turns to the next spout for each request':
+    'Um distribuidor cujo braço gira para a próxima saída a cada requisição',
+  'A server in its case; its fan turns while it works':
+    'Um servidor no gabinete cuja ventoinha gira enquanto ele trabalha',
+  'A ship’s wheel; it turns a spoke for each change it makes':
+    'Um timão que gira um raio a cada mudança que faz',
+  'A rotary card file; it turns a card for each lookup':
+    'Um fichário rotativo que gira uma ficha a cada consulta',
+  'Two reels; the tape runs from one to the other as events are written':
+    'Dois carretéis; a fita passa de um para o outro à medida que os eventos são gravados',
   "The part of a piece that moves runs at the pace of its service's traffic: faster under a surge, slower as traffic thins, and still when nothing passes.":
     'O mecanismo de cada peça acompanha o ritmo do tráfego do serviço. Ele acelera nos picos, desacelera quando o tráfego diminui e fica parado quando não há tráfego.',
   'AEGIS is a simulation. The platform, its metrics and every incident are synthetic and deterministic; no real system is scanned or attacked.':

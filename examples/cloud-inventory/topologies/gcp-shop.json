@@ -1,0 +1,255 @@
+{
+  "kind": "aegis-cloud-inventory",
+  "version": 1,
+  "provider": "gcp",
+  "name": "shop-gcp",
+  "collectedAt": "2026-11-21T12:00:00Z",
+  "resources": [
+    {
+      "id": "platform",
+      "name": "platform",
+      "type": "kubernetes-cluster",
+      "native": "container.googleapis.com/Cluster",
+      "region": "southamerica-east1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "legacy-web",
+      "name": "legacy-web",
+      "type": "virtual-machine",
+      "native": "compute.googleapis.com/InstanceGroupManager",
+      "region": "southamerica-east1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "members": 2
+    },
+    {
+      "id": "search",
+      "name": "search",
+      "type": "virtual-machine",
+      "native": "compute.googleapis.com/Instance",
+      "region": "southamerica-east1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "bastion",
+      "name": "bastion",
+      "type": "virtual-machine",
+      "native": "compute.googleapis.com/Instance",
+      "region": "southamerica-east1",
+      "network": "shop"
+    },
+    {
+      "id": "fulfil",
+      "name": "fulfil",
+      "type": "serverless",
+      "native": "cloudfunctions.googleapis.com/Function",
+      "region": "southamerica-east1",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      }
+    },
+    {
+      "id": "storefront",
+      "name": "storefront",
+      "type": "serverless",
+      "native": "run.googleapis.com/Service",
+      "region": "southamerica-east1",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      }
+    },
+    {
+      "id": "checkout",
+      "name": "checkout",
+      "type": "serverless",
+      "native": "run.googleapis.com/Service",
+      "region": "southamerica-east1",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      }
+    },
+    {
+      "id": "notify",
+      "name": "notify",
+      "type": "serverless",
+      "native": "run.googleapis.com/Service",
+      "region": "southamerica-east1"
+    },
+    {
+      "id": "partners-api",
+      "name": "partners-api",
+      "type": "serverless",
+      "native": "run.googleapis.com/Service",
+      "region": "southamerica-east1",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "order-placed",
+      "name": "order-placed",
+      "type": "event-stream",
+      "native": "pubsub.googleapis.com/Topic",
+      "region": "global",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "order-placed-dead",
+      "name": "order-placed-dead",
+      "type": "event-stream",
+      "native": "pubsub.googleapis.com/Topic",
+      "region": "global"
+    },
+    {
+      "id": "orders-db",
+      "name": "orders-db",
+      "type": "database",
+      "native": "sqladmin.googleapis.com/Instance",
+      "region": "southamerica-east1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "cart-cache",
+      "name": "cart-cache",
+      "type": "cache",
+      "native": "redis.googleapis.com/Instance",
+      "region": "southamerica-east1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "members": 2
+    },
+    {
+      "id": "sessions",
+      "name": "sessions",
+      "type": "database",
+      "native": "firestore.googleapis.com/Database",
+      "region": "southamerica-east1"
+    },
+    {
+      "id": "shop-assets",
+      "name": "shop-assets",
+      "type": "storage",
+      "native": "storage.googleapis.com/Bucket",
+      "region": "southamerica-east1",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "shop-lb",
+      "name": "shop-lb",
+      "type": "load-balancer",
+      "native": "compute.googleapis.com/UrlMap",
+      "region": "global",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "backoffice",
+      "name": "backoffice",
+      "type": "load-balancer",
+      "native": "compute.googleapis.com/UrlMap",
+      "region": "southamerica-east1",
+      "network": "shop"
+    }
+  ],
+  "relations": [
+    {
+      "from": "order-placed",
+      "to": "fulfil",
+      "basis": "event",
+      "evidence": "event trigger"
+    },
+    {
+      "from": "checkout",
+      "to": "orders-db",
+      "basis": "declared",
+      "evidence": "annotation run.googleapis.com/cloudsql-instances"
+    },
+    {
+      "from": "partners-api",
+      "to": "orders-db",
+      "basis": "declared",
+      "evidence": "annotation run.googleapis.com/cloudsql-instances"
+    },
+    {
+      "from": "order-placed",
+      "to": "notify",
+      "basis": "event",
+      "evidence": "push subscription notify-push"
+    },
+    {
+      "from": "order-placed",
+      "to": "order-placed-dead",
+      "basis": "declared",
+      "evidence": "dead letter policy of subscription notify-push"
+    },
+    {
+      "from": "shop-lb",
+      "to": "storefront",
+      "basis": "routing",
+      "evidence": "backend service storefront"
+    },
+    {
+      "from": "shop-lb",
+      "to": "checkout",
+      "basis": "routing",
+      "evidence": "backend service checkout"
+    },
+    {
+      "from": "shop-lb",
+      "to": "legacy-web",
+      "basis": "routing",
+      "evidence": "backend service legacy-web"
+    },
+    {
+      "from": "shop-lb",
+      "to": "shop-assets",
+      "basis": "routing",
+      "evidence": "backend bucket static-assets"
+    },
+    {
+      "from": "backoffice",
+      "to": "legacy-web",
+      "basis": "routing",
+      "evidence": "backend service backoffice"
+    },
+    {
+      "from": "legacy-web",
+      "to": "search",
+      "basis": "network",
+      "evidence": "firewall rule allow-web-to-search: tag web may reach tag search on tcp/9200"
+    },
+    {
+      "from": "platform",
+      "to": "search",
+      "basis": "network",
+      "evidence": "firewall rule allow-web-to-search: tag gke-platform-1a2b3c4d-node may reach tag search on tcp/9200"
+    }
+  ],
+  "notes": [
+    "Not read: Identity Platform, API Gateway and Apigee and what they send on to, App Engine, Eventarc triggers other than a function's own, Cloud Tasks and Scheduler, Security Command Center, proxy Network Load Balancers, the instances of a target pool and of an unmanaged instance group, the endpoints of a zonal network endpoint group, firewall policies and rules that deny, and what runs inside a GKE cluster. Declare such a connection with --relation."
+  ]
+}

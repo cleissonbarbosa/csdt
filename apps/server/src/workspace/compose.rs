@@ -143,14 +143,17 @@ fn document(text: &str) -> Result<Yaml, String> {
 /// recognised is what Compose says it is: a container.
 const KINDS: &[(&[&str], ServiceType)] = &[
     (
+        &["redis", "valkey", "memcached", "dragonfly"],
+        ServiceType::Cache,
+    ),
+    (&["kafka", "redpanda", "pulsar"], ServiceType::EventStream),
+    (&["haproxy"], ServiceType::LoadBalancer),
+    (
         &[
             "postgres",
             "mysql",
             "mariadb",
             "mongo",
-            "redis",
-            "valkey",
-            "memcached",
             "cassandra",
             "elasticsearch",
             "opensearch",
@@ -166,21 +169,13 @@ const KINDS: &[(&[&str], ServiceType)] = &[
         ServiceType::Database,
     ),
     (
-        &[
-            "rabbitmq",
-            "kafka",
-            "redpanda",
-            "nats",
-            "activemq",
-            "pulsar",
-            "mosquitto",
-        ],
+        &["rabbitmq", "nats", "activemq", "mosquitto"],
         ServiceType::MessageQueue,
     ),
     (&["minio", "seaweedfs", "ceph"], ServiceType::Storage),
     (
         &[
-            "nginx", "traefik", "envoy", "haproxy", "caddy", "kong", "apisix", "httpd",
+            "nginx", "traefik", "envoy", "caddy", "kong", "apisix", "httpd",
         ],
         ServiceType::ApiGateway,
     ),
@@ -204,7 +199,7 @@ const KINDS: &[(&[&str], ServiceType)] = &[
 ];
 
 /// Milliseconds a service of each kind takes at rest: the converter's own.
-fn default_latency_ms(kind: ServiceType) -> f64 {
+pub(super) fn default_latency_ms(kind: ServiceType) -> f64 {
     match kind {
         ServiceType::ExternalClient => 0.0,
         ServiceType::ApiGateway | ServiceType::NetworkGateway => 4.0,
@@ -215,6 +210,10 @@ fn default_latency_ms(kind: ServiceType) -> f64 {
         ServiceType::SecurityMonitor => 10.0,
         ServiceType::Storage => 25.0,
         ServiceType::Microservice | ServiceType::Container | ServiceType::Serverless => 20.0,
+        ServiceType::VirtualMachine | ServiceType::KubernetesCluster => 20.0,
+        ServiceType::LoadBalancer => 2.0,
+        ServiceType::Cache => 1.0,
+        ServiceType::EventStream => 3.0,
     }
 }
 
@@ -239,9 +238,12 @@ fn kind_of(service: &str, image: Option<&str>) -> ServiceType {
 }
 
 /// How one service reaches another, by what the other is.
-fn link(target: ServiceType) -> (Protocol, Relationship) {
+pub(super) fn link(target: ServiceType) -> (Protocol, Relationship) {
     match target {
         ServiceType::Database => (Protocol::Sql, Relationship::Data),
+        ServiceType::Cache => (Protocol::Redis, Relationship::Data),
+        ServiceType::LoadBalancer => (Protocol::Https, Relationship::Route),
+        ServiceType::EventStream => (Protocol::Tcp, Relationship::Publish),
         ServiceType::Storage => (Protocol::S3, Relationship::Data),
         ServiceType::MessageQueue => (Protocol::Amqp, Relationship::Publish),
         ServiceType::AuthService => (Protocol::Https, Relationship::Auth),
@@ -252,7 +254,7 @@ fn link(target: ServiceType) -> (Protocol, Relationship) {
 }
 
 /// An id a topology accepts, made of a service's name.
-fn id_of(name: &str) -> String {
+pub(super) fn id_of(name: &str) -> String {
     let id: String = name
         .chars()
         .map(|c| {
@@ -577,11 +579,20 @@ mod tests {
         assert_eq!(kind_of("db", Some("postgres:16")), ServiceType::Database);
         assert_eq!(
             kind_of("broker", Some("docker.io/bitnami/kafka:3")),
+            ServiceType::EventStream
+        );
+        assert_eq!(
+            kind_of("broker", Some("rabbitmq:3-management")),
             ServiceType::MessageQueue
         );
         assert_eq!(kind_of("edge", Some("traefik:v3")), ServiceType::ApiGateway);
+        assert_eq!(kind_of("lb", Some("haproxy:3")), ServiceType::LoadBalancer);
+        assert_eq!(
+            kind_of("sessions", Some("valkey/valkey:8")),
+            ServiceType::Cache
+        );
         // With no image to go by, the service's own name is.
-        assert_eq!(kind_of("redis", None), ServiceType::Database);
+        assert_eq!(kind_of("redis", None), ServiceType::Cache);
         // Anything else is what Compose runs: a container.
         assert_eq!(
             kind_of("web", Some("acme/storefront")),

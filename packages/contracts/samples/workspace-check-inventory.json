@@ -1,0 +1,210 @@
+{
+  "valid": true,
+  "workspace": {
+    "origin": "imported",
+    "importEnabled": true,
+    "formatVersion": 1,
+    "replaced": [
+      "topologies"
+    ],
+    "ignored": [],
+    "topologies": [
+      {
+        "id": "front-desk-cloud",
+        "name": "front-desk-cloud",
+        "description": "Read from front-desk-cloud.json, an inventory of Oracle Cloud: 4 of its 5 resources. Not brought: 1 that the selection does not ask for. Its connections are what the file states: 1 route, 1 declared connection and 1 network rule. A network rule is a permission to reach, not a call that was seen. Left out so that calls run one way: ledger to desk. Clients enter at what the provider states as public and no other public resource routes to. An inventory says nothing of traffic or speed: the 100 requests a second, shared evenly between the entries, the even share of what each router sends on, and every latency here are defaults of the converter, not measurements. It states no capacity either: each service has the model's default headroom over its load at rest.",
+        "nodeCount": 6,
+        "edgeCount": 5,
+        "regionCount": 2,
+        "dataSource": "synthetic"
+      }
+    ],
+    "defaultTopologyId": "front-desk-cloud",
+    "scenarioIds": [
+      "ddos-surge",
+      "credential-stuffing",
+      "cedar-denial",
+      "cascading-failure",
+      "regional-outage"
+    ],
+    "recordingIds": [],
+    "policyCount": 9,
+    "baselineDenyFraction": 0.07,
+    "unavailable": [
+      {
+        "topologyId": "front-desk-cloud",
+        "scenarioId": "ddos-surge",
+        "reason": "topology does not define the `edgeRouter` role"
+      },
+      {
+        "topologyId": "front-desk-cloud",
+        "scenarioId": "credential-stuffing",
+        "reason": "topology does not define the `primaryAuthorizer` role"
+      },
+      {
+        "topologyId": "front-desk-cloud",
+        "scenarioId": "cedar-denial",
+        "reason": "topology does not define the `primaryAuthorizer` role"
+      },
+      {
+        "topologyId": "front-desk-cloud",
+        "scenarioId": "cascading-failure",
+        "reason": "topology does not define the `securityMonitor` role"
+      },
+      {
+        "topologyId": "front-desk-cloud",
+        "scenarioId": "regional-outage",
+        "reason": "topology does not define the `edgeRouter` role"
+      }
+    ]
+  },
+  "inventories": [
+    {
+      "path": "front-desk-cloud.json",
+      "provider": "oci",
+      "name": "front-desk-cloud",
+      "collectedAt": "2026-11-21T12:00:00Z",
+      "resources": 5,
+      "relations": 4,
+      "regions": [
+        {
+          "value": "sa-saopaulo-1",
+          "count": 5
+        }
+      ],
+      "networks": [
+        {
+          "value": "lobby-vcn",
+          "count": 4
+        },
+        {
+          "value": null,
+          "count": 1
+        }
+      ],
+      "kinds": [
+        {
+          "value": "container",
+          "count": 2
+        },
+        {
+          "value": "api-gateway",
+          "count": 1
+        },
+        {
+          "value": "database",
+          "count": 1
+        },
+        {
+          "value": "storage",
+          "count": 1
+        }
+      ],
+      "tags": [
+        {
+          "key": "env",
+          "count": 4,
+          "values": [
+            {
+              "value": "prod",
+              "count": 3
+            },
+            {
+              "value": "test",
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "bases": [
+        {
+          "value": "routing",
+          "count": 1
+        },
+        {
+          "value": "event",
+          "count": 0
+        },
+        {
+          "value": "declared",
+          "count": 1
+        },
+        {
+          "value": "network",
+          "count": 2
+        }
+      ],
+      "selection": {
+        "regions": null,
+        "networks": [
+          "lobby-vcn",
+          null
+        ],
+        "kinds": null,
+        "tags": [
+          {
+            "key": "env",
+            "values": [
+              "prod"
+            ]
+          }
+        ],
+        "name": null,
+        "bases": null,
+        "alongPaths": true,
+        "connectedOnly": true,
+        "exclude": [],
+        "without": []
+      },
+      "kept": {
+        "resources": 4,
+        "relations": 3,
+        "entries": 1
+      },
+      "leftOut": {
+        "unselected": 1,
+        "excluded": 0,
+        "unconnected": 0,
+        "circular": [
+          {
+            "from": "ledger",
+            "to": "desk"
+          }
+        ]
+      },
+      "listed": [
+        {
+          "id": "door",
+          "name": "Door",
+          "type": "api-gateway",
+          "region": "sa-saopaulo-1",
+          "kept": true
+        },
+        {
+          "id": "desk",
+          "name": "Desk",
+          "type": "container",
+          "region": "sa-saopaulo-1",
+          "kept": true
+        },
+        {
+          "id": "ledger",
+          "name": "Ledger",
+          "type": "database",
+          "region": "sa-saopaulo-1",
+          "kept": true
+        },
+        {
+          "id": "archive",
+          "name": "Archive",
+          "type": "storage",
+          "region": "sa-saopaulo-1",
+          "kept": true
+        }
+      ],
+      "notes": [
+        "Fictional inventory used for the contract samples."
+      ]
+    }
+  ]
+}

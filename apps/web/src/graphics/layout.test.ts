@@ -1,3 +1,4 @@
+import { SERVICE_TYPES } from '@aegis/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { largeTopology, topology } from '@/test/fixtures';
@@ -337,7 +338,7 @@ describe('pieces that have a side their traffic arrives at', () => {
   });
 
   it('names only kinds of service there are', () => {
-    const kinds = new Set(helios.nodes.map((node) => node.serviceType));
+    const kinds = new Set<string>(SERVICE_TYPES);
     for (const kind of Object.keys(ARRIVAL)) expect(kinds).toContain(kind);
     for (const kind of TOLD_BY_FACE) expect(ARRIVAL).toHaveProperty(kind);
   });

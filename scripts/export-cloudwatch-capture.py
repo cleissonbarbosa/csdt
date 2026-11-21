@@ -41,6 +41,11 @@ SERVICE_TYPES = (
     "network-gateway",
     "security-monitor",
     "external-client",
+    "load-balancer",
+    "virtual-machine",
+    "kubernetes-cluster",
+    "cache",
+    "event-stream",
 )
 # Each node whose kind is not mapped from a reported resource type, nor
 # declared with --type, is assumed to be this kind.
@@ -50,13 +55,13 @@ RESOURCE_TYPES = {
     "AWS::ApiGateway::RestApi": "api-gateway",
     "AWS::ApiGatewayV2::Api": "api-gateway",
     "AWS::ECS::Service": "container",
-    "AWS::EKS::Cluster": "container",
+    "AWS::EKS::Cluster": "kubernetes-cluster",
     "AWS::Lambda::Function": "serverless",
     "AWS::RDS::DBInstance": "database",
     "AWS::RDS::DBCluster": "database",
     "AWS::DynamoDB::Table": "database",
     "AWS::S3::Bucket": "storage",
-    "AWS::SNS::Topic": "message-queue",
+    "AWS::SNS::Topic": "event-stream",
     "AWS::SQS::Queue": "message-queue",
 }
 

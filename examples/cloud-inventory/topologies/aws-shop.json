@@ -1,0 +1,390 @@
+{
+  "kind": "aegis-cloud-inventory",
+  "version": 1,
+  "provider": "aws",
+  "name": "shop-prod",
+  "collectedAt": "2026-11-21T12:00:00Z",
+  "resources": [
+    {
+      "id": "legacy-web",
+      "name": "legacy-web",
+      "type": "virtual-machine",
+      "native": "AWS::AutoScaling::AutoScalingGroup",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "members": 2
+    },
+    {
+      "id": "bastion",
+      "name": "bastion",
+      "type": "virtual-machine",
+      "native": "AWS::EC2::Instance",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "Name": "bastion",
+        "env": "prod"
+      }
+    },
+    {
+      "id": "storefront",
+      "name": "storefront",
+      "type": "container",
+      "native": "AWS::ECS::Service",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      },
+      "members": 4
+    },
+    {
+      "id": "checkout",
+      "name": "checkout",
+      "type": "container",
+      "native": "AWS::ECS::Service",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      },
+      "members": 2
+    },
+    {
+      "id": "shop-alb",
+      "name": "shop-alb",
+      "type": "load-balancer",
+      "native": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "fulfil",
+      "name": "fulfil",
+      "type": "serverless",
+      "native": "AWS::Lambda::Function",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      }
+    },
+    {
+      "id": "notify",
+      "name": "notify",
+      "type": "serverless",
+      "native": "AWS::Lambda::Function",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "api-handler",
+      "name": "api-handler",
+      "type": "serverless",
+      "native": "AWS::Lambda::Function",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "shoppers",
+      "name": "shoppers",
+      "type": "auth-service",
+      "native": "AWS::Cognito::UserPool",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "partners",
+      "name": "partners",
+      "type": "api-gateway",
+      "native": "AWS::ApiGateway::RestApi",
+      "region": "sa-east-1",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "mobile",
+      "name": "mobile",
+      "type": "api-gateway",
+      "native": "AWS::ApiGatewayV2::Api",
+      "region": "sa-east-1",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "order-events",
+      "name": "order-events",
+      "type": "message-queue",
+      "native": "AWS::SQS::Queue",
+      "region": "sa-east-1",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "order-events-dlq",
+      "name": "order-events-dlq",
+      "type": "message-queue",
+      "native": "AWS::SQS::Queue",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "order-placed",
+      "name": "order-placed",
+      "type": "event-stream",
+      "native": "AWS::SNS::Topic",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "orders-db",
+      "name": "orders-db",
+      "type": "database",
+      "native": "AWS::RDS::DBCluster",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "members": 2
+    },
+    {
+      "id": "reports-db",
+      "name": "reports-db",
+      "type": "database",
+      "native": "AWS::RDS::DBInstance",
+      "region": "sa-east-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "sessions",
+      "name": "sessions",
+      "type": "database",
+      "native": "AWS::DynamoDB::Table",
+      "region": "sa-east-1",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "cart-cache",
+      "name": "cart-cache",
+      "type": "cache",
+      "native": "AWS::ElastiCache::ReplicationGroup",
+      "region": "sa-east-1",
+      "network": "shop",
+      "members": 2
+    },
+    {
+      "id": "shop-assets",
+      "name": "shop-assets",
+      "type": "storage",
+      "native": "AWS::S3::Bucket",
+      "region": "sa-east-1",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "GuardDuty",
+      "name": "GuardDuty",
+      "type": "security-monitor",
+      "native": "AWS::GuardDuty::Detector",
+      "region": "sa-east-1"
+    },
+    {
+      "id": "shop.example",
+      "name": "shop.example",
+      "type": "network-gateway",
+      "native": "AWS::CloudFront::Distribution",
+      "region": "global",
+      "public": true
+    }
+  ],
+  "relations": [
+    {
+      "from": "shop-alb",
+      "to": "storefront",
+      "basis": "routing",
+      "evidence": "target group storefront"
+    },
+    {
+      "from": "shop-alb",
+      "to": "checkout",
+      "basis": "routing",
+      "evidence": "target group checkout"
+    },
+    {
+      "from": "shop-alb",
+      "to": "legacy-web",
+      "basis": "routing",
+      "evidence": "target group legacy"
+    },
+    {
+      "from": "order-events",
+      "to": "fulfil",
+      "basis": "event",
+      "evidence": "event source mapping"
+    },
+    {
+      "from": "partners",
+      "to": "api-handler",
+      "basis": "routing",
+      "evidence": "integration GET /orders"
+    },
+    {
+      "from": "partners",
+      "to": "shoppers",
+      "basis": "declared",
+      "evidence": "authorizer shoppers"
+    },
+    {
+      "from": "mobile",
+      "to": "api-handler",
+      "basis": "routing",
+      "evidence": "integration"
+    },
+    {
+      "from": "mobile",
+      "to": "shop-alb",
+      "basis": "routing",
+      "evidence": "integration"
+    },
+    {
+      "from": "mobile",
+      "to": "shoppers",
+      "basis": "declared",
+      "evidence": "authorizer shoppers-jwt"
+    },
+    {
+      "from": "order-events",
+      "to": "order-events-dlq",
+      "basis": "declared",
+      "evidence": "redrive policy"
+    },
+    {
+      "from": "order-placed",
+      "to": "order-events",
+      "basis": "event",
+      "evidence": "subscription"
+    },
+    {
+      "from": "order-placed",
+      "to": "notify",
+      "basis": "event",
+      "evidence": "subscription"
+    },
+    {
+      "from": "shop.example",
+      "to": "shop-alb",
+      "basis": "routing",
+      "evidence": "origin app"
+    },
+    {
+      "from": "shop.example",
+      "to": "shop-assets",
+      "basis": "routing",
+      "evidence": "origin static"
+    },
+    {
+      "from": "shop-alb",
+      "to": "legacy-web",
+      "basis": "network",
+      "evidence": "security group rule: shop-lb may reach shop-app on tcp/8080"
+    },
+    {
+      "from": "shop-alb",
+      "to": "storefront",
+      "basis": "network",
+      "evidence": "security group rule: shop-lb may reach shop-app on tcp/8080"
+    },
+    {
+      "from": "shop-alb",
+      "to": "checkout",
+      "basis": "network",
+      "evidence": "security group rule: shop-lb may reach shop-app on tcp/8080"
+    },
+    {
+      "from": "legacy-web",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "legacy-web",
+      "to": "reports-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "storefront",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "storefront",
+      "to": "reports-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "checkout",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "checkout",
+      "to": "reports-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "fulfil",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-fn may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "fulfil",
+      "to": "reports-db",
+      "basis": "network",
+      "evidence": "security group rule: shop-fn may reach shop-db on tcp/5432"
+    },
+    {
+      "from": "legacy-web",
+      "to": "cart-cache",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-cache on tcp/6379"
+    },
+    {
+      "from": "storefront",
+      "to": "cart-cache",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-cache on tcp/6379"
+    },
+    {
+      "from": "checkout",
+      "to": "cart-cache",
+      "basis": "network",
+      "evidence": "security group rule: shop-app may reach shop-cache on tcp/6379"
+    }
+  ],
+  "notes": [
+    "Not read: Lambda function URLs, EventBridge rules, Step Functions, what runs inside an EKS cluster, and an origin or an integration named by a DNS name of the operator's own. Declare such a connection with --relation."
+  ]
+}

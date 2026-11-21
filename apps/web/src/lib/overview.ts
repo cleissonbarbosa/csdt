@@ -3,7 +3,7 @@
  *
  * A topology of fifty or five hundred services cannot be taken in at once,
  * and does not have to be. Whatever its size, a platform is made of the same
- * dozen kinds of thing (clients, gateways, an authorizer, services, stores),
+ * dozen or so kinds of thing (clients, gateways, an authorizer, services, stores),
  * and a request crosses them in the same order. The overview draws one piece
  * per kind, in the four layers a request passes through, and nothing else:
  * overview first, details on demand.
@@ -50,7 +50,7 @@ export const LAYERS: readonly LayerSpec[] = [
   {
     id: 'layer:entry',
     name: t('Entry#layer'),
-    columns: [['external-client'], ['network-gateway'], ['api-gateway']],
+    columns: [['external-client'], ['network-gateway'], ['load-balancer', 'api-gateway']],
   },
   {
     id: 'layer:identity',
@@ -60,12 +60,15 @@ export const LAYERS: readonly LayerSpec[] = [
   {
     id: 'layer:compute',
     name: t('Compute#layer'),
-    columns: [['microservice', 'container', 'serverless']],
+    columns: [['virtual-machine', 'microservice', 'container', 'kubernetes-cluster', 'serverless']],
   },
   {
     id: 'layer:data',
     name: t('Data#layer'),
-    columns: [['message-queue'], ['database', 'storage']],
+    columns: [
+      ['message-queue', 'event-stream'],
+      ['database', 'cache', 'storage'],
+    ],
   },
 ];
 

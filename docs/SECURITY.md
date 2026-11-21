@@ -6,19 +6,20 @@ reports (labelled `live`), the one thing it shows that is not synthetic is an
 [incident capture](CAPTURES.md): a real incident read by the browser from a
 file, which it sends nowhere. Capture files are written separately, by
 scripts an operator runs on their own machine with their own access, and
-those scripts only read; AEGIS never runs them. This document states the boundaries that make
-that true and how each one is enforced.
+those scripts only read; AEGIS never runs them. The same holds for a [cloud
+inventory](INVENTORY.md), the file a platform can be read from. This document
+states the boundaries that make that true and how each one is enforced.
 
 ## What AEGIS cannot do
 
-| Boundary                                      | How it is enforced                                                                                                                                                                                                                                                                                                       |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **No real attacks.**                          | Scenarios are declarative data that change numbers inside the simulation engine. The `simulation` and `incidents` modules perform no I/O.                                                                                                                                                                                |
-| **No network scanning.**                      | No code in AEGIS scans a host or a port. The two live adapters send fixed HTTP requests (cedar-agent's health check and its policy, data and `is_authorized` endpoints; rinha-backend's `GET /ready`) to the single target configured for each, through `guard.rs`.                                                      |
-| **No infrastructure changes.**                | The server, the engine and the page contain no cloud SDK and hold no cloud credential. The capture exporters in `scripts/` run on the operator's own machine, call read operations only (listed in [CAPTURES.md](CAPTURES.md)), and write no credential, token or backend address into a capture; AEGIS never runs them. |
-| **No outbound connections by default.**       | Demo Mode makes none. Integrations must be configured on the server _and_ switched on by the operator.                                                                                                                                                                                                                   |
-| **No remote targets.**                        | Live adapters accept loopback targets only, unless a host is explicitly allow-listed.                                                                                                                                                                                                                                    |
-| **No third-party requests from the browser.** | Fonts and scripts are bundled; the deployed CSP is `default-src 'self'`.                                                                                                                                                                                                                                                 |
+| Boundary                                      | How it is enforced                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No real attacks.**                          | Scenarios are declarative data that change numbers inside the simulation engine. The `simulation` and `incidents` modules perform no I/O.                                                                                                                                                                                                                                                                |
+| **No network scanning.**                      | No code in AEGIS scans a host or a port. The two live adapters send fixed HTTP requests (cedar-agent's health check and its policy, data and `is_authorized` endpoints; rinha-backend's `GET /ready`) to the single target configured for each, through `guard.rs`.                                                                                                                                      |
+| **No infrastructure changes.**                | The server, the engine and the page contain no cloud SDK and hold no cloud credential. The capture exporters and the inventory collectors in `scripts/` run on the operator's own machine, call read operations only (listed in [CAPTURES.md](CAPTURES.md) and [INVENTORY.md](INVENTORY.md)), and write no credential, token, backend address or provider identifier into a file; AEGIS never runs them. |
+| **No outbound connections by default.**       | Demo Mode makes none. Integrations must be configured on the server _and_ switched on by the operator.                                                                                                                                                                                                                                                                                                   |
+| **No remote targets.**                        | Live adapters accept loopback targets only, unless a host is explicitly allow-listed.                                                                                                                                                                                                                                                                                                                    |
+| **No third-party requests from the browser.** | Fonts and scripts are bundled; the deployed CSP is `default-src 'self'`.                                                                                                                                                                                                                                                                                                                                 |
 
 ## Data
 
@@ -109,6 +110,15 @@ Whichever way it arrives, a workspace is held to this:
   deep is refused, because the parser follows each level by calling itself,
   and so is one whose aliases would write out to more than 100 000 values.
   What comes out is a topology like any other, held to everything here.
+- **A cloud inventory is read, not fetched.** A file that says it is one
+  (`"kind": "aegis-cloud-inventory"`) is parsed as text for the resources it
+  lists and the connections it states. No provider is asked anything, by the
+  server or by the page: the file was written beforehand, by a script the
+  operator ran. It lists at most 10 000 resources and 50 000 relations in the
+  4 MiB every file is held to, and what it brings must fit a topology. Its
+  selection is data like the rest of it: a list of what to bring. After an
+  import only the topology is kept; the tags, the networks and the notes of
+  the file are not, and the file is not stored.
 - **Data, not behaviour.** A scenario is a list of the eleven effects the
   engine understands, each a bounded number applied to a node or a connection
   of the model. No effect reads a file, opens a socket or runs anything, and
@@ -125,7 +135,8 @@ Whichever way it arrives, a workspace is held to this:
   by `cedar-policy`. A flow is stopped at the authorizer only if Cedar denied
   its request.
 
-Files in a workspace may describe a real system, and two things follow.
+Files in a workspace may describe a real system (a cloud inventory always
+does), and two things follow.
 
 - **They are served to whoever can reach the API.** The topology, the
   scenario texts, the source of every policy and the catalogue of principals
@@ -250,10 +261,14 @@ Rules enforced in `apps/server/src/integrations/guard.rs`:
 - cedar-agent is used read-only unless `AEGIS_CEDAR_AGENT_SYNC=true`.
 
 The server, the engine and the page use no ambient credentials of any kind
-(no `gh` session, no cloud profile, no SSH agent). The one place a cloud
-profile is used is `scripts/export-cloudwatch-capture.py`, through the AWS
-CLI, with the profile the operator names (`--profile`) or, without it, the
-CLI's default credential chain. `scripts/export-otel-capture.py` sends a
+(no `gh` session, no cloud profile, no SSH agent). The two places a cloud
+profile is used are scripts the operator runs:
+`scripts/export-cloudwatch-capture.py`, through the AWS CLI, and
+`scripts/export-cloud-inventory.py`, through the AWS, Google Cloud or Oracle
+Cloud CLI. Each uses the profile, project or compartment the operator names
+or, without one, the CLI's own default, hands the CLI a list of arguments
+and never a line for a shell, and writes nothing of what the CLI is signed in
+as into its file. `scripts/export-otel-capture.py` sends a
 bearer token from `TEMPO_TOKEN` or `PROMETHEUS_TOKEN` only to an `https://`
 URL or a loopback host, and stops before any request otherwise; it asks a
 loopback host directly, never through a proxy from the environment, and

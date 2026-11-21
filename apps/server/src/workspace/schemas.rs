@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use schemars::{generate::SchemaSettings, JsonSchema, Schema};
 
+use super::inventory::Inventory;
 use super::{Bundle, Manifest};
 use crate::authorization::{AuthzCatalog, PolicyDocument, MAX_POLICIES};
 use crate::domain::TopologySpec;
@@ -36,6 +37,7 @@ pub fn documents() -> BTreeMap<&'static str, Schema> {
     BTreeMap::from([
         ("workspace", schema::<Manifest>("workspace")),
         ("bundle", schema::<Bundle>("bundle")),
+        ("inventory", schema::<Inventory>("inventory")),
         ("topology", schema::<TopologySpec>("topology")),
         ("scenario", schema::<ScenarioDef>("scenario")),
         ("recording", schema::<Recording>("recording")),

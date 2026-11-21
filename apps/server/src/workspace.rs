@@ -5,6 +5,7 @@
 //! <workspace>/
 //!   workspace.json           optional file-format version (defaults to 1)
 //!   topologies/*.json        the platforms on offer; the first by file name opens
+//!                            (a Compose file or a cloud inventory is read as one)
 //!   scenarios/*.json         incident scenarios, offered in file-name order
 //!   recordings/*.json        prerecorded incidents (a seed and a command list)
 //!   cedar/policies.json      policies, in cedar-agent's PUT /v1/policies shape
@@ -47,6 +48,7 @@ use crate::incidents::{catalog, ScenarioDef};
 use crate::simulation::topologies;
 
 pub mod compose;
+pub mod inventory;
 pub mod schemas;
 
 /// Version of all AEGIS-authored file formats inside one workspace.
@@ -190,14 +192,19 @@ impl Entry {
     }
 
     /// The topology a file describes: in the topology format, or, for a
-    /// Compose file, what `compose` reads from it.
+    /// Compose file or a cloud inventory, what `compose` or `inventory`
+    /// reads from it.
     fn topology(&self) -> Result<TopologySpec, WorkspaceError> {
         let name = self.name()?;
+        let text = self.text()?;
         if COMPOSE_EXTENSIONS.contains(&extension(name)) {
-            compose::topology_from_compose(name, &self.text()?)
+            compose::topology_from_compose(name, &text)
+                .map_err(|problem| fail(self.path(), problem))
+        } else if inventory::is_inventory(&text) {
+            inventory::topology_from_inventory(name, &text)
                 .map_err(|problem| fail(self.path(), problem))
         } else {
-            self.json()
+            serde_json::from_str(&text).map_err(|e| fail(self.path(), e.to_string()))
         }
     }
 
@@ -469,7 +476,7 @@ fn kind_by_content(path: &Path, name: &str, text: &str) -> Result<Kind, Workspac
     let unknown = || {
         fail(
             path,
-            "is not a file AEGIS recognises: expected a topology (`nodes`, `edges`), a scenario (`phases`), a recording (`commands`), a catalogue (`trafficMix`), a list of policies or entities, a manifest or a bundle",
+            "is not a file AEGIS recognises: expected a topology (`nodes`, `edges`), a cloud inventory (`kind`), a scenario (`phases`), a recording (`commands`), a catalogue (`trafficMix`), a list of policies or entities, a manifest or a bundle",
         )
     };
     let value: serde_json::Value =
@@ -477,7 +484,10 @@ fn kind_by_content(path: &Path, name: &str, text: &str) -> Result<Kind, Workspac
     match &value {
         serde_json::Value::Object(map) => {
             let has = |key: &str| map.contains_key(key);
-            if has("files") {
+            // A cloud inventory says what it is; it is read as a topology.
+            if map.get("kind").and_then(|kind| kind.as_str()) == Some(inventory::KIND) {
+                Ok(Kind::Topology)
+            } else if has("files") {
                 Ok(Kind::Bundle)
             } else if has("nodes") && has("edges") {
                 Ok(Kind::Topology)
@@ -642,6 +652,28 @@ pub fn from_files(files: Vec<SourceFile>, base: Sources) -> Result<Workspace, Wo
         ));
     }
     overlay(parts, base)
+}
+
+/// What each cloud inventory among `files` holds and what its selection
+/// brings: the files [`from_files`] would read as a topology that say they
+/// are one. A file that cannot be read at all is not surveyed; the check of
+/// the files reports it. Touches nothing outside its argument.
+pub fn surveys(files: &[SourceFile]) -> Vec<inventory::Survey> {
+    files
+        .iter()
+        .take(MAX_IMPORT_FILES)
+        .filter(|file| file.text.len() as u64 <= MAX_FILE_BYTES)
+        .filter_map(|file| {
+            let (parent, name) = place(&file.path).ok()?;
+            let a_topology = match kind_by_place(parent.as_deref(), &name) {
+                Some(kind) => matches!(kind, Kind::Topology),
+                None => true,
+            };
+            (a_topology && extension(&name) == "json" && inventory::is_inventory(&file.text))
+                .then(|| inventory::survey(&file.path, &file.text).ok())
+                .flatten()
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

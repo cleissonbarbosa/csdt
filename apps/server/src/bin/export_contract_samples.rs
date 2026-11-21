@@ -313,6 +313,15 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         "workspace-check-invalid",
         post("/demo/workspace/check", json!({ "files": broken })).await?,
     )?;
+    // A cloud inventory among the files is surveyed beside the check.
+    save(
+        "workspace-check-inventory",
+        post(
+            "/demo/workspace/check",
+            json!({ "files": [tiny_inventory()] }),
+        )
+        .await?,
+    )?;
     save(
         "workspace-response",
         post(
@@ -455,6 +464,39 @@ fn tiny_workspace() -> Vec<Value> {
         json!({ "path": "topologies/front-desk.json", "text": topology.to_string() }),
         json!({ "path": "scenarios/01-slow-door.json", "text": scenario.to_string() }),
     ]
+}
+
+/// A small cloud inventory with a selection that chooses, follows a path,
+/// and meets a circle: every part of a survey has something in it.
+fn tiny_inventory() -> Value {
+    let inventory = json!({
+        "kind": "aegis-cloud-inventory",
+        "version": 1,
+        "provider": "oci",
+        "name": "front-desk-cloud",
+        "collectedAt": "2026-11-21T12:00:00Z",
+        "resources": [
+            { "id": "door", "name": "Door", "type": "api-gateway", "native": "LoadBalancer", "region": "sa-saopaulo-1", "network": "lobby-vcn", "public": true, "tags": { "env": "prod" } },
+            { "id": "desk", "name": "Desk", "type": "container", "native": "ContainerInstance", "region": "sa-saopaulo-1", "network": "lobby-vcn", "members": 2, "tags": { "env": "prod" } },
+            { "id": "ledger", "name": "Ledger", "type": "database", "native": "AutonomousDatabase", "region": "sa-saopaulo-1", "network": "lobby-vcn", "tags": { "env": "prod" } },
+            { "id": "archive", "name": "Archive", "type": "storage", "native": "Bucket", "region": "sa-saopaulo-1" },
+            { "id": "spare", "name": "Spare", "type": "container", "native": "ContainerInstance", "region": "sa-saopaulo-1", "network": "lobby-vcn", "tags": { "env": "test" } }
+        ],
+        "relations": [
+            { "from": "door", "to": "desk", "basis": "routing", "evidence": "backend set desk" },
+            { "from": "desk", "to": "ledger", "basis": "network", "evidence": "security rule tcp/1522" },
+            { "from": "ledger", "to": "desk", "basis": "network", "evidence": "security rule tcp/8080" },
+            { "from": "desk", "to": "archive", "basis": "declared", "evidence": "declared by the operator" }
+        ],
+        "selection": {
+            "networks": ["lobby-vcn", null],
+            "tags": [{ "key": "env", "values": ["prod"] }],
+            "alongPaths": true,
+            "connectedOnly": true
+        },
+        "notes": ["Fictional inventory used for the contract samples."]
+    });
+    json!({ "path": "front-desk-cloud.json", "text": inventory.to_string() })
 }
 
 #[tokio::main(flavor = "current_thread")]

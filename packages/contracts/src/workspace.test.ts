@@ -20,6 +20,7 @@ const names = [
   'recording',
   'catalog',
   'policies',
+  'inventory',
 ] as const;
 const validators = Object.fromEntries(
   names.map((name) => [
@@ -59,11 +60,46 @@ for (const workspace of ['fixtures', 'examples/corner-shop']) {
 files.push(['policies', 'fixtures/cedar/policies.json']);
 // What the server exports through the API is a bundle.
 files.push(['bundle', 'packages/contracts/samples/workspace-export.json']);
+// A cloud inventory is read as a topology and has a schema of its own.
+const INVENTORIES = 'examples/cloud-inventory/topologies';
+for (const file of readdirSync(join(ROOT, INVENTORIES)).filter((f) => f.endsWith('.json'))) {
+  files.push(['inventory', `${INVENTORIES}/${file}`]);
+}
 
 describe('workspace JSON Schemas', () => {
   it.each(files)('%s accepts %s', (schema, file) => {
     const validate = validator(schema);
     expect(validate(read(file)), ajv.errorsText(validate.errors)).toBe(true);
+  });
+
+  it('holds an inventory to its version, its kinds and its bounds', () => {
+    const inventory = read(`${INVENTORIES}/aws-shop.json`) as Record<string, unknown> & {
+      resources: Record<string, unknown>[];
+    };
+    const validate = validator('inventory');
+    expect(validate(inventory)).toBe(true);
+    const [first, ...rest] = inventory.resources;
+    for (const broken of [
+      { ...inventory, version: 2 },
+      { ...inventory, kind: 'aegis-incident-capture' },
+      { ...inventory, provider: 'azure' },
+      { ...inventory, resources: [] },
+      { ...inventory, resources: [{ ...first, arn: 'arn:aws:x' }, ...rest] },
+      { ...inventory, resources: [{ ...first, id: 'arn:aws:x' }, ...rest] },
+      { ...inventory, resources: [{ ...first, type: 'warehouse' }, ...rest] },
+      { ...inventory, selection: { regions: 'sa-east-1' } },
+      { ...inventory, selection: { bases: ['guess'] } },
+    ]) {
+      expect(validate(broken), JSON.stringify(broken).slice(0, 120)).toBe(false);
+    }
+    // A selection is part of the file, and so is asking for what is in no network.
+    expect(
+      validate({
+        ...inventory,
+        selection: { networks: ['shop', null], tags: [{ key: 'env' }], connectedOnly: true },
+      }),
+      ajv.errorsText(validate.errors),
+    ).toBe(true);
   });
 
   it('rejects unsupported manifest versions and unknown fields', () => {

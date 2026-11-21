@@ -32,6 +32,11 @@ export const ServiceTypeSchema = z.enum([
   'network-gateway',
   'security-monitor',
   'external-client',
+  'load-balancer',
+  'virtual-machine',
+  'kubernetes-cluster',
+  'cache',
+  'event-stream',
 ]);
 export type ServiceType = z.infer<typeof ServiceTypeSchema>;
 export const SERVICE_TYPES = ServiceTypeSchema.options;
@@ -1261,11 +1266,93 @@ export const WorkspaceProblemSchema = z.object({
 });
 export type WorkspaceProblem = z.infer<typeof WorkspaceProblemSchema>;
 
+// -- a cloud inventory among the files, and what there is to choose from ---
+
+export const InventoryProviderSchema = z.enum(['aws', 'gcp', 'oci']);
+export type InventoryProvider = z.infer<typeof InventoryProviderSchema>;
+
+/** What states a connection of an inventory, strongest first. */
+export const InventoryBasisSchema = z.enum(['routing', 'event', 'declared', 'network']);
+export type InventoryBasis = z.infer<typeof InventoryBasisSchema>;
+
+/** Two resources, in the direction a connection runs. */
+export const InventoryPairSchema = z.object({ from: z.string(), to: z.string() });
+export type InventoryPair = z.infer<typeof InventoryPairSchema>;
+
+/**
+ * Which part of an inventory is brought, as the file carries it. `null`
+ * asks for everything; among `networks`, `null` stands for the resources
+ * that are in none.
+ */
+export const InventorySelectionSchema = z.object({
+  regions: z.array(z.string()).nullable(),
+  networks: z.array(z.string().nullable()).nullable(),
+  kinds: z.array(ServiceTypeSchema).nullable(),
+  tags: z.array(z.object({ key: z.string(), values: z.array(z.string()) })),
+  name: z.string().nullable(),
+  bases: z.array(InventoryBasisSchema).nullable(),
+  alongPaths: z.boolean(),
+  connectedOnly: z.boolean(),
+  exclude: z.array(z.string()),
+  without: z.array(InventoryPairSchema),
+});
+export type InventorySelection = z.infer<typeof InventorySelectionSchema>;
+
+/** One thing a selection can ask for, with how many resources have it. */
+const facet = <T extends z.ZodType>(value: T) => z.object({ value, count });
+
+/** A resource named in a survey: brought, or left out by hand. */
+export const InventoryListedSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: ServiceTypeSchema,
+  region: z.string(),
+  kept: z.boolean(),
+});
+export type InventoryListed = z.infer<typeof InventoryListedSchema>;
+
+/**
+ * What a cloud inventory holds to choose from and what its selection
+ * brings. The server reads the file; the page only rewrites its selection.
+ */
+export const InventorySurveySchema = z.object({
+  /** The file it is of, as it was named. */
+  path: z.string(),
+  provider: InventoryProviderSchema,
+  name: z.string(),
+  collectedAt: z.string().optional(),
+  /** How many the file lists, whatever is selected. */
+  resources: count,
+  relations: count,
+  regions: z.array(facet(z.string())),
+  networks: z.array(facet(z.string().nullable())),
+  kinds: z.array(facet(ServiceTypeSchema)),
+  tags: z.array(z.object({ key: z.string(), count, values: z.array(facet(z.string())) })),
+  bases: z.array(facet(InventoryBasisSchema)),
+  selection: InventorySelectionSchema,
+  kept: z.object({ resources: count, relations: count, entries: count }),
+  leftOut: z.object({
+    unselected: count,
+    excluded: count,
+    unconnected: count,
+    /** Connections left out so that calls run one way. */
+    circular: z.array(InventoryPairSchema),
+  }),
+  listed: z.array(InventoryListedSchema),
+  /** Why the selection is no topology, when it is not. */
+  problem: z.string().optional(),
+  /** The file's own notes, as written. */
+  notes: z.array(z.string()),
+});
+export type InventorySurvey = z.infer<typeof InventorySurveySchema>;
+
 /** The outcome of checking files without applying them. */
 export const WorkspaceCheckSchema = z.object({
   valid: z.boolean(),
   workspace: WorkspaceStatusSchema.optional(),
   problem: WorkspaceProblemSchema.optional(),
+  /** A survey of each cloud inventory among the files, valid or not. */
+  inventories: z.array(InventorySurveySchema).optional(),
 });
 export type WorkspaceCheck = z.infer<typeof WorkspaceCheckSchema>;
 

@@ -21,8 +21,8 @@ vocabulary). Docs and code comments are written in English.
 - `pnpm install` once. Nothing needs credentials, tokens or a `.env`.
 - The static site also needs the `wasm32-unknown-unknown` target:
   `rustup target add wasm32-unknown-unknown`.
-- Python 3 runs the incident capture scripts in `scripts/` and their tests,
-  with the standard library only.
+- Python 3 runs the incident capture scripts and the cloud inventory
+  collectors in `scripts/` and their tests, with the standard library only.
 
 ## Commands
 
@@ -86,7 +86,7 @@ pnpm e2e:static       # Playwright against the static build, no server
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,diff,insight,platforms,mitigations,limits}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,import,inventory,diff,insight,platforms,mitigations,limits}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -174,7 +174,8 @@ domain`.
   goes through `guard.rs`.
 - `workspace`: sorts files into the parts of a workspace, checks each and
   lays them over a set of sources. `workspace/compose.rs` reads a Compose
-  file as a topology. `load` reads the directory (or bundle
+  file as a topology, and `workspace/inventory.rs` a cloud inventory, which
+  it also surveys. `load` reads the directory (or bundle
   file) named by `AEGIS_WORKSPACE` once, before the server listens, and is
   the only file I/O in the server. `from_files` does the same for files
   already in memory and touches nothing; the import route calls it, so a file
@@ -295,6 +296,34 @@ Things that are easy to break:
   nor what aliases expand to: `document()` checks both first
   (`MAX_YAML_DEPTH`, `MAX_YAML_VALUES`), and no YAML may reach the parser
   any other way. Without the first, one request ends the process.
+- **A cloud inventory is text too, and a connection says what states it.**
+  `workspace/inventory.rs` reads the file a collector in `scripts/` wrote
+  (`docs/INVENTORY.md`): it asks no provider anything, and nothing in the
+  server, the engine or the page may. A connection is drawn only from a
+  relation the file holds, as what its `basis` says (`routing`, `event`,
+  `declared`, `network`), and the description counts them by basis and says
+  that a network rule is a permission, not a call. Traffic, the even shares
+  and latencies are defaults the description names; no capacity is given.
+  The two stand-ins (`clients`, `unknown-sources`) are the only nodes the
+  file does not list. Connections that would close a circle are left out,
+  weakest basis first, and named: never silently. `topology_from_inventory`
+  and `survey` are one reading (`check`, `choose`), so what the dialog
+  counts is what Apply gives; change one and the other follows, and a test
+  holds the survey to the topology. The format is public like every
+  fixture format: a field change means `pnpm workspace:schemas`,
+  `docs/INVENTORY.md`, `scripts/cloud_inventory/core.py` (a test holds its
+  names and bounds to the schema) and `examples/cloud-inventory`, which the
+  collectors' own tests write (`AEGIS_UPDATE_EXAMPLES=1`) and never a hand.
+- **A collector only reads, and writes nothing that names the account.**
+  Each of `scripts/cloud_inventory/{aws,gcp,oci}.py` lists the operations it
+  may call (`READS`); a test holds what it calls to that list and each to a
+  list, a describe or a get. It runs the provider's CLI with a list of
+  arguments, never a shell line, and names from the operator go through
+  `core.plain`. A resource takes an id made of its name: no ARN, account or
+  project id, OCID or address is written, and a refused read is noted by
+  the provider's short code alone (`Inventory.attempt`). Their answers in
+  the tests are written from the providers' references, not recorded: do
+  not describe a collector as verified against an account.
 - **A session, like a recording, cannot state an outcome.**
   `Recording::validate_session` refuses `recordDecision`, and
   `session::export` leaves decisions out and counts them. An experiment
@@ -308,7 +337,11 @@ Things that are easy to break:
   lock (a recording's timeline) checks that the assets are still the same
   before it is put in place. The cedar-agent adapter's sync store is updated
   with every swap. The browser never decides what a workspace file is:
-  classification is `workspace::from_files`, on the server. An incident
+  classification is `workspace::from_files`, on the server. The one thing
+  of a workspace file the page rewrites is a cloud inventory's `selection`
+  (`features/workspace/inventory.ts`), and it decides nothing by it: what a
+  selection brings is the survey in the check's answer
+  (`WorkspaceCheck.inventories`), which `InventoryFilters` shows. An incident
   capture is the one file the browser reads itself
   (`features/capture/capture.ts`); it never reaches the server or the
   simulation's timeline. A platform drafted from one, when the viewer asks
@@ -446,7 +479,7 @@ everything drawn inside it and is fed through store subscriptions set up in
   `window.__aegis.projectNode` accepts a service id at either level.
   `useTelemetry` always holds the server's own topology and snapshot.
 - The service pieces are a built asset, not code. `apps/web/scripts/build-pieces.py`
-  models all twelve in Blender and writes `src/graphics/pieces.glb`, which is
+  models all seventeen in Blender and writes `src/graphics/pieces.glb`, which is
   committed and read by the small parser in `graphics/pieces.ts` (a general
   glTF loader is deliberately not in the bundle). After changing a piece,
   rebuild and commit the file; a test fails if a service type has no model
@@ -652,7 +685,8 @@ against. Read it before touching anything visual. In short:
    first visit (`features/guide/Orientation.tsx`), shown once and remembered
    in `stores/guide.ts`.
 3. **Overview first, then one path, then the detail.** The opening view is
-   the twelve kinds of service; a selection, a traced request or an
+   one piece per kind of service (twelve for the bundled platform, at most
+   seventeen); a selection, a traced request or an
    incident's route brings one path forward; opening a service goes to the
    detailed arrangements. A new element belongs to one of these levels and
    appears there, not before.
@@ -736,13 +770,16 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   perform no I/O; files are read by `workspace::load` alone, at start-up, and
   the import route is handed file contents, never a path to open. No real
   attacks or scans; the server, the engine and the page hold no cloud SDK or
-  cloud credential. The capture exporters in `scripts/` are operator tools that
-  read with the operator's own credentials; nothing in AEGIS runs them. No
+  cloud credential. The capture exporters and the cloud inventory collectors
+  in `scripts/` are operator tools that read with the operator's own
+  credentials; nothing in AEGIS runs them, and the interface only writes the
+  command for the operator to run (`features/workspace/CloudCommand.tsx`). No
   outbound connection by default: integrations need server configuration and
   an explicit click, and accept loopback targets only unless allow-listed.
 - **Integrations** adapt only public repositories owned by `cleissonbarbosa`,
   read without authentication, and copy no source from them
-  (`docs/INTEGRATIONS.md`). The capture exporters are not integrations.
+  (`docs/INTEGRATIONS.md`). The capture exporters and the inventory
+  collectors are not integrations.
   Bundled captures are third-party public material (Google Cloud's public
   incident report; aggregates of the RCAEval 0.2.0 release), each naming its
   source.
@@ -774,5 +811,6 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
 `docs/ARCHITECTURE.md` (model, API table, stream protocol),
 `docs/WORKSPACE.md` (the file formats an operator writes), `docs/DESIGN.md`,
 `docs/SECURITY.md`, `docs/INTEGRATIONS.md`, `docs/CAPTURES.md` (incident
-captures: reading rules, format, exporters), `docs/PERFORMANCE.md`,
-`docs/DEMO.md`.
+captures: reading rules, format, exporters), `docs/INVENTORY.md` (cloud
+inventories: what is read, the selection, the format, the collectors),
+`docs/PERFORMANCE.md`, `docs/DEMO.md`.

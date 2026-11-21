@@ -74,6 +74,75 @@ function differences(actual: Json, expected: Json, path = '$', found: string[] =
   return found;
 }
 
+/** A small cloud inventory whose selection meets a circle; the exporter's own. */
+function tinyInventory(): { path: string; text: string } {
+  const lobby = { region: 'sa-saopaulo-1', network: 'lobby-vcn' };
+  const inventory = {
+    kind: 'aegis-cloud-inventory',
+    version: 1,
+    provider: 'oci',
+    name: 'front-desk-cloud',
+    collectedAt: '2026-11-21T12:00:00Z',
+    resources: [
+      {
+        id: 'door',
+        name: 'Door',
+        type: 'api-gateway',
+        native: 'LoadBalancer',
+        ...lobby,
+        public: true,
+        tags: { env: 'prod' },
+      },
+      {
+        id: 'desk',
+        name: 'Desk',
+        type: 'container',
+        native: 'ContainerInstance',
+        ...lobby,
+        members: 2,
+        tags: { env: 'prod' },
+      },
+      {
+        id: 'ledger',
+        name: 'Ledger',
+        type: 'database',
+        native: 'AutonomousDatabase',
+        ...lobby,
+        tags: { env: 'prod' },
+      },
+      {
+        id: 'archive',
+        name: 'Archive',
+        type: 'storage',
+        native: 'Bucket',
+        region: 'sa-saopaulo-1',
+      },
+      {
+        id: 'spare',
+        name: 'Spare',
+        type: 'container',
+        native: 'ContainerInstance',
+        ...lobby,
+        tags: { env: 'test' },
+      },
+    ],
+    relations: [
+      { from: 'door', to: 'desk', basis: 'routing', evidence: 'backend set desk' },
+      { from: 'desk', to: 'ledger', basis: 'network', evidence: 'security rule tcp/1522' },
+      { from: 'ledger', to: 'desk', basis: 'network', evidence: 'security rule tcp/8080' },
+      { from: 'desk', to: 'archive', basis: 'declared', evidence: 'declared by the operator' },
+    ],
+    selection: {
+      networks: ['lobby-vcn', null],
+      tags: [{ key: 'env', values: ['prod'] }],
+      alongPaths: true,
+      connectedOnly: true,
+    },
+    notes: ['Fictional inventory used for the contract samples.'],
+  };
+  return { path: 'front-desk-cloud.json', text: JSON.stringify(inventory) };
+}
+
 /** The smallest workspace that replaces something; the exporter's own. */
 function tinyWorkspace(): { path: string; text: string }[] {
   const topology = {
@@ -342,6 +411,10 @@ describe('the engine built for the browser', () => {
     const broken = tinyWorkspace();
     broken[1]!.text = '{ "id": "slow-door" }';
     produced.set('workspace-check-invalid', post('/demo/workspace/check', { files: broken }).body);
+    produced.set(
+      'workspace-check-inventory',
+      post('/demo/workspace/check', { files: [tinyInventory()] }).body,
+    );
     const imported = post('/demo/workspace/import', { files: tinyWorkspace() });
     produced.set('workspace-response', imported.body);
     produced.set('workspace-export', get('/workspace/export'));
@@ -379,6 +452,7 @@ describe('the engine built for the browser', () => {
     'workspace',
     'workspace-check',
     'workspace-check-invalid',
+    'workspace-check-inventory',
     'workspace-diff',
     'workspace-response',
     'workspace-export',

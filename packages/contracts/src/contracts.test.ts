@@ -84,6 +84,7 @@ const CASES: Record<string, z.ZodType> = {
   workspace: WorkspaceStatusSchema,
   'workspace-check': WorkspaceCheckSchema,
   'workspace-check-invalid': WorkspaceCheckSchema,
+  'workspace-check-inventory': WorkspaceCheckSchema,
   'workspace-diff': WorkspaceDiffSchema,
   'workspace-response': WorkspaceResponseSchema,
   'workspace-export': WorkspaceBundleSchema,

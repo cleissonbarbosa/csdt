@@ -1343,6 +1343,6 @@ pub fn step(ctx: &StepContext, state: &mut SimState, commands: &[Command]) -> Ve
 pub fn is_ingress(service_type: ServiceType) -> bool {
     matches!(
         service_type,
-        ServiceType::ApiGateway | ServiceType::NetworkGateway
+        ServiceType::ApiGateway | ServiceType::NetworkGateway | ServiceType::LoadBalancer
     )
 }

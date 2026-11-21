@@ -320,9 +320,9 @@ class KindTest(unittest.TestCase):
     def test_a_declaration_reads_name_and_kind(self):
         self.assertEqual(otel.kind_pair("redis=database"), ("redis", "database"))
         with self.assertRaisesRegex(
-            ArgumentTypeError, r"unknown kind 'cache' for 'redis'"
+            ArgumentTypeError, r"unknown kind 'memory' for 'redis'"
         ):
-            otel.kind_pair("redis=cache")
+            otel.kind_pair("redis=memory")
         with self.assertRaisesRegex(ArgumentTypeError, "expected NAME=KIND"):
             otel.kind_pair("redis")
 

@@ -1,0 +1,213 @@
+{
+  "kind": "aegis-cloud-inventory",
+  "version": 1,
+  "provider": "oci",
+  "name": "shop-oci",
+  "collectedAt": "2026-11-21T12:00:00Z",
+  "resources": [
+    {
+      "id": "storefront",
+      "name": "storefront",
+      "type": "virtual-machine",
+      "native": "oci.core.InstancePool",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "app": "shop",
+        "env": "prod"
+      },
+      "members": 4
+    },
+    {
+      "id": "platform",
+      "name": "platform",
+      "type": "kubernetes-cluster",
+      "native": "oci.container_engine.Cluster",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "legacy-web",
+      "name": "legacy-web",
+      "type": "virtual-machine",
+      "native": "oci.core.Instance",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "bastion",
+      "name": "bastion",
+      "type": "virtual-machine",
+      "native": "oci.core.Instance",
+      "region": "sa-saopaulo-1",
+      "network": "shop"
+    },
+    {
+      "id": "shop-lb",
+      "name": "shop-lb",
+      "type": "load-balancer",
+      "native": "oci.load_balancer.LoadBalancer",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "Operations.CostCenter": "42",
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "internal-lb",
+      "name": "internal-lb",
+      "type": "load-balancer",
+      "native": "oci.load_balancer.LoadBalancer",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "api-handler",
+      "name": "api-handler",
+      "type": "serverless",
+      "native": "oci.functions.Function",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "partners",
+      "name": "partners",
+      "type": "api-gateway",
+      "native": "oci.apigateway.Gateway",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      },
+      "public": true
+    },
+    {
+      "id": "order-events",
+      "name": "order-events",
+      "type": "event-stream",
+      "native": "oci.streaming.Stream",
+      "region": "sa-saopaulo-1",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "orders-db",
+      "name": "orders-db",
+      "type": "database",
+      "native": "oci.database.AutonomousDatabase",
+      "region": "sa-saopaulo-1",
+      "network": "shop",
+      "tags": {
+        "env": "prod"
+      }
+    },
+    {
+      "id": "shop-assets",
+      "name": "shop-assets",
+      "type": "storage",
+      "native": "oci.object_storage.Bucket",
+      "region": "sa-saopaulo-1",
+      "tags": {
+        "env": "prod"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from": "shop-lb",
+      "to": "storefront",
+      "basis": "routing",
+      "evidence": "backend set storefront"
+    },
+    {
+      "from": "shop-lb",
+      "to": "legacy-web",
+      "basis": "routing",
+      "evidence": "backend set legacy"
+    },
+    {
+      "from": "internal-lb",
+      "to": "platform",
+      "basis": "routing",
+      "evidence": "backend set checkout"
+    },
+    {
+      "from": "partners",
+      "to": "api-handler",
+      "basis": "routing",
+      "evidence": "route /orders"
+    },
+    {
+      "from": "partners",
+      "to": "internal-lb",
+      "basis": "routing",
+      "evidence": "route /checkout"
+    },
+    {
+      "from": "shop-lb",
+      "to": "storefront",
+      "basis": "network",
+      "evidence": "security rule: shop-lb may reach shop-app on tcp/8080"
+    },
+    {
+      "from": "shop-lb",
+      "to": "legacy-web",
+      "basis": "network",
+      "evidence": "security rule: shop-lb may reach shop-app on tcp/8080"
+    },
+    {
+      "from": "partners",
+      "to": "internal-lb",
+      "basis": "network",
+      "evidence": "security rule: shop-api may reach shop-internal on tcp/443"
+    },
+    {
+      "from": "internal-lb",
+      "to": "platform",
+      "basis": "network",
+      "evidence": "security rule: shop-internal may reach oke-workers on tcp/30000-32767"
+    },
+    {
+      "from": "storefront",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security rule: shop-app may reach shop-db on tcp/1521"
+    },
+    {
+      "from": "legacy-web",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security rule: shop-app may reach shop-db on tcp/1521"
+    },
+    {
+      "from": "api-handler",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security rule: shop-fn may reach shop-db on tcp/1521"
+    },
+    {
+      "from": "platform",
+      "to": "orders-db",
+      "basis": "network",
+      "evidence": "security rule: oke-workers may reach shop-db on tcp/1521"
+    }
+  ],
+  "notes": [
+    "Not read: Cloud Guard, identity domains, Notifications topics, Events rules, Service Connector Hub, what runs inside an OKE cluster, security lists, the VNICs of a container instance, compartments under the one named, and a backend named by a host name or held in another network. An instance pool is taken to be in the network security groups of its first running instance. Declare a connection that is not here with --relation."
+  ]
+}

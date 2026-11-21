@@ -215,4 +215,75 @@ export default {
     '{service}: {base} req/s em A, {candidate} req/s em B',
   'The two runs (A in use, B with these files)':
     'As duas execuções (A em uso, B com estes arquivos)',
+
+  // A cloud inventory: the command that writes one.
+  'Get an inventory of a cloud account, to import':
+    'Obter o inventário de uma conta de nuvem para importar',
+  'A script in this project’s repository reads what a provider lists of an account, its resources and the connections it states between them, and writes one file. It runs on your machine, through the provider’s own CLI and with your own access, and only reads. AEGIS never runs it and is given no credential: what you type here goes into the line below and nowhere else. Drop the file it writes on this dialog.':
+    'Um script no repositório deste projeto lê o que o provedor lista de uma conta, seus recursos e as conexões que ele declara entre eles, e grava um único arquivo. Ele roda na sua máquina, pela CLI do próprio provedor e com o seu acesso, e apenas lê. O AEGIS nunca o executa e não recebe nenhuma credencial: o que você digita aqui vai para a linha abaixo e para nenhum outro lugar. Solte neste diálogo o arquivo que ele gravar.',
+  Provider: 'Provedor',
+  Profile: 'Perfil',
+  'Of the provider’s CLI. Empty: its default.': 'Da CLI do provedor. Vazio: o padrão dela.',
+  Project: 'Projeto',
+  'The id of the project to read.': 'O id do projeto a ler.',
+  Compartment: 'Compartimento',
+  'The OCID of the compartment to read.': 'O OCID do compartimento a ler.',
+  'Region codes, separated by spaces or commas.':
+    'Códigos de região, separados por espaços ou vírgulas.',
+  'Only with these tags': 'Somente com estas tags',
+  'KEY or KEY=VALUE, separated by spaces. Empty: everything.':
+    'CHAVE ou CHAVE=VALOR, separados por espaços. Vazio: tudo.',
+  'Name in AEGIS': 'Nome no AEGIS',
+  'It need not be the account’s.': 'Não precisa ser o da conta.',
+  'Copy the command': 'Copiar o comando',
+  'Still needed: {fields}': 'Ainda falta: {fields}',
+  'Command copied.': 'Comando copiado.',
+  'The command could not be copied.': 'Não foi possível copiar o comando.',
+  'Run it from the repository’s folder, with the provider’s CLI installed and signed in. <c>--help</c> after the provider lists every option; what it reads, and the least access it needs, is in <c>docs/INVENTORY.md</c>.':
+    'Execute-o na pasta do repositório, com a CLI do provedor instalada e autenticada. <c>--help</c> depois do provedor lista todas as opções; o que ele lê, e o acesso mínimo de que precisa, está em <c>docs/INVENTORY.md</c>.',
+
+  // A cloud inventory among the files: what to bring from it.
+  'What to bring from {file}': 'O que trazer de {file}',
+  '<c>{file}</c> is an inventory of {provider}.': '<c>{file}</c> é um inventário de {provider}.',
+  'Read <n>{when}</n>.': 'Lido em <n>{when}</n>.',
+  'Its resources and the connections the provider states between them are read as a platform. Choose what to bring: each choice is written into the file, and what it brings is counted again.':
+    'Seus recursos e as conexões que o provedor declara entre eles são lidos como uma plataforma. Escolha o que trazer: cada escolha é gravada no arquivo, e o que ela traz é contado de novo.',
+  'Resources brought': 'Recursos trazidos',
+  '{kept} of {total}': '{kept} de {total}',
+  'Connections drawn': 'Conexões desenhadas',
+  'Where clients enter': 'Por onde os clientes entram',
+  '{n} resource': '{n} recurso',
+  '{n} resources': '{n} recursos',
+  'Not brought': 'Não trazidos',
+  '{n} that the filters do not ask for': '{n} que os filtros não pedem',
+  '{n} left out by hand': '{n} fora por escolha manual',
+  '{n} that no connection touches': '{n} sem nenhuma conexão',
+  'Left out so that calls run one way': 'Fora, para que as chamadas sigam em um só sentido',
+  '{n} more': 'mais {n}',
+  Networks: 'Redes',
+  'In no network': 'Em nenhuma rede',
+  Tag: 'Tag',
+  'Choose a tag': 'Escolher uma tag',
+  'Stop asking for the tag {key}': 'Deixar de pedir a tag {key}',
+  'Values of {key}': 'Valores de {key}',
+  'Any value': 'Qualquer valor',
+  '(empty)': '(vazio)',
+  'Name has': 'Nome contém',
+  'Also what leads to them and what they lead to':
+    'Também o que leva a eles e aquilo a que eles levam',
+  'From what the filters choose, follows the connections both ways: what a tag misses on the same path comes too.':
+    'A partir do que os filtros escolhem, segue as conexões nos dois sentidos: o que uma tag não alcança no mesmo caminho vem junto.',
+  'Only what a connection touches': 'Somente o que tem alguma conexão',
+  'A resource nothing leads to and that leads nowhere is left out. A security monitor stays: it watches, and nothing calls it.':
+    'Um recurso ao qual nada leva e que não leva a lugar nenhum fica de fora. Um monitor de segurança permanece: ele observa, e nada o chama.',
+  'Draw connections from network rules': 'Desenhar conexões a partir de regras de rede',
+  'A rule that admits one group to another is a permission to reach, not a call that was seen. The file states {n} of them.':
+    'Uma regra que admite um grupo em outro é uma permissão de alcance, não uma chamada que foi vista. O arquivo declara {n} delas.',
+  'Resources, one by one': 'Recursos, um a um',
+  'Find a resource': 'Buscar um recurso',
+  'Leave out {name}': 'Deixar {name} de fora',
+  'Bring back {name}': 'Trazer {name} de volta',
+  '{n} more: search to find one of them.': 'Mais {n}: use a busca para encontrar um deles.',
+  'Notes in the file': 'Notas do arquivo',
+  'Bring everything': 'Trazer tudo',
 } as const satisfies Record<string, string>;

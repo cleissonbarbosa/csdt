@@ -276,7 +276,7 @@ milliseconds.
 
 - **Ids** (of regions and nodes) are 1–80 letters, digits, `.`, `_` or `-`,
   unique, and everything that names one must name one that exists. A node's
-  `type` is one of the twelve service kinds of a topology
+  `type` is one of the seventeen service kinds of a topology
   ([WORKSPACE.md](WORKSPACE.md)).
 - **`typeSource`** says where a node's kind comes from: `source`, mapped by
   the exporter from a resource type the platform reported; `declared`, named
@@ -316,7 +316,7 @@ anything they read from. They use only Python 3's standard library. The two
 exporters each write a new file and refuse to overwrite one, keep within the
 limits above, and exit 0 when they wrote the file, 1 with `Capture failed:
 …` when the export failed, and 2 for a usage error; `--help` lists their
-options and the twelve kinds.
+options and the kinds.
 
 **A capture can name your systems.** It holds service names, connections and
 times from the account or the backends it was read from. A CloudWatch node

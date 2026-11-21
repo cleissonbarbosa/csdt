@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useThrottledSnapshot } from '@/app/hooks';
 import { HealthGlyph, HealthMark } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/Section';
 import { sceneHandle } from '@/graphics/handle';
 import { t } from '@/i18n';
@@ -19,32 +20,6 @@ import { impactedSet, matchesFilters, nodeHealth } from './filtering';
 const HEALTHS: Health[] = ['healthy', 'degraded', 'critical', 'down'];
 /** Worst first: what needs attention is at the top of its region. */
 const SEVERITY: Record<Health, number> = { down: 0, critical: 1, degraded: 2, healthy: 3 };
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-control border px-1.5 text-[11px] transition-colors',
-        active
-          ? 'border-accent bg-accent text-on-accent'
-          : 'border-line text-ink-dim hover:border-line-strong hover:text-ink',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 interface Row {
   node: InfrastructureNode;
