@@ -183,8 +183,8 @@ export default {
   'The files in use could not be read.': 'Não foi possível ler os arquivos em uso.',
   "The policies in force, in Cedar's own syntax":
     'As políticas em vigor, na sintaxe do próprio Cedar',
-  'A policy goes by its {id}. Nothing is applied until you say so, and applying replaces the policies only: the platform, its scenarios and its entities stay as they are. The timeline starts again, as it does for any change of files.':
-    'Cada política é identificada pelo {id}. Ao aplicar as alterações, você substitui apenas as políticas. A plataforma, os cenários e as entidades permanecem iguais. Como em qualquer mudança de arquivos, a linha do tempo recomeça.',
+  'A policy goes by its {id}. Nothing is applied until you say so, and applying replaces the policies and the shares of ordinary traffic only: the platform, its scenarios and its entities stay as they are. The timeline starts again, as it does for any change of files.':
+    'Cada política é identificada pelo {id}. Nada é aplicado até você pedir, e aplicar substitui apenas as políticas e as proporções do tráfego comum. A plataforma, os cenários e as entidades permanecem iguais. Como em qualquer mudança de arquivos, a linha do tempo recomeça.',
   'These are the policies in use.': 'Estas são as políticas em uso.',
   'The policies could not be checked.': 'Não foi possível verificar as políticas.',
   'Cedar accepts them: {n} policy.': 'O Cedar validou {n} política.',
@@ -194,4 +194,41 @@ export default {
   'Applying…': 'Aplicando…',
   'Apply these policies': 'Aplicar estas políticas',
   'Put back the ones in use': 'Restaurar as que estão em uso',
+
+  // A policy written as a sentence.
+  'Write one as a sentence': 'Escrever uma como frase',
+  '{effect} {who} to {what} on {on}': '{effect} a {who} {what} em {on}',
+  'Permit or forbid': 'Permite ou proíbe',
+  Who: 'Quem',
+  anyone: 'qualquer um',
+  'A group, as the entity store has it': 'Um grupo, como o repositório de entidades o tem',
+  'members of {group}': 'membros de {group}',
+  'One principal': 'Um principal',
+  'To do what': 'Para fazer o quê',
+  'do anything': 'fazer qualquer coisa',
+  'On what': 'Em quê',
+  anything: 'qualquer coisa',
+  'Every resource of a type': 'Todo recurso de um tipo',
+  'any {type}': 'qualquer {type}',
+  'One resource': 'Um recurso',
+  Conditions: 'Condições',
+  'the resource is of the principal’s own tenant': 'o recurso é do próprio locatário do principal',
+  'What the conditions do': 'O que as condições fazem',
+  'Only when these hold': 'Só quando valem',
+  'Except when these hold': 'Exceto quando valem',
+  'Its id': 'O id dela',
+  'Another policy goes by this id.': 'Outra política já usa este id.',
+  'What it is for, in a sentence': 'Para que serve, em uma frase',
+  'Add it to the policies': 'Adicionar às políticas',
+  'Cedar checks it with the rest before anything is applied.':
+    'O Cedar a verifica com as demais antes de qualquer coisa ser aplicada.',
+
+  // The ordinary traffic.
+  'What ordinary traffic asks': 'O que o tráfego comum pede',
+  'The request shapes the catalogue sends at rest, each as wide as its share. Carry a boundary to move share from one to the next. The share Cedar denies is the denial rate at rest.':
+    'Os formatos de requisição que o catálogo envia em repouso, cada um com a largura da sua proporção. Leve um limite para passar proporção de um para o seguinte. A proporção que o Cedar nega é a taxa de negação em repouso.',
+  '{who}: {asks}, {share} of requests': '{who}: {asks}, {share} das requisições',
+  'Between {a} and {b}': 'Entre {a} e {b}',
+  'At rest Cedar would deny {then} of ordinary requests; it denies {now} now.':
+    'Em repouso o Cedar negaria {then} das requisições comuns; hoje nega {now}.',
 } as const satisfies Record<string, string>;

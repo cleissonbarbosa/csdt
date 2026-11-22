@@ -3,5 +3,15 @@
   "problem": {
     "path": "scenarios/01-slow-door.json",
     "message": "missing field `name` at line 1 column 21"
-  }
+  },
+  "sorted": [
+    {
+      "path": "topologies/front-desk.json",
+      "part": "topologies"
+    },
+    {
+      "path": "scenarios/01-slow-door.json",
+      "part": "scenarios"
+    }
+  ]
 }

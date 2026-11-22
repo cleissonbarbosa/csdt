@@ -9,18 +9,19 @@
 import type {
   InventorySelection,
   InventorySurvey,
+  SortedFile,
   WorkspaceCheck,
   WorkspaceFile,
   WorkspaceStatus,
 } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileUp, FolderUp, RotateCcw, X } from 'lucide-react';
+import { Download, FileUp, FolderUp, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 
 import { actions } from '@/app/actions';
 import { HOST } from '@/app/host';
 import { queryKeys } from '@/app/queryClient';
-import { Button, IconButton } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { t } from '@/i18n';
 import { tr } from '@/i18n/rich';
@@ -29,19 +30,12 @@ import { formatPercent } from '@/lib/format';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
 
+import { Board } from './Board';
 import { CloudCommand } from './CloudCommand';
 import { InventoryFilters } from './InventoryFilters';
 import { PlatformRuns } from './PlatformRuns';
 import { PolicyDiff } from './PolicyDiff';
-import {
-  download,
-  formatBytes,
-  fromDrop,
-  fromInput,
-  stage,
-  type Picked,
-  type Skipped,
-} from './files';
+import { download, fromDrop, fromInput, stage, type Picked, type Skipped } from './files';
 import { withSelection } from './inventory';
 
 const ORIGIN: Record<WorkspaceStatus['origin'], string> = {
@@ -205,6 +199,12 @@ function Import() {
     if (outcome !== null && typeof outcome === 'object') setSurveys(outcome.inventories ?? []);
   }, [outcome]);
   const surveyed = surveys.filter((survey) => staged.some((file) => file.path === survey.path));
+  // Where the server last said each file goes, kept the same way while the
+  // next answer is on its way, so a file does not jump out of its slot.
+  const [sorted, setSorted] = useState<SortedFile[]>([]);
+  useEffect(() => {
+    if (outcome !== null && typeof outcome === 'object') setSorted(outcome.sorted ?? []);
+  }, [outcome]);
   const select = (path: string, selection: InventorySelection) =>
     setStaged((files) =>
       files.map((file) =>
@@ -362,29 +362,12 @@ function Import() {
 
       {staged.length > 0 && (
         <>
-          <ul
-            className="mt-3 max-h-40 divide-y divide-line overflow-y-auto rounded-control border border-line"
-            aria-label={t('Files to import')}
-            data-testid="workspace-staged"
-          >
-            {staged.map((file) => (
-              <li key={file.path} className="flex items-center gap-2 px-2 py-1 text-[11px]">
-                <span className="code min-w-0 flex-1 truncate text-ink" title={file.path}>
-                  {file.path}
-                </span>
-                <span className="numeric shrink-0 text-ink-faint">
-                  {formatBytes(new Blob([file.text]).size)}
-                </span>
-                <IconButton
-                  size="sm"
-                  label={t('Remove {file}', { file: file.path })}
-                  onClick={() => setStaged(staged.filter((other) => other !== file))}
-                >
-                  <X size={12} />
-                </IconButton>
-              </li>
-            ))}
-          </ul>
+          <Board
+            staged={staged}
+            sorted={sorted}
+            answered={outcome !== null}
+            onRemove={(file) => setStaged(staged.filter((other) => other !== file))}
+          />
 
           {surveyed.map((survey) => (
             <InventoryFilters

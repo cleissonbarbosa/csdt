@@ -286,4 +286,31 @@ export default {
   '{n} more: search to find one of them.': 'Mais {n}: use a busca para encontrar um deles.',
   'Notes in the file': 'Notas do arquivo',
   'Bring everything': 'Trazer tudo',
+
+  // The files to import, by the part each goes to.
+  Platforms: 'Plataformas',
+  Recordings: 'Gravações',
+  'topologies, Compose files, inventories': 'topologias, arquivos Compose, inventários',
+  'incidents to run': 'incidentes para executar',
+  'incidents to replay': 'incidentes para rever',
+  'Cedar policies': 'Políticas Cedar',
+  'what Cedar decides by': 'pelo que o Cedar decide',
+  Entities: 'Entidades',
+  'who and what Cedar knows': 'quem e o que o Cedar conhece',
+  Catalogue: 'Catálogo',
+  'requests, and ordinary traffic': 'requisições, e o tráfego comum',
+  Schema: 'Esquema',
+  'optional: what policies are checked against':
+    'opcional: contra o que as políticas são verificadas',
+  'replaced by these': 'substituída por estes',
+  'stays as it is': 'fica como está',
+  'Not read': 'Não lidos',
+  'no part of a workspace': 'nenhuma parte de um espaço de trabalho',
+  'a saved workspace: its files are in the slots below':
+    'um espaço de trabalho salvo: seus arquivos estão nos encaixes abaixo',
+  'being read…': 'sendo lido…',
+  'not told: see what is wrong below': 'não identificado: veja abaixo o que está errado',
+  'the manifest: which version of the format the files are in':
+    'o manifesto: em que versão do formato os arquivos estão',
+  'in {bundle}': 'em {bundle}',
 } as const satisfies Record<string, string>;

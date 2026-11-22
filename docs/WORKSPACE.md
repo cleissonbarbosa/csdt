@@ -68,10 +68,14 @@ same without a restart.
   recording by its `commands`, a catalogue by its `trafficMix`, policies and
   entities by their first item, and `.cedar` and `.cedarschema` files by
   their extension.
-- The files are checked as you add them. The dialog shows what applying them
-  would give (the platforms, the scenarios, the share of ordinary requests
-  Cedar would deny, any scenario that could not run and why) or the file a
-  mistake is in and what it is. Nothing changes until **Apply**.
+- The files are checked as you add them. Each one is laid in a slot for the
+  part of a workspace the server reads it as (platforms, scenarios,
+  recordings, Cedar policies, entities, catalogue, schema, or not read; a
+  saved workspace's files go to their own slots), and a part no file goes to
+  says it stays as it is. The dialog shows what applying them would give
+  (the platforms, the scenarios, the share of ordinary requests Cedar would
+  deny, any scenario that could not run and why) or the file a mistake is in
+  and what it is. Nothing changes until **Apply**.
 - Once the files are valid, **Compare with what is in use** asks what Cedar
   would decide differently under them: policies added, removed or changed
   in meaning, catalogued requests and scenario flows whose outcome changes,
@@ -679,12 +683,12 @@ in the decision.
 **`cedar/catalog.json`** is AEGIS' own file. It says what the request tracer
 offers and what authorization traffic is made of:
 
-| Field                                           | Meaning                                                                                                                                        |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tenants`, `principals`, `actions`, `resources` | the choices in the request tracer, with their labels. A resource is offered for an action when their `resourceType` matches.                   |
-| `contextKeys`                                   | boolean context attributes the tracer lets you set.                                                                                            |
-| `trafficMix`                                    | request shapes and their weights: the platform's ordinary authorization traffic. The denial rate at rest is the share of it that Cedar denies. |
-| `scenarioRequests`                              | request shapes a scenario's flow can be tied to, by `id`.                                                                                      |
+| Field                                           | Meaning                                                                                                                                                                                                                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenants`, `principals`, `actions`, `resources` | the choices in the request tracer, with their labels. A resource is offered for an action when their `resourceType` matches.                                                                                                                                         |
+| `contextKeys`                                   | boolean context attributes the tracer lets you set.                                                                                                                                                                                                                  |
+| `trafficMix`                                    | request shapes and their weights: the platform's ordinary authorization traffic. The denial rate at rest is the share of it that Cedar denies. The policy editor draws it as a bar whose boundaries move share from one shape to the next, keeping the file's total. |
+| `scenarioRequests`                              | request shapes a scenario's flow can be tied to, by `id`.                                                                                                                                                                                                            |
 
 A decision made over a workspace's policies is still labelled `synthetic`. It
 is Cedar's answer for the entities in the file, not an observation of a

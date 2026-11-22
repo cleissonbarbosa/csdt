@@ -206,5 +206,11 @@
         "Fictional inventory used for the contract samples."
       ]
     }
+  ],
+  "sorted": [
+    {
+      "path": "front-desk-cloud.json",
+      "part": "topologies"
+    }
   ]
 }

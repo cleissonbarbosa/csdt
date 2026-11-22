@@ -425,12 +425,12 @@ has only shows as an evaluation error in a decision.
 
 **`cedar/catalog.json`** is AEGIS' own file:
 
-| Field                                           | Meaning                                                                                                                             |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `tenants`, `principals`, `actions`, `resources` | The choices in the request tracer, with their labels. A resource is offered for an action when their `resourceType` matches.        |
-| `contextKeys`                                   | Boolean context attributes the tracer lets you set.                                                                                 |
-| `trafficMix`                                    | Request shapes and their weights: the platform's ordinary authorization traffic. The denial rate at rest is the share Cedar denies. |
-| `scenarioRequests`                              | Request shapes a scenario's flow can be tied to, by `id`.                                                                           |
+| Field                                           | Meaning                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenants`, `principals`, `actions`, `resources` | The choices in the request tracer, with their labels. A resource is offered for an action when their `resourceType` matches.                                                                                                                                                                                            |
+| `contextKeys`                                   | Boolean context attributes the tracer lets you set.                                                                                                                                                                                                                                                                     |
+| `trafficMix`                                    | Request shapes and their weights: the platform's ordinary authorization traffic. The denial rate at rest is the share Cedar denies. The policy editor draws it as a bar whose boundaries move share from one shape to the next, keeping the file's total ([Cedar policies](Cedar-policies#what-ordinary-traffic-asks)). |
+| `scenarioRequests`                              | Request shapes a scenario's flow can be tied to, by `id`.                                                                                                                                                                                                                                                               |
 
 Every request shape in the catalogue is evaluated by Cedar once, when the
 files are loaded, and the simulation only looks the answers up: that keeps

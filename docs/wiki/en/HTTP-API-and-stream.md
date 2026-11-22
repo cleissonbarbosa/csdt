@@ -89,15 +89,15 @@ timelines of its own, from the server's seed.
 A file is `{"path", "text"}`; [Workspace files](Workspace-files) describes
 the formats.
 
-| Method | Path                      | What it does                                                                                                                                         |
-| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/workspace`              | What is in use: the parts replaced, the topologies, scenario and recording ids, the number of policies, and whether importing is on                  |
-| GET    | `/workspace/export`       | The files in use as one bundle, to save, edit and import again                                                                                       |
-| POST   | `/demo/workspace/check`   | What applying `{files}` would give, or what is wrong with them, with a survey of each cloud inventory among them (`inventories`). Nothing is applied |
-| POST   | `/demo/workspace/import`  | Replaces the topologies, scenarios and policies in use with `{files}`, held in memory only                                                           |
-| POST   | `/demo/workspace/diff`    | What Cedar would decide differently under `{files}`: `decisionsChanged` and the `diff`. Nothing is applied                                           |
-| POST   | `/demo/workspace/preview` | One platform of `{files, topologyId?}` at rest, on a timeline of its own. Nothing is applied                                                         |
-| POST   | `/demo/workspace/reset`   | Returns to what the server was started with                                                                                                          |
+| Method | Path                      | What it does                                                                                                                                                                                      |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/workspace`              | What is in use: the parts replaced, the topologies, scenario and recording ids, the number of policies, and whether importing is on                                                               |
+| GET    | `/workspace/export`       | The files in use as one bundle, to save, edit and import again                                                                                                                                    |
+| POST   | `/demo/workspace/check`   | What applying `{files}` would give, or what is wrong with them, with the part each file is read as (`sorted`) and a survey of each cloud inventory among them (`inventories`). Nothing is applied |
+| POST   | `/demo/workspace/import`  | Replaces the topologies, scenarios and policies in use with `{files}`, held in memory only                                                                                                        |
+| POST   | `/demo/workspace/diff`    | What Cedar would decide differently under `{files}`: `decisionsChanged` and the `diff`. Nothing is applied                                                                                        |
+| POST   | `/demo/workspace/preview` | One platform of `{files, topologyId?}` at rest, on a timeline of its own. Nothing is applied                                                                                                      |
+| POST   | `/demo/workspace/reset`   | Returns to what the server was started with                                                                                                                                                       |
 
 ### Authorization
 

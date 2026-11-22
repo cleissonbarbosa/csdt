@@ -125,10 +125,15 @@ without a restart what a workspace directory does at start-up.
 1. **Choose files**, **Choose a folder**, or drop either on the marked area.
    A folder is read as the workspace layout; a file on its own is recognised
    by what it holds.
-2. The files are checked as you add them. The dialog shows what applying
-   them would give (the platforms, the scenarios, the share of ordinary
-   requests Cedar would deny, any scenario that could not run and why), or
-   the file a mistake is in and what it is. Nothing changes until **Apply**.
+2. The files are checked as you add them. Each is laid in a slot for the
+   part the server reads it as: **Platforms**, **Scenarios**,
+   **Recordings**, **Cedar policies**, **Entities**, **Catalogue**,
+   **Schema**, or **Not read**. Each part says whether it is **replaced by
+   these** or **stays as it is**; the server decides, never the page. The
+   dialog shows what applying them would give (the platforms, the
+   scenarios, the share of ordinary requests Cedar would deny, any scenario
+   that could not run and why), or the file a mistake is in and what it is.
+   Nothing changes until **Apply**.
 3. Optionally, ask what they would change before you apply (the next two
    sections).
 4. **Apply**. There is one simulation, so applying starts a new timeline for

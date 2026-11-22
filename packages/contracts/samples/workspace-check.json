@@ -28,5 +28,15 @@
     "policyCount": 9,
     "baselineDenyFraction": 0.07,
     "unavailable": []
-  }
+  },
+  "sorted": [
+    {
+      "path": "topologies/front-desk.json",
+      "part": "topologies"
+    },
+    {
+      "path": "scenarios/01-slow-door.json",
+      "part": "scenarios"
+    }
+  ]
 }

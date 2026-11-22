@@ -409,6 +409,52 @@ async fn a_check_says_what_applying_would_give_and_applies_nothing() {
 }
 
 #[tokio::test]
+async fn a_check_says_which_part_each_file_is_read_as() {
+    let state = common::state();
+    let mut files = files_in(&example_dir());
+    // A file on its own is told by what it holds.
+    files.push(file("loose.json", &a_scenario("loose")));
+    let check = common::post(&state, "/api/v1/demo/workspace/check", body(&files)).await;
+    assert_eq!(check.body["valid"], true);
+    let sorted = check.body["sorted"].as_array().expect("sorted");
+    assert_eq!(sorted.len(), files.len(), "every file is told");
+    let part = |path: &str| {
+        sorted
+            .iter()
+            .find(|entry| entry["path"] == path)
+            .map(|entry| entry["part"].clone())
+    };
+    assert_eq!(
+        part("topologies/corner-shop.json"),
+        Some(json!("topologies"))
+    );
+    assert_eq!(
+        part("scenarios/01-ledger-fire.json"),
+        Some(json!("scenarios"))
+    );
+    assert_eq!(part("loose.json"), Some(json!("scenarios")));
+    assert_eq!(part("README.md"), Some(json!("ignored")));
+
+    // A bundle is opened, and its files are listed in its place.
+    let example = workspace::load(&example_dir()).unwrap().sources;
+    let bundle = SourceFile {
+        path: "shop.aegis.json".into(),
+        text: serde_json::to_string(&bundle_of(&example).unwrap()).unwrap(),
+    };
+    let check = common::post(&state, "/api/v1/demo/workspace/check", body(&[bundle])).await;
+    let sorted = check.body["sorted"].as_array().expect("sorted");
+    assert!(sorted
+        .iter()
+        .all(|entry| entry["path"] == "shop.aegis.json"));
+    assert!(sorted.iter().any(|entry| {
+        entry["within"] == "topologies/01-corner-shop.json" && entry["part"] == "topologies"
+    }));
+
+    // Telling is not applying.
+    assert_eq!(status(&state).await["origin"], "bundled");
+}
+
+#[tokio::test]
 async fn a_check_names_the_file_a_mistake_is_in() {
     let state = common::state();
     let mut files = files_in(&example_dir());

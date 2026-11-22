@@ -323,34 +323,34 @@ incident with its moments, and as the two halves of an experiment.
 `/api/v1`, JSON, camelCase. Contracts live in `apps/server/src/domain` and
 are mirrored in `packages/contracts`.
 
-|                                                        |                                              |
-| ------------------------------------------------------ | -------------------------------------------- |
-| `GET /health`                                          | versions, uptime, active topology            |
-| `GET /topology` · `/topologies`                        | nodes and edges with current metrics         |
-| `GET /metrics`                                         | current platform metrics and history         |
-| `GET /events?afterSeq&limit&nodeId&minSeverity`        | timeline events                              |
-| `GET /incidents` · `/scenarios` · `/recordings`        | incident data                                |
-| `GET /incidents/{id}/report`                           | one incident read back from its record       |
-| `GET /providers` · `POST /providers/{id}/(dis)connect` | integrations                                 |
-| `POST /demo/scenarios/start` · `/reset`                | scenario control                             |
-| `POST /demo/playback/control`                          | play, pause, step, seek, speed, replay, live |
-| `POST /demo/faults/inject` · `/clear`                  | place or lift a fault by hand                |
-| `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                     |
-| `POST /demo/authorization/explain`                     | one request, policy by policy; not recorded  |
-| `POST /demo/authorization/matrix`                      | every request of the catalogue; not recorded |
-| `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                       |
-| `POST /demo/topology/select` · `/demo/recordings/load` | switch context                               |
-| `GET /session` · `POST /demo/session/load`             | the timeline as what reproduces it           |
-| `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed    |
-| `POST /demo/experiments/trial`                         | one fault on the platform at rest            |
-| `POST /demo/experiments/platforms`                     | one scenario in use and on uploaded files    |
-| `POST /demo/experiments/headroom`                      | how much demand the platform takes at rest   |
-| `POST /demo/experiments/weak-points`                   | every service taken out in turn              |
-| `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
-| `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
-| `POST /demo/workspace/preview`                         | uploaded files' platform at rest             |
-| `POST /demo/workspace/diff`                            | what Cedar would decide differently          |
-| `WS /stream`                                           | telemetry and events                         |
+|                                                        |                                                                            |
+| ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `GET /health`                                          | versions, uptime, active topology                                          |
+| `GET /topology` · `/topologies`                        | nodes and edges with current metrics                                       |
+| `GET /metrics`                                         | current platform metrics and history                                       |
+| `GET /events?afterSeq&limit&nodeId&minSeverity`        | timeline events                                                            |
+| `GET /incidents` · `/scenarios` · `/recordings`        | incident data                                                              |
+| `GET /incidents/{id}/report`                           | one incident read back from its record                                     |
+| `GET /providers` · `POST /providers/{id}/(dis)connect` | integrations                                                               |
+| `POST /demo/scenarios/start` · `/reset`                | scenario control                                                           |
+| `POST /demo/playback/control`                          | play, pause, step, seek, speed, replay, live                               |
+| `POST /demo/faults/inject` · `/clear`                  | place or lift a fault by hand                                              |
+| `POST /demo/authorization/evaluate`                    | evaluate a Cedar request                                                   |
+| `POST /demo/authorization/explain`                     | one request, policy by policy; not recorded                                |
+| `POST /demo/authorization/matrix`                      | every request of the catalogue; not recorded                               |
+| `GET /demo/authorization/catalog` · `/decisions`       | policies and decisions                                                     |
+| `POST /demo/topology/select` · `/demo/recordings/load` | switch context                                                             |
+| `GET /session` · `POST /demo/session/load`             | the timeline as what reproduces it                                         |
+| `POST /demo/experiments/compare`                       | one scenario twice, with one fault placed                                  |
+| `POST /demo/experiments/trial`                         | one fault on the platform at rest                                          |
+| `POST /demo/experiments/platforms`                     | one scenario in use and on uploaded files                                  |
+| `POST /demo/experiments/headroom`                      | how much demand the platform takes at rest                                 |
+| `POST /demo/experiments/weak-points`                   | every service taken out in turn                                            |
+| `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle                                        |
+| `POST /demo/workspace/check` · `/import` · `/reset`    | check (with the part each file is read as), replace or restore those files |
+| `POST /demo/workspace/preview`                         | uploaded files' platform at rest                                           |
+| `POST /demo/workspace/diff`                            | what Cedar would decide differently                                        |
+| `WS /stream`                                           | telemetry and events                                                       |
 
 A check also surveys each [cloud inventory](INVENTORY.md) among the files it
 is given: its answer carries, beside what applying would give, what each

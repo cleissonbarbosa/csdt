@@ -27,7 +27,7 @@ use crate::domain::{
 use crate::incidents::recordings::Recording;
 use crate::incidents::Effect;
 use crate::workspace::inventory::Survey;
-use crate::workspace::{bundle_of, from_files, surveys, Bundle, SourceFile};
+use crate::workspace::{bundle_of, from_files, sorting, surveys, Bundle, SortedFile, SourceFile};
 
 use super::error::ApiError;
 use super::AppState;
@@ -632,8 +632,10 @@ async fn build_import(state: &AppState, files: Vec<SourceFile>) -> Result<Loaded
 }
 
 /// A check, and beside it what each cloud inventory among the files holds
-/// to choose from. The survey is there whether or not the files are valid:
-/// a selection that is no platform is put right by choosing again.
+/// to choose from, and the part of a workspace each file is read as. Both
+/// are there whether or not the files are valid: a selection that is no
+/// platform is put right by choosing again, and a file that went to the
+/// wrong part is the first thing to see.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceCheckResponse {
@@ -641,6 +643,8 @@ pub struct WorkspaceCheckResponse {
     check: WorkspaceCheck,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     inventories: Vec<Survey>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    sorted: Vec<SortedFile>,
 }
 
 /// Says what applying the files would give, or what is wrong with them.
@@ -652,7 +656,7 @@ pub async fn workspace_check(
     let Json(body) = body?;
     // Reading an inventory is CPU work like the rest of the check.
     let files = body.files.clone();
-    let inventories = off_the_workers(move || surveys(&files))
+    let (inventories, sorted) = off_the_workers(move || (surveys(&files), sorting(&files)))
         .await
         .map_err(|()| internal("the files could not be checked"))?;
     let check = match build_import(&state, body.files).await {
@@ -668,7 +672,11 @@ pub async fn workspace_check(
         },
         Err(ImportFailure::Api(error)) => return Err(error),
     };
-    Ok(Json(WorkspaceCheckResponse { check, inventories }))
+    Ok(Json(WorkspaceCheckResponse {
+        check,
+        inventories,
+        sorted,
+    }))
 }
 
 #[derive(Serialize)]

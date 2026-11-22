@@ -1347,12 +1347,38 @@ export const InventorySurveySchema = z.object({
 export type InventorySurvey = z.infer<typeof InventorySurveySchema>;
 
 /** The outcome of checking files without applying them. */
+/** The parts of a workspace a file can be read as, and `ignored` for none. */
+export const WORKSPACE_PARTS = [
+  'topologies',
+  'scenarios',
+  'recordings',
+  'cedar/policies',
+  'cedar/entities',
+  'cedar/catalog',
+  'cedar/schema',
+  'manifest',
+  'ignored',
+] as const;
+export type WorkspacePart = (typeof WORKSPACE_PARTS)[number];
+
+/** Where one file of a set is read, as the server sorts it. */
+export const SortedFileSchema = z.object({
+  /** The file as it was handed over. */
+  path: z.string(),
+  /** For a file inside a bundle, where it sits in the bundle. */
+  within: z.string().optional(),
+  part: z.enum(WORKSPACE_PARTS),
+});
+export type SortedFile = z.infer<typeof SortedFileSchema>;
+
 export const WorkspaceCheckSchema = z.object({
   valid: z.boolean(),
   workspace: WorkspaceStatusSchema.optional(),
   problem: WorkspaceProblemSchema.optional(),
   /** A survey of each cloud inventory among the files, valid or not. */
   inventories: z.array(InventorySurveySchema).optional(),
+  /** The part of a workspace each file is read as, valid or not; a file that cannot be told is left out. */
+  sorted: z.array(SortedFileSchema).optional(),
 });
 export type WorkspaceCheck = z.infer<typeof WorkspaceCheckSchema>;
 

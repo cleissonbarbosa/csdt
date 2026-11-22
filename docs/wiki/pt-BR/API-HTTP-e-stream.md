@@ -88,15 +88,15 @@ linhas do tempo próprias, a partir da semente do servidor.
 Um arquivo é `{"path", "text"}`; [Arquivos do espaço de
 trabalho](Arquivos-do-espaço-de-trabalho) descreve os formatos.
 
-| Método | Caminho                   | O que faz                                                                                                                                                  |
-| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/workspace`              | O que está em uso: as partes substituídas, as topologias, os ids de cenários e gravações, o número de políticas e se a importação está ligada              |
-| GET    | `/workspace/export`       | Os arquivos em uso como um só pacote, para salvar, editar e importar de novo                                                                               |
-| POST   | `/demo/workspace/check`   | O que aplicar `{files}` daria, ou o que há de errado com eles, com um levantamento de cada inventário de nuvem entre eles (`inventories`). Nada é aplicado |
-| POST   | `/demo/workspace/import`  | Troca as topologias, os cenários e as políticas em uso por `{files}`, mantidos só em memória                                                               |
-| POST   | `/demo/workspace/diff`    | O que o Cedar decidiria diferente com `{files}`: `decisionsChanged` e o `diff`. Nada é aplicado                                                            |
-| POST   | `/demo/workspace/preview` | Uma plataforma de `{files, topologyId?}` em repouso, numa linha do tempo própria. Nada é aplicado                                                          |
-| POST   | `/demo/workspace/reset`   | Volta ao que o servidor tinha ao iniciar                                                                                                                   |
+| Método | Caminho                   | O que faz                                                                                                                                                                                                       |
+| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/workspace`              | O que está em uso: as partes substituídas, as topologias, os ids de cenários e gravações, o número de políticas e se a importação está ligada                                                                   |
+| GET    | `/workspace/export`       | Os arquivos em uso como um só pacote, para salvar, editar e importar de novo                                                                                                                                    |
+| POST   | `/demo/workspace/check`   | O que aplicar `{files}` daria, ou o que há de errado com eles, com a parte como a qual cada arquivo é lido (`sorted`) e um levantamento de cada inventário de nuvem entre eles (`inventories`). Nada é aplicado |
+| POST   | `/demo/workspace/import`  | Troca as topologias, os cenários e as políticas em uso por `{files}`, mantidos só em memória                                                                                                                    |
+| POST   | `/demo/workspace/diff`    | O que o Cedar decidiria diferente com `{files}`: `decisionsChanged` e o `diff`. Nada é aplicado                                                                                                                 |
+| POST   | `/demo/workspace/preview` | Uma plataforma de `{files, topologyId?}` em repouso, numa linha do tempo própria. Nada é aplicado                                                                                                               |
+| POST   | `/demo/workspace/reset`   | Volta ao que o servidor tinha ao iniciar                                                                                                                                                                        |
 
 ### Autorização
 

@@ -534,6 +534,17 @@ test('a platform is imported from its files, runs its own incident, and is put b
   await expect(check).toContainText('These files are valid');
   await expect(check).toContainText('Corner Shop (6 services)');
   await expect(check).toContainText('3 Cedar policies');
+  // Each file stands in the slot of the part the server reads it as; a part
+  // no file goes to stays as it is.
+  await expect(dialog.getByTestId('workspace-slot-topologies')).toHaveAttribute(
+    'data-filled',
+    'true',
+  );
+  await expect(dialog.getByTestId('workspace-slot-scenarios').getByRole('listitem')).toHaveCount(2);
+  await expect(dialog.getByTestId('workspace-slot-cedar-policies')).toHaveAttribute(
+    'data-filled',
+    'true',
+  );
   // Checking changed nothing.
   await expect(page.getByTestId('platform-status')).toContainText('51 services');
 
@@ -1560,6 +1571,46 @@ test('a denial is taken policy by policy, everyone is asked at once, and edited 
   // Back at the matrix, under the policies now in force: one more answer is yes.
   await expect(page.getByTestId('matrix-summary')).toHaveText('Cedar allows 21 of 84 requests.');
   await expect(page.getByTestId('matrix-cell-1-1')).toHaveText('2 of 3');
+});
+
+test('a policy written as a sentence is checked by Cedar, and ordinary traffic is reshared', async ({
+  page,
+}) => {
+  await openApp(page);
+  await waitForScene(page);
+  await page.getByTestId('open-tracer').click();
+  await page.getByTestId('open-policy-editor').click();
+  const editor = page.getByTestId('policy-editor');
+  // Contractors may not export a ledger, of any tenant.
+  await editor.getByTestId('sentence-effect').selectOption('forbid');
+  await editor.getByTestId('sentence-who').selectOption('member|Role::"contractor"');
+  await editor.getByTestId('sentence-what').selectOption('Action::"exportLedger"');
+  await editor.getByTestId('sentence-on').selectOption('type|Ledger');
+  await expect(editor.getByTestId('sentence-cedar')).toContainText(
+    'forbid(principal in Role::"contractor", action == Action::"exportLedger", resource is Ledger);',
+  );
+  await editor.getByTestId('sentence-add').click();
+  const text = editor.getByTestId('policy-text');
+  await expect(text).toHaveValue(/@id\("forbid-contractor-exportledger-ledger"\)/);
+  const check = editor.getByTestId('policy-check');
+  await expect(check).toContainText('Cedar accepts them: 10 policies.');
+  await expect(editor.getByTestId('policy-deny-rate')).toContainText(
+    'At rest Cedar would deny 7.00% of ordinary requests; it denies 7.00% now.',
+  );
+
+  // Two points of share move from Carol's deletion inside the change window,
+  // which Cedar allows, to Bob's large refund, which it denies: the engine
+  // says what that makes of the denial rate at rest.
+  const boundary = editor.getByTestId('traffic-boundary-6');
+  await expect(boundary).toHaveAttribute('aria-valuenow', '2');
+  await boundary.focus();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(boundary).toHaveAttribute('aria-valuenow', '0');
+  await expect(editor.getByTestId('policy-deny-rate')).toContainText(
+    'At rest Cedar would deny 9.00% of ordinary requests; it denies 7.00% now.',
+  );
+  await editor.getByTestId('policy-revert').click();
+  await expect(check).toContainText('These are the policies in use.');
 });
 
 test('a fault is tried on a timeline of its own before it is placed', async ({ page }) => {

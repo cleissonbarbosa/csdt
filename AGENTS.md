@@ -341,11 +341,20 @@ Things that are easy to break:
   lock (a recording's timeline) checks that the assets are still the same
   before it is put in place. The cedar-agent adapter's sync store is updated
   with every swap. The browser never decides what a workspace file is:
-  classification is `workspace::from_files`, on the server. The one thing
-  of a workspace file the page rewrites is a cloud inventory's `selection`
-  (`features/workspace/inventory.ts`), and it decides nothing by it: what a
-  selection brings is the survey in the check's answer
-  (`WorkspaceCheck.inventories`), which `InventoryFilters` shows. An incident
+  classification is `workspace::from_files`, on the server, and the import
+  dialog's slots (`features/workspace/Board.tsx`) show where each file goes
+  from `workspace::sorting` (`WorkspaceCheck.sorted`), the same reading,
+  never a guess from a path. Besides the files the editors write whole, the
+  page rewrites two things of a file in use: a cloud inventory's
+  `selection` (`features/workspace/inventory.ts`) and the catalogue's
+  `trafficMix` weights (`lib/trafficMix.ts`, which keeps the file's total),
+  and it decides nothing by either: what a selection brings is the survey
+  in the check's answer (`WorkspaceCheck.inventories`), which
+  `InventoryFilters` shows, and what the weights make of the denial rate at
+  rest is the check's `baselineDenyFraction`. A policy written as a
+  sentence (`lib/policySentence.ts`) is text added to the policies; nothing
+  reads a policy to fill a sentence in, and its choices are only what the
+  catalogue and the entity store state. An incident
   capture is the one file the browser reads itself
   (`features/capture/capture.ts`); it never reaches the server or the
   simulation's timeline. A platform drafted from one, when the viewer asks

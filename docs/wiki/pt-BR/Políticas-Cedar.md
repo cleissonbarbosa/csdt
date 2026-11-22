@@ -193,6 +193,38 @@ servidor iniciado com `AEGIS_IMPORT=off` a recusa. Para comparar dois
 conjuntos de políticas num terminal, veja
 [Sua própria plataforma](Sua-própria-plataforma#comparar-dois-conjuntos-de-políticas).
 
+### Escrevendo uma como frase
+
+**Escrever uma como frase**, acima do texto, adiciona uma política sem
+escrever Cedar:
+
+1. Escolha **Permite** ou **Proíbe**, **Quem** (um principal, um grupo como
+   o repositório de entidades o tem, ou qualquer um), **Para fazer o quê**
+   (uma ação, ou qualquer coisa) e **Em quê** (um recurso, todos os recursos
+   de um tipo, ou qualquer coisa).
+2. Em **Condições**, marque _o recurso é do próprio locatário do principal_ ou
+   uma chave do contexto do catálogo, e diga se a política vale **Só quando
+   valem** ou **Exceto quando valem**.
+3. Dê a ela um id e uma frase sobre para que serve, e pressione **Adicionar
+   às políticas**. O texto Cedar dela é adicionado ao editor, e o Cedar o
+   verifica junto com o resto antes de qualquer coisa ser aplicada.
+
+A frase só adiciona texto: ela nunca lê uma política já escrita. As opções
+são só o que os arquivos informam: quem e o quê, do catálogo; grupos, do
+repositório de entidades; e a condição de locatário só onde todo principal
+e todo recurso do catálogo têm um `tenant`.
+
+### O que o tráfego comum pede
+
+Abaixo do texto, **O que o tráfego comum pede** desenha o `trafficMix` do
+catálogo como uma barra, uma faixa por forma de requisição, cada uma tão
+larga quanto a sua parcela. Arraste uma divisa, ou mova-a com as setas, para
+passar parcela de uma forma para a seguinte; o total do arquivo continua o
+mesmo. A verificação então diz "Em repouso o Cedar negaria … das requisições
+comuns; hoje nega …", com as políticas e parcelas novas contra as que estão
+em uso. **Aplicar estas políticas** aplica as parcelas novas junto com as
+políticas.
+
 ## Exposição
 
 **Exposição**, no cartão de um serviço, segue as conexões dele até o fim:

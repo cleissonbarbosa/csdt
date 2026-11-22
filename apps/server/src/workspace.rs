@@ -654,6 +654,79 @@ pub fn from_files(files: Vec<SourceFile>, base: Sources) -> Result<Workspace, Wo
     overlay(parts, base)
 }
 
+/// Where one file of an import is read: the part of a workspace it goes to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SortedFile {
+    /// The file as it was handed over.
+    pub path: String,
+    /// For a file inside a bundle, where it sits in the bundle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub within: Option<String>,
+    /// `topologies`, `scenarios`, `recordings`, `cedar/policies`,
+    /// `cedar/entities`, `cedar/catalog`, `cedar/schema`, `manifest`, or
+    /// `ignored` for a file that is no part of one.
+    pub part: &'static str,
+}
+
+/// Where each of `files` would be read, by the reading [`from_files`] sorts
+/// them with: the directory a file says it is in, or else what it holds. A
+/// bundle is opened and its files listed in its place. A file that cannot
+/// be told (a path that is refused, a JSON file that is no workspace file)
+/// is left out: the check of the files says what is wrong with it. Touches
+/// nothing outside its argument.
+pub fn sorting(files: &[SourceFile]) -> Vec<SortedFile> {
+    let mut sorted = Vec::new();
+    for file in files.iter().take(MAX_IMPORT_FILES) {
+        sort_into(file, None, &mut sorted);
+    }
+    sorted
+}
+
+fn sort_into(file: &SourceFile, bundle: Option<&str>, sorted: &mut Vec<SortedFile>) {
+    if file.text.len() as u64 > MAX_FILE_BYTES {
+        return;
+    }
+    let Ok((parent, name)) = place(&file.path) else {
+        return;
+    };
+    let kind = match kind_by_place(parent.as_deref(), &name) {
+        Some(kind) => kind,
+        None => match kind_by_content(Path::new(&file.path), &name, &file.text) {
+            Ok(kind) => kind,
+            Err(_) => return,
+        },
+    };
+    let part = match kind {
+        Kind::Bundle => {
+            // A bundle holds files, not another bundle.
+            if bundle.is_some() {
+                return;
+            }
+            if let Ok(inner) = serde_json::from_str::<Bundle>(&file.text) {
+                for entry in inner.files.iter().take(MAX_IMPORT_FILES) {
+                    sort_into(entry, Some(&file.path), sorted);
+                }
+            }
+            return;
+        }
+        Kind::Manifest => "manifest",
+        Kind::Topology => TOPOLOGIES,
+        Kind::Scenario => SCENARIOS,
+        Kind::Recording => RECORDINGS,
+        Kind::Policies | Kind::PolicyFile => "cedar/policies",
+        Kind::Entities => "cedar/entities",
+        Kind::Catalog => "cedar/catalog",
+        Kind::Schema => "cedar/schema",
+        Kind::Ignored => "ignored",
+    };
+    let (path, within) = match bundle {
+        Some(outer) => (outer.to_string(), Some(file.path.clone())),
+        None => (file.path.clone(), None),
+    };
+    sorted.push(SortedFile { path, within, part });
+}
+
 /// What each cloud inventory among `files` holds and what its selection
 /// brings: the files [`from_files`] would read as a topology that say they
 /// are one. A file that cannot be read at all is not surveyed; the check of

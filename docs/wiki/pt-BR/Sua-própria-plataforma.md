@@ -131,7 +131,12 @@ inicialização.
 1. **Escolher arquivos**, **Escolher uma pasta**, ou solte um ou outro na
    área marcada. Uma pasta é lida com a estrutura de um espaço de trabalho;
    um arquivo sozinho é reconhecido pelo que contém.
-2. Os arquivos são verificados à medida que você os acrescenta. O diálogo
+2. Os arquivos são verificados à medida que você os acrescenta. Cada um é
+   posto no espaço da parte como a qual o servidor o lê: **Plataformas**,
+   **Cenários**, **Gravações**, **Políticas Cedar**, **Entidades**,
+   **Catálogo**, **Esquema** ou **Não lidos**. Cada parte diz se é
+   **substituída por estes** ou se **fica como está**; quem decide é o
+   servidor, nunca a página. O diálogo
    mostra o que aplicá-los daria (as plataformas, os cenários, a parcela das
    requisições comuns que o Cedar negaria, cada cenário que não pôde rodar e
    o motivo), ou o arquivo em que está um erro e qual é. Nada muda antes de

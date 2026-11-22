@@ -115,9 +115,12 @@ lays the answers out, principals down and actions across, under the context
 you set. Switch a policy off and the cells that changed against every policy
 in force are marked; pick a cell and
 **Trace it** to see that request cross the model. **Edit the policies** opens
-the policies in force as Cedar text: change one, read what Cedar would decide
-differently, and **Apply these policies** to come back to the matrix under
-them. **Import or export files → Return to what the server started with**
+the policies in force as Cedar text: change one, or write one as a sentence
+(**Forbid** _members of Role contractor_ to _Export ledger_ on _any Ledger_)
+and **Add it to the policies**, read what Cedar would decide differently,
+carry a boundary of **What ordinary traffic asks** to see the denial rate at
+rest the engine gives the new shares, and **Apply these policies** to come
+back to the matrix under them. **Import or export files → Return to what the server started with**
 undoes it.
 
 ## 4 · Launch an incident (90 s)

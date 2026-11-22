@@ -186,6 +186,36 @@ page opened with**) undoes it. A server started with `AEGIS_IMPORT=off`
 refuses it. To compare two sets of policies from a terminal, see
 [Your own platform](Your-own-platform#compare-two-sets-of-policies).
 
+### Writing one as a sentence
+
+**Write one as a sentence**, above the text, adds a policy without writing
+Cedar:
+
+1. Choose **Permit** or **Forbid**, **Who** (one principal, a group as the
+   entity store has it, or anyone), **To do what** (one action, or anything)
+   and **On what** (one resource, every resource of a type, or anything).
+2. Under **Conditions**, tick _the resource is of the principal's own
+   tenant_ or a key of the catalogue's context, and say whether the policy
+   applies **Only when these hold** or **Except when these hold**.
+3. Give it an id and a sentence on what it is for, and press **Add it to the
+   policies**. Its Cedar text is added to the editor, and Cedar checks it
+   with the rest before anything is applied.
+
+The sentence only adds text: it never reads a policy already written. Its
+choices are only what the files state: who and what from the catalogue,
+groups from the entity store, and the tenant condition only where every
+principal and resource of the catalogue has a `tenant`.
+
+### What ordinary traffic asks
+
+Below the text, **What ordinary traffic asks** draws the catalogue's
+`trafficMix` as a bar, one band per request shape, each as wide as its
+share. Drag a boundary, or move it with the arrow keys, to shift share from
+one shape to the next; the file's total stays the same. The check then says
+"At rest Cedar would deny … of ordinary requests; it denies … now", with the
+new policies and shares against those in use. **Apply these policies**
+applies the new shares with the policies.
+
 ## Exposure
 
 **Exposure**, on a service's card, follows its connections all the way:

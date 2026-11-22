@@ -1,4 +1,4 @@
-import type { WorkspaceCheck, WorkspaceFile } from '@aegis/contracts';
+import type { AuthorizationCatalog, WorkspaceCheck, WorkspaceFile } from '@aegis/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,9 +11,18 @@ import { EmptyState } from '@/components/ui/Section';
 import { PolicyDiff } from '@/features/workspace/PolicyDiff';
 import { t } from '@/i18n';
 import { tr } from '@/i18n/rich';
+import { formatPercent } from '@/lib/format';
 import { policiesAsCedar, withPolicies } from '@/lib/policies';
+import { appendPolicy } from '@/lib/policySentence';
+import { CATALOG_FILE, readMix, withCatalog, writeMix } from '@/lib/trafficMix';
 import { api, ApiError } from '@/providers/api';
 import { useUi } from '@/stores/ui';
+
+import { PolicySentence } from './PolicySentence';
+import { TrafficMixBar } from './TrafficMixBar';
+
+/** Where the entity store is among the files a workspace is saved as. */
+const ENTITIES_FILE = 'cedar/entities.json';
 
 /** What the engine said of one text: an answer, or why it could not be asked. */
 interface Checked {
@@ -25,32 +34,60 @@ function message(error: unknown): string {
   return error instanceof ApiError ? error.message : t('The policies could not be checked.');
 }
 
-function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
+function Editor({
+  inUse,
+  files,
+  catalog,
+}: {
+  inUse: string;
+  files: WorkspaceFile[];
+  catalog: AuthorizationCatalog;
+}) {
   const [text, setText] = useState(inUse);
   const [checked, setChecked] = useState<Checked | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const changed = text !== inUse;
-  const candidate = useMemo(() => withPolicies(files, text), [files, text]);
+  // The ids the sentence has given policies here, besides those in force.
+  const [added, setAdded] = useState<string[]>([]);
+  const catalogText = files.find((file) => file.path === CATALOG_FILE)?.text ?? null;
+  const entitiesText = files.find((file) => file.path === ENTITIES_FILE)?.text ?? '[]';
+  const mix = useMemo(() => (catalogText ? readMix(catalogText) : null), [catalogText]);
+  const [shares, setShares] = useState<number[]>(() => mix?.shares ?? []);
+  const mixedText = useMemo(
+    () => (mix && catalogText ? writeMix(catalogText, mix, shares) : null),
+    [mix, catalogText, shares],
+  );
+  const mixChanged = mixedText !== null && mixedText !== catalogText;
+  const changed = text !== inUse || mixChanged;
+  const candidate = useMemo(() => {
+    const policies = withPolicies(files, text);
+    return mixChanged && mixedText !== null ? withCatalog(policies, mixedText) : policies;
+  }, [files, text, mixChanged, mixedText]);
+  const taken = useMemo(
+    () => [...catalog.policies.map((policy) => policy.id), ...added],
+    [catalog.policies, added],
+  );
 
   // Ask about the text a moment after it stops changing. An answer is kept
   // with the text it is about, so a late one is never shown against another.
+  // What a check is about: the policies and the shares together.
+  const asked = `${text}\n${mixedText ?? ''}`;
   useEffect(() => {
     if (!changed) return;
     let stale = false;
     const timer = setTimeout(() => {
       api.checkWorkspace(candidate).then(
-        (outcome) => !stale && setChecked({ text, outcome }),
-        (error: unknown) => !stale && setChecked({ text, outcome: message(error) }),
+        (outcome) => !stale && setChecked({ text: asked, outcome }),
+        (error: unknown) => !stale && setChecked({ text: asked, outcome: message(error) }),
       );
     }, 400);
     return () => {
       stale = true;
       clearTimeout(timer);
     };
-  }, [candidate, text, changed]);
+  }, [candidate, asked, changed]);
 
-  const outcome = changed && checked?.text === text ? checked.outcome : null;
+  const outcome = changed && checked?.text === asked ? checked.outcome : null;
   const valid = typeof outcome === 'object' && outcome?.valid === true;
 
   const apply = async () => {
@@ -67,7 +104,17 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
 
   return (
     <div data-testid="policy-editor">
-      <label className="caption mb-1 block" htmlFor="policy-text">
+      <PolicySentence
+        catalog={catalog}
+        entitiesText={entitiesText}
+        taken={taken}
+        onAdd={(policy, id) => {
+          setText((current) => appendPolicy(current, policy));
+          setAdded((ids) => [...ids, id]);
+          setFailure(null);
+        }}
+      />
+      <label className="caption mb-1 mt-4 block" htmlFor="policy-text">
         {t("The policies in force, in Cedar's own syntax")}
       </label>
       <textarea
@@ -86,10 +133,24 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
       />
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
         {tr(
-          'A policy goes by its {id}. Nothing is applied until you say so, and applying replaces the policies only: the platform, its scenarios and its entities stay as they are. The timeline starts again, as it does for any change of files.',
+          'A policy goes by its {id}. Nothing is applied until you say so, and applying replaces the policies and the shares of ordinary traffic only: the platform, its scenarios and its entities stay as they are. The timeline starts again, as it does for any change of files.',
           { id: <span className="code">@id</span> },
         )}
       </p>
+
+      {mix && (
+        <section className="mt-4" aria-labelledby="traffic-mix-title">
+          <h3 id="traffic-mix-title" className="text-xs font-bold text-ink">
+            {t('What ordinary traffic asks')}
+          </h3>
+          <p className="mb-2 mt-0.5 text-[11px] leading-relaxed text-ink-faint">
+            {t(
+              'The request shapes the catalogue sends at rest, each as wide as its share. Carry a boundary to move share from one to the next. The share Cedar denies is the denial rate at rest.',
+            )}
+          </p>
+          <TrafficMixBar catalog={catalog} mix={mix} shares={shares} onShares={setShares} />
+        </section>
+      )}
 
       <div
         className="mt-3 min-h-[2.5rem]"
@@ -113,7 +174,13 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
                   ? 'Cedar accepts them: {n} policy.'
                   : 'Cedar accepts them: {n} policies.',
                 { n: outcome.workspace.policyCount },
-              )}
+              )}{' '}
+              <span data-testid="policy-deny-rate">
+                {t('At rest Cedar would deny {then} of ordinary requests; it denies {now} now.', {
+                  then: formatPercent(outcome.workspace.baselineDenyFraction),
+                  now: formatPercent(catalog.baselineDenyFraction),
+                })}
+              </span>
             </p>
             <PolicyDiff files={candidate} />
           </div>
@@ -145,6 +212,7 @@ function Editor({ inUse, files }: { inUse: string; files: WorkspaceFile[] }) {
           disabled={!changed || busy}
           onClick={() => {
             setText(inUse);
+            setShares(mix?.shares ?? []);
             setFailure(null);
           }}
           data-testid="policy-revert"
@@ -191,10 +259,15 @@ export function PolicyEditorDialog() {
         <EmptyState title={t('The policies are unavailable')}>
           {t('The files in use could not be read.')}
         </EmptyState>
-      ) : inUse !== null && bundle ? (
+      ) : inUse !== null && bundle && catalog ? (
         // A new editor for each set of policies: applying, or an import made
         // elsewhere, starts it again from what is then in force.
-        <Editor key={inUse} inUse={inUse} files={bundle.files} />
+        <Editor
+          key={`${inUse}\n${bundle.files.find((file) => file.path === CATALOG_FILE)?.text ?? ''}`}
+          inUse={inUse}
+          files={bundle.files}
+          catalog={catalog}
+        />
       ) : null}
     </Dialog>
   );
