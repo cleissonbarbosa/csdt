@@ -337,6 +337,29 @@ right, each region is a lane across them, and a tier lines up between
 regions. A lane is a plate like any other, so it takes its region's state
 colour and goes dark with it.
 
+_Drawing a platform_ uses the swimlanes, because there a place is exactly the
+two things a topology file says about it: the lane is the region and the
+column the tier. While a piece is carried, the part of the table it would
+take is outlined in the viewer's blue, and only that part: no grid is drawn.
+A piece carried onto another draws the connection it would make, in blue,
+or, where it would close a circle, dashed in amber with the reason beside
+it, so the answer does not rest on the hue. A piece picked up from the
+table is held up over the slot it would take, its shadow drawn in under
+it, and is set down there when let go of, or back in its place over
+nothing. A refused connection goes back to the piece it was drawn from, and
+the circle it would have closed is drawn once, from its first service round
+to it again. A piece from the palette is set down where it was let go of,
+and the others walk aside, hopping as far as they go; a piece that did not
+move does not stir, keeps its name, and its mechanism goes on in its cycle.
+Only a new connection draws itself. A draft the engine has not run is drawn
+as unknown, as a capture's unmeasured service is: when the engine says what
+it does at rest the answer comes along the path, a column at a time from
+where requests enter, each piece starting to work and its connections to
+carry beads as it reaches them. That is the reward for a platform that
+runs, and it is the engine's, not the editor's. Where the stage has no room
+for the palette beside the draft's card, the palette is a column of glyphs,
+each still named.
+
 ## Words
 
 **Time is the simulation's.** The cursor is at the _simulation's now_, where
@@ -656,6 +679,16 @@ Text is set in sentence case throughout.
 - **Three things on the bar.** Search, the request tracer and the incidents
   are each one step away. The tracer used to be in the menu, where the part
   of the application that is about authorization was the hardest to find.
+- **A menu in sections, two columns wide.** Sixteen things in one list had
+  to be read from the top to be found. They are grouped by what the viewer
+  came to do, in the words of the first visit's card (understand the
+  platform, investigate a failure, test an authorization), then a platform
+  of one's own and its files, with settings, help and the challenges along
+  the foot. The headings are sentence case and faint, not tracked capitals;
+  the menu is as wide as its longest label, so none breaks, and two columns
+  wide where the screen has room. That makes it wider than a menu usually
+  is, over the model, for as long as it is open. On a phone it is one
+  column, and scrolls on a screen shorter than it.
 - **A round plate for a region that is not round.** A small region with a
   long chain of tiers gets a plate wider than its lines need, because a
   circle is as wide as it is deep. The plates stay round by region so that

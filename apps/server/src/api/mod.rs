@@ -30,8 +30,8 @@ pub use server::Limits;
 
 /// Largest request body accepted by any endpoint but the two below.
 pub const MAX_BODY_BYTES: usize = 16 * 1024;
-/// Largest body of a workspace check, import or comparison: the files
-/// themselves.
+/// Largest body of a workspace check, import, preview or comparison: the
+/// files themselves.
 pub const MAX_IMPORT_BYTES: usize = 8 * 1024 * 1024;
 /// Largest body of a session: a recording of up to 512 commands.
 pub const MAX_SESSION_BYTES: usize = 256 * 1024;
@@ -109,6 +109,10 @@ fn route_table() -> Router<AppState> {
         .route(
             "/demo/workspace/diff",
             post(routes::workspace_diff).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
+        )
+        .route(
+            "/demo/workspace/preview",
+            post(routes::workspace_preview).layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES)),
         )
         .route("/demo/workspace/reset", post(routes::workspace_reset))
         .route(

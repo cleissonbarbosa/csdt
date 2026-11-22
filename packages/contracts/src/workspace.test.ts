@@ -136,6 +136,12 @@ describe('workspace JSON Schemas', () => {
     expect(checked).toHaveLength(5);
   });
 
+  it('holds the topology a preview answers with to the topology schema', () => {
+    const preview = read('packages/contracts/samples/workspace-preview.json') as { spec: unknown };
+    const validate = validator('topology');
+    expect(validate(preview.spec), ajv.errorsText(validate.errors)).toBe(true);
+  });
+
   it('rejects a bundle of another version, with unknown fields or with too many files', () => {
     const file = { path: 'a.json', text: '{}' };
     for (const bundle of [

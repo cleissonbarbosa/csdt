@@ -104,10 +104,68 @@ only saves. The API behind it:
 | `GET /api/v1/workspace`                   | where the files in use came from and what they amount to       |
 | `GET /api/v1/workspace/export`            | the files in use, as a bundle                                  |
 | `POST /api/v1/demo/workspace/check`       | what `{ "files": [{ "path", "text" }] }` would give; no change |
+| `POST /api/v1/demo/workspace/preview`     | their platform at rest, as the engine runs it; no change       |
 | `POST /api/v1/demo/workspace/diff`        | what Cedar would decide differently under them; no change      |
 | `POST /api/v1/demo/experiments/platforms` | one scenario on the platform in use and on theirs; no change   |
 | `POST /api/v1/demo/workspace/import`      | the same, applied; 422 with the file and reason if invalid     |
 | `POST /api/v1/demo/workspace/reset`       | back to what the server started with                           |
+
+A preview takes `{ "files", "topologyId"? }` and runs one platform of the
+files, the one they open on or the one `topologyId` names, with nothing
+started and nothing placed, on a timeline of its own from the server's seed,
+for four virtual seconds. It answers with what `GET /topology` and the
+stream's snapshot would show once the files were applied and as long had
+passed (`topology`, `snapshot`, its playback paused), and with the topology
+as it was read, in the format of a topology file (`spec`): for a Compose file
+or a cloud inventory, the topology it was converted to. Files that are not
+valid get the import's 422; a `topologyId` the files do not give gets a 422
+that names the ones they do.
+
+### Drawing a platform
+
+A topology can also be drawn on the model itself: **Edit this platform**,
+in the menu at the end of the top bar, opens the one on show, and **Draw a
+new platform** starts from one region and a client. It is a mode of the same
+window, as an incident capture is: the simulation goes on behind it and
+comes back as it was.
+
+- The model is drawn in the swimlanes, where a lane is a region and a column
+  is a tier. Carrying a piece from the palette on the left onto the table
+  stands a service of that kind there: the lane under the pointer is its
+  region and the column its tier. The middle of the gap between two columns
+  makes a new column (every service from that tier on moves one along), and
+  just past the last lane a new region. The layout has no other notion of
+  place, so nothing about position is written to the file.
+- A piece carried onto another connects the two, from the one carried, with
+  the protocol and relationship their kinds suggest (the same ones the
+  Compose reader uses). A connection that would close a circle is refused as
+  it is drawn, with the services it would run through; the server refuses
+  one too.
+- A palette piece pressed without being carried, or with the keyboard, is
+  added one tier past what is selected. **Connect to** on a service's card
+  connects without carrying. Delete takes the selection away, Ctrl Z and
+  Ctrl Shift Z undo and redo.
+- The card on the right edits every field of the file for what is selected:
+  a service, a connection, or with nothing selected the platform, its
+  regions and its region roles. A figure a file may leave out (a capacity,
+  a rate limit, a filter, an autoscaler, a connection's latency) is off until
+  it is turned on, and then starts from what the engine gave it at rest.
+- A moment after the draft stops changing it is put to the engine with the
+  files in use around it (the [preview](#from-the-interface) above), and the
+  model shows what the engine made of it at rest: each service's state, its
+  pieces working at the pace of its traffic, beads along the connections.
+  Until the engine has answered, a service is drawn as unknown, upright and
+  fainter on a dashed ring; while a change is being run, the bar says the
+  model is showing the last run.
+- **Save the file** downloads the topology as written. **Compare an
+  incident** stages it in **Import or export files**, where an incident is
+  run on it and on the platform in use. **Apply** imports the files in use
+  with the draft in place of the file it was drawn from, and puts it on
+  show: as with any import, the simulation starts a new timeline for
+  everyone connected.
+
+A platform read from a Compose file or a cloud inventory is opened as the
+topology the server read it as, and saved or applied as a topology file.
 
 ## Layout
 

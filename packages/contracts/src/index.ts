@@ -1373,6 +1373,32 @@ export const WorkspaceResponseSchema = z.object({
 });
 export type WorkspaceResponse = z.infer<typeof WorkspaceResponseSchema>;
 
+/**
+ * One platform a set of files describes, at rest: run with nothing started
+ * and nothing placed, on a timeline of its own from the server's seed, for
+ * the quiet lead-in an experiment begins with (4 virtual seconds). `topology`
+ * and `snapshot` are what the timeline in use shows once the files are
+ * applied and as long has passed; the snapshot's playback is paused, since
+ * nothing advances that timeline. Nothing is applied.
+ */
+export const WorkspacePreviewSchema = z.object({
+  topology: TopologySchema,
+  snapshot: TelemetrySnapshotSchema,
+  /**
+   * The topology as the server read it, in the format a topology file is
+   * written in (`schemas/v1/topology.schema.json`): for a Compose file or a
+   * cloud inventory, the topology it was converted to. Not checked here.
+   */
+  spec: z.record(z.string(), z.unknown()),
+});
+export type WorkspacePreview = z.infer<typeof WorkspacePreviewSchema>;
+
+export interface WorkspacePreviewRequest {
+  files: WorkspaceFile[];
+  /** Which platform of the files to run, when they describe several; else the one they open on. */
+  topologyId?: string;
+}
+
 // -- what Cedar would decide differently under other files -----------------
 
 const PolicyOutcomeSchema = z.object({

@@ -9,6 +9,7 @@ import capture from './capture';
 import chrome from './chrome';
 import common from './common';
 import core from './core';
+import editor from './editor';
 import experiments from './experiments';
 import guide from './guide';
 import inspector from './inspector';
@@ -26,6 +27,7 @@ export const PARTS = {
   experiments,
   workspace,
   capture,
+  editor,
 } as const;
 
 export const PT_BR = {
@@ -39,4 +41,5 @@ export const PT_BR = {
   ...experiments,
   ...workspace,
   ...capture,
+  ...editor,
 } as const;

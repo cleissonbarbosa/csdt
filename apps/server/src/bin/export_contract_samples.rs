@@ -322,6 +322,16 @@ async fn export(dir: &Path) -> Result<usize, AnyError> {
         )
         .await?,
     )?;
+    // The platform the files describe at rest, on a timeline of its own:
+    // what an editor shows of a draft. Nothing is applied.
+    save(
+        "workspace-preview",
+        post(
+            "/demo/workspace/preview",
+            json!({ "files": tiny_workspace() }),
+        )
+        .await?,
+    )?;
     save(
         "workspace-response",
         post(

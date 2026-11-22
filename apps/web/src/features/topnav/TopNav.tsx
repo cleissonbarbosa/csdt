@@ -15,10 +15,12 @@ import {
   History,
   KeyRound,
   List,
+  PencilRuler,
   Play,
   Search,
   Settings,
   Share2,
+  SquarePlus,
   Table2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -37,6 +39,8 @@ import { draftOf } from '@/features/capture/draft';
 import { draftNotes, draftRefusal } from '@/features/capture/draftNotes';
 import { provenanceOf } from '@/features/capture/CaptureCard';
 import { CaptureStatus } from '@/features/capture/CaptureStatus';
+import { EditorActions, EditorStatus } from '@/features/editor/EditorBar';
+import { editBlankPlatform, editPlatformInUse } from '@/features/editor/open';
 import { Deviations } from '@/features/hud/Hud';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -44,6 +48,7 @@ import { formatClock } from '@/lib/format';
 import { COLOR, DATA_SOURCE_HINT, HEALTH_COLOR } from '@/lib/palette';
 import { api } from '@/providers/api';
 import { selectOpen, useCapture } from '@/stores/capture';
+import { selectEditing, useEditor } from '@/stores/editor';
 import { useGuide } from '@/stores/guide';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
@@ -358,7 +363,18 @@ const draftPlatform = () => {
  */
 export function TopNav() {
   const captured = useCapture(selectOpen);
-  return captured ? <CaptureNav /> : <SimulationNav />;
+  const editing = useEditor(selectEditing);
+  return captured ? <CaptureNav /> : editing ? <EditorNav /> : <SimulationNav />;
+}
+
+/** The bar while a platform is drawn: what it is, what the engine makes of it, what to do with it. */
+function EditorNav() {
+  return (
+    <Bar>
+      <EditorStatus />
+      <EditorActions />
+    </Bar>
+  );
 }
 
 function SimulationNav() {
@@ -439,107 +455,154 @@ function SimulationNav() {
             <span className="max-sm:capitalize">{t('incident')}</span>
           </span>
         </Button>
+        {/* Grouped by what the viewer came to do: the three things the card
+            of a first visit offers, which says they are all in this menu,
+            then a platform of their own and its files. Settings, help and
+            the challenges, which serve all of it, run along the foot. */}
         <Menu
           label={t('More')}
           testId="open-menu"
           icon={<Ellipsis size={17} />}
-          items={[
+          layout="columns"
+          sections={[
             {
-              id: 'trace',
-              label: t('Trace a request through Cedar'),
-              icon: <KeyRound size={14} />,
-              onSelect: () => useUi.getState().togglePanel('authorization'),
+              id: 'understand',
+              label: t('Understand the platform'),
+              items: [
+                {
+                  id: 'overview',
+                  label: t('Platform signals'),
+                  icon: <Activity size={14} />,
+                  onSelect: () => {
+                    const ui = useUi.getState();
+                    ui.select(null);
+                    ui.setPanel(null);
+                    ui.setInspectorOpen(true);
+                  },
+                },
+                {
+                  id: 'services',
+                  label: t('List every service'),
+                  hint: '/',
+                  icon: <List size={14} />,
+                  onSelect: () => useUi.getState().setLeftTab('explorer'),
+                },
+                {
+                  id: 'view',
+                  label: viewMode === 'scene' ? t('Table view') : t('3D model'),
+                  hint: 'T',
+                  icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
+                  onSelect: () =>
+                    useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+                },
+                {
+                  id: 'limits',
+                  label: t('Find where the platform gives'),
+                  icon: <Gauge size={14} />,
+                  onSelect: () => useUi.getState().setPanel('limits'),
+                },
+              ],
             },
             {
-              id: 'matrix',
-              label: t('Who may do what'),
-              icon: <Grid3x3 size={14} />,
-              onSelect: () => useUi.getState().setPanel('matrix'),
+              id: 'investigate',
+              label: t('Investigate a failure'),
+              items: [
+                {
+                  id: 'timeline',
+                  label: t('Timeline and playback'),
+                  icon: <History size={14} />,
+                  checked: timelineOpen,
+                  onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
+                },
+                {
+                  id: 'experiment',
+                  label: t('Compare an intervention'),
+                  icon: <GitCompareArrows size={14} />,
+                  onSelect: () => useUi.getState().openExperiment(),
+                },
+                {
+                  // A real incident, read in this tab: not the simulation's
+                  // timeline, so not its clock either.
+                  id: 'capture',
+                  label: t('Open an incident capture'),
+                  icon: <FileClock size={14} />,
+                  onSelect: openCaptures,
+                },
+              ],
             },
             {
-              id: 'experiment',
-              label: t('Compare an intervention'),
-              icon: <GitCompareArrows size={14} />,
-              onSelect: () => useUi.getState().openExperiment(),
+              id: 'authorization',
+              label: t('Test an authorization'),
+              items: [
+                {
+                  id: 'trace',
+                  label: t('Trace a request through Cedar'),
+                  icon: <KeyRound size={14} />,
+                  onSelect: () => useUi.getState().togglePanel('authorization'),
+                },
+                {
+                  id: 'matrix',
+                  label: t('Who may do what'),
+                  icon: <Grid3x3 size={14} />,
+                  onSelect: () => useUi.getState().setPanel('matrix'),
+                },
+              ],
             },
             {
-              id: 'limits',
-              label: t('Find where the platform gives'),
-              icon: <Gauge size={14} />,
-              onSelect: () => useUi.getState().setPanel('limits'),
+              id: 'files',
+              label: t('Platform and files'),
+              items: [
+                {
+                  // Drawn on the model itself, as a mode of the same shell.
+                  id: 'edit-platform',
+                  label: t('Edit this platform'),
+                  icon: <PencilRuler size={14} />,
+                  onSelect: () => void editPlatformInUse(),
+                },
+                {
+                  id: 'draw-platform',
+                  label: t('Draw a new platform'),
+                  icon: <SquarePlus size={14} />,
+                  onSelect: () => void editBlankPlatform(),
+                },
+                {
+                  id: 'workspace',
+                  label: t('Import or export files'),
+                  icon: <FolderOpen size={14} />,
+                  onSelect: () => useUi.getState().setPanel('workspace'),
+                },
+                {
+                  id: 'session',
+                  label: t('Save or share this session'),
+                  icon: <Share2 size={14} />,
+                  onSelect: () => useUi.getState().setPanel('session'),
+                },
+              ],
             },
             {
-              id: 'guide',
-              label: t('Guided challenges'),
-              icon: <Flag size={14} />,
-              checked: guideOpen,
-              onSelect: () => useGuide.getState().setOpen(!guideOpen),
-            },
-            {
-              id: 'services',
-              label: t('List every service'),
-              hint: '/',
-              icon: <List size={14} />,
-              onSelect: () => useUi.getState().setLeftTab('explorer'),
-            },
-            {
-              id: 'overview',
-              label: t('Platform signals'),
-              icon: <Activity size={14} />,
-              onSelect: () => {
-                const ui = useUi.getState();
-                ui.select(null);
-                ui.setPanel(null);
-                ui.setInspectorOpen(true);
-              },
-            },
-            {
-              id: 'timeline',
-              label: t('Timeline and playback'),
-              icon: <History size={14} />,
-              checked: timelineOpen,
-              onSelect: () => useUi.getState().setTimelineOpen(!timelineOpen),
-            },
-            {
-              id: 'view',
-              label: viewMode === 'scene' ? t('Table view') : t('3D model'),
-              hint: 'T',
-              icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
-              onSelect: () =>
-                useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
-            },
-            {
-              id: 'session',
-              label: t('Save or share this session'),
-              icon: <Share2 size={14} />,
-              onSelect: () => useUi.getState().setPanel('session'),
-            },
-            {
-              id: 'workspace',
-              label: t('Import or export files'),
-              icon: <FolderOpen size={14} />,
-              onSelect: () => useUi.getState().setPanel('workspace'),
-            },
-            {
-              // A real incident, read in this tab: not the simulation's
-              // timeline, so not its clock either.
-              id: 'capture',
-              label: t('Open an incident capture'),
-              icon: <FileClock size={14} />,
-              onSelect: openCaptures,
-            },
-            {
-              id: 'settings',
-              label: t('Settings'),
-              icon: <Settings size={14} />,
-              onSelect: () => useUi.getState().setPanel('settings'),
-            },
-            {
-              id: 'help',
-              label: t('Help and legend'),
-              hint: '?',
-              icon: <CircleHelp size={14} />,
-              onSelect: () => useUi.getState().setPanel('help'),
+              id: 'general',
+              items: [
+                {
+                  id: 'guide',
+                  label: t('Guided challenges'),
+                  icon: <Flag size={14} />,
+                  checked: guideOpen,
+                  onSelect: () => useGuide.getState().setOpen(!guideOpen),
+                },
+                {
+                  id: 'settings',
+                  label: t('Settings'),
+                  icon: <Settings size={14} />,
+                  onSelect: () => useUi.getState().setPanel('settings'),
+                },
+                {
+                  id: 'help',
+                  label: t('Help and legend'),
+                  hint: '?',
+                  icon: <CircleHelp size={14} />,
+                  onSelect: () => useUi.getState().setPanel('help'),
+                },
+              ],
             },
           ]}
         />
@@ -669,50 +732,67 @@ function CaptureNav() {
           <span className="max-sm:hidden">{t('Back to the simulation')}</span>
           <span className="sm:hidden">{t('Back')}</span>
         </Button>
+        {/* Short enough to need no headings: the view, the capture and the
+            way out of it, then what serves both modes. */}
         <Menu
           label={t('More')}
           testId="open-menu"
           icon={<Ellipsis size={17} />}
-          items={[
+          sections={[
             {
               id: 'view',
-              label: viewMode === 'scene' ? t('Table view') : t('3D model'),
-              hint: 'T',
-              icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
-              onSelect: () =>
-                useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+              items: [
+                {
+                  id: 'view',
+                  label: viewMode === 'scene' ? t('Table view') : t('3D model'),
+                  hint: 'T',
+                  icon: viewMode === 'scene' ? <Table2 size={14} /> : <Box size={14} />,
+                  onSelect: () =>
+                    useUi.getState().setViewMode(viewMode === 'scene' ? 'table' : 'scene'),
+                },
+              ],
             },
             {
               id: 'capture',
-              label: t('Open another capture'),
-              icon: <FileClock size={14} />,
-              onSelect: openCaptures,
+              items: [
+                {
+                  id: 'capture',
+                  label: t('Open another capture'),
+                  icon: <FileClock size={14} />,
+                  onSelect: openCaptures,
+                },
+                {
+                  // Leaves the capture: what it becomes is a file for the simulation.
+                  id: 'draft',
+                  label: t('Draft a platform from this capture'),
+                  icon: <FolderOpen size={14} />,
+                  onSelect: draftPlatform,
+                },
+                {
+                  id: 'back',
+                  label: t('Back to the simulation'),
+                  icon: <ArrowLeft size={14} />,
+                  onSelect: leaveCapture,
+                },
+              ],
             },
             {
-              // Leaves the capture: what it becomes is a file for the simulation.
-              id: 'draft',
-              label: t('Draft a platform from this capture'),
-              icon: <FolderOpen size={14} />,
-              onSelect: draftPlatform,
-            },
-            {
-              id: 'settings',
-              label: t('Settings'),
-              icon: <Settings size={14} />,
-              onSelect: () => useUi.getState().setPanel('settings'),
-            },
-            {
-              id: 'help',
-              label: t('Help and legend'),
-              hint: '?',
-              icon: <CircleHelp size={14} />,
-              onSelect: () => useUi.getState().setPanel('help'),
-            },
-            {
-              id: 'back',
-              label: t('Back to the simulation'),
-              icon: <ArrowLeft size={14} />,
-              onSelect: leaveCapture,
+              id: 'general',
+              items: [
+                {
+                  id: 'settings',
+                  label: t('Settings'),
+                  icon: <Settings size={14} />,
+                  onSelect: () => useUi.getState().setPanel('settings'),
+                },
+                {
+                  id: 'help',
+                  label: t('Help and legend'),
+                  hint: '?',
+                  icon: <CircleHelp size={14} />,
+                  onSelect: () => useUi.getState().setPanel('help'),
+                },
+              ],
             },
           ]}
         />

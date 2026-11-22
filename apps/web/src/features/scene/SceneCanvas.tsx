@@ -17,6 +17,12 @@
  * over the model again when the capture is closed. What the viewer selects
  * or points at in a capture goes to the capture's store, never to the
  * simulation's.
+ *
+ * The platform editor (`stores/editor.ts`) is the same again: while a
+ * platform is drawn the controller is handed the draft, in the swimlanes,
+ * and the selection and the pointer go to the editor. Each change to the
+ * draft is handed over as an edit, so the pieces keep their places and
+ * walk to new ones, and the camera stays where the viewer left it.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -33,6 +39,8 @@ import {
   type SceneStats,
 } from '@/graphics/SceneController';
 import { frameAt, stepAt } from '@/features/capture/capture';
+import { attachEditor } from '@/features/editor/interaction';
+import { draftScene } from '@/features/editor/scene';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
 import { t } from '@/i18n';
 import {
@@ -46,6 +54,7 @@ import {
 } from '@/lib/overview';
 import type { ThemeName } from '@/lib/palette';
 import { useCapture } from '@/stores/capture';
+import { editing, useEditor } from '@/stores/editor';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
@@ -110,12 +119,14 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       {
         onHover: (id) => {
           if (captured()) useCapture.getState().hover(id);
+          else if (editing()) useEditor.getState().hover(id);
           else useUi.getState().setHovered(id);
         },
         // In the overview a piece is a kind of service, and only pieces can
         // be selected there: a connection between two kinds is a summary.
         onSelect: (selection) => {
           if (captured()) useCapture.getState().select(selection);
+          else if (editing()) useEditor.getState().select(selection);
           else if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
           else if (selection?.kind === 'node') {
             useUi.getState().select({ kind: 'group', id: selection.id });
@@ -132,7 +143,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
 
     /** The overview being shown, or null in the detailed arrangements and in a capture. */
     const summary = (): Overview | null => {
-      if (captured()) return null;
+      if (captured() || editing()) return null;
       const { topology } = useTelemetry.getState();
       return topology && useUi.getState().layoutMode === 'layers' ? overviewOf(topology) : null;
     };
@@ -232,6 +243,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
     };
     /** Hands the scene the simulation's topology and everything that is read against it. */
     const applyAll = () => {
+      instance.setPieceCursor('pointer');
       applyTopology();
       applySnapshot();
       applySelection();
@@ -256,6 +268,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
     const applyCapture = () => {
       const { capture, topology, selection, hovered } = useCapture.getState();
       if (!capture || !topology) return;
+      instance.setPieceCursor('pointer');
       instance.setTopology(topology, 'regions');
       applyCaptureFrame();
       instance.setSelection(selection);
@@ -268,14 +281,80 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       instance.setPartial(null);
     };
 
+    /**
+     * Hands the scene the draft being edited, in the swimlanes, with what
+     * the engine last made of it. `edit` when it is the draft already on
+     * show, changed: the pieces keep their places and walk to new ones.
+     */
+    const applyEditor = (edit: boolean) => {
+      const { draft, lastRun, selection, hovered } = useEditor.getState();
+      if (!draft) return;
+      const { topology, frame } = draftScene(draft, lastRun);
+      // A piece on the table is there to be picked up.
+      instance.setPieceCursor('grab');
+      instance.setTopology(topology, 'dependencies', null, edit);
+      instance.applySnapshot(frame);
+      instance.setSelection(selection);
+      instance.setHoveredNode(hovered);
+      instance.clearTrace();
+      instance.setRoute([], []);
+      instance.setImpacted([]);
+      instance.setReached([]);
+      instance.setVisibility(null);
+      instance.setPartial(null);
+    };
+    // An answer that has just come: it reaches the pieces along the path.
+    const applyEditorFrame = () => {
+      const { draft, lastRun } = useEditor.getState();
+      if (draft) instance.applySnapshot(draftScene(draft, lastRun).frame, true);
+    };
+    // A piece being carried is held up over the slot it would take; over
+    // another piece, to be connected to it, or over nothing, it is held
+    // over its own place.
+    const applyCarry = () => {
+      const { carrying, drag } = useEditor.getState();
+      if (carrying?.kind !== 'move') {
+        instance.setCarried(null, null);
+        return;
+      }
+      const slot = drag && drag.target === null ? drag.slot : null;
+      instance.setCarried(
+        carrying.id,
+        slot
+          ? { x: (slot.rect.x0 + slot.rect.x1) / 2, z: (slot.rect.z0 + slot.rect.z1) / 2 }
+          : null,
+      );
+    };
+
     if (captured()) applyCapture();
+    else if (editing()) applyEditor(false);
     else applyAll();
 
+    // A piece on the table can be carried while a platform is drawn.
+    const stage = gl.domElement.parentElement ?? gl.domElement;
+    const detachEditor = attachEditor(stage);
+
     const unsubscribe = [
+      detachEditor,
+      useEditor.subscribe((state, previous) => {
+        if (captured()) return;
+        if (state.draft !== previous.draft) {
+          if (state.draft && !previous.draft) applyEditor(false);
+          else if (!state.draft) applyAll();
+          else applyEditor(true);
+          return;
+        }
+        if (!state.draft) return;
+        if (state.carrying !== previous.carrying || state.drag !== previous.drag) applyCarry();
+        if (state.lastRun !== previous.lastRun) applyEditorFrame();
+        if (state.selection !== previous.selection) instance.setSelection(state.selection);
+        if (state.hovered !== previous.hovered) instance.setHoveredNode(state.hovered);
+      }),
       useCapture.subscribe((state, previous) => {
         if (state.capture !== previous.capture || state.topology !== previous.topology) {
           // Opened, replaced by another, or closed: the simulation comes back.
           if (state.capture) applyCapture();
+          else if (editing()) applyEditor(false);
           else applyAll();
           return;
         }
@@ -287,8 +366,8 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
         if (state.hovered !== previous.hovered) instance.setHoveredNode(state.hovered);
       }),
       useTelemetry.subscribe((state, previous) => {
-        // The stream goes on behind a capture; it is drawn again on closing it.
-        if (captured()) return;
+        // The stream goes on behind a capture or a draft; it is drawn again on closing it.
+        if (captured() || editing()) return;
         if (state.topology && state.topology !== previous.topology) applyAll();
         if (state.snapshot && state.snapshot !== previous.snapshot) {
           applySnapshot();
@@ -298,7 +377,7 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
         }
       }),
       useUi.subscribe((state, previous) => {
-        if (captured()) return;
+        if (captured() || editing()) return;
         if (state.layoutMode !== previous.layoutMode) {
           // Between the two detailed arrangements the pieces walk; to and
           // from the overview the model is a different one, and is rebuilt.

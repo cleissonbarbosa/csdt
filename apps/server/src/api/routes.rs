@@ -11,6 +11,7 @@ use crate::application::diff::{compare, Diff};
 use crate::application::experiment::{Experiment, Trial};
 use crate::application::limits::{Headroom, WeakPoints};
 use crate::application::platforms::PlatformComparison;
+use crate::application::preview::WorkspacePreview;
 use crate::application::session::SessionExport;
 use crate::application::{ControlAction, EvaluateEngine, EvaluateInput, Loaded, ResetScope};
 use crate::authorization::{
@@ -731,6 +732,39 @@ pub async fn experiment_platforms(
     .await
     .map_err(|()| internal("the comparison could not be run"))??;
     Ok(Json(comparison))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreviewBody {
+    files: Vec<SourceFile>,
+    /// Which platform of the files to run, when they describe several.
+    #[serde(default)]
+    topology_id: Option<String>,
+}
+
+/// One platform the uploaded files describe, at rest: the one named or the
+/// one they open on, run with nothing started and nothing placed on a
+/// timeline of its own from the server's seed. The answer is its topology
+/// and snapshot at the end of the run and the topology as it was read. The
+/// files are built the way an import builds them; nothing is applied and the
+/// timeline in use is not touched.
+pub async fn workspace_preview(
+    State(state): State<AppState>,
+    body: Result<Json<PreviewBody>, JsonRejection>,
+) -> ApiResult<WorkspacePreview> {
+    import_allowed(&state)?;
+    let Json(body) = body?;
+    if let Some(id) = &body.topology_id {
+        check_id("topologyId", id)?;
+    }
+    let candidate = build_import(&state, body.files).await?;
+    let service = state.service.clone();
+    let preview =
+        off_the_workers(move || service.preview_platform(&candidate, body.topology_id.as_deref()))
+            .await
+            .map_err(|()| internal("the files could not be previewed"))??;
+    Ok(Json(preview))
 }
 
 fn apply(state: &AppState, loaded: Loaded) -> Json<WorkspaceResponse> {

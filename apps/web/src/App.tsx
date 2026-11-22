@@ -32,6 +32,11 @@ import { Inspector } from '@/features/inspector/Inspector';
 import { IntegrationsDialog } from '@/features/integrations/IntegrationsDialog';
 import { ScenarioConsole } from '@/features/scenarios/ScenarioConsole';
 import { ScenarioEditor } from '@/features/scenarios/ScenarioEditor';
+import { EditorCard } from '@/features/editor/EditorCard';
+import { EditorOverlay } from '@/features/editor/EditorOverlay';
+import { EditorTable } from '@/features/editor/EditorTable';
+import { editorKey } from '@/features/editor/keys';
+import { Palette } from '@/features/editor/Palette';
 import { DevOverlay } from '@/features/scene/DevOverlay';
 import { SceneCanvas } from '@/features/scene/SceneCanvas';
 import { SessionDialog } from '@/features/session/SessionDialog';
@@ -53,12 +58,15 @@ import {
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { selectOpen, useCapture } from '@/stores/capture';
+import { selectEditing, useEditor } from '@/stores/editor';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { LAYOUT_MODES, prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
 const LEFT_WIDTH = 300;
 const RIGHT_WIDTH = 332;
+/** The editor's palette where the stage has no room for it beside the card: a column of glyphs. */
+const RAIL_WIDTH = 64;
 /** Space between a card and the edges of the stage it floats over. */
 const GUTTER = 12;
 /** Room the scene keeps clear at the top (its toolbar) and the bottom. */
@@ -218,6 +226,13 @@ function useShortcuts() {
       // A dialog that has just closed itself on this key has dealt with it;
       // the same Escape must not go on to put a panel away as well.
       if (event.defaultPrevented) return;
+      // While a platform is drawn the keys are the editor's; of the
+      // simulation's only `?` still opens the help.
+      if (useEditor.getState().draft !== null) {
+        if (editorKey(event, isTyping(event.target))) event.preventDefault();
+        else if (event.key === '?' && !isTyping(event.target)) useUi.getState().setPanel('help');
+        return;
+      }
       const captured = useCapture.getState().capture !== null;
       // The command palette opens from anywhere, including while typing;
       // over a capture there is nothing in it to reach.
@@ -300,6 +315,14 @@ function useShortcuts() {
 /** Where the keyboard is put once a capture has been opened: its clock. */
 const CAPTURE_LANDING = '[data-testid="capture-toggle"]';
 /**
+ * Where it is put once the platform editor has been opened: the first
+ * piece of its palette, which Enter adds, or the draft's card when the
+ * palette is put away.
+ */
+const EDITOR_LANDING = '[data-testid="editor-palette"] button, [data-testid="editor-card"] button';
+/** The editor as a mode the keyboard follows; it has no file of its own to tell one from another. */
+const EDITING = { mode: 'editor' } as const;
+/**
  * Where it is put once the simulation is back: the stage, which the skip
  * link leads to too, where the simulation's keys work as they did.
  */
@@ -336,8 +359,8 @@ function useLastFocused(): { readonly current: Element | null } {
 
 /**
  * Puts the keyboard somewhere when what the page shows is replaced under
- * it: a capture opened, another one opened in its place, or the simulation
- * back. The control the focus was on (a menu's item, the dialog's button,
+ * it: a capture opened, another one opened in its place, the platform
+ * editor opened, or the simulation back. The control the focus was on (a menu's item, the dialog's button,
  * "Back to the simulation") went with the part it belonged to, and the
  * browser would leave the focus at the top of the document without a word.
  * Only once no dialog is open, since a dialog holds the focus until it has
@@ -348,6 +371,7 @@ function useLastFocused(): { readonly current: Element | null } {
  */
 function useFocusAcrossModes(
   shown: object | null,
+  landing: string | null,
   dialogOpen: boolean,
   lastFocused: { readonly current: Element | null },
 ): void {
@@ -367,11 +391,12 @@ function useFocusAcrossModes(
       // Nothing was ever focused, or what was is still on the page: the
       // change took nothing from the viewer.
       if (!gone(lastFocused.current)) return;
-      const landing = shown !== null ? document.querySelector<HTMLElement>(CAPTURE_LANDING) : null;
-      (landing ?? document.querySelector<HTMLElement>(SIMULATION_LANDING))?.focus();
+      const target =
+        shown !== null && landing !== null ? document.querySelector<HTMLElement>(landing) : null;
+      (target ?? document.querySelector<HTMLElement>(SIMULATION_LANDING))?.focus();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [shown, dialogOpen, lastFocused]);
+  }, [shown, landing, dialogOpen, lastFocused]);
 }
 
 /** A capture's service's row in its list; ids are letters, digits, `.`, `_` and `-`. */
@@ -515,6 +540,10 @@ export function App() {
   // While an incident capture is open its parts take the place of the
   // simulation's; the simulation's panels keep their state for its return.
   const captureOpen = useCapture(selectOpen);
+  // So do the editor's while a platform is drawn.
+  const editorOpen = useEditor(selectEditing);
+  const paletteOpen = useEditor((state) => state.paletteOpen);
+  const modeOpen = captureOpen || editorOpen;
   const explorerOpen = useUi((state) => state.explorerOpen);
   const inspectorOpen = useUi((state) => state.inspectorOpen);
   const leftTab = useUi((state) => state.leftTab);
@@ -542,7 +571,12 @@ export function App() {
       (state.openPanel !== null && state.openPanel !== 'authorization') || state.commandOpen,
   );
   const lastFocused = useLastFocused();
-  useFocusAcrossModes(shownCapture, dialogOpen, lastFocused);
+  useFocusAcrossModes(
+    shownCapture ?? (editorOpen ? EDITING : null),
+    shownCapture ? CAPTURE_LANDING : editorOpen ? EDITOR_LANDING : null,
+    dialogOpen,
+    lastFocused,
+  );
   useFocusAfterCaptureSheets(lastFocused);
   useCaptureFailures();
   const incidentActive = useTelemetry((state) => state.snapshot?.incident != null);
@@ -573,15 +607,24 @@ export function App() {
   const can3D = support !== null && canRender3D(support) && sceneError === null;
   const showScene = viewMode === 'scene' && can3D;
 
-  const simulationExplorer = !captureOpen && explorerOpen;
-  const simulationInspector = !captureOpen && inspectorOpen;
-  const left = (captureOpen ? captureListOpen : explorerOpen) ? LEFT_WIDTH + GUTTER : 0;
-  const right = (captureOpen ? captureCardOpen : inspectorOpen) ? RIGHT_WIDTH + GUTTER : 0;
+  const simulationExplorer = !modeOpen && explorerOpen;
+  const simulationInspector = !modeOpen && inspectorOpen;
+  // Where the palette and the card would leave the model less than its room,
+  // the palette is a column of glyphs, each still named.
+  const paletteRail = !useMinWidth(LEFT_WIDTH + RIGHT_WIDTH + MODEL_ROOM + GUTTER * 4);
+  const leftWidth = editorOpen && paletteRail ? RAIL_WIDTH : LEFT_WIDTH;
+  const left = (captureOpen ? captureListOpen : editorOpen ? paletteOpen : explorerOpen)
+    ? leftWidth + GUTTER
+    : 0;
+  const right = (captureOpen ? captureCardOpen : editorOpen || inspectorOpen)
+    ? RIGHT_WIDTH + GUTTER
+    : 0;
   // The timeline floats at the foot of the stage when there is one. A
   // capture's bar is there for as long as the capture is open.
   const timelineHeight = useTimelineHeight();
   const timelineVisible = useTimelineVisible();
-  const foot = captureOpen || timelineVisible ? timelineHeight + GUTTER : 0;
+  // The editor has no timeline: nothing has happened on a draft.
+  const foot = captureOpen || (!editorOpen && timelineVisible) ? timelineHeight + GUTTER : 0;
   // On a first visit the orientation lies over the foot of the stage; the
   // model is framed above it for as long as it is there.
   const [orientation, setOrientation] = useState(0);
@@ -595,12 +638,12 @@ export function App() {
   const guideAlongFoot = narrow || !roomBeside;
   const [guide, setGuide] = useState(0);
   // Neither the guide nor the orientation is on the stage over a capture.
-  const guideFoot = !captureOpen && guideAlongFoot && guide > 0 ? guide + GUTTER : 0;
+  const guideFoot = !modeOpen && guideAlongFoot && guide > 0 ? guide + GUTTER : 0;
   // Beside the panels the card stands on the model's side of them, and the
   // model moves over for it as it does for a panel. It used to stay where it
   // was, under the card: the first layer of the overview, and the edge's
   // lane with its name, could not be seen while a challenge was open.
-  const guideBeside = !captureOpen && !guideAlongFoot && guide > 0 ? GUIDE_WIDTH + GUTTER : 0;
+  const guideBeside = !modeOpen && !guideAlongFoot && guide > 0 ? GUIDE_WIDTH + GUTTER : 0;
   // The toolbar and the notices move over for the panels where the stage
   // has room for them in between. Where it has not (a phone with a panel
   // open, a tablet with one on each side) they were squeezed into what was
@@ -608,7 +651,7 @@ export function App() {
   // notices over the panels and the toolbar under them.
   const roomBetween = useMinWidth(left + right + TOOLBAR_ROOM);
   const beside = roomBetween ? { left, right } : { left: 0, right: 0 };
-  const orientationFoot = !captureOpen && orientation > 0 ? orientation + GUTTER : 0;
+  const orientationFoot = !modeOpen && orientation > 0 ? orientation + GUTTER : 0;
   const bottom = BOTTOM_INSET + foot + orientationFoot + guideFoot;
   // On a phone a card takes the width of the stage, so the model cannot move
   // over beside it. It used to be asked to, and went out of the picture the
@@ -622,7 +665,7 @@ export function App() {
   );
   const cardOnTop = captureOpen
     ? captureCardOpen && captureCardHeight > 0
-    : inspectorOpen && card > 0;
+    : !editorOpen && inspectorOpen && card > 0;
   const under = narrow && cardOnTop;
   const sceneLeft = narrow ? 0 : left + guideBeside;
   const sceneRight = narrow ? 0 : right;
@@ -634,7 +677,7 @@ export function App() {
       top: sceneTop,
       bottom,
     });
-  }, [sceneLeft, sceneRight, sceneTop, bottom, showScene, hasTopology, captureOpen]);
+  }, [sceneLeft, sceneRight, sceneTop, bottom, showScene, hasTopology, captureOpen, editorOpen]);
   const onRuntime = useCallback(() => {
     sceneHandle.current?.setViewInsets({
       left: sceneLeft,
@@ -697,6 +740,8 @@ export function App() {
             >
               {captureOpen ? (
                 <CaptureTable notice={viewMode === 'scene' ? unavailable : null} />
+              ) : editorOpen ? (
+                <EditorTable notice={viewMode === 'scene' ? unavailable : null} />
               ) : (
                 <TopologyTable notice={viewMode === 'scene' ? unavailable : null} />
               )}
@@ -722,7 +767,7 @@ export function App() {
           className="pointer-events-none absolute top-3 z-10 flex items-start justify-end gap-2 px-3 transition-[left,right] duration-200 ease-arrive"
           style={beside}
         >
-          <div className="pointer-events-auto">{showScene && <SceneToolbar />}</div>
+          <div className="pointer-events-auto">{showScene && !editorOpen && <SceneToolbar />}</div>
         </div>
         <div
           className="pointer-events-none absolute top-3 z-30 flex justify-center px-3 transition-[left,right] duration-200 ease-arrive"
@@ -730,6 +775,9 @@ export function App() {
         >
           <Notices />
         </div>
+
+        {/* What a carry shows over the model: where a piece would go. */}
+        {showScene && editorOpen && <EditorOverlay />}
 
         {showScene && devOverlay && (
           <div
@@ -855,17 +903,47 @@ export function App() {
           </Sheet>
         )}
 
+        {/* The editor's parts: the pieces to carry on the left, the card of
+            what is selected (or of the platform) on the right. */}
+        {editorOpen && (
+          <Sheet
+            side="left"
+            open={paletteOpen}
+            width={leftWidth}
+            foot={foot}
+            label={t('Pieces to place')}
+          >
+            <Palette rail={paletteRail} />
+          </Sheet>
+        )}
+        {editorOpen && (
+          <Sheet
+            side="right"
+            open
+            width={RIGHT_WIDTH}
+            foot={foot}
+            compact
+            share={narrow ? CARD_SHARE_WHEN_NARROW : undefined}
+            label={t('The draft')}
+            testId="editor-card"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <EditorCard />
+            </div>
+          </Sheet>
+        )}
+
         {/* An embed has no bar and is nobody's first visit to the application.
             Neither is on the stage over a capture, nor is a challenge: both
             are about the simulation. */}
-        {captureOpen ? null : embed === null ? (
+        {modeOpen ? null : embed === null ? (
           <Orientation bottom={GUTTER + foot} onHeight={setOrientation} />
         ) : (
           <EmbedBar />
         )}
         {/* Kept mounted over a capture, only out of sight: mounting it again
             would take up the address's challenge a second time. */}
-        <div className={captureOpen ? 'hidden' : 'contents'}>
+        <div className={modeOpen ? 'hidden' : 'contents'}>
           <GuideCard
             left={guideAlongFoot ? GUTTER : left + GUTTER}
             bottom={GUTTER + foot}
@@ -873,7 +951,7 @@ export function App() {
             onHeight={setGuide}
           />
         </div>
-        {captureOpen ? <CaptureBar /> : <Timeline />}
+        {captureOpen ? <CaptureBar /> : editorOpen ? null : <Timeline />}
       </div>
 
       <IntegrationsDialog />

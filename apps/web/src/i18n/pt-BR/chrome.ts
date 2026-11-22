@@ -42,6 +42,9 @@ export default {
   'Explore an#incident': 'Explorar um',
   incident: 'incidente',
   More: 'Mais',
+  // The menu's sections, after the three paths of the first visit's card
+  // ("Understand the platform" and the others), then this one.
+  'Platform and files': 'Plataforma e arquivos',
   'Trace a request through Cedar': 'Rastrear uma requisição com o Cedar',
   'List every service': 'Listar todos os serviços',
   'Table view': 'Visualização em tabela',

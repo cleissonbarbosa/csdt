@@ -1102,6 +1102,94 @@ test('a scenario written in the editor is checked by the engine and runs', async
   await expect(page.getByTestId('platform-status')).toContainText('Slow ledger');
 });
 
+test('a platform drawn on the model is run by the engine at rest and applied', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openApp(page);
+  await waitForScene(page);
+  await fromMenu(page, 'draw-platform');
+  const status = page.getByTestId('editor-status');
+  await expect(status).toContainText('Drawing a platform');
+  // The keyboard is put on the first piece of the palette, which Enter adds.
+  await expect(page.getByTestId('palette-external-client')).toBeFocused();
+  // An empty page is one region and a client; the engine runs it at rest.
+  await waitForScene(page, 1);
+  await expect(status).toContainText('one service, normal');
+  // Once it has, no piece is drawn as unknown any more.
+  await expect.poll(() => page.evaluate(() => window.__aegis?.stats().unknown ?? -1)).toBe(0);
+  const carrying = page.locator('html');
+
+  const canvas = (await page.locator('canvas').first().boundingBox())!;
+  const at = async (id: string) => {
+    const point = await page.evaluate((node) => window.__aegis?.projectNode(node) ?? null, id);
+    expect(point, id).not.toBeNull();
+    return { x: canvas.x + point!.x, y: canvas.y + point!.y };
+  };
+
+  // A gateway carried from the palette stands one column past the client.
+  const client = await at('clients');
+  const tile = page.getByTestId('palette-api-gateway');
+  await tile.hover();
+  await page.mouse.down();
+  await page.mouse.move(client.x + 40, client.y, { steps: 4 });
+  await page.mouse.move(client.x + 110, client.y, { steps: 8 });
+  await expect(page.getByTestId('editor-slot')).toBeVisible();
+  // While it is carried, the tile it came from says so, and the page shows a hand that holds it.
+  await expect(tile).toHaveAttribute('data-carried', 'true');
+  await expect(carrying).toHaveAttribute('data-carrying', 'true');
+  await page.mouse.up();
+  await expect(carrying).not.toHaveAttribute('data-carrying', 'true');
+  await waitForScene(page, 2);
+  await expect(page.getByTestId('editor-service-card')).toContainText('API gateway');
+
+  // The client carried onto the gateway connects the two.
+  const from = await at('clients');
+  const to = await at('api-gateway');
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 6 });
+  await page.mouse.move(to.x, to.y, { steps: 6 });
+  await expect(page.getByTestId('editor-link')).toBeVisible();
+  // A piece picked up is the one in hand: its card is the one shown.
+  await expect(page.getByTestId('editor-service-card')).toContainText('Clients');
+  await page.mouse.up();
+  await expect(page.getByTestId('editor-connection-card')).toContainText('Routes to');
+  await expect(status).toContainText('2 services, all normal');
+
+  // Carried back onto the client, the gateway would close a circle: nothing
+  // is connected, and the circle is drawn with the reason.
+  const gateway = await at('api-gateway');
+  const back = await at('clients');
+  await page.mouse.move(gateway.x, gateway.y);
+  await page.mouse.down();
+  await page.mouse.move((gateway.x + back.x) / 2, (gateway.y + back.y) / 2, { steps: 6 });
+  await page.mouse.move(back.x, back.y, { steps: 6 });
+  await expect(page.getByTestId('editor-caption')).toContainText('That would close a circle');
+  await page.mouse.up();
+  await expect(page.getByTestId('editor-circle')).toBeVisible();
+  await expect(status).toContainText('That would close a circle');
+  await expect.poll(() => page.evaluate(() => window.__aegis?.stats().edges ?? -1)).toBe(1);
+
+  // The keyboard adds a kind too, and undoing takes it away again.
+  await page.getByTestId('palette-database').focus();
+  await page.keyboard.press('Enter');
+  await waitForScene(page, 3);
+  await page.getByTestId('editor-undo').click();
+  await waitForScene(page, 2);
+
+  // Applied, it is the platform on show, and the editor makes way for the simulation.
+  await page.getByTestId('editor-apply').click();
+  await expect(page.getByTestId('editor-status')).toHaveCount(0);
+  await expect(page.getByTestId('platform-status')).toBeVisible();
+  const topology = (await (await page.request.get(`${API}/topology`)).json()) as {
+    id: string;
+    nodes: unknown[];
+    edges: unknown[];
+  };
+  expect(topology.id).toBe('my-platform');
+  expect(topology.nodes).toHaveLength(2);
+  expect(topology.edges).toHaveLength(1);
+});
+
 test('a guided challenge checks an answer against the incident itself', async ({ page }) => {
   test.setTimeout(120_000);
   await openApp(page);
@@ -1596,4 +1684,55 @@ test('an incident capture opens in place and leaves the server’s simulation un
   expect(await commands()).toEqual(timeline);
   expect(await tick()).toBeGreaterThan(before);
   expect(errors).toEqual([]);
+});
+
+test('the menu is in sections, in two columns where there is room, and stays on the screen', async ({
+  page,
+}) => {
+  // In Portuguese, whose labels are the longest the menu holds.
+  await openApp(page, { language: 'pt-BR' });
+  const menu = page.getByRole('menu');
+  const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
+  // How tall each item is drawn: one line each when no label breaks.
+  const heights = () =>
+    menu.evaluate((element) =>
+      [...element.querySelectorAll('[role^="menuitem"]')].map(
+        (item) => item.getBoundingClientRect().height,
+      ),
+    );
+
+  for (const size of [
+    { width: 1600, height: 900 },
+    { width: 1024, height: 640 },
+    { width: 390, height: 780 },
+    { width: 844, height: 390 },
+  ]) {
+    const where = `${size.width}×${size.height}`;
+    await page.setViewportSize(size);
+    await page.getByTestId('open-menu').click();
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('group', { name: 'Entender a plataforma' })).toBeVisible();
+
+    // Never past an edge of the screen; a short one scrolls the menu.
+    const frame = (await menu.boundingBox())!;
+    expect(frame.x, where).toBeGreaterThanOrEqual(0);
+    expect(frame.x + frame.width, where).toBeLessThanOrEqual(size.width);
+    expect(frame.y + frame.height, where).toBeLessThanOrEqual(size.height);
+    await page.getByTestId('menu-help').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('menu-help'), where).toBeInViewport();
+
+    const [left, right] = [await box('menu-overview'), await box('menu-trace')];
+    if (size.width >= 768) {
+      // Side by side, and not one label broken across two lines.
+      expect(right.x, where).toBeGreaterThan(left.x + left.width / 2);
+      const drawn = await heights();
+      expect(Math.max(...drawn) - Math.min(...drawn), where).toBeLessThan(2);
+    } else {
+      // One column: the sections follow each other.
+      expect(right.x, where).toBe(left.x);
+      expect(right.y, where).toBeGreaterThan(left.y);
+    }
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
 });

@@ -21,6 +21,7 @@ use crate::simulation::{Command, Timeline, TICK_MS};
 use super::experiment::{self, Experiment, Trial};
 use super::limits::{self, Headroom, WeakPoints};
 use super::platforms::{self, PlatformComparison, Refusal};
+use super::preview::{self, WorkspacePreview};
 use super::session::{self, SessionExport};
 use super::{Assets, Loaded};
 
@@ -63,6 +64,8 @@ pub enum ServiceError {
     InvalidSession(String),
     #[error("the comparison cannot be run: {0}")]
     InvalidExperiment(String),
+    #[error("the files cannot be previewed: {0}")]
+    InvalidPreview(String),
     #[error("the platform's files were replaced while this was being prepared; try again")]
     WorkspaceChanged,
     #[error(transparent)]
@@ -719,6 +722,19 @@ impl SimulationService {
         })
     }
 
+    /// One platform of `candidate`, a set of files that is not in use, at
+    /// rest: the one named, or the one its files open on, run with nothing
+    /// started and nothing placed on a timeline of its own with the
+    /// server's seed. Neither the timeline nor the files in use are touched;
+    /// the runtime is not even locked.
+    pub fn preview_platform(
+        &self,
+        candidate: &Loaded,
+        topology_id: Option<&str>,
+    ) -> Result<WorkspacePreview, ServiceError> {
+        preview::preview(candidate, topology_id, self.seed).map_err(ServiceError::InvalidPreview)
+    }
+
     // -- authorization ------------------------------------------------------
 
     /// Validates a request and checks the policy filter before any engine runs.
@@ -837,6 +853,13 @@ impl SimulationService {
     pub fn snapshot(&self) -> TelemetrySnapshot {
         let rt = self.lock();
         rt.timeline.telemetry(rt.status, rt.speed)
+    }
+
+    /// A fingerprint of the whole state at the cursor of the timeline in
+    /// use, generator included: what a test compares to hold a question to
+    /// having changed nothing.
+    pub fn state_digest(&self) -> u64 {
+        self.lock().timeline.state().digest()
     }
 
     pub fn playback(&self) -> PlaybackState {

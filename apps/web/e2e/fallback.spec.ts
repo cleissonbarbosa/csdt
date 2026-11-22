@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { openApp, openOverview } from './support';
+import { fromMenu, openApp, openOverview } from './support';
 
 test('without WebGPU or WebGL 2 the topology is shown as an accessible table', async ({ page }) => {
   await openApp(page);
@@ -35,4 +35,25 @@ test('without WebGPU or WebGL 2 the topology is shown as an accessible table', a
     'data-scenario',
     'cedar-denial',
   );
+});
+
+test('without a model a platform is still drawn, in a table', async ({ page }) => {
+  await openApp(page);
+  await fromMenu(page, 'edit-platform');
+  const table = page.getByTestId('editor-table');
+  await expect(table).toBeVisible();
+  await expect(table.getByRole('status')).toContainText('neither WebGPU nor WebGL 2');
+  await expect(page.getByTestId('editor-status')).toContainText('Editing Helios Commerce');
+  await expect(page.getByTestId('editor-status')).toContainText('51 services, all normal');
+
+  // A piece pressed rather than carried is added, and the card is its own.
+  await page.getByTestId('palette-cache').click();
+  await expect(page.getByTestId('editor-service-card')).toContainText('Cache');
+  await expect(table.getByRole('button', { name: 'Cache', exact: true })).toBeVisible();
+  await expect(page.getByTestId('editor-status')).toContainText('52 services');
+
+  // Leaving with a change asks first; nothing was applied.
+  await page.getByTestId('editor-leave').click();
+  await page.getByTestId('editor-leave-anyway').click();
+  await expect(page.getByTestId('topology-table')).toBeVisible();
 });

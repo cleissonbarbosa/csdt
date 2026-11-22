@@ -29,6 +29,7 @@ import {
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
   WorkspaceDiffSchema,
+  WorkspacePreviewSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
   AccessMatrixSchema,
@@ -86,6 +87,7 @@ const CASES: Record<string, z.ZodType> = {
   'workspace-check-invalid': WorkspaceCheckSchema,
   'workspace-check-inventory': WorkspaceCheckSchema,
   'workspace-diff': WorkspaceDiffSchema,
+  'workspace-preview': WorkspacePreviewSchema,
   'workspace-response': WorkspaceResponseSchema,
   'workspace-export': WorkspaceBundleSchema,
   'stream-lagged': StreamMessageSchema,
@@ -148,6 +150,25 @@ describe('columnar snapshots', () => {
       { kind: 'latency', node: expect.any(Number), edge: null, onto: null, value: 3 },
     ]);
     expect(topology.nodes[snapshot.faults[0]?.node ?? -1]?.id).toBe('use-search');
+  });
+});
+
+describe('a preview of files', () => {
+  const { topology, snapshot, spec } = WorkspacePreviewSchema.parse(sample('workspace-preview'));
+
+  it('is the platform the files describe, at rest and paused', () => {
+    expect(spec.id).toBe(topology.id);
+    expect(snapshot.topologyId).toBe(topology.id);
+    for (const column of Object.values(snapshot.nodes)) {
+      expect(column).toHaveLength(topology.nodes.length);
+    }
+    for (const column of Object.values(snapshot.edges)) {
+      expect(column).toHaveLength(topology.edges.length);
+    }
+    expect(snapshot.playback.status).toBe('paused');
+    expect(snapshot.virtualTimeMs).toBe(4000);
+    expect(snapshot.incident).toBeNull();
+    expect(snapshot.faults).toEqual([]);
   });
 });
 

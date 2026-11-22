@@ -1,0 +1,253 @@
+{
+  "topology": {
+    "schemaVersion": "1.0",
+    "id": "front-desk",
+    "name": "Front Desk",
+    "description": "Fictional two-service platform used for the contract samples.",
+    "dataSource": "synthetic",
+    "regions": [
+      {
+        "id": "lobby",
+        "name": "Lobby",
+        "kind": "cloud",
+        "location": "Ground floor"
+      }
+    ],
+    "roles": {
+      "primaryGateway": "door"
+    },
+    "nodes": [
+      {
+        "id": "visitors",
+        "name": "Visitors",
+        "serviceType": "external-client",
+        "region": "lobby",
+        "environment": "demo",
+        "tier": 0,
+        "description": "",
+        "dataSource": "synthetic",
+        "capacityRps": 0.0,
+        "baselineLatencyMs": 4.6,
+        "connectedServices": [
+          "door"
+        ],
+        "metrics": {
+          "health": "healthy",
+          "latencyMs": 4.7,
+          "throughputRps": 42.8,
+          "errorRate": 0.0,
+          "saturation": 0.0,
+          "queueDepth": 0.0
+        }
+      },
+      {
+        "id": "door",
+        "name": "Door",
+        "serviceType": "api-gateway",
+        "region": "lobby",
+        "environment": "demo",
+        "tier": 1,
+        "description": "",
+        "dataSource": "synthetic",
+        "capacityRps": 96.0,
+        "baselineLatencyMs": 3.4,
+        "rateLimitRps": 90.0,
+        "suspiciousFilter": 0.9,
+        "autoscale": {
+          "maxFactor": 3.0,
+          "seconds": 20.0
+        },
+        "connectedServices": [
+          "visitors"
+        ],
+        "metrics": {
+          "health": "healthy",
+          "latencyMs": 3.5,
+          "throughputRps": 42.8,
+          "errorRate": 0.0,
+          "saturation": 0.443,
+          "queueDepth": 0.0
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "visitors->door",
+        "source": "visitors",
+        "target": "door",
+        "protocol": "https",
+        "relationship": "route",
+        "weight": 1.0,
+        "crossRegion": false,
+        "metrics": {
+          "trafficRps": 42.8,
+          "latencyMs": 1.2,
+          "errorRate": 0.0,
+          "rejectedRps": 0.0,
+          "suspiciousRps": 0.0,
+          "securityStatus": "secure"
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "schemaVersion": "1.0",
+    "topologyId": "front-desk",
+    "dataSource": "synthetic",
+    "tick": 20,
+    "virtualTimeMs": 4000,
+    "seq": 0,
+    "global": {
+      "rps": 42.9,
+      "avgLatencyMs": 5.0,
+      "p50LatencyMs": 4.7,
+      "p95LatencyMs": 8.5,
+      "p99LatencyMs": 10.8,
+      "errorRate": 0.0,
+      "authzChecksRps": 0.0,
+      "authzDenialRate": 0.0,
+      "rejectedRps": 0.0,
+      "suspiciousRps": 0.0,
+      "activeIncidents": 0,
+      "health": {
+        "healthy": 2,
+        "degraded": 0,
+        "critical": 0,
+        "down": 0
+      }
+    },
+    "nodes": {
+      "health": [
+        0,
+        0
+      ],
+      "latencyMs": [
+        4.7,
+        3.5
+      ],
+      "throughputRps": [
+        42.8,
+        42.8
+      ],
+      "errorRate": [
+        0.0,
+        0.0
+      ],
+      "saturation": [
+        0.0,
+        0.443
+      ],
+      "queueDepth": [
+        0.0,
+        0.0
+      ]
+    },
+    "edges": {
+      "trafficRps": [
+        42.8
+      ],
+      "latencyMs": [
+        1.2
+      ],
+      "errorRate": [
+        0.0
+      ],
+      "rejectedRps": [
+        0.0
+      ],
+      "suspiciousRps": [
+        0.0
+      ],
+      "securityStatus": [
+        0
+      ]
+    },
+    "regions": [
+      {
+        "id": "lobby",
+        "health": "healthy",
+        "rps": 42.8,
+        "errorRate": 0.0,
+        "nodesTotal": 2,
+        "nodesUnhealthy": 0
+      }
+    ],
+    "flows": [],
+    "incident": null,
+    "faults": [],
+    "playback": {
+      "status": "paused",
+      "mode": "live",
+      "speed": 1.0,
+      "tick": 20,
+      "virtualTimeMs": 4000,
+      "headTick": 20,
+      "headTimeMs": 4000,
+      "windowStartMs": 0,
+      "tickMs": 200,
+      "recordingId": null
+    }
+  },
+  "spec": {
+    "id": "front-desk",
+    "name": "Front Desk",
+    "description": "Fictional two-service platform used for the contract samples.",
+    "dataSource": "synthetic",
+    "regions": [
+      {
+        "id": "lobby",
+        "name": "Lobby",
+        "kind": "cloud",
+        "location": "Ground floor"
+      }
+    ],
+    "roles": {
+      "primaryGateway": "door"
+    },
+    "nodes": [
+      {
+        "id": "visitors",
+        "name": "Visitors",
+        "type": "external-client",
+        "region": "lobby",
+        "tier": 0,
+        "description": "",
+        "environment": "demo",
+        "baseLatencyMs": 0.0,
+        "capacityRps": null,
+        "headroom": null,
+        "baseRps": 40.0
+      },
+      {
+        "id": "door",
+        "name": "Door",
+        "type": "api-gateway",
+        "region": "lobby",
+        "tier": 1,
+        "description": "",
+        "environment": "demo",
+        "baseLatencyMs": 3.0,
+        "capacityRps": null,
+        "headroom": null,
+        "baseRps": null,
+        "rateLimitRps": 90.0,
+        "suspiciousFilter": 0.9,
+        "autoscale": {
+          "maxFactor": 3.0,
+          "seconds": 20.0
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "visitors",
+        "target": "door",
+        "protocol": "https",
+        "relationship": "route",
+        "weight": 1.0,
+        "criticality": null,
+        "latencyMs": null
+      }
+    ]
+  }
+}

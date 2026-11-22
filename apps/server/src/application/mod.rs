@@ -12,6 +12,7 @@ pub mod diff;
 pub mod experiment;
 pub mod limits;
 pub mod platforms;
+pub mod preview;
 mod service;
 pub mod session;
 

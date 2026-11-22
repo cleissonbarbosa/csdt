@@ -248,11 +248,14 @@ Things that are easy to break:
   request to the decision Cedar gave; keep it passing when Cedar is
   upgraded.
 - **Asking is not recording.** `explain`, `matrix`, `trial`, the comparison
-  of platforms, `headroom` and `weak-points` place nothing on the timeline:
-  no command, no event, no decision. They are bounded (`MATRIX_LIMIT`,
-  `MAX_DISABLED_POLICIES`, `TRIAL_MS`, an import's limits,
-  `HEADROOM_LADDER` and `HEADROOM_REFINEMENTS`, `WEAK_POINTS_MAX`), and all
-  but `explain` run through `off_the_workers`.
+  of platforms, the preview of a workspace, `headroom` and `weak-points`
+  place nothing on the timeline: no command, no event, no decision. They are
+  bounded (`MATRIX_LIMIT`, `MAX_DISABLED_POLICIES`, `TRIAL_MS`, an import's
+  limits, `LEAD_IN_MS`, `HEADROOM_LADDER` and `HEADROOM_REFINEMENTS`,
+  `WEAK_POINTS_MAX`), and all but `explain` run through `off_the_workers`.
+  A preview (`application/preview.rs`) is the platform of the files at rest
+  for `LEAD_IN_MS`: a test holds its topology and snapshot to what Apply
+  shows after as long, so keep the two built the same way.
 - **A limit is two runs, never a figure between them.**
   `application/limits.rs` reports the highest multiple of demand it ran at
   which every objective was met and the lowest at which one was missed,
@@ -620,6 +623,48 @@ to come back as they were. Things that are easy to break:
   written; the copies of a bundled capture's title and source in
   `bundled.ts` are marked `not-interface-text` and held equal to the file by
   `bundled.test.ts`.
+
+The **platform editor** (`features/editor/`, `stores/editor.ts`) is a third
+mode of the same shell: while `useEditor.draft` is set, `App.tsx` and
+`TopNav.tsx` show the editor's parts (the palette, the card, a bar of its
+own) and the simulation's slide away untouched. Things that are easy to
+break:
+
+- **The draft is a file.** `lib/topologyFile.ts` reads a topology file into
+  a draft and writes it back, and every change is a pure function of it; a
+  test holds that every topology the repository ships comes back unchanged.
+  The editor writes nothing the format does not have. In particular a
+  piece's place is its region and tier, which is all the layout reads:
+  `slotAt` (`graphics/layout.ts`) turns a point of the swimlanes into the
+  two, and a test holds every piece's own place to its own slot.
+- **Defaults are the Compose reader's.** `DEFAULT_LATENCY_MS` and
+  `connectionDefaults` copy `default_latency_ms` and `link` in
+  `workspace/compose.rs`; a test reads that file and fails when they part.
+- **Figures are the engine's.** The draft is put to the preview route with
+  the files in use around it (`open.ts`, `withDraft`), a moment after it
+  stops changing (the write rate limit counts every call). An answer is kept
+  with the exact text it is about; a piece the last run did not have is
+  drawn unknown, and the bar says when the model shows the last run.
+  Nothing is applied, and nothing reaches the timeline, before **Apply**.
+- **One scene bridge.** `SceneBridge` asks `editing()` as it asks
+  `captured()`, and hands the controller the draft with
+  `setTopology(…, 'dependencies', null, true)`: an edited model keeps its
+  pieces by id and walks them to new places, a new piece grows where it
+  was put, only a new connection draws itself, and the camera is framed
+  again only until the viewer takes it. Everything a piece or a connection
+  shows (`NODE_STATE`, `EDGE_STATE`, the turn) is carried over by id, so a
+  piece that did not move does not stir: a state added to the controller
+  that changes over time belongs in those lists. An answer from the engine
+  is handed over with `applySnapshot(frame, true)` and reaches the pieces
+  along the path (`revealAlongPath`); `setCarried` holds up the piece in
+  hand. With reduced motion none of it moves. A carry is followed by
+  `features/editor/interaction.ts`, which listens on the stage before the
+  camera does and takes only a press that starts on a piece; what it shows
+  over the model (`EditorOverlay`) is drawn on the page, so it adds no draw
+  call.
+- **Every carry has a way without one.** A palette piece pressed adds its
+  kind; a service's card connects with **Connect to**; the table view
+  (`EditorTable`) edits without the model.
 
 The static build also writes a service worker and a link preview
 (`vite.config.ts`: `offline()` from `src/engine/offline.sw.js`,

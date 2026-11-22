@@ -1066,3 +1066,217 @@ export function nodePosition(layout: SceneLayout, index: number): Vec3 {
     layout.positions[index * 3 + 2] ?? 0,
   ];
 }
+
+// ---------------------------------------------------------------------------
+// Where a piece would stand
+// ---------------------------------------------------------------------------
+
+/** A rectangle on the table, `x` and `z` from and to, drawn where a piece would go. */
+export interface GroundRect {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+/**
+ * Where a piece dropped at a point of the swimlanes would stand, as the two
+ * fields the layout reads: a region and a tier. The layout has no other
+ * notion of place, so this is all a drop can change.
+ *
+ * - `region` names the lane (or the edge) under the point; `null` with
+ *   `newRegion` when the point is past the last lane, where a region of its
+ *   own would be laid.
+ * - `insert` means a column that is not there yet, between two that are:
+ *   every service at `tier` or beyond moves one on to make room.
+ * - `rect` is the part of the table that would hold it, to be drawn while
+ *   something is carried over it.
+ */
+export interface DropSlot {
+  region: string | null;
+  newRegion: boolean;
+  tier: number;
+  insert: boolean;
+  rect: GroundRect;
+}
+
+/** How far outside a plate a point still counts as over it. */
+const DROP_REACH = 1.2;
+/** How deep the place for a new lane is drawn, and how far past the last one it reaches. */
+const NEW_LANE_DEPTH = 7;
+/** The share of the gap between two columns, about its middle, that makes a new column. */
+const INSERT_SHARE = 0.5;
+/** How wide a column that is not there yet is drawn. */
+const NEW_COLUMN_WIDTH = 2.4;
+
+interface ColumnSpan {
+  tier: number;
+  from: number;
+  to: number;
+}
+
+/** The columns the given pieces stand in, by tier, each from its first piece to its last. */
+function columnsOf(topology: SceneTopology, layout: SceneLayout, members: number[]): ColumnSpan[] {
+  const spans = new Map<number, ColumnSpan>();
+  for (const i of members) {
+    const tier = topology.nodes[i]!.tier;
+    const x = layout.positions[i * 3]!;
+    const size = layout.scales[i]!;
+    // A piece raised on the mast above another stands in that one's column.
+    if (layout.positions[i * 3 + 1]! > layout.ground[i]! + size + 1e-3) continue;
+    const span = spans.get(tier);
+    if (span) {
+      span.from = Math.min(span.from, x - size);
+      span.to = Math.max(span.to, x + size);
+    } else {
+      spans.set(tier, { tier, from: x - size, to: x + size });
+    }
+  }
+  return [...spans.values()].sort((a, b) => a.tier - b.tier);
+}
+
+/** The tier a point along x falls in, among `columns`, and the part of x it would take. */
+function tierAlong(
+  columns: ColumnSpan[],
+  x: number,
+): { tier: number; insert: boolean; from: number; to: number } {
+  const first = columns[0];
+  const last = columns[columns.length - 1];
+  if (!first || !last) return { tier: 0, insert: false, from: x - 1.2, to: x + 1.2 };
+  const pad = PIECE_CLEAR / 2;
+  if (x < first.from - pad) {
+    const from = first.from - pad - NEW_COLUMN_WIDTH;
+    return first.tier > 0
+      ? { tier: first.tier - 1, insert: false, from, to: first.from - pad }
+      : { tier: 0, insert: true, from, to: first.from - pad };
+  }
+  if (x > last.to + pad) {
+    return {
+      tier: Math.min(255, last.tier + 1),
+      insert: false,
+      from: last.to + pad,
+      to: last.to + pad + NEW_COLUMN_WIDTH,
+    };
+  }
+  for (let k = 0; k < columns.length; k++) {
+    const column = columns[k]!;
+    if (x <= column.to + pad) {
+      const before = columns[k - 1];
+      if (before && x < column.from - pad) {
+        // In the gap between two columns: its middle is a new column.
+        const gapFrom = before.to + pad;
+        const gapTo = column.from - pad;
+        const middle = (gapFrom + gapTo) / 2;
+        const half = ((gapTo - gapFrom) * INSERT_SHARE) / 2;
+        if (Math.abs(x - middle) <= half) {
+          const free = before.tier + 1 < column.tier;
+          return {
+            tier: free ? before.tier + 1 : column.tier,
+            insert: !free,
+            from: middle - NEW_COLUMN_WIDTH / 2,
+            to: middle + NEW_COLUMN_WIDTH / 2,
+          };
+        }
+        const near = x < middle ? before : column;
+        return { tier: near.tier, insert: false, from: near.from - pad, to: near.to + pad };
+      }
+      return { tier: column.tier, insert: false, from: column.from - pad, to: column.to + pad };
+    }
+  }
+  return { tier: last.tier, insert: false, from: last.from - pad, to: last.to + pad };
+}
+
+/**
+ * The slot under a point `(x, z)` of the table, in the swimlanes. `null`
+ * when the point is over no plate and not where a new lane would go, or
+ * the arrangement is not the swimlanes. A piece's own place is always the
+ * slot of its region and tier, which a test holds for every piece.
+ */
+export function slotAt(
+  topology: SceneTopology,
+  layout: SceneLayout,
+  x: number,
+  z: number,
+): DropSlot | null {
+  if (layout.mode !== 'dependencies') return null;
+  const regionIds = new Set(topology.regions.map((region) => region.id));
+  const lanes = layout.regions.filter((region) => region.kind === 'cloud');
+  const edge = layout.regions.find((region) => region.kind === 'edge');
+  const laneIds = new Set(lanes.map((lane) => lane.id));
+  const inLanes: number[] = [];
+  const onEdge: number[] = [];
+  topology.nodes.forEach((node, i) => (laneIds.has(node.region) ? inLanes : onEdge).push(i));
+
+  const over = (plate: RegionLayout) =>
+    Math.abs(x - plate.center[0]) <= plate.halfWidth + DROP_REACH &&
+    Math.abs(z - plate.center[2]) <= plate.halfDepth + PLATE_GAP / 2;
+  const laneZ = (plate: RegionLayout) => ({
+    z0: plate.center[2] - plate.halfDepth,
+    z1: plate.center[2] + plate.halfDepth,
+  });
+
+  if (
+    edge &&
+    over(edge) &&
+    !lanes.some((lane) => over(lane) && Math.abs(x - lane.center[0]) <= lane.halfWidth)
+  ) {
+    const along = tierAlong(columnsOf(topology, layout, onEdge), x);
+    // The edge's plate is named after its region when it has one; otherwise
+    // after the region of the piece nearest the point.
+    let region = regionIds.has(edge.id) ? edge.id : null;
+    if (region === null) {
+      let nearest = Infinity;
+      for (const i of onEdge) {
+        const d = Math.hypot(layout.positions[i * 3]! - x, layout.positions[i * 3 + 2]! - z);
+        if (d < nearest) {
+          nearest = d;
+          region = topology.nodes[i]!.region;
+        }
+      }
+    }
+    if (region === null) return null;
+    return {
+      region,
+      newRegion: false,
+      tier: along.tier,
+      insert: along.insert,
+      rect: { x0: along.from, x1: along.to, ...laneZ(edge) },
+    };
+  }
+
+  const columns = columnsOf(topology, layout, inLanes);
+  for (const lane of lanes) {
+    if (!over(lane)) continue;
+    const along = tierAlong(columns, x);
+    return {
+      region: lane.id,
+      newRegion: false,
+      tier: along.tier,
+      insert: along.insert,
+      rect: { x0: along.from, x1: along.to, ...laneZ(lane) },
+    };
+  }
+
+  // Past the last lane, toward the viewer: a lane of its own.
+  const lastLane = lanes[lanes.length - 1];
+  if (lastLane) {
+    const far = lastLane.center[2] + lastLane.halfDepth;
+    const inX = Math.abs(x - lastLane.center[0]) <= lastLane.halfWidth + DROP_REACH;
+    if (inX && z > far && z <= far + PLATE_GAP + NEW_LANE_DEPTH) {
+      const along = tierAlong(columns, x);
+      return {
+        region: null,
+        newRegion: true,
+        tier: along.tier,
+        insert: along.insert,
+        rect: {
+          x0: lastLane.center[0] - lastLane.halfWidth,
+          x1: lastLane.center[0] + lastLane.halfWidth,
+          z0: far + PLATE_GAP,
+          z1: far + PLATE_GAP + NEW_LANE_DEPTH,
+        },
+      };
+    }
+  }
+  return null;
+}

@@ -14,6 +14,7 @@ import {
   MOST_ASKEW,
   nameAnchor,
   nodePosition,
+  slotAt,
   TOLD_BY_FACE,
   VIEW,
   type RegionLayout,
@@ -413,5 +414,79 @@ describe('edge curves', () => {
     const huge = edgeControl([0, 0, 0], [4000, 0, 0])[1];
     expect(long).toBeGreaterThan(short);
     expect(huge).toBe(13);
+  });
+});
+
+describe('where a piece dropped on the swimlanes would stand', () => {
+  const helios = topology();
+  const layout = computeLayout(helios, 'dependencies');
+
+  it('is its own region and tier, for every piece standing on a plate', () => {
+    helios.nodes.forEach((node, i) => {
+      const [x, y, z] = nodePosition(layout, i);
+      if (y > layout.ground[i]! + layout.scales[i]! + 1e-3) return; // on the mast
+      const slot = slotAt(helios, layout, x, z);
+      expect(slot, node.id).not.toBeNull();
+      expect({ id: node.id, region: slot?.region, tier: slot?.tier, insert: slot?.insert }).toEqual(
+        {
+          id: node.id,
+          region: node.region,
+          tier: node.tier,
+          insert: false,
+        },
+      );
+      expect(slot!.rect.x0).toBeLessThanOrEqual(x);
+      expect(slot!.rect.x1).toBeGreaterThanOrEqual(x);
+      expect(slot!.rect.z0).toBeLessThanOrEqual(z);
+      expect(slot!.rect.z1).toBeGreaterThanOrEqual(z);
+    });
+  });
+
+  it('is a tier past the last, beyond the last column of a lane', () => {
+    const lane = layout.regions.find((region) => region.kind === 'cloud')!;
+    const last = Math.max(...helios.nodes.filter((n) => n.region === lane.id).map((n) => n.tier));
+    const lanesLast = Math.max(
+      ...helios.nodes
+        .filter((n) => layout.regions.some((r) => r.kind === 'cloud' && r.id === n.region))
+        .map((n) => n.tier),
+    );
+    const slot = slotAt(helios, layout, lane.center[0] + lane.halfWidth + 0.5, lane.center[2]);
+    expect(slot?.region).toBe(lane.id);
+    expect(slot?.tier).toBe(lanesLast + 1);
+    expect(last).toBeLessThanOrEqual(lanesLast);
+  });
+
+  it('is a new column in the middle of the gap between two', () => {
+    const lane = layout.regions.find((region) => region.kind === 'cloud')!;
+    const inLanes = helios.nodes
+      .map((node, i) => ({ node, i }))
+      .filter(({ node }) => layout.regions.some((r) => r.kind === 'cloud' && r.id === node.region));
+    const tiers = [...new Set(inLanes.map(({ node }) => node.tier))].sort((a, b) => a - b);
+    const [a, b] = tiers;
+    const edgeOf = (tier: number, side: 1 | -1) =>
+      Math.max(
+        ...inLanes
+          .filter(({ node }) => node.tier === tier)
+          .map(({ i }) => side * (layout.positions[i * 3]! + side * layout.scales[i]!)),
+      ) * side;
+    const middle = (edgeOf(a!, 1) + edgeOf(b!, -1)) / 2;
+    const slot = slotAt(helios, layout, middle, lane.center[2]);
+    expect(slot?.region).toBe(lane.id);
+    expect(slot?.insert).toBe(a! + 1 === b!);
+    expect(slot?.tier).toBe(a! + 1 === b! ? b : a! + 1);
+  });
+
+  it('is a lane of its own just past the last lane, and nothing far from the table', () => {
+    const lanes = layout.regions.filter((region) => region.kind === 'cloud');
+    const last = lanes[lanes.length - 1]!;
+    const slot = slotAt(helios, layout, last.center[0], last.center[2] + last.halfDepth + 4);
+    expect(slot).toMatchObject({ region: null, newRegion: true });
+    expect(slotAt(helios, layout, last.center[0], last.center[2] + 400)).toBeNull();
+    expect(slotAt(helios, layout, 900, 900)).toBeNull();
+  });
+
+  it('is nothing in another arrangement', () => {
+    const regions = computeLayout(helios, 'regions');
+    expect(slotAt(helios, regions, 0, 0)).toBeNull();
   });
 });

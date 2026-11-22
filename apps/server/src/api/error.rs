@@ -103,6 +103,11 @@ impl From<ServiceError> for ApiError {
                 "invalid_experiment",
                 error.to_string(),
             ),
+            ServiceError::InvalidPreview(_) => Self::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_preview",
+                error.to_string(),
+            ),
             ServiceError::ScenarioUnavailable(_)
             | ServiceError::NoActiveScenario
             | ServiceError::WorkspaceChanged => {

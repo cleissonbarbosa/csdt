@@ -270,6 +270,46 @@ describe('panels on demand', () => {
     });
   }, 15_000);
 
+  it('keeps the menu in sections, by what the viewer came to do', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'More' }));
+    const menu = screen.getByRole('menu', { name: 'More' });
+    // Items and the items that switch, in the order they are drawn.
+    const ids = (group: HTMLElement) =>
+      [...group.querySelectorAll('[role^="menuitem"]')].map((item) =>
+        item.getAttribute('data-testid'),
+      );
+    const named = (name: string) => ids(within(menu).getByRole('group', { name }));
+
+    // The three paths of a first visit's card, which says they are all here.
+    expect(named('Understand the platform')).toEqual([
+      'menu-overview',
+      'menu-services',
+      'menu-view',
+      'menu-limits',
+    ]);
+    expect(named('Investigate a failure')).toEqual([
+      'menu-timeline',
+      'menu-experiment',
+      'menu-capture',
+    ]);
+    expect(named('Test an authorization')).toEqual(['menu-trace', 'menu-matrix']);
+    expect(named('Platform and files')).toEqual([
+      'menu-edit-platform',
+      'menu-draw-platform',
+      'menu-workspace',
+      'menu-session',
+    ]);
+    // What serves all of it, at the foot; and nothing outside a section.
+    expect(ids(screen.getByTestId('menu-section-general'))).toEqual([
+      'menu-guide',
+      'menu-settings',
+      'menu-help',
+    ]);
+    expect(ids(menu)).toHaveLength(16);
+  });
+
   it('says which moment it speaks of while the cursor is in the history', () => {
     const past = fixtures.snapshot();
     past.incident = null;

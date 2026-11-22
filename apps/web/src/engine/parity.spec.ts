@@ -415,6 +415,10 @@ describe('the engine built for the browser', () => {
       'workspace-check-inventory',
       post('/demo/workspace/check', { files: [tinyInventory()] }).body,
     );
+    produced.set(
+      'workspace-preview',
+      post('/demo/workspace/preview', { files: tinyWorkspace() }).body,
+    );
     const imported = post('/demo/workspace/import', { files: tinyWorkspace() });
     produced.set('workspace-response', imported.body);
     produced.set('workspace-export', get('/workspace/export'));
@@ -454,6 +458,7 @@ describe('the engine built for the browser', () => {
     'workspace-check-invalid',
     'workspace-check-inventory',
     'workspace-diff',
+    'workspace-preview',
     'workspace-response',
     'workspace-export',
     'topology-mitigated',
@@ -623,6 +628,13 @@ describe('every route, in the module', () => {
       ],
       ['POST', '/demo/playback/control', { action: 'play' }],
       ['POST', '/demo/workspace/diff', { files: [policiesWithout('forbid-suspended')] }],
+      ['POST', '/demo/workspace/preview', { files: tinyWorkspace() }],
+      [
+        'POST',
+        '/demo/workspace/preview',
+        { files: [largerGateway()], topologyId: 'hyperscale-stress' },
+        422,
+      ],
       ['POST', '/demo/topology/select', { topologyId: 'hyperscale-stress' }],
       ['POST', '/demo/scenarios/reset', { scope: 'simulation' }],
       ['POST', '/demo/workspace/reset', {}],

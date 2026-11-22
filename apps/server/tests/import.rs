@@ -6,10 +6,14 @@ mod common;
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 
 use aegis_server::api::{AppState, MAX_BODY_BYTES, MAX_IMPORT_BYTES};
+use aegis_server::application::experiment::LEAD_IN_MS;
 use aegis_server::application::{Assets, Sources};
-use aegis_server::domain::Decision;
+use aegis_server::domain::{Decision, TopologySpec};
+use aegis_server::simulation::TICK_MS;
 use aegis_server::workspace::{
     self, bundle_of, from_files, Bundle, SourceFile, MAX_FILE_BYTES, MAX_IMPORT_FILES,
 };
@@ -607,6 +611,10 @@ async fn importing_can_be_switched_off() {
             body(&files_in(&example_dir())),
         ),
         (
+            "/api/v1/demo/workspace/preview",
+            body(&files_in(&example_dir())),
+        ),
+        (
             "/api/v1/demo/workspace/import",
             body(&files_in(&example_dir())),
         ),
@@ -668,11 +676,13 @@ async fn import_requests_are_validated_and_bounded() {
     assert_eq!(status(&state).await["origin"], "bundled");
 }
 
+const COMPOSE: &str = "services:\n  web:\n    image: nginx\n    ports: ['80:80']\n    depends_on: [db]\n  db:\n    image: postgres:16\n";
+
 #[test]
 fn a_compose_file_dropped_on_its_own_is_taken_for_a_topology() {
     let compose = SourceFile {
         path: "docker-compose.yml".into(),
-        text: "services:\n  web:\n    image: nginx\n    ports: ['80:80']\n    depends_on: [db]\n  db:\n    image: postgres:16\n".into(),
+        text: COMPOSE.into(),
     };
     let workspace = from_files(vec![compose], bundled()).expect("a Compose file is a topology");
     assert_eq!(workspace.replaced, ["topologies"]);
@@ -690,4 +700,278 @@ fn a_compose_file_dropped_on_its_own_is_taken_for_a_topology() {
     };
     let error = from_files(vec![other], bundled()).expect_err("refused");
     assert!(error.message.contains("not a Compose file"), "{error}");
+}
+
+// ---------------------------------------------------------------------------
+// A preview: the platform of the files at rest, applied nowhere
+// ---------------------------------------------------------------------------
+
+const PREVIEW: &str = "/api/v1/demo/workspace/preview";
+
+/// Everything a client can read of the timeline in use, and the state at
+/// its cursor, generator included.
+async fn in_use(state: &AppState) -> Value {
+    json!({
+        "digest": state.service.state_digest().to_string(),
+        "snapshot": serde_json::to_value(state.service.snapshot()).unwrap(),
+        "topology": common::get(state, "/api/v1/topology").await.body,
+        "session": common::get(state, "/api/v1/session").await.body,
+        "events": common::get(state, "/api/v1/events?limit=1000").await.body,
+        "incidents": common::get(state, "/api/v1/incidents").await.body,
+        "decisions": common::get(state, "/api/v1/demo/authorization/decisions").await.body,
+        "workspace": status(state).await,
+    })
+}
+
+fn advance(state: &AppState, ms: u64) {
+    for _ in 0..ms / TICK_MS {
+        state.service.advance(Duration::from_millis(TICK_MS));
+    }
+}
+
+/// The files in use as a bundle writes them out.
+async fn files_in_use(state: &AppState) -> Value {
+    common::get(state, "/api/v1/workspace/export").await.body["files"].clone()
+}
+
+#[tokio::test]
+async fn a_preview_records_nothing_and_applies_nothing() {
+    let state = common::state();
+    advance(&state, 3_000);
+    // Something on the timeline to keep: an incident under way and a decision.
+    let started = common::post(
+        &state,
+        "/api/v1/demo/scenarios/start",
+        json!({ "scenarioId": "cascading-failure" }),
+    )
+    .await;
+    assert_eq!(started.status, StatusCode::OK);
+    advance(&state, 4_000);
+    let decided = common::post(
+        &state,
+        "/api/v1/demo/authorization/evaluate",
+        json!({
+            "principal": "User::\"alice\"",
+            "action": "Action::\"exportLedger\"",
+            "resource": "Ledger::\"acme-ledger-2026\"",
+            "context": { "mfa": true },
+        }),
+    )
+    .await;
+    assert_eq!(decided.status, StatusCode::OK);
+
+    let before = in_use(&state).await;
+    let assets = state.service.assets();
+    let mut stream = state.service.subscribe();
+    let mut broken = files_in(&example_dir());
+    broken
+        .iter_mut()
+        .find(|file| file.path.starts_with("topologies/"))
+        .unwrap()
+        .text = "{".into();
+    for (request, answer) in [
+        (body(&files_in(&example_dir())), StatusCode::OK),
+        (
+            json!({ "files": files_in_use(&state).await, "topologyId": "hyperscale-stress" }),
+            StatusCode::OK,
+        ),
+        (body(&broken), StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            json!({ "files": files_in(&example_dir()), "topologyId": "nowhere" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let reply = common::post(&state, PREVIEW, request).await;
+        assert_eq!(reply.status, answer, "{}", reply.body);
+    }
+
+    assert!(
+        stream.try_recv().is_err(),
+        "nothing was sent to the subscribers"
+    );
+    assert_eq!(
+        in_use(&state).await,
+        before,
+        "the timeline in use is as it was"
+    );
+    assert!(
+        Arc::ptr_eq(&assets, &state.service.assets()),
+        "the files in use are the same ones"
+    );
+}
+
+#[tokio::test]
+async fn a_preview_is_what_applying_the_files_shows_once_as_long_has_passed() {
+    let bundled = files_in_use(&common::state()).await;
+    let example = serde_json::to_value(files_in(&example_dir())).unwrap();
+    for files in [bundled, example] {
+        let asked = common::state();
+        let preview = common::post(&asked, PREVIEW, json!({ "files": files })).await;
+        assert_eq!(preview.status, StatusCode::OK, "{}", preview.body);
+        let preview = preview.body;
+        assert_eq!(preview["snapshot"]["virtualTimeMs"], LEAD_IN_MS);
+        assert_eq!(preview["snapshot"]["playback"]["status"], "paused");
+
+        // The same files applied on another server with the same seed, left
+        // to run for as long, and paused there: nothing advances a preview.
+        let applied = common::state();
+        let imported = common::post(
+            &applied,
+            "/api/v1/demo/workspace/import",
+            json!({ "files": files }),
+        )
+        .await;
+        assert_eq!(imported.status, StatusCode::OK, "{}", imported.body);
+        advance(&applied, LEAD_IN_MS);
+        let paused = common::post(
+            &applied,
+            "/api/v1/demo/playback/control",
+            json!({ "action": "pause" }),
+        )
+        .await;
+        assert_eq!(paused.status, StatusCode::OK);
+
+        let id = preview["spec"]["id"].as_str().unwrap();
+        assert_eq!(id, applied.service.topology_id(), "the topology that opens");
+        assert_eq!(
+            preview["topology"],
+            common::get(&applied, "/api/v1/topology").await.body
+        );
+        assert_eq!(
+            preview["snapshot"],
+            serde_json::to_value(applied.service.snapshot()).unwrap()
+        );
+        let assets = applied.service.assets();
+        assert_eq!(
+            preview["spec"],
+            serde_json::to_value(&assets.world(id).unwrap().topo.spec).unwrap()
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_compose_file_previews_as_the_topology_it_is_read_as() {
+    let state = common::state();
+    let compose = SourceFile {
+        path: "docker-compose.yml".into(),
+        text: COMPOSE.into(),
+    };
+    let read = from_files(vec![compose.clone()], bundled())
+        .unwrap()
+        .sources
+        .topologies
+        .remove(0);
+    let preview = common::post(&state, PREVIEW, body(&[compose])).await;
+    assert_eq!(preview.status, StatusCode::OK, "{}", preview.body);
+    let preview = preview.body;
+
+    // The topology the file was converted to, in the format a file writes.
+    assert_eq!(preview["spec"], serde_json::to_value(&read).unwrap());
+    let spec: TopologySpec = serde_json::from_value(preview["spec"].clone()).unwrap();
+    assert_eq!(spec, read);
+    assert_eq!(spec.id, "docker-compose");
+    assert_eq!(preview["topology"]["id"], "docker-compose");
+    assert_eq!(preview["snapshot"]["topologyId"], "docker-compose");
+    let nodes = preview["topology"]["nodes"].as_array().unwrap();
+    assert_eq!(nodes.len(), spec.nodes.len());
+    assert_eq!(
+        preview["snapshot"]["nodes"]["health"]
+            .as_array()
+            .unwrap()
+            .len(),
+        spec.nodes.len()
+    );
+    // At rest the platform carries its ordinary traffic.
+    let traffic = preview["snapshot"]["edges"]["trafficRps"]
+        .as_array()
+        .unwrap();
+    assert_eq!(traffic.len(), spec.edges.len());
+    assert!(traffic.iter().all(|rps| rps.as_f64().unwrap() > 0.0));
+
+    // Written out as a topology file, it is the same platform at rest: what
+    // an editor opens from it and sends again.
+    let again = common::post(
+        &state,
+        PREVIEW,
+        body(&[file("topologies/docker-compose.json", &preview["spec"])]),
+    )
+    .await;
+    assert_eq!(again.status, StatusCode::OK, "{}", again.body);
+    assert_eq!(again.body, preview);
+}
+
+#[tokio::test]
+async fn a_preview_refuses_what_it_cannot_run_as_an_import_would() {
+    let state = common::state();
+    // A mistake in the files: the file and the reason, as an import answers.
+    let mut files = files_in(&example_dir());
+    let scenario = files
+        .iter_mut()
+        .find(|file| file.path == "scenarios/01-ledger-fire.json")
+        .unwrap();
+    scenario.text = scenario.text.replace("\"rampMs\"", "\"rampMS\"");
+    let refused = common::post(&state, PREVIEW, body(&files)).await;
+    assert_eq!(refused.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(refused.body["error"]["code"], "invalid_workspace");
+    let message = refused.body["error"]["message"].as_str().unwrap();
+    assert!(
+        message.starts_with("scenarios/01-ledger-fire.json: ") && message.contains("rampMS"),
+        "{message}"
+    );
+
+    // A topology the files do not give, with the ones they do.
+    let unknown = common::post(
+        &state,
+        PREVIEW,
+        json!({ "files": files_in(&example_dir()), "topologyId": "nowhere" }),
+    )
+    .await;
+    assert_eq!(unknown.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(unknown.body["error"]["code"], "invalid_preview");
+    let message = unknown.body["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("no topology `nowhere`") && message.contains("`corner-shop`"),
+        "{message}"
+    );
+
+    // One they give is the one run.
+    let stress = common::post(
+        &state,
+        PREVIEW,
+        json!({ "files": files_in_use(&state).await, "topologyId": "hyperscale-stress" }),
+    )
+    .await;
+    assert_eq!(stress.status, StatusCode::OK, "{}", stress.body);
+    assert_eq!(stress.body["topology"]["id"], "hyperscale-stress");
+    assert_eq!(
+        stress.body["topology"]["nodes"].as_array().unwrap().len(),
+        stress.body["spec"]["nodes"].as_array().unwrap().len()
+    );
+
+    // The request is held to what an import's is.
+    let example = serde_json::to_value(files_in(&example_dir())).unwrap();
+    for invalid in [
+        json!({}),
+        json!({ "files": [] }),
+        json!({ "files": example, "topologyId": "../corner-shop" }),
+        json!({ "files": example, "scenarioId": "ledger-fire" }),
+        json!({ "files": [{ "path": "a.json", "text": "{}", "mode": "0777" }] }),
+    ] {
+        let reply = common::post(&state, PREVIEW, invalid.clone()).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{invalid}");
+    }
+    let too_large = Request::builder()
+        .method(Method::POST)
+        .uri(PREVIEW)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({ "files": [{ "path": "notes.txt", "text": "x".repeat(MAX_IMPORT_BYTES) }] })
+                .to_string(),
+        ))
+        .unwrap();
+    assert_eq!(
+        common::raw(&state, too_large).await.status,
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    assert_eq!(status(&state).await["origin"], "bundled");
 }

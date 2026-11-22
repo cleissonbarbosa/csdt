@@ -27,6 +27,7 @@ import {
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
   WorkspaceDiffSchema,
+  WorkspacePreviewSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
   type ControlAction,
@@ -38,6 +39,7 @@ import {
   type FaultEffect,
   type Recording,
   type WorkspaceFile,
+  type WorkspacePreview,
   TrialSchema,
   WeakPointsSchema,
   type TrialRequest,
@@ -214,6 +216,16 @@ export const api = {
   /** Says what applying the files would give, without applying them. */
   checkWorkspace: (files: WorkspaceFile[]) =>
     request(WorkspaceCheckSchema, '/demo/workspace/check', { files }),
+  /**
+   * One platform the files describe, at rest as the engine runs it: the one
+   * named, or the one they open on. Nothing is applied or recorded.
+   */
+  previewWorkspace: (files: WorkspaceFile[], topologyId?: string): Promise<WorkspacePreview> =>
+    request(
+      WorkspacePreviewSchema,
+      '/demo/workspace/preview',
+      topologyId === undefined ? { files } : { files, topologyId },
+    ),
   /** What Cedar would decide differently under the files, against what is in use. */
   diffWorkspace: (files: WorkspaceFile[]) =>
     request(WorkspaceDiffSchema, '/demo/workspace/diff', { files }, LONG_TIMEOUT_MS),

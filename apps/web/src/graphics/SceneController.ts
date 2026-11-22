@@ -62,6 +62,7 @@ import {
   hang,
   nameAnchor,
   nodePosition,
+  slotAt,
   TOLD_BY_FACE,
   UPRIGHT_ASPECT,
   askew,
@@ -69,6 +70,7 @@ import {
   VIEW_UPRIGHT,
   headingOf,
   viewOf,
+  type DropSlot,
   type LayoutMode,
   type SceneLayout,
   type Vec3,
@@ -112,6 +114,12 @@ CameraControls.install({
 });
 
 export type SceneSelection = { kind: 'node' | 'edge'; id: string } | null;
+
+/** What lies under a point of the stage: a piece, and the slot a piece dropped there would take. */
+export interface StagePoint {
+  node: string | null;
+  slot: DropSlot | null;
+}
 
 export interface SceneHooks {
   onHover(nodeId: string | null): void;
@@ -219,6 +227,68 @@ const WIND = 1.6;
 const MANNER_RATE = 3;
 /** How far the connections outside a selection's neighbourhood recede (pieces: `FOCUS_DIM`). */
 const EDGE_FOCUS_DIM = 0.26;
+/** How high a piece hops on its way to a new arrangement, in table units. */
+const WALK_HOP = 2.6;
+/**
+ * What a piece does in a change made by hand (`stepping`): it stays where
+ * it is, walks to its new place, or is new and is set down where it was put.
+ */
+const STAYS = 0;
+const WALKS = 1;
+const GROWS = 2;
+/** How high a piece carried in the editor is held over the table, in piece heights. */
+const CARRY_LIFT = 1.1;
+/**
+ * The engine's first answer about a draft comes along the path: one column
+ * after another, this far apart in seconds, and never longer than the span.
+ */
+const REVEAL_STEP = 0.14;
+const REVEAL_SPAN = 1.1;
+
+/**
+ * What every piece and connection is showing, carried over by id when a
+ * model is changed by hand, so that nothing that did not change starts
+ * again: a mechanism keeps its pace and its place in its cycle, a colour
+ * does not flash, a piece does not turn round once more.
+ */
+const NODE_STATE = [
+  'health',
+  'known',
+  'measured',
+  'shockAt',
+  'throughput',
+  'pace',
+  'work',
+  'manner',
+  'emphasis',
+  'focus',
+  'visibility',
+  'visibilityTarget',
+  'revealAt',
+] as const;
+const EDGE_STATE = [
+  'edgeTraffic',
+  'edgeError',
+  'edgeRejected',
+  'edgeSuspicious',
+  'edgeSecurity',
+  'edgeDensity',
+  'edgeErrShown',
+  'edgeRejShown',
+  'edgeSusShown',
+  'edgeHighlight',
+  'edgeFocus',
+  'edgeGlow',
+] as const;
+type Column = Uint8Array | Float32Array;
+interface Held {
+  nodes: Map<string, number>;
+  edges: Map<string, number>;
+  node: (readonly [(typeof NODE_STATE)[number], Column])[];
+  edge: (readonly [(typeof EDGE_STATE)[number], Column])[];
+  tint: Float32Array;
+  yaw: Float32Array;
+}
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const easeOutCubic = (x: number) => 1 - (1 - x) ** 3;
@@ -462,6 +532,21 @@ export class SceneController {
   private delay = new Float32Array(0);
   /** Where each piece walks from when the layout changes; null to drop in. */
   private walkFrom: Float32Array | null = null;
+  /** In a change made by hand, what each piece does (`STAYS`, `WALKS`, `GROWS`). */
+  private stepping = new Uint8Array(0);
+  /** How high each piece hops on its way, in table units. */
+  private hop = new Float32Array(0);
+  /** When a piece the engine has just answered for is first drawn as it answered. */
+  private revealAt = new Float32Array(0);
+  /** The piece carried in the editor (-1 for none) and the point of the table it is held over. */
+  private carried = -1;
+  private carryAt: { x: number; z: number } | null = null;
+  /** The piece the carry is drawn on, until it is set down again; where it is held, and how high. */
+  private carryNode = -1;
+  private carryLift = 0;
+  private readonly carryPos = new Float32Array(2);
+  /** What the pointer shows over a piece. */
+  private pieceCursor: 'pointer' | 'grab' = 'pointer';
   /** Position and scale of every piece as drawn in the last frame. */
   private shown = new Float32Array(0);
   /** 0 at rest, 0.5 pointed at, 1 selected; eased. */
@@ -652,16 +737,30 @@ export class SceneController {
   /**
    * `labels`, when given, is what to write beside each node instead of its
    * name: the overview's pieces stand for several services and say how many.
+   *
+   * `edit` says the topology is the one already drawn, changed by hand (the
+   * platform editor): pieces are kept by id and walk to their new places, a
+   * new piece grows where it was put, only a new connection draws itself,
+   * and the camera stays where the viewer left it.
    */
   setTopology(
     topology: SceneTopology,
     mode: LayoutMode,
     labels: readonly string[] | null = null,
+    edit = false,
   ): void {
     const first = this.topology === null;
-    const changed = this.topology?.id !== topology.id || this.n !== topology.nodes.length;
+    const edited = edit && !first && this.topology?.id === topology.id;
+    const changed = edited || this.topology?.id !== topology.id || this.n !== topology.nodes.length;
+    // Where each piece was drawn, by id, for an edited topology to walk from.
+    const before = edited ? new Map(this.nodeIds.map((id, i) => [id, i])) : null;
+    const shownBefore = edited ? this.shown.slice() : null;
+    const edgesBefore = edited ? new Set(this.edgeIds) : null;
+    const platesBefore = edited ? new Set(this.layout?.regions.map((region) => region.id)) : null;
+    const held = edited ? this.heldState() : null;
+    const movedBefore = this.userMoved;
     // The same services in another arrangement: they walk there.
-    const walkFrom = !changed && mode !== this.layoutMode ? this.shown.slice() : null;
+    let walkFrom = !changed && mode !== this.layoutMode ? this.shown.slice() : null;
     const relaid = first || changed || walkFrom !== null;
     this.clearWorld();
     this.topology = topology;
@@ -674,6 +773,19 @@ export class SceneController {
     const index = new Map(topology.nodes.map((node, i) => [node.id, i]));
     this.nodeIds = topology.nodes.map((node) => node.id);
     this.edgeIds = topology.edges.map((edge) => edge.id);
+    if (before && shownBefore) {
+      // A piece that was there walks from where it stood; a new one grows in place.
+      walkFrom = new Float32Array(n * 4);
+      topology.nodes.forEach((node, i) => {
+        const k = before.get(node.id);
+        if (k !== undefined && shownBefore.length >= (k + 1) * 4) {
+          walkFrom!.set(shownBefore.subarray(k * 4, k * 4 + 4), i * 4);
+        } else {
+          const p = nodePosition(layout, i);
+          walkFrom!.set([p[0], p[1], p[2], 0], i * 4);
+        }
+      });
+    }
 
     if (changed) {
       this.health = new Uint8Array(n);
@@ -713,6 +825,10 @@ export class SceneController {
       this.edgeFocus = new Float32Array(m).fill(1);
       this.edgeGlow = new Float32Array(m);
       this.edgeDrawFrom = new Float32Array(m).fill(1);
+      this.revealAt = new Float32Array(n).fill(-100);
+      this.carried = this.carryNode = -1;
+      this.carryAt = null;
+      this.carryLift = 0;
       this.hasSnapshot = false;
       this.selectedNode = this.selectedEdge = this.hoveredNode = -1;
       this.reached = new Uint8Array(n);
@@ -732,6 +848,7 @@ export class SceneController {
       const busiest = Math.max(1, ...topology.edges.map((edge) => edge.metrics.trafficRps));
       this.trafficReference = busiest * 1.5;
     }
+    if (held) this.carryAcross(held);
 
     this.edgeSource = new Uint32Array(m);
     this.edgeTarget = new Uint32Array(m);
@@ -750,7 +867,8 @@ export class SceneController {
     void this.buildLabels(topology, layout);
     this.applyQuality(this.quality);
     this.refreshHighlights();
-    this.beginAssembly(topology, layout, relaid, walkFrom);
+    this.beginAssembly(topology, layout, relaid, walkFrom, edgesBefore, platesBefore);
+    if (edited) this.userMoved = movedBefore;
 
     this.controls.minDistance = 6 * LENS;
     this.controls.maxDistance = layout.radius * 5 * LENS;
@@ -758,12 +876,47 @@ export class SceneController {
     this.syncStage(false);
     // Pieces that walk to a new arrangement turn to it on the way. A model
     // that is laid out afresh arrives already turned.
-    if (this.yaw.length !== n) this.yaw = new Float32Array(n);
+    if (this.yaw.length !== n || held) this.yaw = new Float32Array(n);
     this.yawAim = new Float32Array(n);
     this.aimPieces();
     if (walkFrom === null || this.options.reducedMotion) this.yaw.set(this.yawAim);
+    else if (held) {
+      // A piece keeps the turn it had; a new one arrives turned.
+      this.nodeIds.forEach((id, i) => {
+        const k = held.nodes.get(id);
+        this.yaw[i] = k === undefined ? this.yawAim[i]! : (held.yaw[k] ?? this.yawAim[i]!);
+      });
+    }
+    // An edited model is framed again as it grows, until the viewer takes the camera.
     if (first) this.intro();
-    else this.frameAll(!this.options.reducedMotion);
+    else if (!edited || !this.userMoved) this.frameAll(!this.options.reducedMotion);
+  }
+
+  /** What every piece and connection shows now, by id, for an edited model to carry over. */
+  private heldState(): Held {
+    return {
+      nodes: new Map(this.nodeIds.map((id, i) => [id, i])),
+      edges: new Map(this.edgeIds.map((id, e) => [id, e])),
+      node: NODE_STATE.map((key) => [key, this[key]] as const),
+      edge: EDGE_STATE.map((key) => [key, this[key]] as const),
+      tint: this.tint,
+      yaw: this.yaw,
+    };
+  }
+
+  /** Gives each piece and connection of an edited model what it showed before, by id. */
+  private carryAcross(held: Held): void {
+    this.nodeIds.forEach((id, i) => {
+      const k = held.nodes.get(id);
+      if (k === undefined) return;
+      for (const [key, before] of held.node) this[key][i] = before[k] ?? 0;
+      this.tint.set(held.tint.subarray(k * 3, k * 3 + 3), i * 3);
+    });
+    this.edgeIds.forEach((id, e) => {
+      const k = held.edges.get(id);
+      if (k === undefined) return;
+      for (const [key, before] of held.edge) this[key][e] = before[k] ?? 0;
+    });
   }
 
   private track<T extends { dispose(): void }>(resource: T): T {
@@ -1169,18 +1322,27 @@ export class SceneController {
   // Inputs from the application
   // ---------------------------------------------------------------------------
 
-  applySnapshot(snapshot: SceneFrame): void {
+  /**
+   * `cascade` says the frame is an answer that has just come, about pieces
+   * nothing was known of (the engine's run of a draft in the editor): each
+   * piece that becomes known is drawn so in turn along the path, from where
+   * requests enter, and the traffic on its connections follows it.
+   */
+  applySnapshot(snapshot: SceneFrame, cascade = false): void {
     if (snapshot.nodes.health.length !== this.n || snapshot.edges.trafficRps.length !== this.m) {
       return;
     }
     const { known, measured } = snapshot.nodes;
+    const answered: number[] = [];
     for (let i = 0; i < this.n; i++) {
       const next = snapshot.nodes.health[i]!;
       // A node that just turned critical or went down sends out a shockwave.
       if (this.hasSnapshot && next >= 2 && next > this.health[i]!) this.shockAt[i] = this.time;
       this.health[i] = next;
       this.throughput[i] = snapshot.nodes.throughputRps[i] ?? 0;
+      const was = this.known[i];
       this.known[i] = known && known[i] === 0 ? 0 : 1;
+      if (cascade && was === 0 && this.known[i] === 1) answered.push(i);
       this.measured[i] = measured && measured[i] === 0 ? 0 : 1;
       // A model laid out where nothing is known is drawn so from the start.
       if (!this.hasSnapshot && this.known[i] === 0) this.tint.set(this.tones.unknown, i * 3);
@@ -1198,6 +1360,29 @@ export class SceneController {
     }
     this.applyPlateStates();
     this.hasSnapshot = true;
+    if (answered.length > 0 && !this.options.reducedMotion) this.revealAlongPath(answered);
+  }
+
+  /**
+   * Schedules when each of `answered` is first drawn as the engine answered:
+   * one column of the path after another, the first at once. A connection's
+   * beads start with the piece they leave.
+   */
+  private revealAlongPath(answered: readonly number[]): void {
+    const layout = this.layout;
+    if (!layout) return;
+    const along = (i: number) => {
+      const p = nodePosition(layout, i);
+      const distance = layout.mode === 'regions' ? Math.hypot(p[0], p[2]) : p[0];
+      return Math.round(distance * 10) / 10;
+    };
+    const stops = [...new Set(answered.map(along))].sort((a, b) => a - b);
+    const pace = Math.min(REVEAL_STEP, REVEAL_SPAN / Math.max(1, stops.length));
+    for (const i of answered) this.revealAt[i] = this.time + stops.indexOf(along(i)) * pace;
+    for (let e = 0; e < this.m; e++) {
+      const at = this.revealAt[this.edgeSource[e]!]!;
+      if (at > this.time) this.edgeLiveAt[e] = Math.max(this.edgeLiveAt[e]!, at);
+    }
   }
 
   /**
@@ -1429,10 +1614,14 @@ export class SceneController {
     layout: SceneLayout,
     relaid: boolean,
     walkFrom: Float32Array | null,
+    edgesBefore: ReadonlySet<string> | null = null,
+    platesBefore: ReadonlySet<string> | null = null,
   ): void {
     const n = this.n;
     const m = this.m;
     this.delay = new Float32Array(n);
+    this.stepping = new Uint8Array(n).fill(WALKS);
+    this.hop = new Float32Array(n).fill(WALK_HOP);
     this.edgeDrawAt = new Float32Array(m).fill(-100);
     this.edgeLiveAt = new Float32Array(m).fill(-100);
     this.edgeDrawFrom.fill(1);
@@ -1445,7 +1634,25 @@ export class SceneController {
     }
 
     let landed = 0;
-    if (walkFrom) {
+    const byHand = walkFrom !== null && edgesBefore !== null;
+    if (walkFrom && byHand) {
+      // A change made by hand, all at once as the hand made it: what moved
+      // walks, hopping as far as it goes; what is new is set down where it
+      // was put; the rest stays where it is, and keeps its name.
+      this.walkFrom = walkFrom;
+      for (let i = 0; i < n; i++) {
+        const p = nodePosition(layout, i);
+        const far = Math.hypot(p[0] - walkFrom[i * 4]!, p[2] - walkFrom[i * 4 + 2]!);
+        this.stepping[i] = walkFrom[i * 4 + 3] === 0 ? GROWS : far > 0.02 ? WALKS : STAYS;
+        this.hop[i] = Math.min(WALK_HOP, far * 0.45);
+      }
+      // A plate that was there stays open, at its new length; a new lane unrolls.
+      layout.regions.forEach((region, k) => {
+        const base = this.bases[k];
+        if (base && platesBefore?.has(region.id)) base.delay = -PLATE_TIME;
+      });
+      landed = WALK_TIME;
+    } else if (walkFrom) {
       this.walkFrom = walkFrom;
       // A short ripple so the pieces do not move as one block.
       for (let i = 0; i < n; i++) this.delay[i] = (i / Math.max(1, n)) * 0.22;
@@ -1487,10 +1694,18 @@ export class SceneController {
     }
 
     const duration = walkFrom ? WALK_TIME : DROP_TIME;
+    // When a piece stands in its place: by hand, one that stays already does.
+    const settled = (i: number) =>
+      this.delay[i]! +
+      (!byHand
+        ? duration * 0.8
+        : this.stepping[i] === STAYS
+          ? 0
+          : (this.stepping[i] === GROWS ? DROP_TIME : WALK_TIME) * 0.8);
     for (let e = 0; e < m; e++) {
-      const ready =
-        Math.max(this.delay[this.edgeSource[e]!]!, this.delay[this.edgeTarget[e]!]!) +
-        duration * 0.8;
+      // A connection that was already there stays drawn; only a new one draws itself.
+      if (edgesBefore?.has(this.edgeIds[e]!)) continue;
+      const ready = Math.max(settled(this.edgeSource[e]!), settled(this.edgeTarget[e]!));
       this.edgeDrawAt[e] = this.time + ready;
       this.edgeLiveAt[e] = this.time + ready + DRAW_TIME * 0.7;
     }
@@ -1933,6 +2148,74 @@ export class SceneController {
     return i === -1 ? null : this.project(i);
   }
 
+  /**
+   * What lies under a point of the page, in client pixels: the piece there,
+   * if any, and the slot of the swimlanes a piece dropped there would take
+   * (`slotAt`). Nothing of the pointer's own state is touched.
+   */
+  pointAt(clientX: number, clientY: number): StagePoint {
+    const rect = this.dom.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (!this.layout || !this.topology || x < 0 || y < 0 || x > rect.width || y > rect.height) {
+      return { node: null, slot: null };
+    }
+    const node = this.pickNode({ x, y });
+    let slot: DropSlot | null = null;
+    if (this.aimAt(x, y) && Math.abs(this.ray.direction.y) > 1e-4) {
+      const along = -this.ray.origin.y / this.ray.direction.y;
+      if (along > 0) {
+        slot = slotAt(
+          this.topology,
+          this.layout,
+          this.ray.origin.x + this.ray.direction.x * along,
+          this.ray.origin.z + this.ray.direction.z * along,
+        );
+      }
+    }
+    return { node: node === -1 ? null : this.nodeIds[node]!, slot };
+  }
+
+  /** Screen position, in CSS pixels of the stage, of a point of the table; null when off screen. */
+  projectGround(x: number, z: number): { x: number; y: number } | null {
+    this.scratch.set(x, 0, z).project(this.camera);
+    if (this.scratch.z < -1 || this.scratch.z > 1) return null;
+    const rect = this.dom.getBoundingClientRect();
+    return {
+      x: (this.scratch.x * 0.5 + 0.5) * rect.width,
+      y: (-this.scratch.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
+  /** Holds the camera still while something is carried over the model. */
+  setCameraHeld(held: boolean): void {
+    this.controls.enabled = !held;
+  }
+
+  /**
+   * The piece carried in the editor, held up over `at` (a point of the
+   * table: the middle of the slot it would take) or over its own place when
+   * `at` is null. `null` lets go of it: it is set down where it stands, or,
+   * when the model is changed first, walks down from where it was held.
+   */
+  setCarried(nodeId: string | null, at: { x: number; z: number } | null): void {
+    const i = nodeId === null ? -1 : this.nodeIds.indexOf(nodeId);
+    if (i !== -1 && i !== this.carryNode) {
+      this.carryNode = i;
+      this.carryPos[0] = this.shown[i * 4] ?? 0;
+      this.carryPos[1] = this.shown[i * 4 + 2] ?? 0;
+      this.carryLift = 0;
+    }
+    this.carried = i;
+    this.carryAt = i === -1 ? null : at;
+  }
+
+  /** What the pointer shows over a piece: `grab` where the pieces can be carried. */
+  setPieceCursor(cursor: 'pointer' | 'grab'): void {
+    this.pieceCursor = cursor;
+    this.pointer.dirty = true;
+  }
+
   private project(i: number): { x: number; y: number } | null {
     if (!this.layout) return null;
     const p = nodePosition(this.layout, i);
@@ -2006,12 +2289,14 @@ export class SceneController {
   /** Points `this.ray` from the camera through the pointer. */
   private aim(): boolean {
     if (!this.pointer.inside) return false;
+    return this.aimAt(this.pointer.x, this.pointer.y);
+  }
+
+  /** Points `this.ray` from the camera through a point of the stage, in CSS pixels. */
+  private aimAt(x: number, y: number): boolean {
     const rect = this.dom.getBoundingClientRect();
-    this.scratch.set(
-      (this.pointer.x / rect.width) * 2 - 1,
-      -(this.pointer.y / rect.height) * 2 + 1,
-      0.5,
-    );
+    if (rect.width === 0 || rect.height === 0) return false;
+    this.scratch.set((x / rect.width) * 2 - 1, -(y / rect.height) * 2 + 1, 0.5);
     this.scratch.unproject(this.camera);
     this.ray.origin.copy(this.camera.position);
     this.ray.direction.copy(this.scratch).sub(this.camera.position).normalize();
@@ -2042,9 +2327,9 @@ export class SceneController {
     return best;
   }
 
-  private pickNode(): number {
+  private pickNode(at: { x: number; y: number } | null = null): number {
     const layout = this.layout;
-    if (!layout || !this.aim()) return -1;
+    if (!layout || !(at ? this.aimAt(at.x, at.y) : this.aim())) return -1;
     let best = -1;
     let bestDepth = Infinity;
     for (let i = 0; i < this.n; i++) {
@@ -2173,7 +2458,7 @@ export class SceneController {
         this.refreshHighlights();
         this.hooks.onHover(hit === -1 ? null : this.nodeIds[hit]!);
       }
-      this.dom.style.cursor = hit === -1 ? '' : 'pointer';
+      this.dom.style.cursor = hit === -1 ? '' : this.pieceCursor;
     }
 
     if (this.assembling && this.time >= this.assembleEnd) {
@@ -2221,7 +2506,9 @@ export class SceneController {
       const batch = this.batches[this.nodeTypeIndex[i]!];
       if (!batch) continue;
       const slot = this.nodeSlot[i]!;
-      const known = this.known[i] === 1;
+      // An answer that has just come reaches each piece in turn (`revealAlongPath`).
+      const answered = this.revealAt[i]! <= this.time;
+      const known = this.known[i] === 1 && answered;
       // A state the data does not give is no state: neither normal nor any other.
       const code = known ? this.health[i]! : 0;
       const selected = i === this.selectedNode;
@@ -2248,8 +2535,9 @@ export class SceneController {
       this.visibility[i]! += (this.visibilityTarget[i]! - this.visibility[i]!) * ease;
       // With something selected, its neighbourhood stays in front and the
       // rest recedes. A piece that is not in its normal state never does,
-      // nor one whose state is unknown.
-      this.focus[i]! += (look.focus - this.focus[i]!) * ease;
+      // nor one whose state is unknown, nor the one in the viewer's hand.
+      const inFront = i === this.carryNode ? 1 : look.focus;
+      this.focus[i]! += (inFront - this.focus[i]!) * ease;
       const visible = this.visibility[i]!;
       const present = visible * this.focus[i]!;
       this.emphasis[i]! += ((selected ? 1 : hovered ? 0.5 : 0) - this.emphasis[i]!) * quick;
@@ -2271,15 +2559,25 @@ export class SceneController {
       // Whether it stands on a plate: a piece still on its way down does not work yet.
       let standing = true;
       if (this.assembling) {
-        if (walkFrom) {
+        const stepping = this.stepping[i];
+        if (walkFrom && stepping === GROWS) {
+          // Put there by hand: set down from about the height it was carried at.
+          const local = clamp01((elapsed - this.delay[i]!) / DROP_TIME);
+          const fall = (1 - easeOutCubic(local)) * CARRY_LIFT * base;
+          y += fall;
+          arrived = local <= 0 ? 0 : easeOutBack(local);
+          size = base * Math.max(arrived, 0.0001);
+          airborne = fall / (2 * base);
+          standing = local >= 1;
+        } else if (walkFrom && stepping === WALKS) {
           const k = easeInOutCubic(clamp01((elapsed - this.delay[i]!) / WALK_TIME));
-          const hop = Math.sin(Math.PI * k) * 2.6;
+          const hop = Math.sin(Math.PI * k) * this.hop[i]!;
           x = walkFrom[i * 4]! + (p[0] - walkFrom[i * 4]!) * k;
           y = walkFrom[i * 4 + 1]! + (p[1] - walkFrom[i * 4 + 1]!) * k + hop;
           z = walkFrom[i * 4 + 2]! + (p[2] - walkFrom[i * 4 + 2]!) * k;
           size = walkFrom[i * 4 + 3]! + (base - walkFrom[i * 4 + 3]!) * k;
           airborne = hop / (2 * base);
-        } else {
+        } else if (!walkFrom) {
           const local = clamp01((elapsed - this.delay[i]!) / DROP_TIME);
           const fall = (1 - easeOutCubic(local)) * 3.2 * base;
           y += fall;
@@ -2289,12 +2587,34 @@ export class SceneController {
           standing = local >= 1;
         }
       }
+      if (i === this.carryNode) {
+        // Carried in the editor: held up over the slot it would take, or
+        // over its own place, and set down again there when let go of over
+        // nothing. Let go of over a slot, the model changes and it walks
+        // down from where it was held.
+        const holding = this.carried === i;
+        const glide = motion ? 1 - Math.exp(-step * 12) : 1;
+        const over = holding ? this.carryAt : null;
+        this.carryPos[0]! += ((over ? over.x : x) - this.carryPos[0]!) * glide;
+        this.carryPos[1]! += ((over ? over.z : z) - this.carryPos[1]!) * glide;
+        this.carryLift += ((holding ? 1 : 0) - this.carryLift) * glide;
+        const settledBack =
+          !holding &&
+          this.carryLift < 0.005 &&
+          Math.hypot(this.carryPos[0]! - x, this.carryPos[1]! - z) < 0.01;
+        x = this.carryPos[0]!;
+        z = this.carryPos[1]!;
+        const lift = this.carryLift * CARRY_LIFT * base;
+        y += lift;
+        airborne = Math.max(airborne, lift / (2 * base));
+        if (settledBack) this.carryNode = -1;
+      }
       // The part of a piece that works runs at the pace of its service's
       // traffic. It starts once the piece stands on its plate, takes up a
       // new pace gradually, and winds down when nothing passes. Where the
       // traffic was not measured it rests as it was modelled, as with
       // motion off: stillness there would claim that nothing passed.
-      const measured = this.measured[i] === 1;
+      const measured = this.measured[i] === 1 && answered;
       const pace =
         motion && standing && measured
           ? paceOf(this.throughput[i]!, this.throughputReference[i]!)
@@ -2359,7 +2679,8 @@ export class SceneController {
       // The selected and the pointed-at piece are always named; the rest
       // get their names when the camera is close enough to read them.
       if (i < named.length) {
-        named[i] = this.assembling && (walkFrom !== null || arrived < 0.99) ? 0 : present;
+        const walking = walkFrom !== null && this.stepping[i] !== STAYS;
+        named[i] = this.assembling && (walking || arrived < 0.99) ? 0 : present;
         this.labelEmphasis[i] = selected || hovered ? 1 : 0;
         this.labelRing[i] = ringed;
         // What matters more is named first: a failing service, then one an
@@ -2415,6 +2736,13 @@ export class SceneController {
         anchors[i * 3 + 1]!,
         anchors[i * 3 + 2]! + out * this.nameToward[1],
       );
+      if (i === this.carryNode) {
+        // The name of a piece held up in the editor goes with it.
+        const p = nodePosition(layout, i);
+        this.scratch.x += this.shown[i * 4]! - p[0];
+        this.scratch.y += this.shown[i * 4 + 1]! - p[1];
+        this.scratch.z += this.shown[i * 4 + 2]! - p[2];
+      }
       const distance = this.scratch.distanceTo(eye);
       // Away from the camera a name fades out, unless it is the one in hand.
       const near = clamp01((distance - this.labelFadeNear) / span);
@@ -2796,7 +3124,11 @@ export class SceneController {
       textures: this.renderer.info.memory.textures,
       names: this.labelLayer.drawn,
       namesMs: this.namesMs,
-      unknown: this.known.reduce((count, known) => count + (known === 0 ? 1 : 0), 0),
+      // A piece an answer has not reached yet is still drawn as unknown.
+      unknown: this.known.reduce(
+        (count, known, i) => count + (known === 0 || this.revealAt[i]! > this.time ? 1 : 0),
+        0,
+      ),
     };
   }
 

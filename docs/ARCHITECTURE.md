@@ -267,6 +267,13 @@ samples already produced.
   and phases in which the same scenario prescribes another figure (a rate
   written as a share of a capacity). It lists differences; it does not say
   which of them an outcome follows from.
+- **A preview of files** (`POST /demo/workspace/preview`,
+  `application/preview.rs`) builds them as an import does and runs one of
+  their platforms at rest, on a timeline of its own from the server's seed,
+  for the four seconds an experiment's lead-in lasts. Its topology and
+  snapshot are what the timeline in use shows once the files are applied and
+  as long has passed; a test holds the two equal. It also returns the
+  topology as it was read, in the file format. Nothing is applied.
 
 Tests assert bit-for-bit equality of the state digest after arbitrary seeks,
 equality of regenerated events, and that history stays bounded (30 minutes of
@@ -341,6 +348,7 @@ are mirrored in `packages/contracts`.
 | `POST /demo/experiments/weak-points`                   | every service taken out in turn              |
 | `GET /workspace` · `/workspace/export`                 | the files in use, and as one bundle          |
 | `POST /demo/workspace/check` · `/import` · `/reset`    | check, replace or restore those files        |
+| `POST /demo/workspace/preview`                         | uploaded files' platform at rest             |
 | `POST /demo/workspace/diff`                            | what Cedar would decide differently          |
 | `WS /stream`                                           | telemetry and events                         |
 

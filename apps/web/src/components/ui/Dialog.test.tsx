@@ -107,7 +107,12 @@ function Page({ landing = false }: { landing?: boolean }) {
       <Menu
         label="Things"
         icon={null}
-        items={[{ id: 'open', label: 'Open it from the menu', onSelect: () => setOpen(true) }]}
+        sections={[
+          {
+            id: 'things',
+            items: [{ id: 'open', label: 'Open it from the menu', onSelect: () => setOpen(true) }],
+          },
+        ]}
       />
       <button type="button" ref={elsewhere}>
         Elsewhere

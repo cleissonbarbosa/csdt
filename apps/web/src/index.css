@@ -56,6 +56,13 @@
   --animate-swap: swap 240ms var(--ease-arrive) both;
   --animate-fade: fade 140ms linear both;
   --animate-attention: attention 1s steps(2, jump-none) infinite;
+  /*
+   * A line drawn once from its first point to its last, and a line that
+   * goes back to its first point and is gone. Both run on a stroke of
+   * `pathLength="1"` dashed "1 1" (or on a mask of one, for a dashed line).
+   */
+  --animate-trace: trace 520ms var(--ease-arrive) both;
+  --animate-recoil: recoil 380ms var(--ease-travel) both;
 
   @keyframes rise {
     from {
@@ -83,6 +90,27 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  @keyframes trace {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes recoil {
+    from {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    75% {
+      opacity: 1;
+    }
+    to {
+      stroke-dashoffset: 1;
+      opacity: 0;
     }
   }
   /* The one looping animation: an alarm nobody has acknowledged yet. */
@@ -336,6 +364,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* While a piece is carried in the platform editor, the pointer is a hand that holds it. */
+:root[data-carrying='true'],
+:root[data-carrying='true'] * {
+  cursor: grabbing !important;
 }
 
 /* The same switch, driven by the in-app setting. */

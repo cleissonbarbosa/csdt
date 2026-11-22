@@ -188,6 +188,10 @@ takes an outcome, and what each can make the server do is bounded.
   describes (at most 20 000, off the async workers). Neither is placed on
   the timeline: there is no event, no decision in the list and no path on
   the model. Both take at most 32 policy ids to leave out.
+- **A preview applies nothing.** `POST /demo/workspace/preview` builds the
+  uploaded files as a check does and runs one of their platforms at rest
+  for four virtual seconds, on a timeline of its own. It is one of the import
+  routes: the same 8 MiB, and 403 with `AEGIS_IMPORT=off`.
 - **A policy comparison applies nothing.** `POST /demo/workspace/diff`
   builds the uploaded files as a check does and has Cedar evaluate the
   catalogued requests, and every request the tracer can build (at most
