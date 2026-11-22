@@ -217,8 +217,13 @@ Publishing is a person's decision:
   server for its version, pushes them to the GitHub Container Registry, tags
   the commit `v<version>` and publishes a GitHub release. A version with a
   suffix (`0.2.0-rc.1`) is a pre-release and moves neither `latest` nor
-  `MAJOR.MINOR`. So never change the version by hand, nor as part of other
-  work.
+  `MAJOR.MINOR`. The version is changed with `version.sh`, never by hand.
+- **The version follows the code.** A change to what the server, the
+  engine, the page, the contract or a file format does raises it, in a
+  commit of its own after that work: PATCH for a fix that changes nothing a
+  client or a file relies on, MINOR for anything else. Documents, the wiki,
+  tests and CI leave it alone. Pushing that commit to `main` is the
+  decision to publish.
 - **The static site** is deployed to GitHub Pages by
   `.github/workflows/pages.yml`, which runs only when started by hand.
 - **The wiki** is published by a person too; see [The wiki](#the-wiki).

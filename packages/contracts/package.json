@@ -1,6 +1,6 @@
 {
   "name": "@aegis/contracts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Versioned AEGIS data contracts: zod schemas, inferred types and the provider interface",
   "license": "AGPL-3.0-or-later",

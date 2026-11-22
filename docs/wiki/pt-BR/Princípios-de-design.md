@@ -177,6 +177,22 @@ propriedades CSS. Uma mudança vai para os dois, nos dois temas.
   só para código literal. Só a primeira letra da frase em maiúscula, em todo
   lugar.
 
+## Identidade
+
+![A identidade do AEGIS: três portais aninhados com uma linha cinza parada na passagem, ao lado do nome, nos temas claro e noturno, com o símbolo em 64, 32 e 16 px e os tons em que é desenhada](https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/docs/assets/identity/aegis-brand-preview.png)
+
+A marca é uma passagem por portais aninhados, as etapas que uma requisição
+atravessa, com uma linha parada dentro dela: a rota em repouso, nem
+selecionada nem anormal. Ela não tem matiz em nenhum dos temas. Os portais
+são tinta e a linha é `--color-logo-line`, o cinza da estrutura no tema
+claro e um tom mais claro à noite. Ela fica ao lado do nome na barra do
+topo, e sobre uma placa de porcelana como favicon.
+
+Os arquivos ficam em `docs/assets/identity/`, gerados por
+`apps/web/scripts/build-identity.py` a partir dos próprios traços da barra e
+dos tokens, com as palavras convertidas em contornos para que fiquem iguais
+onde a B612 não está instalada.
+
 ## Deliberadamente ausente
 
 | Não está aqui                       | Porque                                                                                                         |

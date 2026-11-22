@@ -1,10 +1,11 @@
 <div align="center">
 
-<img src="apps/web/public/favicon.svg" width="72" alt="" />
-
-# AEGIS
-
-### Interactive Cloud Security Digital Twin
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/identity/aegis-logo-dark.svg" />
+    <img src="docs/assets/identity/aegis-logo.svg" width="420" alt="AEGIS, Cloud Security Digital Twin" />
+  </picture>
+</h1>
 
 **See your infrastructure. Understand every connection. Watch threats unfold.**
 

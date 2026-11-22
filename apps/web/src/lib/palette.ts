@@ -37,6 +37,8 @@ export const COLOR = {
   ink: 'var(--color-ink)',
   inkDim: 'var(--color-ink-dim)',
   inkFaint: 'var(--color-ink-faint)',
+  /** The line resting in the passage of the AEGIS mark (`Logo.tsx`). */
+  logoLine: 'var(--color-logo-line)',
   /** The viewer's own attention: selection, the path being followed. */
   focus: 'var(--color-focus)',
   /** Deviation: degraded, throttled, rejected. */

@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -123,8 +123,10 @@ function offline(): Plugin {
       const files = Object.keys(bundle)
         .filter((name) => !name.endsWith('.map') && name !== PREVIEW_FILE)
         .sort();
-      // What `public/` holds is copied beside the bundle, not through it.
-      const kept = ['./', 'favicon.svg', 'manifest.webmanifest', ...files];
+      // What `public/` holds (the favicon, the icons, the manifest) is
+      // copied beside the bundle, not through it.
+      const copied = readdirSync(path('./public')).sort();
+      const kept = ['./', ...copied, ...files];
       const version = createHash('sha256').update(kept.join('\n')).digest('hex').slice(0, 16);
       this.emitFile({
         type: 'asset',

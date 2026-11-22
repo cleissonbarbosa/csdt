@@ -170,6 +170,22 @@ custom properties. A change goes into both, for both themes.
 - **Type.** B612, in two weights, with digits of equal width; B612 Mono only
   for literal code. Sentence case throughout.
 
+## Identity
+
+![The AEGIS identity: three nested gates with a grey line resting in the passage, beside the name, in the light and night themes, with the symbol at 64, 32 and 16 px and the tones it is drawn in](https://raw.githubusercontent.com/cleissonbarbosa/csdt/main/docs/assets/identity/aegis-brand-preview.png)
+
+The mark is a passage through nested gates, the stages a request crosses,
+with one line resting in it: the route at rest, neither selected nor
+abnormal. It has no hue in either theme. The gates are ink and the line is
+`--color-logo-line`, structure grey by day and a step lighter at night. It
+stands beside the name in the top bar, and on a porcelain plate as the
+favicon.
+
+The files are in `docs/assets/identity/`, built by
+`apps/web/scripts/build-identity.py` from the bar's own strokes and the
+tokens, with the words turned into outlines so that they look the same where
+B612 is not installed.
+
 ## Deliberately absent
 
 | Not here                       | Because                                                                                                               |

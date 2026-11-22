@@ -1,6 +1,6 @@
 {
   "name": "@aegis/web",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "AEGIS web client: WebGPU digital twin of a simulated cloud platform",
   "license": "AGPL-3.0-or-later",

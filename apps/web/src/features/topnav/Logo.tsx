@@ -1,18 +1,45 @@
+import { COLOR } from '@/lib/palette';
+
 /**
- * The AEGIS mark: a shield drawn as a plate seen from above, with the one
- * point being watched. Ink only; it inherits the text colour.
+ * The AEGIS mark: a passage through nested gates, the stages a request
+ * crosses, with one line resting in it, the route, neither selected nor
+ * abnormal. The gates are ink and inherit the text colour; the line is
+ * `--color-logo-line`. No hue, in either theme.
+ *
+ * The strokes are the identity's own: `apps/web/scripts/build-identity.py`
+ * draws the logo files and the favicon from the same ones, and
+ * `Logo.test.ts` holds the two together. The mark always stands beside the
+ * name, which says the same thing, so assistive technology is not told it
+ * twice.
  */
+export const GATES = [
+  { d: 'M14 106 V43 L58 18 H70 L114 43 V106', width: 12 },
+  { d: 'M31 106 V54 L59 38 H69 L97 54 V106', width: 10 },
+  { d: 'M48 106 V67 L60 60 H68 L80 67 V106', width: 8 },
+] as const;
+
+export const LINE = { d: 'M64 86 V106', width: 8 } as const;
+
 export function Logo({ size = 24 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" role="img" aria-label="AEGIS">
-      <path
-        d="M16 3.5 27 8.4v7.9c0 5.9-4.4 10.3-11 12.4C9.4 26.600 5 22.200 5 16.300V8.400L16 3.500Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="15.5" r="3.2" fill="currentColor" />
+    <svg
+      width={size}
+      height={size}
+      // The ink runs from 12 to 106 of the 128 unit square; the view is
+      // moved up by 5 so it sits in the middle of the name's line.
+      viewBox="0 -5 128 128"
+      aria-hidden
+      className="shrink-0"
+      fill="none"
+      strokeLinejoin="bevel"
+      strokeLinecap="butt"
+    >
+      <g stroke="currentColor">
+        {GATES.map(({ d, width }) => (
+          <path key={d} d={d} strokeWidth={width} />
+        ))}
+      </g>
+      <path d={LINE.d} strokeWidth={LINE.width} stroke={COLOR.logoLine} />
     </svg>
   );
 }

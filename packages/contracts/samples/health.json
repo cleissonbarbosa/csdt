@@ -1,7 +1,7 @@
 {
   "status": "ok",
   "service": "aegis-server",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "schemaVersion": "1.0",
   "protocolVersion": 1,
   "mode": "demo",

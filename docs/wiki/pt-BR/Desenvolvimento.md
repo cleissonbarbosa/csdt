@@ -223,8 +223,13 @@ Publicar é uma decisão de uma pessoa:
   ao servidor, envia as imagens ao GitHub Container Registry, cria a tag
   `v<versão>` no commit e publica uma release no GitHub. Uma versão com
   sufixo (`0.2.0-rc.1`) é uma pré-release e não move nem `latest` nem
-  `MAJOR.MINOR`. Por isso, nunca mude a versão à mão, nem como parte de outro
-  trabalho.
+  `MAJOR.MINOR`. A versão muda pelo `version.sh`, nunca à mão.
+- **A versão acompanha o código.** Uma mudança no que o servidor, o motor,
+  a página, o contrato ou um formato de arquivo fazem sobe a versão, num
+  commit só dela, depois desse trabalho: PATCH para uma correção que não
+  muda nada de que um cliente ou um arquivo dependa, MINOR para todo o
+  resto. Documentos, o wiki, os testes e o CI não a mudam. Enviar esse
+  commit à `main` é a decisão de publicar.
 - **O site estático** é publicado no GitHub Pages por
   `.github/workflows/pages.yml`, que só roda quando iniciado manualmente.
 - **O wiki** também é publicado por uma pessoa; veja [O wiki](#o-wiki).

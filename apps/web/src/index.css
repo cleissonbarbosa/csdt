@@ -21,6 +21,12 @@
   --color-raised: #f0efea;
   --color-line: #dddcd7;
   --color-line-strong: #a9afb1;
+  /*
+   * The line resting in the passage of the AEGIS mark: structure in the
+   * light theme, a step lighter at night so it still reads at 24 px.
+   * `apps/web/scripts/build-identity.py` reads it for the logo files.
+   */
+  --color-logo-line: #a9afb1;
 
   --color-ink: #252b30;
   --color-ink-dim: #545c63;
@@ -137,6 +143,7 @@
     --color-raised: #31373c;
     --color-line: #3b4248;
     --color-line-strong: #5b6369;
+    --color-logo-line: #90979b;
     --color-ink: #ecedea;
     --color-ink-dim: #b5babd;
     --color-ink-faint: #90979b;
@@ -158,6 +165,7 @@
       --color-raised: #31373c;
       --color-line: #3b4248;
       --color-line-strong: #5b6369;
+      --color-logo-line: #90979b;
       --color-ink: #ecedea;
       --color-ink-dim: #b5babd;
       --color-ink-faint: #90979b;

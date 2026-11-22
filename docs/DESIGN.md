@@ -567,6 +567,7 @@ text.
 | Graphite (ink)        | `#252B30` | `#ECEDEA` |
 | Ink, secondary        | `#545C63` | `#B5BABD` |
 | Ink, tertiary         | `#697177` | `#90979B` |
+| Logo line             | `#A9AFB1` | `#90979B` |
 | Focus                 | `#3B5FC0` | `#8FABF3` |
 | Warning               | `#8F5A00` | `#FFB224` |
 | Incident (critical)   | `#BF4631` | `#F47C66` |
@@ -598,6 +599,32 @@ weights, which is one fewer decision per label, and digits of equal width,
 so figures hold their columns without a monospace face. B612 Mono is used
 only for things that are literally code: identifiers, Cedar source, JSON.
 Text is set in sentence case throughout.
+
+## Identity
+
+The mark is a passage through nested gates, the stages a request crosses
+seen as one doorway, with a single line resting in the passage. The line is
+the route at rest, neither selected nor abnormal, so it is grey and not
+blue. Like everything normal the mark has no hue, in either theme: the gates
+are ink and the line is `--color-logo-line`, which is structure in the light
+theme and a step lighter at night, so that it still reads at 24 px. There is
+no shield, lock, glow or gradient in it.
+
+In the interface the mark stands at the left of the top bar and of an
+embedded view, always beside the name, and is hidden from assistive
+technology because the name already says what it says
+([`Logo.tsx`](../apps/web/src/features/topnav/Logo.tsx)). The favicon puts
+it on a porcelain plate that follows the system's theme.
+
+The files are in [`docs/assets/identity/`](assets/identity/): the symbol,
+the logo with and without its descriptor, a stacked lockup, each for both
+themes, the favicon and the icons. They are built by
+[`apps/web/scripts/build-identity.py`](../apps/web/scripts/build-identity.py)
+from the same strokes as the bar's mark, with the colours read from
+`index.css` and the words in B612 turned into outlines, so that a file looks
+the same where the font is not installed. A test holds the files and the bar
+to the same strokes and to the tokens: change the mark in the script and in
+`Logo.tsx`, then rebuild, rather than editing an exported file.
 
 ## Deliberately absent
 

@@ -809,6 +809,16 @@ from its class, and one that floats over the model also takes `.floating`
 for its shadow. Type is B612 in two weights; B612 Mono only for literal code;
 sentence case throughout.
 
+The identity is a built asset too (`docs/DESIGN.md`, "Identity").
+`apps/web/scripts/build-identity.py` (fontTools and Google Chrome) writes
+the logo files in `docs/assets/identity/` and the favicon and icons in
+`apps/web/public/`, from the strokes `features/topnav/Logo.tsx` draws and
+the colour tokens of `index.css` (the line is `--color-logo-line`), with the
+words in B612 turned into outlines. Change the mark in both, or a token it
+reads, then run `python3 apps/web/scripts/build-identity.py` and commit what
+it writes; `Logo.test.ts` fails when the files and the bar part, or when a
+file holds a colour that is not a token. Never hand-edit an exported file.
+
 These rules are tested: `lib/palette.test.ts` holds the palette to them,
 `lib/overview.test.ts` holds the overview to its arithmetic, and E2E tests
 read the rendered frame back and assert that no sampled pixel has a hue while
@@ -823,7 +833,9 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
 - **Nothing is fabricated.** Figures in `docs/PERFORMANCE.md` come from
   `./scripts/benchmark.sh`, with the raw output committed under `docs/assets/`.
   Images in `docs/assets/` come from `./scripts/capture-docs.sh` against the
-  running app. Both need `cargo build --release -p aegis-server && pnpm build`
+  running app, except the identity in `docs/assets/identity/`, which
+  `apps/web/scripts/build-identity.py` draws. The benchmark and the
+  screenshot run both need `cargo build --release -p aegis-server && pnpm build`
   and Google Chrome; the screenshot run also uses ffmpeg. Do not hand-edit
   numbers or describe something unmeasured as measured. A bundled capture
   states nothing its source does not: each state of a provider report names
@@ -860,12 +872,24 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   deploys the static site and runs only when started by hand.
   `.github/workflows/release.yml` pushes the two container images and
   creates a tagged GitHub release, but only for a version that has no tag
-  yet: the decision is the commit that changes the version, and no other
-  push publishes anything. `Cargo.toml` states the version (the server
-  reports it), and three `package.json` files, `Cargo.lock` and the health
-  sample repeat it. Change it with `./scripts/version.sh set <version>`,
-  never in one of them by hand, and never as part of other work: on `main`
-  that commit is a public release.
+  yet: what publishes is a push to `main` that carries a new version, and
+  no other push publishes anything. Pushing stays a person's decision, so
+  say so whenever work leaves the version raised.
+- **The version follows the code.** A change to what the server, the
+  engine, the page, the contract or a file format does raises the version,
+  in the same piece of work. `Cargo.toml` states it (the server reports
+  it), and three `package.json` files, `Cargo.lock` and the health sample
+  repeat it: change it with `./scripts/version.sh set <version>`, never in
+  one of them by hand. While the version is `0.MINOR.PATCH`, PATCH is a fix
+  that changes nothing a client or a file relies on, and MINOR is anything
+  else (a new capability, a change to the contract or to a format);
+  `1.0.0` is a person's decision. A version above the newest tag
+  (`git tag --list 'v*' --sort=-v:refname`) is not released yet, so later
+  work raises it again only to a higher level: a fix after an unreleased
+  MINOR leaves it, a feature after an unreleased PATCH moves `0.3.1` to
+  `0.4.0`. Documents, the wiki, tests, CI and comments leave it alone. The
+  change goes in a commit of its own, after the work it versions, so that
+  it can be held back from a push.
 - **The wiki summarises, in two languages.** `docs/wiki/` is the source of
   the GitHub wiki: `en/` and `pt-BR/` hold one page per file, named as the
   wiki names the page (no `#` title: the wiki shows the name), and
