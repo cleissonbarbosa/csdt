@@ -9,7 +9,9 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryClient } from '@/app/queryClient';
+import { useEditor } from '@/stores/editor';
 import { useGuide } from '@/stores/guide';
+import { useIncident } from '@/stores/incident';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useSettings, useUi } from '@/stores/ui';
@@ -48,6 +50,7 @@ const api = vi.hoisted(() => ({
   workspace: vi.fn(),
   exportWorkspace: vi.fn(),
   checkWorkspace: vi.fn(),
+  previewWorkspace: vi.fn(),
   importWorkspace: vi.fn(),
   resetWorkspace: vi.fn(),
 }));
@@ -105,6 +108,9 @@ beforeEach(() => {
   useGuide.setState({ ...useGuide.getInitialState(), oriented: true }, true);
   useTelemetry.setState(useTelemetry.getInitialState(), true);
   useUi.setState(useUi.getInitialState(), true);
+  // The editor is a mode of the shell: one test's draft is not the next one's.
+  useEditor.setState(useEditor.getInitialState(), true);
+  useIncident.setState(useIncident.getInitialState(), true);
   useNotices.setState({ notices: [] });
   useSettings.getState().reset();
   const control = { playback: fixtures.snapshot().playback };
@@ -127,6 +133,7 @@ beforeEach(() => {
   api.workspace.mockResolvedValue(fixtures.workspace());
   api.exportWorkspace.mockResolvedValue(fixtures.workspaceExport());
   api.checkWorkspace.mockResolvedValue(fixtures.workspaceCheck());
+  api.previewWorkspace.mockResolvedValue(fixtures.workspacePreview());
   api.importWorkspace.mockResolvedValue(fixtures.workspaceResponse());
   api.injectFault.mockResolvedValue(control);
   api.clearFaults.mockResolvedValue(control);
@@ -2172,21 +2179,41 @@ describe('sessions', () => {
 });
 
 describe('writing a scenario', () => {
+  /** Opens the editor on the platform in use, writing an incident, from the incidents panel. */
+  async function writeOne(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
+    await user.click(await screen.findByTestId('open-scenario-editor'));
+    return await screen.findByTestId('incident-card');
+  }
+
+  /** Places an effect on the gateway of the samples' platform, as the keyboard does. */
+  async function placeOnGateway(user: ReturnType<typeof userEvent.setup>, effect: string) {
+    await user.click(await screen.findByRole('button', { name: /^Door\b/ }));
+    await user.click(screen.getByTestId(`effect-${effect}`));
+  }
+
   it('has the engine check the file with everything in use, then runs it', async () => {
     const user = userEvent.setup();
     renderOpen();
-    await user.click(screen.getByRole('tab', { name: /Incidents/ }));
-    await user.click(await screen.findByTestId('open-scenario-editor'));
-    const dialog = await screen.findByRole('dialog', { name: 'Write a scenario' });
-    const editor = await within(dialog).findByTestId('scenario-editor');
+    const card = await writeOne(user);
+    // The simulation's panels make way for the editor, on the incident.
+    expect(screen.getByTestId('phase-strip')).toBeInTheDocument();
 
-    const name = within(editor).getByTestId('editor-name');
+    const name = within(card).getByTestId('incident-name');
     await user.clear(name);
     await user.type(name, 'Slow ledger');
     // The id follows the name until it is set by hand.
-    expect(within(editor).getByTestId('editor-id')).toHaveValue('slow-ledger');
+    expect(within(card).getByTestId('incident-id')).toHaveValue('slow-ledger');
+    await placeOnGateway(user, 'latency');
+    expect(within(screen.getByTestId('incident-card')).getAllByTestId('effect-row')).toHaveLength(
+      1,
+    );
 
-    await within(editor).findByTestId('editor-valid');
+    await waitFor(() =>
+      expect(screen.getByTestId('incident-verdict')).toHaveTextContent(
+        'The engine accepts this incident and can run it on Front Desk.',
+      ),
+    );
     const inUse = fixtures.workspaceExport().files;
     const sent = api.checkWorkspace.mock.lastCall![0] as { path: string; text: string }[];
     // Everything in use goes with it: an import is laid over what the
@@ -2199,21 +2226,23 @@ describe('writing a scenario', () => {
       id: 'slow-ledger',
       name: 'Slow ledger',
       durationMs: 60_000,
+      targets: ['role:primaryGateway'],
       phases: [
-        { name: 'Degradation', atMs: 0, status: 'active', effects: [{ type: 'latency' }] },
+        {
+          name: 'Degradation',
+          atMs: 0,
+          status: 'active',
+          effects: [{ type: 'latency', nodes: 'role:primaryGateway', factor: 4 }],
+        },
         { name: 'Recovery', atMs: 30_000, status: 'recovering', effects: [] },
       ],
     });
-    // The file on show is the one that was checked.
-    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"id": "slow-ledger"');
     expect(api.importWorkspace).not.toHaveBeenCalled();
 
-    await user.click(within(editor).getByTestId('editor-run'));
+    await user.click(screen.getByTestId('incident-run'));
     await waitFor(() => expect(api.startScenario).toHaveBeenCalledWith('slow-ledger'));
     expect(api.importWorkspace).toHaveBeenCalledWith(sent);
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Write a scenario' })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByTestId('incident-card')).not.toBeInTheDocument());
   });
 
   it('shows what the engine says is wrong and will not run it', async () => {
@@ -2225,69 +2254,74 @@ describe('writing a scenario', () => {
       },
     });
     const user = userEvent.setup();
-    renderApp();
-    act(() => useUi.getState().setPanel('scenario-editor'));
-    const editor = await screen.findByTestId('scenario-editor');
-    expect(await within(editor).findByTestId('editor-problem')).toHaveTextContent(
-      'factor must be between 0 and 1000',
+    renderOpen();
+    await writeOne(user);
+    await waitFor(() =>
+      expect(screen.getByTestId('incident-verdict')).toHaveTextContent(
+        'factor must be between 0 and 1000',
+      ),
     );
-    expect(within(editor).getByTestId('editor-run')).toBeDisabled();
+    expect(screen.getByTestId('incident-run')).toBeDisabled();
     // The file can be saved all the same.
-    expect(within(editor).getByTestId('editor-download')).toBeEnabled();
-    await user.click(within(editor).getByTestId('editor-add-phase'));
-    expect(within(editor).getByTestId('phase-draft-2')).toBeInTheDocument();
+    expect(screen.getByTestId('incident-save')).toBeEnabled();
+    // A phase is added by cutting the one in hand in two.
+    await user.click(screen.getByTestId('phase-add'));
+    expect(screen.getByTestId('phase-block-2')).toBeInTheDocument();
   });
 
   it('takes a figure typed key by key, decimal point included', async () => {
     const user = userEvent.setup();
-    renderApp();
-    act(() => useUi.getState().setPanel('scenario-editor'));
-    const editor = await screen.findByTestId('scenario-editor');
-    const factor = within(editor).getAllByRole('spinbutton', { name: 'Factor' })[0]!;
+    renderOpen();
+    await writeOne(user);
+    await placeOnGateway(user, 'capacity');
+    const factor = screen.getByTestId('effect-value');
     await user.clear(factor);
     // "1." is not a number yet: the field must not take the point away.
     await user.type(factor, '1.75');
     expect(factor).toHaveValue(1.75);
-    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"factor": 1.75');
-    // The same for a time, which the file keeps in milliseconds.
-    const starts = within(editor).getAllByTestId('phase-at')[1]!;
+    await waitFor(() =>
+      expect(api.checkWorkspace.mock.lastCall![0].at(-1)!.text).toContain('"factor": 1.75'),
+    );
+    // The same for a time, which the file keeps in milliseconds, on the tick.
+    await user.click(screen.getByTestId('phase-block-1').querySelector('button')!);
+    const starts = screen.getByTestId('phase-at');
     await user.clear(starts);
-    await user.type(starts, '12.5');
-    expect(starts).toHaveValue(12.5);
-    expect(within(editor).getByTestId('editor-file')).toHaveTextContent('"atMs": 12500');
+    await user.type(starts, '12.4');
+    expect(starts).toHaveValue(12.4);
+    await waitFor(() =>
+      expect(api.checkWorkspace.mock.lastCall![0].at(-1)!.text).toContain('"atMs": 12400'),
+    );
     // Left empty, a field goes back to the figure the scenario still holds.
     await user.clear(starts);
     await user.tab();
-    expect(starts).toHaveValue(12.5);
+    expect(starts).toHaveValue(12.4);
   });
 
   it('says what is missing before the engine is asked', async () => {
     const user = userEvent.setup();
-    renderApp();
-    act(() => useUi.getState().setPanel('scenario-editor'));
-    const editor = await screen.findByTestId('scenario-editor');
-    await within(editor).findByTestId('editor-valid');
+    renderOpen();
+    const card = await writeOne(user);
+    await waitFor(() => expect(api.checkWorkspace).toHaveBeenCalled());
     api.checkWorkspace.mockClear();
-    await user.clear(within(editor).getByTestId('editor-name'));
-    expect(within(editor).getByTestId('editor-problem')).toHaveTextContent(
-      'The scenario needs a name.',
-    );
-    expect(within(editor).getByTestId('editor-download')).toBeDisabled();
+    await user.clear(within(card).getByTestId('incident-name'));
+    expect(screen.getByTestId('incident-problems')).toHaveTextContent('The scenario needs a name.');
+    expect(screen.getByTestId('incident-save')).toBeDisabled();
+    expect(screen.getByTestId('incident-run')).toBeDisabled();
     expect(api.checkWorkspace).not.toHaveBeenCalled();
   });
 
   it('starts from a copy of a scenario in use, keeping what it cannot edit', async () => {
     const user = userEvent.setup();
-    renderApp();
-    act(() => useUi.getState().setPanel('scenario-editor'));
-    const editor = await screen.findByTestId('scenario-editor');
-    const from = within(editor).getByTestId('editor-start-from') as HTMLSelectElement;
-    await waitFor(() => expect(from.options.length).toBeGreaterThan(1));
-    await user.selectOptions(from, from.options[1]!.value);
+    renderOpen();
+    const card = await writeOne(user);
+    const from = within(card).getByTestId('incident-start-from') as HTMLSelectElement;
+    await waitFor(() => expect(from.options.length).toBeGreaterThan(2));
+    await user.selectOptions(from, 'scenarios/01-slow-door.json');
     // The tiny workspace of the samples has one scenario: a slow door.
-    expect(within(editor).getByTestId('editor-id')).toHaveValue('slow-door-copy');
-    expect(within(editor).getByTestId('editor-name')).toHaveValue('Slow door (copy)');
-    expect(within(editor).getAllByTestId('effect-row')).toHaveLength(1);
+    const copy = screen.getByTestId('incident-card');
+    expect(within(copy).getByTestId('incident-id')).toHaveValue('slow-door-copy');
+    expect(within(copy).getByTestId('incident-name')).toHaveValue('Slow door (copy)');
+    expect(within(copy).getAllByTestId('effect-row')).toHaveLength(1);
   });
 });
 

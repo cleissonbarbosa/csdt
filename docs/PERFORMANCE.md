@@ -31,7 +31,8 @@ run before it, on an earlier build, is kept as
 [`assets/benchmark-2026-11-15.json`](assets/benchmark-2026-11-15.json).
 
 > **What is measured is the arrangement that draws every service.** The
-> application opens on an overview of at most twelve pieces; the benchmark
+> application opens on an overview of one piece per kind of service (twelve
+> for the bundled platform, seventeen at most); the benchmark
 > opens it with `?arrangement=regions` instead, as a returning visitor (the
 > card of a first visit is not on the stage). The overview has not been
 > measured.
@@ -107,7 +108,8 @@ one. To measure on your own display:
 ./scripts/benchmark.sh --headed          # opens a Chrome window for a few minutes
 ```
 
-or press <kbd>P</kbd> in the running application for the live overlay (frame
+or press <kbd>P</kbd> in the running application for the **Performance
+overlay** (frame
 rate, frame time, p95, draw calls, triangles, beads, backend, quality).
 
 ## What the names cost
@@ -260,7 +262,8 @@ by an end-to-end test.
 
 Wall-clock on the same machine, each from its command to its exit, with the
 builds it needs already made (the end-to-end suites still start their own
-server and preview).
+server and preview). The counts and times are those of the last run, on
+2026-11-16; the suites have grown since and have not been timed again.
 
 | Suite                                                                                                     | Tests |       Time |
 | --------------------------------------------------------------------------------------------------------- | ----: | ---------: |

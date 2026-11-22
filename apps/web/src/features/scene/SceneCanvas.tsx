@@ -40,6 +40,7 @@ import {
 } from '@/graphics/SceneController';
 import { frameAt, stepAt } from '@/features/capture/capture';
 import { attachEditor } from '@/features/editor/interaction';
+import { phaseReach } from '@/features/editor/incident/effects';
 import { draftScene } from '@/features/editor/scene';
 import { computeVisibilityMask } from '@/features/explorer/filtering';
 import { t } from '@/i18n';
@@ -55,6 +56,7 @@ import {
 import type { ThemeName } from '@/lib/palette';
 import { useCapture } from '@/stores/capture';
 import { editing, useEditor } from '@/stores/editor';
+import { useIncident } from '@/stores/incident';
 import { useTelemetry } from '@/stores/telemetry';
 import { prefersReducedMotion, useSettings, useUi } from '@/stores/ui';
 
@@ -126,8 +128,17 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
         // be selected there: a connection between two kinds is a summary.
         onSelect: (selection) => {
           if (captured()) useCapture.getState().select(selection);
-          else if (editing()) useEditor.getState().select(selection);
-          else if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
+          else if (editing()) {
+            // While a flow is drawn, a piece clicked is the next one it passes.
+            const drawing = useIncident.getState().drawing;
+            if (drawing !== null && useEditor.getState().tab === 'incident') {
+              if (selection?.kind === 'node' && drawing.at(-1) !== selection.id) {
+                useIncident.getState().draw([...drawing, selection.id]);
+              }
+              return;
+            }
+            useEditor.getState().select(selection);
+          } else if (useUi.getState().layoutMode !== 'layers') useUi.getState().select(selection);
           else if (selection?.kind === 'node') {
             useUi.getState().select({ kind: 'group', id: selection.id });
           } else useUi.getState().select(null);
@@ -282,6 +293,31 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
     };
 
     /**
+     * On the incident, the model keeps in front what is being placed: while
+     * an effect is carried, what it would be placed on; while a flow is
+     * drawn, the services it passes; otherwise what the phase in hand holds
+     * is placed on. On the platform, nothing.
+     */
+    const applyIncident = () => {
+      const { draft, tab, carrying, drag } = useEditor.getState();
+      const { scenario, phase, drawing } = useIncident.getState();
+      if (!draft || tab !== 'incident' || !scenario) {
+        instance.setReached([]);
+        return;
+      }
+      if (carrying?.kind === 'effect') {
+        instance.setReached(drag?.placing?.reach.nodes ?? [], drag?.placing?.reach.edges ?? []);
+        return;
+      }
+      if (drawing !== null) {
+        instance.setReached(drawing);
+        return;
+      }
+      const reach = phaseReach(draft, scenario, phase);
+      instance.setReached(reach.nodes, reach.edges);
+    };
+
+    /**
      * Hands the scene the draft being edited, in the swimlanes, with what
      * the engine last made of it. `edit` when it is the draft already on
      * show, changed: the pieces keep their places and walk to new ones.
@@ -290,8 +326,8 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       const { draft, lastRun, selection, hovered } = useEditor.getState();
       if (!draft) return;
       const { topology, frame } = draftScene(draft, lastRun);
-      // A piece on the table is there to be picked up.
-      instance.setPieceCursor('grab');
+      // A piece on the table is there to be picked up; on the incident it is only selected.
+      instance.setPieceCursor(useEditor.getState().tab === 'platform' ? 'grab' : 'pointer');
       instance.setTopology(topology, 'dependencies', null, edit);
       instance.applySnapshot(frame);
       instance.setSelection(selection);
@@ -299,9 +335,9 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
       instance.clearTrace();
       instance.setRoute([], []);
       instance.setImpacted([]);
-      instance.setReached([]);
       instance.setVisibility(null);
       instance.setPartial(null);
+      applyIncident();
     };
     // An answer that has just come: it reaches the pieces along the path.
     const applyEditorFrame = () => {
@@ -345,10 +381,27 @@ function SceneBridge({ backend, pieces, theme, tooltip, onQuality }: BridgeProps
           return;
         }
         if (!state.draft) return;
-        if (state.carrying !== previous.carrying || state.drag !== previous.drag) applyCarry();
+        if (state.tab !== previous.tab) {
+          instance.setPieceCursor(state.tab === 'platform' ? 'grab' : 'pointer');
+          applyIncident();
+        }
+        if (state.carrying !== previous.carrying || state.drag !== previous.drag) {
+          applyCarry();
+          applyIncident();
+        }
         if (state.lastRun !== previous.lastRun) applyEditorFrame();
         if (state.selection !== previous.selection) instance.setSelection(state.selection);
         if (state.hovered !== previous.hovered) instance.setHoveredNode(state.hovered);
+      }),
+      useIncident.subscribe((state, previous) => {
+        if (captured() || !editing()) return;
+        if (
+          state.scenario !== previous.scenario ||
+          state.phase !== previous.phase ||
+          state.drawing !== previous.drawing
+        ) {
+          applyIncident();
+        }
       }),
       useCapture.subscribe((state, previous) => {
         if (state.capture !== previous.capture || state.topology !== previous.topology) {

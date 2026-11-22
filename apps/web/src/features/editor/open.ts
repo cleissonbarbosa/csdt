@@ -22,8 +22,15 @@ import {
   type TopologyDraft,
 } from '@/lib/topologyFile';
 import { api, ApiError } from '@/providers/api';
+import {
+  blankScenario,
+  draftFromFile as scenarioFromFile,
+  draftToFile as scenarioToFile,
+  type ScenarioDraft,
+} from '@/lib/scenarioFile';
 import { useCapture } from '@/stores/capture';
-import { useEditor, type Origin } from '@/stores/editor';
+import { useEditor, type EditorTab, type Origin } from '@/stores/editor';
+import { useIncident } from '@/stores/incident';
 import { useNotices } from '@/stores/notices';
 import { useTelemetry } from '@/stores/telemetry';
 import { useUi } from '@/stores/ui';
@@ -95,17 +102,20 @@ function begin(
   origin: Origin,
   files: WorkspaceFile[],
   replaces: string | null,
+  tab: EditorTab = 'platform',
 ) {
   base = { files, replaces };
   clearStage();
-  useEditor.getState().open(draft, origin);
+  useIncident.getState().close();
+  useEditor.getState().open(draft, origin, tab);
+  if (tab === 'incident') useIncident.getState().open(blankScenario(''), false);
 }
 
 /**
  * The platform on show, as its file says it. A platform read from a
  * Compose file or a cloud inventory is the topology the server read it as.
  */
-export async function editPlatformInUse(): Promise<boolean> {
+export async function editPlatformInUse(tab: EditorTab = 'platform'): Promise<boolean> {
   const active = useTelemetry.getState().topology?.id;
   const files = await filesInUse();
   if (!files || !active) return false;
@@ -114,7 +124,7 @@ export async function editPlatformInUse(): Promise<boolean> {
   if (own) {
     const draft = draftFromFile(parsed(own.text));
     if (draft) {
-      begin(draft, { kind: 'in-use', name: draft.name }, files, own.path);
+      begin(draft, { kind: 'in-use', name: draft.name }, files, own.path, tab);
       return true;
     }
   }
@@ -125,7 +135,7 @@ export async function editPlatformInUse(): Promise<boolean> {
       const preview = await api.previewWorkspace([file]);
       const draft = draftFromFile(preview.spec);
       if (draft && draft.id === active) {
-        begin(draft, { kind: 'in-use', name: draft.name }, files, file.path);
+        begin(draft, { kind: 'in-use', name: draft.name }, files, file.path, tab);
         return true;
       }
     } catch {
@@ -138,7 +148,7 @@ export async function editPlatformInUse(): Promise<boolean> {
     const preview = await api.previewWorkspace(files, active);
     const draft = draftFromFile(preview.spec);
     if (draft) {
-      begin(draft, { kind: 'in-use', name: draft.name }, files, null);
+      begin(draft, { kind: 'in-use', name: draft.name }, files, null, tab);
       return true;
     }
   } catch (error) {
@@ -226,5 +236,101 @@ export async function applyDraft(): Promise<string | null> {
 
 export function leaveEditor(): void {
   base = { files: [], replaces: null };
+  useIncident.getState().close();
   useEditor.getState().close();
+}
+
+// ---------------------------------------------------------------------------
+// The incident written on the platform
+// ---------------------------------------------------------------------------
+
+const isScenarioPath = (path: string) => /(^|\/)scenarios\/[^/]+\.json$/.test(path);
+
+/** The scenarios in use, as files, to start a new one from a copy of. */
+export function scenariosInUse(): WorkspaceFile[] {
+  return base.files.filter((file) => isScenarioPath(file.path));
+}
+
+/**
+ * Writes an incident on the platform in use: the editor opened on that
+ * platform, on its incident, with a blank scenario in hand.
+ */
+export function writeIncident(): Promise<boolean> {
+  return editPlatformInUse('incident');
+}
+
+/** Puts the incident in hand: the scenario already being written, or a blank one. */
+export function openIncident(): void {
+  if (!useIncident.getState().scenario) useIncident.getState().open(blankScenario(''), false);
+  useEditor.getState().setTab('incident');
+}
+
+/** Starts again from a blank scenario, or from a copy of one in use (by its path). */
+export function startIncidentFrom(path: string): string | null {
+  if (path === '') {
+    useIncident.getState().open(blankScenario(''), false);
+    return null;
+  }
+  const file = scenariosInUse().find((entry) => entry.path === path);
+  const read = file ? scenarioFromFile(parsed(file.text)) : null;
+  if (!read) return t('That file could not be read as a scenario.');
+  // A copy, so the scenario it was read from is not replaced by accident.
+  useIncident.getState().open(
+    {
+      ...read,
+      id: `${read.id}-copy`.slice(0, 64),
+      name: t('{name} (copy)', { name: read.name }),
+    },
+    true,
+  );
+  return null;
+}
+
+/** The scenario as its file is written. */
+export const scenarioText = (scenario: ScenarioDraft): string =>
+  `${JSON.stringify(scenarioToFile(scenario), null, 2)}\n`;
+
+/**
+ * The files an incident is checked and run with: those in use, with the
+ * platform as drawn in place of its file (the files in use as they are,
+ * while the platform in use is unchanged), and the scenario added or put in
+ * place of the one with its id. Scenarios are listed in file-name order: a
+ * new one goes last.
+ */
+export function withIncident(scenario: ScenarioDraft): WorkspaceFile[] {
+  const { draft, origin, past } = useEditor.getState();
+  const platform =
+    !draft || (origin?.kind === 'in-use' && past.length === 0) ? base.files : withDraft(draft);
+  const text = scenarioText(scenario);
+  const same = platform.find(
+    (file) => isScenarioPath(file.path) && scenarioFromFile(parsed(file.text))?.id === scenario.id,
+  );
+  if (same) return platform.map((file) => (file === same ? { ...file, text } : file));
+  return [...platform, { path: `scenarios/zz-${scenario.id}.json`, text }];
+}
+
+/** Saves the scenario as a file. */
+export function saveIncident(): void {
+  const scenario = useIncident.getState().scenario;
+  if (scenario) downloadJson(scenarioToFile(scenario), `${scenario.id}.json`);
+}
+
+/**
+ * Runs the incident: the files in use with the platform as drawn and the
+ * scenario in, applied as an import is, the platform put on show and the
+ * scenario started. The simulation starts a new timeline, for everyone
+ * connected, as any import does.
+ */
+export async function runIncident(): Promise<string | null> {
+  const draft = useEditor.getState().draft;
+  const scenario = useIncident.getState().scenario;
+  if (!draft || !scenario) return null;
+  const outcome = await actions.importWorkspace(withIncident(scenario));
+  if (outcome instanceof ApiError) return outcome.message;
+  if (useTelemetry.getState().topology?.id !== draft.id) await actions.selectTopology(draft.id);
+  // One that does not start has said so; the editor stays, with the incident in hand.
+  if (!(await actions.startScenario(scenario.id))) return null;
+  leaveEditor();
+  useUi.getState().setLeftTab('incidents');
+  return null;
 }

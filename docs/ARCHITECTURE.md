@@ -237,7 +237,7 @@ samples already produced.
 - **Replay** keeps stepping from there; it reproduces recorded history exactly
   and re-announces nothing.
 - **Branch**: issuing a command in the past discards the future beyond the
-  cursor and continues live.
+  cursor, and the simulation's now goes on from there.
 - **Recordings** are a seed plus a command list. Loading one re-simulates it.
 - **A session** is the timeline in use written out in that same form
   (`GET /session`), and loaded like one (`POST /demo/session/load`). The

@@ -115,7 +115,8 @@ There is **no** metrics, Prometheus or OpenTelemetry endpoint, and the
 repositories publish no benchmark results.
 
 **Decision.** The adapter issues read-only `GET /ready` probes at a fixed low
-rate (at most one per second, exponential backoff while unreachable) and
+rate (every 2 s, set by `AEGIS_RINHA_PROBE_SECONDS`, never more than one per
+second nor less than one an hour; exponential backoff while unreachable) and
 reports only what it measured itself: probes sent, probes succeeded, and the
 round-trip time of the last 60 successful probes. It never sends
 `POST /fraud-score`, never generates load and reports no throughput figure,

@@ -111,8 +111,9 @@ shown in the card. Nothing is scripted. Close the card and the path is put
 away with it.
 
 **⋯ → Who may do what** asks Cedar every request the catalogue describes and
-lays the answers out, principals down and actions across. Set the context or
-switch a policy off and the cells that changed are marked; pick a cell and
+lays the answers out, principals down and actions across, under the context
+you set. Switch a policy off and the cells that changed against every policy
+in force are marked; pick a cell and
 **Trace it** to see that request cross the model. **Edit the policies** opens
 the policies in force as Cedar text: change one, read what Cedar would decide
 differently, and **Apply these policies** to come back to the matrix under
@@ -150,10 +151,10 @@ region under attack takes a red outline.
 Phases are timed from the start of the incident. Press one that has been
 reached to see why: what the scenario _prescribed_ in it, what followed in
 the _model_ (each service with the dependency it was traced along) and what
-was _observed_. **Summary so far**, and afterwards the incident's entry
-under **On this timeline**, give the whole of it: origin, propagation, peak
-impact, recovery, and the moments to go back to. **Copy** takes it away as
-text.
+was _observed_. **Summary so far: origin, propagation, peak**, and
+afterwards **Summary: origin, propagation, peak and recovery** under the
+incident's entry in **On this timeline**, give the whole of it, with the
+moments to go back to. **Copy** takes it away as text.
 
 ## 5 · Travel in time (60 s)
 

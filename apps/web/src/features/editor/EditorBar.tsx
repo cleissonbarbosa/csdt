@@ -12,19 +12,46 @@ import { GitCompareArrows, LogOut, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button, IconButton } from '@/components/ui/Button';
+import { Segmented } from '@/components/ui/Field';
 import { t } from '@/i18n';
 import { draftProblems, draftText } from '@/lib/topologyFile';
 import { api, ApiError } from '@/providers/api';
-import { selectCanRedo, selectCanUndo, useEditor } from '@/stores/editor';
+import { selectCanRedo, selectCanUndo, useEditor, type EditorTab } from '@/stores/editor';
 import { useNotices } from '@/stores/notices';
 
-import { applyDraft, leaveEditor, saveDraft, stageDraft, withDraft } from './open';
+import { applyDraft, leaveEditor, openIncident, saveDraft, stageDraft, withDraft } from './open';
+
+const TABS: readonly { value: EditorTab; label: string }[] = [
+  { value: 'platform', label: t('Platform') },
+  { value: 'incident', label: t('Incident') },
+];
+
+/**
+ * What the editor has in hand: the platform, or an incident written on it.
+ * The incident is written against the platform as it is drawn, and run
+ * with it.
+ */
+export function EditorTabs() {
+  const tab = useEditor((state) => state.tab);
+  return (
+    <Segmented
+      label={t('What is edited')}
+      value={tab}
+      options={TABS}
+      onChange={(next) =>
+        next === 'incident' ? openIncident() : useEditor.getState().setTab(next)
+      }
+      size="sm"
+      testId="editor-tab"
+    />
+  );
+}
 
 /** How long the draft has to stay as it is before the engine is asked about it. */
 const ASK_AFTER_MS = 600;
 
 /** Asks the engine about the draft as it settles. */
-function usePreview(): void {
+export function usePreview(): void {
   const draft = useEditor((state) => state.draft);
   const text = useMemo(() => (draft ? draftText(draft) : null), [draft]);
   useEffect(() => {

@@ -46,6 +46,8 @@ export interface CommandContext {
     setTheme: (theme: 'system' | 'light' | 'night') => void;
     openPanel: (panel: PanelId) => void;
     openGuide: () => void;
+    /** Opens the editor on the platform in use, writing an incident. */
+    writeIncident: () => void;
     toggleOverlay: () => void;
   };
 }
@@ -160,13 +162,6 @@ export function buildCommands(context: CommandContext): Command[] {
       run: () => act.openPanel('session'),
     },
     {
-      id: 'scenario-editor',
-      group: 'Actions',
-      title: t('Write a scenario'),
-      hint: t('editor, phases, effects'),
-      run: () => act.openPanel('scenario-editor'),
-    },
-    {
       id: 'integrations',
       group: 'Actions',
       title: t('Open integrations'),
@@ -179,6 +174,18 @@ export function buildCommands(context: CommandContext): Command[] {
       hint: t('topology, scenarios, Cedar policies'),
       run: () => act.openPanel('workspace'),
     },
+    // The editor has a bar of its own, which an embed does not show.
+    ...(context.embedded
+      ? []
+      : [
+          {
+            id: 'scenario-editor',
+            group: 'Actions' as const,
+            title: t('Write a scenario'),
+            hint: t('editor, phases, effects'),
+            run: act.writeIncident,
+          },
+        ]),
     ...(context.embedded
       ? []
       : [

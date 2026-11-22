@@ -360,6 +360,20 @@ runs, and it is the engine's, not the editor's. Where the stage has no room
 for the palette beside the draft's card, the palette is a column of glyphs,
 each still named.
 
+_Writing an incident_ is the same model with the platform held still: a
+piece is selected, not carried. The phases are blocks on a strip where the
+timeline is, each named with the incident's stage in words and its ramp
+drawn as a slope, in ink; the one in hand is outlined in blue. What its
+effects are placed on is kept in front in the viewer's blue, and each
+effect hangs a chip under its service (or its connection, or the middle of
+its region) with what it does there and its figure: nothing has happened
+to those services yet, so they take no state colour. While an effect is
+carried, what it would be placed on is what stands in front, a whole lane
+at once for a region; let go over something it does nothing on, it says
+why, in words. A flow being drawn is a dashed blue line through the
+services clicked, numbered in the order they were. Nothing here says what
+the incident will do: that is the engine's, when it runs.
+
 ## Words
 
 **Time is the simulation's.** The cursor is at the _simulation's now_, where
@@ -394,8 +408,8 @@ policy, still says which permit came nearest. The lines are ink: a permit
 is an outlined tag and a forbid a filled one, because which is which is
 told by shape (rule 7) and neither is an alarm. The access matrix is drawn
 the same way. A cell is a count and a glyph, a denial is not red, and the
-one mark it carries is on a cell that the context or the switched-off
-policies changed.
+one mark it carries is on a cell that the switched-off policies changed,
+against every policy in force under the same context.
 
 **A trial is not an event.** What a fault would do, shown before it is
 placed, takes no signal hue: nothing has happened on the platform, so

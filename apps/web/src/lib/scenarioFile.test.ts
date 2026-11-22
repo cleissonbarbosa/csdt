@@ -43,14 +43,44 @@ describe('a scenario file in the editor', () => {
     expect(draftToFile(draftFromFile(written)!)).toEqual(written);
   });
 
-  it('keeps what it has no control for exactly as written', () => {
+  it('reads flows and their rates, and keeps what it has no control for as written', () => {
     const flood = files.find((file) => file.name === '01-ddos-surge.json')!.json;
     const draft = draftFromFile(flood)!;
-    expect(draft.flows).toEqual(flood.flows);
-    const kept = draft.phases.flatMap((phase) => phase.effects).filter((e) => e.kind === 'raw');
-    // Flow rates and rejections act on the scenario's own flow.
-    expect(kept.length).toBeGreaterThan(0);
-    expect(kept.every((effect) => /^flow/.test(String(effect.json.type)))).toBe(true);
+    expect(draft.flows.every((flow) => flow.kind === 'flow')).toBe(true);
+    const effects = draft.phases.flatMap((phase) => phase.effects);
+    expect(effects.some((effect) => effect.kind === 'flowRate')).toBe(true);
+    // A flow rejected at a node has no control: it is kept.
+    const kept = effects.filter((effect) => effect.kind === 'raw');
+    expect(kept.every((effect) => effect.json.type === 'flowReject')).toBe(true);
+    expect(draftToFile(draft).flows).toEqual(flood.flows);
+  });
+
+  it('writes an effect on one connection, and reads it back as one', () => {
+    const draft = blankScenario('');
+    draft.phases[0]!.effects = [
+      {
+        key: rowKey(),
+        kind: 'edgeError',
+        target: '',
+        value: 0.3,
+        between: { from: 'role:primaryGateway', to: 'node:use-orders' },
+      },
+    ];
+    const written = draftToFile(draft);
+    const phases = written.phases as { effects: Record<string, unknown>[] }[];
+    expect(phases[0]!.effects).toEqual([
+      {
+        type: 'edgeError',
+        edges: { between: { from: 'role:primaryGateway', to: 'node:use-orders' } },
+        rate: 0.3,
+      },
+    ]);
+    // It names no one service as affected.
+    expect(written.targets).toEqual([]);
+    expect(draftFromFile(written)!.phases[0]!.effects[0]).toMatchObject({
+      kind: 'edgeError',
+      between: { from: 'role:primaryGateway', to: 'node:use-orders' },
+    });
   });
 
   it('refuses what is not a scenario', () => {
@@ -97,6 +127,7 @@ describe('a scenario file in the editor', () => {
     const fine = blankScenario('role:primaryDatabase');
     expect(draftProblems(fine)).toEqual([]);
     const broken = blankScenario('');
+    broken.phases[0]!.effects = [{ key: rowKey(), kind: 'latency', target: '', value: 4 }];
     broken.name = ' ';
     broken.id = 'two words';
     broken.phases[0]!.atMs = 5000;

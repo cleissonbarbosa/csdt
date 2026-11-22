@@ -39,7 +39,12 @@ import { draftOf } from '@/features/capture/draft';
 import { draftNotes, draftRefusal } from '@/features/capture/draftNotes';
 import { provenanceOf } from '@/features/capture/CaptureCard';
 import { CaptureStatus } from '@/features/capture/CaptureStatus';
-import { EditorActions, EditorStatus } from '@/features/editor/EditorBar';
+import { EditorActions, EditorStatus, EditorTabs } from '@/features/editor/EditorBar';
+import {
+  IncidentActions,
+  IncidentStatus,
+  useIncidentVerdict,
+} from '@/features/editor/incident/IncidentBar';
 import { editBlankPlatform, editPlatformInUse } from '@/features/editor/open';
 import { Deviations } from '@/features/hud/Hud';
 import { t } from '@/i18n';
@@ -369,11 +374,32 @@ export function TopNav() {
 
 /** The bar while a platform is drawn: what it is, what the engine makes of it, what to do with it. */
 function EditorNav() {
+  const tab = useEditor((state) => state.tab);
+  // The tabs stay where they are when one is chosen, and the keyboard with them.
   return (
     <Bar>
+      <EditorTabs />
+      {tab === 'incident' ? <IncidentNav /> : <PlatformNav />}
+    </Bar>
+  );
+}
+
+function PlatformNav() {
+  return (
+    <>
       <EditorStatus />
       <EditorActions />
-    </Bar>
+    </>
+  );
+}
+
+function IncidentNav() {
+  const verdict = useIncidentVerdict();
+  return (
+    <>
+      <IncidentStatus verdict={verdict} />
+      <IncidentActions runs={verdict.runs} />
+    </>
   );
 }
 

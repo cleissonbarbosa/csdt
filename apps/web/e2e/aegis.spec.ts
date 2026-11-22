@@ -1072,29 +1072,52 @@ test('the address follows the view and brings it back', async ({ page }) => {
   await expect(page).not.toHaveURL(/select=/);
 });
 
-test('a scenario written in the editor is checked by the engine and runs', async ({ page }) => {
+test('a scenario written over the model is checked by the engine and runs', async ({ page }) => {
+  test.setTimeout(120_000);
   await openApp(page);
   await waitForScene(page);
   await page.getByTestId('explore-incident').click();
   await page.getByTestId('open-scenario-editor').click();
-  const editor = page.getByTestId('scenario-editor');
-  await editor.getByTestId('editor-name').fill('Slow ledger');
-  await expect(editor.getByTestId('editor-id')).toHaveValue('slow-ledger');
-  await editor.getByTestId('effect-target').first().selectOption('role:primaryDatabase');
-  await expect(editor.getByTestId('editor-valid')).toContainText('can run it on Helios Commerce');
+  // The editor opens on the platform in use, writing an incident; its phases
+  // are where the timeline is.
+  const card = page.getByTestId('incident-card');
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId('phase-strip')).toBeVisible();
+  await waitForScene(page, 51);
+  await card.getByTestId('incident-name').fill('Slow ledger');
+  await expect(card.getByTestId('incident-id')).toHaveValue('slow-ledger');
+
+  // An effect carried onto a piece is placed on it, by its role.
+  const canvas = (await page.locator('canvas').first().boundingBox())!;
+  const point = await page.evaluate(() => window.__aegis?.projectNode('use-orders-db') ?? null);
+  expect(point).not.toBeNull();
+  const database = { x: canvas.x + point!.x, y: canvas.y + point!.y };
+  await page.getByTestId('effect-latency').hover();
+  await page.mouse.down();
+  await page.mouse.move(database.x - 60, database.y, { steps: 6 });
+  await page.mouse.move(database.x, database.y, { steps: 6 });
+  await expect(page.getByTestId('editor-caption')).toContainText('on primaryDatabase');
+  await page.mouse.up();
+  await expect(page.getByTestId('effect-chip')).toHaveText('Latency ×4');
+  const verdict = page.getByTestId('incident-verdict');
+  await expect(verdict).toContainText('can run it on Helios Commerce');
 
   // A figure out of range is refused by the engine, in the engine's words.
-  const factor = editor.getByRole('spinbutton', { name: 'Factor' }).first();
+  const factor = card.getByTestId('effect-value');
   await factor.fill('5000');
-  await expect(editor.getByTestId('editor-problem')).toContainText(
-    'factor must be between 0 and 1000',
-  );
-  await expect(editor.getByTestId('editor-run')).toBeDisabled();
+  await expect(verdict).toContainText('factor must be between 0 and 1000');
+  await expect(page.getByTestId('incident-run')).toBeDisabled();
   await factor.fill('8');
-  await expect(editor.getByTestId('editor-valid')).toBeVisible();
-  await expect(editor.getByTestId('editor-file')).toContainText('"factor": 8');
+  await expect(verdict).toContainText('can run it on Helios Commerce');
+  await expect(page.getByTestId('effect-chip')).toHaveText('Latency ×8');
 
-  await editor.getByTestId('editor-run').click();
+  // The recovery starts a second earlier, moved on the strip by the keyboard.
+  const start = page.getByTestId('phase-start-1');
+  await start.focus();
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(start).toHaveAttribute('aria-valuenow', '29');
+
+  await page.getByTestId('incident-run').click();
   await expect(page.getByTestId('active-incident')).toHaveAttribute('data-scenario', 'slow-ledger');
   // It is one of the platform's scenarios now, with the five it had.
   await expect(page.getByTestId('scenario-slow-ledger')).toBeVisible();

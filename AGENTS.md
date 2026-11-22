@@ -10,7 +10,8 @@ a WebAssembly module (`apps/wasm`) so the client can run as a static site
 with no server. Everything the simulation shows is synthetic; an incident
 capture (a file the browser reads itself, `features/capture/`) is not, and is
 labelled as not simulated (`recording`, in the contract's provenance
-vocabulary). Docs and code comments are written in English.
+vocabulary). Docs and code comments are written in English; the wiki
+(`docs/wiki/`) is written in English and Brazilian Portuguese.
 
 ## Toolchain
 
@@ -73,7 +74,7 @@ pnpm format:check     # pnpm format to fix
 pnpm typecheck
 pnpm lint
 pnpm test             # Vitest: contracts + web
-python3 -B -m unittest discover -s scripts -p 'test_*.py'   # the capture scripts; standard library only
+python3 -B -m unittest discover -s scripts -p 'test_*.py'   # the capture scripts and the wiki; standard library only
 pnpm build
 pnpm e2e              # Playwright against the real stack
 # The static site (its own CI job; needs the wasm32 target):
@@ -86,7 +87,7 @@ pnpm e2e:static       # Playwright against the static build, no server
 A single test:
 
 ```bash
-cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,import,inventory,diff,insight,platforms,mitigations,limits}.rs
+cargo test -p aegis-server --test simulation <name_substring>   # tests/{api,simulation,stream,integrations,workspace,import,inventory,diff,insight,platforms,mitigations,limits,faults}.rs
 cargo test -p aegis-server --lib <module::or::name>             # unit tests inside src/
 pnpm --filter @aegis/web exec vitest run src/stores/ui.test.ts
 pnpm --filter @aegis/web exec vitest run -t "part of the test name"
@@ -665,6 +666,20 @@ break:
 - **Every carry has a way without one.** A palette piece pressed adds its
   kind; a service's card connects with **Connect to**; the table view
   (`EditorTable`) edits without the model.
+- **The incident is a tab of the same editor, written on the platform as
+  drawn.** `stores/incident.ts` holds the scenario with a history of its
+  own; `features/editor/incident/` has the palette of effects, the phase
+  strip (in the timeline's place), the card and the chips over the model.
+  It replaced the scenario dialog: there is one editor of the file. Every
+  change is a pure function of `lib/scenarioFile.ts` (`movePhase`,
+  `setRamp`, `splitPhase`, `placeEffect`…), which also reads what a
+  selector names on a platform by the server's rules (`resolveNode`,
+  `reachOf`, mirroring `Resolver` in `incidents/mod.rs`); a test reads
+  `is_gateway` and `is_sync` in `domain/topology.rs` and fails when they
+  part. What the model keeps in front is where the effects are placed,
+  never what they will do. The check and the run (`withIncident` in
+  `open.ts`) send the files in use with the platform as drawn: the files
+  in use exactly as they are while the platform in use is unchanged.
 
 The static build also writes a service worker and a link preview
 (`vite.config.ts`: `offline()` from `src/engine/offline.sw.js`,
@@ -842,7 +857,24 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
   sample repeat it. Change it with `./scripts/version.sh set <version>`,
   never in one of them by hand, and never as part of other work: on `main`
   that commit is a public release.
-- **Rust lints.** `unsafe` is forbidden and `dbg!` / `todo!` are denied.
+- **The wiki summarises, in two languages.** `docs/wiki/` is the source of
+  the GitHub wiki: `en/` and `pt-BR/` hold one page per file, named as the
+  wiki names the page (no `#` title: the wiki shows the name), and
+  `_Sidebar.md` and `_Footer.md` are shared. `scripts/test_wiki.py` holds
+  each page to its translation (the language switch on its first line, the
+  same headings, the same code, since a command is not translated) and
+  every link and image to something that exists on `main`; an image is one
+  of `docs/assets/`. The documents in `docs/` stay the reference: a change
+  that makes one of them wrong changes the wiki page that summarises it
+  too, in both languages, and a new page goes into `_Sidebar.md`. The
+  Portuguese keeps to the glossary of `pt-BR/common.ts` and quotes the
+  interface's own labels. The wiki is published by a person, like the
+  static site: `./scripts/wiki.sh <checkout>` lays the pages out in a clone
+  of `csdt.wiki.git` and commits nothing. An edit made in the wiki itself
+  is replaced by the next publication.
+- **Rust lints.** `unsafe` is forbidden in `aegis-server`; `aegis-wasm`
+  denies it, allowing only the `#[no_mangle]` exports the lint also covers,
+  and has no `unsafe` block. `dbg!` / `todo!` are denied.
   `unwrap()` outside tests is a Clippy warning, which CI's `-D warnings`
   turns into a failure. Request bodies deserialise into types that reject
   unknown fields.
@@ -858,4 +890,5 @@ times more than the scene itself (`docs/PERFORMANCE.md`).
 `docs/SECURITY.md`, `docs/INTEGRATIONS.md`, `docs/CAPTURES.md` (incident
 captures: reading rules, format, exporters), `docs/INVENTORY.md` (cloud
 inventories: what is read, the selection, the format, the collectors),
-`docs/PERFORMANCE.md`, `docs/DEMO.md`.
+`docs/PERFORMANCE.md`, `docs/DEMO.md`, and the wiki's summary of all of
+them in `docs/wiki/`.

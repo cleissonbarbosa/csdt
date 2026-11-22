@@ -54,8 +54,6 @@ export type PanelId =
   | 'limits'
   /** Saving, sharing and opening a session. */
   | 'session'
-  /** Writing a scenario by hand. */
-  | 'scenario-editor'
   /** Who may do what: every request of the catalogue, asked of Cedar. */
   | 'matrix'
   /** Editing the Cedar policies in the page. */

@@ -58,7 +58,10 @@ real system only if its service names may be seen there; the static site
 keeps the draft in the tab.
 
 AEGIS collects no telemetry about its users and stores nothing outside the
-browser's `localStorage` (display preferences).
+browser. There, `localStorage` holds the settings (`aegis.settings.v1`) and
+the guide's progress (`aegis.guide.v1`: whether the orientation card was
+seen, and which challenges were answered); on the static site the service
+worker also keeps the build's own files in Cache Storage.
 
 ## Workspace
 
@@ -83,15 +86,18 @@ it holds in the browser. This is what the route can and cannot do:
   compiled exactly as a directory is at start-up. If anything is wrong the
   import is refused with the file and the reason, and what is running is not
   touched. `POST /demo/workspace/check` does the same without applying.
-- **It is bounded.** These two routes accept 8 MiB instead of 16 KiB, at most
+- **It is bounded.** The routes that take files (check, diff, preview,
+  import, and the comparison of platforms) accept 8 MiB instead of 16 KiB, at most
   256 files of at most 4 MiB each, under the same per-client limit as every
   other mutation. Parsing and compiling run off the async workers.
 - **It replaces what everyone sees.** There is one simulation. Whoever can
   reach the API can already start an incident or reset the timeline for
   everyone connected; an import is in that class, and goes further: it
   replaces the platform, the scenarios and the policies on show. On a server
-  that others share, switch it off with `AEGIS_IMPORT=off`. The three routes
-  then answer 403, and the interface says so.
+  that others share, switch it off with `AEGIS_IMPORT=off`. The routes that
+  take files and the reset (`check`, `diff`, `preview`, `import`,
+  `experiments/platforms`, `reset`) then answer 403, and the interface says
+  so.
 - **It can always be undone.** `POST /demo/workspace/reset` returns to what
   the server was started with, which an import never modifies.
 

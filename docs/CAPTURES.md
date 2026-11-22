@@ -476,7 +476,8 @@ the last `=` and must equal exactly one node's `name` as the capture writes
 it (case included); KIND is one of `api-gateway`, `auth-service`,
 `cedar-authorizer`, `microservice`, `container`, `serverless`,
 `message-queue`, `database`, `storage`, `network-gateway`,
-`security-monitor`, `external-client`, the list a test holds to
+`security-monitor`, `external-client`, `load-balancer`, `virtual-machine`,
+`kubernetes-cluster`, `cache`, `event-stream`, the list a test holds to
 `schemas/v1/topology.schema.json`. A kind outside it is a usage error before
 anything is read. A name no node has, or several have, or a name declared
 twice stops the export before any metric is read (CloudWatch) or Tempo is

@@ -7,6 +7,72 @@
 import { sceneHandle } from '@/graphics/handle';
 import { disconnect, removeService } from '@/lib/topologyFile';
 import { useEditor } from '@/stores/editor';
+import { useIncident } from '@/stores/incident';
+
+import { finishFlow } from './incident/IncidentPalette';
+
+/**
+ * The keys of the incident: undo and redo its own history; Delete takes out
+ * the effect or flow open in the card; Enter finishes a flow being drawn
+ * and Escape stops drawing it, or closes what is open.
+ */
+function incidentKey(event: KeyboardEvent, typing: boolean): boolean | null {
+  const incident = useIncident.getState();
+  const command = event.metaKey || event.ctrlKey;
+  if (command && !event.altKey && !typing) {
+    const key = event.key.toLowerCase();
+    if (key === 'z') {
+      if (event.shiftKey) incident.redo();
+      else incident.undo();
+      return true;
+    }
+    if (key === 'y') {
+      incident.redo();
+      return true;
+    }
+    return null;
+  }
+  if (typing || event.altKey) return null;
+  switch (event.key) {
+    case 'Enter':
+      if (incident.drawing === null) return null;
+      finishFlow();
+      return true;
+    case 'Escape':
+      if (incident.drawing !== null) {
+        incident.draw(null);
+        return true;
+      }
+      if (incident.item !== null) {
+        incident.selectItem(null);
+        return true;
+      }
+      return null;
+    case 'Delete':
+    case 'Backspace': {
+      const item = incident.item;
+      if (item === null) return false;
+      incident.change((scenario) => {
+        const flow = scenario.flows.find((entry) => entry.key === item);
+        const gone = flow?.kind === 'flow' ? flow.id : null;
+        return {
+          ...scenario,
+          flows: scenario.flows.filter((entry) => entry.key !== item),
+          phases: scenario.phases.map((phase) => ({
+            ...phase,
+            effects: phase.effects.filter(
+              (effect) =>
+                effect.key !== item && !(effect.kind === 'flowRate' && effect.flow === gone),
+            ),
+          })),
+        };
+      });
+      return true;
+    }
+    default:
+      return null;
+  }
+}
 
 /**
  * Returns whether the key was the editor's. `typing` is whether the key
@@ -14,6 +80,12 @@ import { useEditor } from '@/stores/editor';
  */
 export function editorKey(event: KeyboardEvent, typing: boolean): boolean {
   const editor = useEditor.getState();
+  if (editor.tab === 'incident') {
+    const used = incidentKey(event, typing);
+    if (used !== null) return used;
+    // The platform stands as it is: a selection is not removed from here.
+    if (!typing && (event.key === 'Delete' || event.key === 'Backspace')) return false;
+  }
   const command = event.metaKey || event.ctrlKey;
   if (command && !event.altKey) {
     const key = event.key.toLowerCase();

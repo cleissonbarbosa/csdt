@@ -173,7 +173,7 @@ topology the server read it as, and saved or applied as a topology file.
 <workspace>/
   workspace.json           optional format version; omitted means version 1
   topologies/*.json         the platforms on offer
-  topologies/*.yml          … or a Compose file, read as one (see below)
+  topologies/*.yml          … or a Compose file (.yml or .yaml), read as one (see below)
                             (a .json that is a cloud inventory is read as one too)
   scenarios/*.json          incident scenarios
   recordings/*.json         prerecorded incidents
@@ -206,7 +206,7 @@ A mistake stops the server from starting and names the file:
 my-platform/scenarios/02-brownout.json: phase `Slow`: factor must be between 0 and 1000, got -3
 ```
 
-Limits: 4 MiB per file, 64 files per directory, 2 000 services and 20 000
+Limits: 4 MiB per file, 64 files of one kind, 2 000 services and 20 000
 connections per topology, 512 policies. They exist so a mistake fails at
 start-up instead of exhausting memory. The renderer has been exercised at 178
 services; nothing larger has been measured.
@@ -233,7 +233,10 @@ the [bundle](../schemas/v1/bundle.schema.json),
 [authorization catalogue](../schemas/v1/catalog.schema.json) and
 [policy list](../schemas/v1/policies.schema.json). They provide editor
 completion and structural validation, including selectors, effect ranges and
-the commands and events a file may declare. Entities and `.cedar` files
+the commands a file may declare. The scenario schema lists every event kind,
+the engine's own among them; a scenario may announce only `alert`,
+`auth-failure`, `mitigation` and `reroute`, and the server refuses the rest
+(see [Events](#events)). Entities and `.cedar` files
 continue to use Cedar's own formats.
 
 Schemas are generated from the Rust types with `pnpm workspace:schemas`.
@@ -300,6 +303,8 @@ The same format as
 | `nodes[].rateLimitRps`            | Optional. The most requests a second the service admits; the rest are turned away at its door. See [What a service does about load](#what-a-service-does-about-load).        |
 | `nodes[].suspiciousFilter`        | Optional, 0 to 1: the share of traffic a scenario marks as suspicious that the service turns away as it arrives.                                                             |
 | `nodes[].autoscale`               | Optional `{ "maxFactor", "seconds" }`: capacity that follows the load.                                                                                                       |
+| `nodes[].description`             | Optional text, shown on the service's card.                                                                                                                                  |
+| `nodes[].environment`             | Optional: `production`, `staging` or `demo` (the default). It is carried into the topology the server reports; neither the model nor the interface uses it.                  |
 | `edges[].weight`                  | Calls made on the connection per request the source handles.                                                                                                                 |
 | `edges[].relationship`            | `route` (each request takes exactly one), `call`, `auth`, `authz`, `data` (all synchronous: a failure reaches the caller), `publish`, `consume`, `replication`, `telemetry`. |
 | `edges[].criticality`             | Optional, 0 to 1: how strongly a failure of the target fails the caller. Defaults by relationship.                                                                           |
@@ -449,15 +454,26 @@ still evaluates requests; the tracer just has no path to draw, and says so.
 A scenario changes numbers inside the model and announces events. It cannot do
 anything else: there is no effect that reaches outside the engine.
 
-A scenario can be written in a text editor, or in the interface: **Write a
-scenario of your own**, under the scenarios in the incidents panel. The form
-there writes this same file. Effects are placed by role first (so the
-scenario runs on any platform that has the role), then by region or by
-service; the engine checks the file as it is written, with everything else
-in use, and says where it can run; **Save the file** hands it over as it is,
-and **Add it and run it** imports it with the files in use and starts it.
-Injected flows, and an effect between two named ends, are not in the form:
-a scenario that has them is opened with those parts kept as written.
+A scenario can be written in a text editor, or in the interface, over the
+model: **Write a scenario of your own**, under the scenarios in the incidents
+panel, opens the platform editor on the platform in use at its **Incident**
+(the same tab is next to **Platform** whenever a platform is drawn). The
+phases lie on a strip where the timeline is: a phase is carried sideways to
+start earlier or later, on the tick and a tick from its neighbours, the grip
+at the top of its slope sets `rampMs`, and a double click cuts one in two.
+An effect is carried from the palette onto a service, onto a region's lane
+(every service of the region) or onto a connection (`edges.between`), and is
+placed in the phase in hand by role first, so the scenario runs on any
+platform that has the role, then by region or by service; dropping one on a
+service it does nothing on says so instead (demand is a client's). A flow is
+drawn by clicking the services it passes, one after another: a hop is the
+connection between two of them, or `"via": "path"` where there is none, and
+the phase in hand gets its `flowRate`. The engine checks the file as it is
+written, with everything else in use and the platform as it is drawn, and
+says where it can run; **Save the scenario** hands it over as it is, and
+**Run it** imports it with the files in use and starts it. A `routeShift`, a
+`flowReject` and a flow's `authz` have no control: a scenario that has them
+is opened with those parts kept as written.
 
 ```json
 {
@@ -846,8 +862,8 @@ timeline in use is not touched.
   be well before any objective is missed), and a row for every figure
   tried. Nothing is said of the figures between two rows.
 - **What each service takes with it.** Every service is made unreachable in
-  turn, exactly as **Try one first** on its card does, and the others that
-  left their normal state are counted. The one that takes the most with it
+  turn, exactly as **Try one first, without placing it** on its card does,
+  and the others that left their normal state are counted. The one that takes the most with it
   is first. A platform of more than 250 services is not ranked.
 
 ```http

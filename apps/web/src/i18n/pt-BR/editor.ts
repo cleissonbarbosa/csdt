@@ -159,4 +159,136 @@ export default {
     'Nenhuma ainda. Os incidentes incluídos e o rastreador de requisições pedem funções: atribua-as no card de um serviço.',
   None: 'Nenhuma',
   'No service yet.': 'Nenhum serviço ainda.',
+  // The incident written on the platform: the tabs and the bar.
+  'What is edited': 'O que está sendo editado',
+  Platform: 'Plataforma',
+  Incident: 'Incidente',
+  'Writing {name}': 'Escrevendo {name}',
+  'The engine is checking the incident with everything in use…':
+    'O motor está verificando o incidente com tudo o que está em uso…',
+  '{n} things to put right before the engine can check it, first: {first}':
+    '{n} coisas a acertar antes que o motor possa verificá-lo; a primeira: {first}',
+  'The engine accepts it, but it cannot run on {platform}: {reason}':
+    'O motor aceita o incidente, mas ele não pode ser executado em {platform}: {reason}',
+  'The engine accepts this incident and can run it on {platform}.':
+    'O motor aceita este incidente e pode executá-lo em {platform}.',
+  'Save the scenario': 'Salvar o cenário',
+  'Run it': 'Executar',
+  'Apply the platform as drawn with the incident in, and start it: the simulation starts a new timeline, for everyone connected.':
+    'Aplica a plataforma como está desenhada, com o incidente, e o inicia: a simulação começa uma nova linha do tempo para todos os conectados.',
+  'Leave without running it? The incident is not kept.':
+    'Sair sem executar? O incidente não é guardado.',
+
+  // The effects to place.
+  'Effects to place': 'Efeitos para posicionar',
+  'Carry an effect onto a service, a region or a connection: it holds during the phase in hand. Whatever a phase does not list eases back to normal.':
+    'Leve um efeito até um serviço, uma região ou uma conexão: ele vale durante a fase selecionada. O que uma fase não lista volta aos poucos ao normal.',
+  'On services': 'Em serviços',
+  'On a client': 'Em um cliente',
+  'On calls': 'Em chamadas',
+  'Traffic of its own': 'Tráfego próprio',
+  'Place: {effect}': 'Posicionar: {effect}',
+  'Drag onto the model, or press to place it on what is selected':
+    'Arraste para o modelo, ou pressione para posicioná-lo no que está selecionado',
+  '{effect}: drag onto the model, or press to place it on what is selected':
+    '{effect}: arraste para o modelo, ou pressione para posicioná-lo no que está selecionado',
+  'Draw a flow': 'Desenhar um fluxo',
+  'Click, one after another, the services the flow passes':
+    'Clique, um depois do outro, nos serviços por onde o fluxo passa',
+  'Click the service the flow starts at.': 'Clique no serviço onde o fluxo começa.',
+  '{n} service so far. Click the next one it passes.':
+    '{n} serviço até aqui. Clique no próximo por onde ele passa.',
+  '{n} services so far. Click the next one, or finish.':
+    '{n} serviços até aqui. Clique no próximo, ou conclua.',
+  'Finish the flow': 'Concluir o fluxo',
+  Done: 'Concluir',
+  'Stop drawing the flow': 'Parar de desenhar o fluxo',
+  'Flow {n}': 'Fluxo {n}',
+  Capacity: 'Capacidade',
+  'Requests fail': 'Requisições falham',
+  Demand: 'Demanda',
+  'Calls into it': 'Chamadas recebidas',
+  'Network latency into it': 'Latência de rede das chamadas recebidas',
+  'Calls into it fail': 'Chamadas recebidas falham',
+  'Lasts, s': 'Dura (s)',
+
+  // Where an effect goes, and what it says on the model.
+  'Demand is what a client sends: carry it onto a client.':
+    'Demanda é o que um cliente envia: leve-a até um cliente.',
+  'This effect is placed on a service or a region, not on a connection.':
+    'Este efeito vai em um serviço ou em uma região, não em uma conexão.',
+  'This effect is placed on one service, not on a whole region.':
+    'Este efeito vai em um serviço, não em uma região inteira.',
+  '{effect} on {what}': '{effect} em {what}',
+  'Capacity ×{n}': 'Capacidade ×{n}',
+  'Latency ×{n}': 'Latência ×{n}',
+  '{share} of requests fail': '{share} das requisições falham',
+  'Demand ×{n}': 'Demanda ×{n}',
+  'Calls ×{n}': 'Chamadas ×{n}',
+  'Network latency ×{n}': 'Latência de rede ×{n}',
+  '{share} of calls fail': '{share} das chamadas falham',
+  '{rate} requests a second': '{rate} requisições por segundo',
+  '{n} times the capacity of {service}': '{n} vezes a capacidade de {service}',
+  'the connection {from} → {to}': 'a conexão {from} → {to}',
+  'nothing yet': 'nada ainda',
+  'every call into {service}': 'todas as chamadas a {service}',
+  'the gateway of {region} ({name})': 'o gateway de {region} ({name})',
+  '{flow}: {rate}': '{flow}: {rate}',
+  'Open {effect} in the card': 'Abrir {effect} no card',
+
+  // The phases of the incident.
+  'The phases of the incident': 'As fases do incidente',
+  Phases: 'Fases',
+  'Cut the phase in hand in two': 'Dividir em duas a fase selecionada',
+  'How long the incident lasts, in seconds: up to 1800':
+    'Quanto tempo o incidente dura, em segundos: até 1.800',
+  '{phase}, from {start} to {end}': '{phase}, de {start} a {end}',
+  'Where {phase} starts': 'Onde {phase} começa',
+  'How long {phase} eases in over': 'Duração da transição de {phase}',
+  '{s} s': '{s} s',
+
+  // The incident's card.
+  'Untitled incident': 'Incidente sem nome',
+  '{n} phases, {length} long': '{n} fases, {length} de duração',
+  'Before the engine can check it': 'Antes que o motor possa verificá-lo',
+  'Phase {n}: {name}': 'Fase {n}: {name}',
+  'Remove this phase': 'Remover esta fase',
+  'Seconds after the incident starts': 'Segundos depois do início do incidente',
+  'Holds from {start} to {end}.': 'Vale de {start} a {end}.',
+  'What it holds': 'O que ela mantém',
+  'Nothing: everything eases back to normal. Carry an effect from the palette onto the model.':
+    'Nada: tudo volta aos poucos ao normal. Leve um efeito da paleta até o modelo.',
+  'on {what}': 'em {what}',
+  'Every call into': 'Todas as chamadas a',
+  'Its rate': 'A taxa dele',
+  'A multiple of a service’s capacity': 'Um múltiplo da capacidade de um serviço',
+  'Requests a second': 'Requisições por segundo',
+  'Of the capacity of': 'Da capacidade de',
+  'So the same incident overloads a small platform and a large one alike.':
+    'Assim o mesmo incidente sobrecarrega igualmente uma plataforma pequena e uma grande.',
+  'Remove this rate': 'Remover esta taxa',
+  'What the phases name it by when they set its rate.':
+    'O nome pelo qual as fases se referem a ele ao definir sua taxa.',
+  Hostile: 'Hostil',
+  'Drawn as hostile traffic.': 'Desenhado como tráfego hostil.',
+  'Joins the traffic where it ends': 'Junta-se ao tráfego onde termina',
+  'What survives the last hop goes on to what that service calls, as a flood does.':
+    'O que passa do último salto segue para o que aquele serviço chama, como faz uma inundação.',
+  'Remove this flow': 'Remover este fluxo',
+  'Add an event': 'Adicionar um evento',
+  'None.': 'Nenhum.',
+  'Flows it injects': 'Fluxos que ele injeta',
+  'None. Draw one from the palette, through the services it passes.':
+    'Nenhum. Desenhe um pela paleta, através dos serviços por onde ele passa.',
+  '{n} flow is kept as written.': '{n} fluxo é mantido como foi escrito.',
+  '{n} flows are kept as written.': '{n} fluxos são mantidos como foram escritos.',
+  'The incident': 'O incidente',
+  'This scenario, as it is': 'Este cenário, como está',
+
+  // What is missing, before the engine is asked.
+  'An effect of “{phase}” sets the rate of a flow the scenario does not have.':
+    'Um efeito de “{phase}” define a taxa de um fluxo que o cenário não tem.',
+  'A flow’s id is 1 to 64 letters, digits, "-", "_" or ".".':
+    'O ID de um fluxo deve ter entre 1 e 64 caracteres. Use letras, números, hífen (-), sublinhado (_) ou ponto (.).',
+  'The flow “{flow}” has no hop.': 'O fluxo “{flow}” não tem nenhum salto.',
 } as const;

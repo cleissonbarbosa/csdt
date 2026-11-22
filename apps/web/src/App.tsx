@@ -31,10 +31,13 @@ import { HelpDialog } from '@/features/help/HelpDialog';
 import { Inspector } from '@/features/inspector/Inspector';
 import { IntegrationsDialog } from '@/features/integrations/IntegrationsDialog';
 import { ScenarioConsole } from '@/features/scenarios/ScenarioConsole';
-import { ScenarioEditor } from '@/features/scenarios/ScenarioEditor';
 import { EditorCard } from '@/features/editor/EditorCard';
 import { EditorOverlay } from '@/features/editor/EditorOverlay';
 import { EditorTable } from '@/features/editor/EditorTable';
+import { IncidentCard } from '@/features/editor/incident/IncidentCard';
+import { IncidentOverlay } from '@/features/editor/incident/IncidentOverlay';
+import { IncidentPalette } from '@/features/editor/incident/IncidentPalette';
+import { PhaseStrip, STRIP_HEIGHT } from '@/features/editor/incident/PhaseStrip';
 import { editorKey } from '@/features/editor/keys';
 import { Palette } from '@/features/editor/Palette';
 import { DevOverlay } from '@/features/scene/DevOverlay';
@@ -319,7 +322,8 @@ const CAPTURE_LANDING = '[data-testid="capture-toggle"]';
  * piece of its palette, which Enter adds, or the draft's card when the
  * palette is put away.
  */
-const EDITOR_LANDING = '[data-testid="editor-palette"] button, [data-testid="editor-card"] button';
+const EDITOR_LANDING =
+  '[data-testid="editor-palette"] button, [data-testid="incident-palette"] button, [data-testid="editor-card"] button';
 /** The editor as a mode the keyboard follows; it has no file of its own to tell one from another. */
 const EDITING = { mode: 'editor' } as const;
 /**
@@ -542,6 +546,8 @@ export function App() {
   const captureOpen = useCapture(selectOpen);
   // So do the editor's while a platform is drawn.
   const editorOpen = useEditor(selectEditing);
+  // An incident written on the platform: its phases where the timeline is.
+  const incidentOpen = useEditor((state) => state.draft !== null && state.tab === 'incident');
   const paletteOpen = useEditor((state) => state.paletteOpen);
   const modeOpen = captureOpen || editorOpen;
   const explorerOpen = useUi((state) => state.explorerOpen);
@@ -624,7 +630,12 @@ export function App() {
   const timelineHeight = useTimelineHeight();
   const timelineVisible = useTimelineVisible();
   // The editor has no timeline: nothing has happened on a draft.
-  const foot = captureOpen || (!editorOpen && timelineVisible) ? timelineHeight + GUTTER : 0;
+  const foot =
+    captureOpen || (!editorOpen && timelineVisible)
+      ? timelineHeight + GUTTER
+      : incidentOpen
+        ? STRIP_HEIGHT + GUTTER
+        : 0;
   // On a first visit the orientation lies over the foot of the stage; the
   // model is framed above it for as long as it is there.
   const [orientation, setOrientation] = useState(0);
@@ -778,6 +789,7 @@ export function App() {
 
         {/* What a carry shows over the model: where a piece would go. */}
         {showScene && editorOpen && <EditorOverlay />}
+        {showScene && incidentOpen && <IncidentOverlay />}
 
         {showScene && devOverlay && (
           <div
@@ -911,9 +923,9 @@ export function App() {
             open={paletteOpen}
             width={leftWidth}
             foot={foot}
-            label={t('Pieces to place')}
+            label={incidentOpen ? t('Effects to place') : t('Pieces to place')}
           >
-            <Palette rail={paletteRail} />
+            {incidentOpen ? <IncidentPalette rail={paletteRail} /> : <Palette rail={paletteRail} />}
           </Sheet>
         )}
         {editorOpen && (
@@ -928,7 +940,7 @@ export function App() {
             testId="editor-card"
           >
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <EditorCard />
+              {incidentOpen ? <IncidentCard /> : <EditorCard />}
             </div>
           </Sheet>
         )}
@@ -951,7 +963,7 @@ export function App() {
             onHeight={setGuide}
           />
         </div>
-        {captureOpen ? <CaptureBar /> : editorOpen ? null : <Timeline />}
+        {captureOpen ? <CaptureBar /> : editorOpen ? incidentOpen && <PhaseStrip /> : <Timeline />}
       </div>
 
       <IntegrationsDialog />
@@ -962,7 +974,6 @@ export function App() {
       <AccessMatrixDialog />
       <PolicyEditorDialog />
       <SessionDialog />
-      <ScenarioEditor />
       <HelpDialog />
       {/* An embed reaches no capture: it has no bar to say what one is. */}
       <CaptureDialog

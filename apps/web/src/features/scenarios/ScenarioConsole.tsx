@@ -31,6 +31,7 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { Segmented, Select } from '@/components/ui/Field';
 import { EmptyState, Section } from '@/components/ui/Section';
 import { ServiceName } from '@/components/ui/ServiceName';
+import { writeIncident } from '@/features/editor/open';
 import { t } from '@/i18n';
 import { tr } from '@/i18n/rich';
 import { cn } from '@/lib/cn';
@@ -823,7 +824,7 @@ export function ScenarioConsole() {
         <Recordings />
         <button
           type="button"
-          onClick={() => useUi.getState().setPanel('scenario-editor')}
+          onClick={() => void writeIncident()}
           className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
           data-testid="open-scenario-editor"
         >

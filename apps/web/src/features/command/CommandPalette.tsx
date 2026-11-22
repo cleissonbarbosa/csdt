@@ -7,6 +7,7 @@ import { actions } from '@/app/actions';
 import { embedFromSearch } from '@/app/embed';
 import { showRegion } from '@/app/navigate';
 import { queryKeys } from '@/app/queryClient';
+import { writeIncident } from '@/features/editor/open';
 import { sceneHandle } from '@/graphics/handle';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
@@ -66,6 +67,7 @@ export function CommandPalette() {
           setTheme: (theme) => useSettings.getState().set('theme', theme),
           openPanel: (panel) => useUi.getState().setPanel(panel),
           openGuide: () => useGuide.getState().setOpen(true),
+          writeIncident: () => void writeIncident(),
           toggleOverlay: () => {
             const settings = useSettings.getState();
             settings.set('devOverlay', !settings.devOverlay);

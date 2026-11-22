@@ -256,8 +256,6 @@ export default {
   'denied by default': 'negado por padrão',
 
   // The scenario editor: the scenario.
-  'Phases on a timeline, the effects each holds and the events it announces, in the file format the engine reads. A scenario changes figures inside the simulation and nothing else.':
-    'Defina as fases na linha do tempo, com os efeitos e eventos de cada uma, usando o formato de arquivo do motor. O cenário altera apenas valores da simulação.',
   'Start from': 'Começar a partir de',
   'A blank scenario': 'Um cenário em branco',
   'A copy of {name}': 'Uma cópia de {name}',
@@ -269,8 +267,6 @@ export default {
   Summary: 'Resumo',
   Category: 'Categoria',
   'Lasts, in seconds': 'Duração, em segundos',
-  'Up to 1800: the half hour of history the timeline keeps.':
-    'Até 1.800 segundos, o equivalente à meia hora de histórico da linha do tempo.',
   'Root cause, if it names one': 'Causa raiz, se o cenário indicar uma',
   'None named': 'Nenhuma indicada',
 
@@ -288,22 +284,15 @@ export default {
   Degradation: 'Degradação',
   'New phase': 'Nova fase',
   'Starts at, s': 'Início (s)',
-  'Seconds after the scenario starts': 'Segundos depois do início do cenário',
   'Eases in, s': 'Duração da transição (s)',
   'How long its effects take to ease in from what held before':
     'Tempo para passar gradualmente dos valores anteriores aos efeitos desta fase',
   'Incident is': 'Estado do incidente',
-  'Remove phase {n}': 'Remover a fase {n}',
   'What happens, in a sentence': 'O que acontece, em uma frase',
-  'Effects held during this phase. Whatever a phase does not list eases back to nominal.':
-    'Efeitos que ficam ativos nesta fase. Os demais valores voltam aos poucos ao normal.',
-  'Add an effect': 'Adicionar um efeito',
   'Events it announces': 'Eventos da fase',
-  'Add an event it announces': 'Adicionar um evento',
   'Add a phase': 'Adicionar uma fase',
 
   // An effect.
-  Effect: 'Efeito',
   'Capacity ×': 'Capacidade ×',
   'Latency ×': 'Latência ×',
   'Share of requests that fail': 'Proporção das requisições que falham',
@@ -329,12 +318,6 @@ export default {
   'What the event says': 'Mensagem do evento',
   'Remove this event': 'Remover este evento',
 
-  // Flows the editor keeps as they were read.
-  '{n} injected flow read from the file is kept as written. Flows are edited in the file itself.':
-    'O editor mantém {n} fluxo injetado tal como está no arquivo. Edite o fluxo diretamente no arquivo.',
-  '{n} injected flows read from the file are kept as written. Flows are edited in the file itself.':
-    'O editor mantém {n} fluxos injetados tal como estão no arquivo. Edite os fluxos diretamente no arquivo.',
-
   // What is missing, before the engine is asked.
   'The scenario needs a name.': 'O cenário precisa de um nome.',
   'The id is 1 to 64 letters, digits, "-", "_" or ".".':
@@ -348,25 +331,11 @@ export default {
   'An event of “{phase}” has no title.': 'Um evento de “{phase}” não tem título.',
 
   // What the engine says of it.
-  'The scenarios in use could not be read, so this one cannot be checked against them.':
-    'Não foi possível ler os cenários em uso para validar este cenário.',
-  'Asking the engine whether this is valid…': 'Validando o cenário no motor…',
   'The file could not be checked.': 'O arquivo não pôde ser verificado.',
   '{error} The file can still be saved and given to a server when it starts.':
     '{error} Você ainda pode salvar o arquivo e fornecê-lo ao servidor na inicialização.',
   'The engine does not accept this scenario.': 'O motor não aceita este cenário.',
-  'The engine accepts this scenario and can run it on {platform}.':
-    'O motor aceita este cenário e pode executá-lo em {platform}.',
-  'The engine accepts this scenario.': 'O motor aceita este cenário.',
-  'It cannot run on <id>{topology}</id>: {reason}':
-    'Não é possível executar o cenário em <id>{topology}</id>. {reason}',
-  'A scenario with the id <id>{scenario}</id> is in use; running this one takes its place.':
-    'Já existe um cenário em uso com o ID <id>{scenario}</id>. Se você executar este cenário, ele substituirá o anterior.',
 
   // Running it, or keeping it.
-  'Add it and run it': 'Adicionar e executar',
   'Save the file': 'Salvar o arquivo',
-  'Running it adds it to the scenarios in use and starts a new timeline for everyone connected.':
-    'Ao executar este cenário, você o adiciona à lista em uso e inicia uma nova linha do tempo para todos os usuários conectados.',
-  'The file': 'O arquivo',
 } as const satisfies Record<string, string>;

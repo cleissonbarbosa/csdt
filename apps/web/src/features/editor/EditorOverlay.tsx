@@ -22,6 +22,7 @@ import { t } from '@/i18n';
 import { SERVICE_TYPE } from '@/lib/palette';
 import { useEditor } from '@/stores/editor';
 
+import { EFFECT_GLYPH, EFFECT_NAME, placedOn } from './incident/effects';
 import { KIND_GLYPH } from './Palette';
 
 /** How long a refused connection's circle stays drawn, in milliseconds. */
@@ -174,7 +175,18 @@ export function EditorOverlay() {
   const regionName = (id: string | null) =>
     draft?.regions.find((region) => region.id === id)?.name ?? id ?? '';
   let caption: string | null = null;
-  if (drag?.target && drag.refusal) caption = drag.refusal;
+  if (carrying?.kind === 'effect') {
+    // An effect says what it would be placed on, or why it cannot be.
+    const label = EFFECT_NAME[carrying.effect];
+    caption =
+      drag?.refusal ??
+      (drag?.placing && draft
+        ? t('{effect} on {what}', {
+            effect: label,
+            what: placedOn(draft, { key: '', ...drag.placing.effect }),
+          })
+        : label);
+  } else if (drag?.target && drag.refusal) caption = drag.refusal;
   else if (drag?.target && draft) {
     const name = draft.nodes.find((node) => node.id === drag.target)?.name ?? drag.target;
     caption = t('Connect to {name}', { name });
@@ -199,7 +211,12 @@ export function EditorOverlay() {
       : carrying?.kind === 'move'
         ? draft?.nodes.find((node) => node.id === carrying.id)?.type
         : undefined;
-  const Glyph = carriedType ? KIND_GLYPH[carriedType] : null;
+  const Glyph =
+    carrying?.kind === 'effect'
+      ? EFFECT_GLYPH[carrying.effect]
+      : carriedType
+        ? KIND_GLYPH[carriedType]
+        : null;
 
   return (
     <div ref={box} className="pointer-events-none absolute inset-0 z-10" aria-hidden>

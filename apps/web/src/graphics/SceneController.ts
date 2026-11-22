@@ -119,6 +119,10 @@ export type SceneSelection = { kind: 'node' | 'edge'; id: string } | null;
 export interface StagePoint {
   node: string | null;
   slot: DropSlot | null;
+  /** The connection under the point, when no piece is. */
+  edge: string | null;
+  /** The region whose plate is under the point. */
+  region: string | null;
 }
 
 export interface SceneHooks {
@@ -588,6 +592,8 @@ export class SceneController {
   private upright = false;
   /** See `setReached`. */
   private reached = new Uint8Array(0);
+  /** Connections named by what reached the pieces, besides those between two of them. */
+  private reachedEdges = new Uint8Array(0);
   private reachedAny = false;
   /** The size of the stage the shot and the names were last taken for. */
   private stageWidth = 0;
@@ -832,6 +838,7 @@ export class SceneController {
       this.hasSnapshot = false;
       this.selectedNode = this.selectedEdge = this.hoveredNode = -1;
       this.reached = new Uint8Array(n);
+      this.reachedEdges = new Uint8Array(m);
       this.reachedAny = false;
       this.trace = null;
       this.userMoved = false;
@@ -1524,7 +1531,7 @@ export class SceneController {
    * to the viewer, so the connections among them take the focus colour and
    * the pieces themselves take none: on the timeline in use they are well.
    */
-  setReached(nodeIds: readonly string[]): void {
+  setReached(nodeIds: readonly string[], edgeIds: readonly string[] = []): void {
     const reached = new Uint8Array(this.n);
     let any = false;
     for (const id of nodeIds) {
@@ -1533,7 +1540,15 @@ export class SceneController {
       reached[i] = 1;
       any = true;
     }
+    const reachedEdges = new Uint8Array(this.m);
+    for (const id of edgeIds) {
+      const e = this.edgeIds.indexOf(id);
+      if (e < 0) continue;
+      reachedEdges[e] = 1;
+      any = true;
+    }
     this.reached = reached;
+    this.reachedEdges = reachedEdges;
     this.reachedAny = any;
     this.refreshHighlights();
   }
@@ -1582,10 +1597,15 @@ export class SceneController {
     }
     if (this.reachedAny && this.reached.length === this.n) {
       for (let i = 0; i < this.n; i++) if (this.reached[i] === 1) this.related[i] = 1;
+      const named = this.reachedEdges.length === this.m;
       for (let e = 0; e < this.m; e++) {
-        if (this.reached[this.edgeSource[e]!] === 1 && this.reached[this.edgeTarget[e]!] === 1) {
+        const between =
+          this.reached[this.edgeSource[e]!] === 1 && this.reached[this.edgeTarget[e]!] === 1;
+        if (between || (named && this.reachedEdges[e] === 1)) {
           this.edgeHighlight[e] = Math.max(this.edgeHighlight[e]!, 0.75);
           this.edgeRelated[e] = 1;
+          this.related[this.edgeSource[e]!] = 1;
+          this.related[this.edgeTarget[e]!] = 1;
         }
       }
     }
@@ -2158,9 +2178,11 @@ export class SceneController {
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     if (!this.layout || !this.topology || x < 0 || y < 0 || x > rect.width || y > rect.height) {
-      return { node: null, slot: null };
+      return { node: null, slot: null, edge: null, region: null };
     }
     const node = this.pickNode({ x, y });
+    const edge = node === -1 ? this.pickEdge({ x, y }) : -1;
+    const region = this.pickRegion({ x, y });
     let slot: DropSlot | null = null;
     if (this.aimAt(x, y) && Math.abs(this.ray.direction.y) > 1e-4) {
       const along = -this.ray.origin.y / this.ray.direction.y;
@@ -2173,7 +2195,30 @@ export class SceneController {
         );
       }
     }
-    return { node: node === -1 ? null : this.nodeIds[node]!, slot };
+    return {
+      node: node === -1 ? null : this.nodeIds[node]!,
+      slot,
+      edge: edge === -1 ? null : this.edgeIds[edge]!,
+      region,
+    };
+  }
+
+  /** Screen position, in CSS pixels of the stage, of the middle of a connection; null when off screen. */
+  projectEdge(edgeId: string): { x: number; y: number } | null {
+    const e = this.edgeIds.indexOf(edgeId);
+    const layout = this.layout;
+    if (e === -1 || !layout) return null;
+    const a = nodePosition(layout, this.edgeSource[e]!);
+    const b = nodePosition(layout, this.edgeTarget[e]!);
+    const c: Vec3 = [this.edgeCtrl[e * 3]!, this.edgeCtrl[e * 3 + 1]!, this.edgeCtrl[e * 3 + 2]!];
+    const middle = bezierPoint(a, c, b, 0.5);
+    this.scratch.set(middle[0], middle[1], middle[2]).project(this.camera);
+    if (this.scratch.z < -1 || this.scratch.z > 1) return null;
+    const rect = this.dom.getBoundingClientRect();
+    return {
+      x: (this.scratch.x * 0.5 + 0.5) * rect.width,
+      y: (-this.scratch.y * 0.5 + 0.5) * rect.height,
+    };
   }
 
   /** Screen position, in CSS pixels of the stage, of a point of the table; null when off screen. */
@@ -2303,10 +2348,10 @@ export class SceneController {
     return true;
   }
 
-  /** The region whose plate is under the pointer, nearest the camera first. */
-  private pickRegion(): string | null {
+  /** The region whose plate is under the pointer (or `at`), nearest the camera first. */
+  private pickRegion(at: { x: number; y: number } | null = null): string | null {
     const layout = this.layout;
-    if (!layout || !this.aim()) return null;
+    if (!layout || !(at ? this.aimAt(at.x, at.y) : this.aim())) return null;
     let best: string | null = null;
     let bestDepth = Infinity;
     for (const region of layout.regions) {
@@ -2350,9 +2395,11 @@ export class SceneController {
     return best;
   }
 
-  private pickEdge(): number {
+  private pickEdge(at: { x: number; y: number } | null = null): number {
     const layout = this.layout;
-    if (!layout || !this.pointer.inside) return -1;
+    if (!layout || (!at && !this.pointer.inside)) return -1;
+    const pointerX = at ? at.x : this.pointer.x;
+    const pointerY = at ? at.y : this.pointer.y;
     const rect = this.dom.getBoundingClientRect();
     this.viewProjection.multiplyMatrices(
       this.camera.projectionMatrix,
@@ -2384,12 +2431,9 @@ export class SceneController {
           const lengthSq = dx * dx + dy * dy || 1;
           const u = Math.max(
             0,
-            Math.min(1, ((this.pointer.x - px) * dx + (this.pointer.y - py) * dy) / lengthSq),
+            Math.min(1, ((pointerX - px) * dx + (pointerY - py) * dy) / lengthSq),
           );
-          const distance = Math.hypot(
-            this.pointer.x - (px + u * dx),
-            this.pointer.y - (py + u * dy),
-          );
+          const distance = Math.hypot(pointerX - (px + u * dx), pointerY - (py + u * dy));
           if (distance < bestDistance) {
             bestDistance = distance;
             best = e;

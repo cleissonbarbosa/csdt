@@ -251,10 +251,10 @@ and in what the two configurations differ.
   so each policy is put to the request by itself, as it is and with its
   conditions left out; the lines are Cedar's answers, and the permit that
   came nearest is said first.
-- **Who can do what.** The access matrix asks Cedar every request the
+- **Who may do what.** The access matrix asks Cedar every request the
   catalogue describes, principals down and actions across, under a context
-  and with any policies switched off, and marks the cells that changed.
-  Any cell opens in the tracer.
+  and with any policies switched off, and marks the cells the switched-off
+  policies changed. Any cell opens in the tracer.
 - **Edit the policies.** The policies in force open as Cedar text. As you
   write they are checked by the engine, and what Cedar would decide
   differently is listed before anything is applied. Applied, they are an
@@ -448,7 +448,9 @@ pnpm --filter @aegis/web preview:static    # http://localhost:4173
 `apps/web/dist-static` is then plain files that run the simulation in the
 browser.
 
-Then follow the five-minute tour in [docs/DEMO.md](docs/DEMO.md).
+Then follow the five-minute tour in [docs/DEMO.md](docs/DEMO.md). The
+[wiki](https://github.com/cleissonbarbosa/csdt/wiki) gathers all of this
+documentation by task, in English and Brazilian Portuguese.
 
 To run it on a platform of your own:
 
@@ -673,7 +675,8 @@ packages/contracts  Shared contract: zod schemas + samples exported by the serve
 fixtures            The bundled topology, scenarios, recordings and Cedar files, laid
                     out as a workspace
 examples            A small workspace to copy from, and cloud inventories as the collectors write them
-docs                Design, architecture, integrations, captures, inventories, security, performance, demo
+docs                Design, architecture, integrations, captures, inventories, security, performance, demo,
+                    and the wiki's source in English and Brazilian Portuguese (docs/wiki)
 scripts             Screenshot and benchmark runners, the incident capture scripts, the cloud inventory collectors
 ```
 
@@ -681,8 +684,6 @@ scripts             Screenshot and benchmark runners, the incident capture scrip
 
 - Direct OTLP ingestion for streaming topology updates.
 - Merge live probe data into the scene as its own clearly-labelled region.
-- A topology editor in the interface, and injected flows in the scenario
-  editor (both are files today, read from a [workspace](docs/WORKSPACE.md)).
 - True orthographic projection as an option, with its own picking and zoom.
 - The bundled platform's own text (scenario descriptions, event messages,
   the catalogue's labels) in Portuguese; the interface is translated, what

@@ -25,6 +25,7 @@ import {
   WeakPointsSchema,
   WorkspaceBundleSchema,
   WorkspaceCheckSchema,
+  WorkspacePreviewSchema,
   WorkspaceDiffSchema,
   WorkspaceResponseSchema,
   WorkspaceStatusSchema,
@@ -70,6 +71,8 @@ export const workspaceCheckInventory = () =>
 export const workspaceResponse = () => sample('workspace-response', WorkspaceResponseSchema);
 export const workspaceExport = () => sample('workspace-export', WorkspaceBundleSchema);
 export const workspaceDiff = () => sample('workspace-diff', WorkspaceDiffSchema);
+/** The contract samples' platform at rest, as the preview route answers for it. */
+export const workspacePreview = () => sample('workspace-preview', WorkspacePreviewSchema);
 /** The report of the incident under way in the samples (credential stuffing). */
 export const incidentReport = () => sample('incident-report', IncidentReportSchema);
 export const session = () => sample('session', SessionExportSchema);

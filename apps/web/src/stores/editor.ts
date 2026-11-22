@@ -22,6 +22,7 @@ import { create } from 'zustand';
 
 import type { DropSlot } from '@/graphics/layout';
 import type { SceneSelection } from '@/graphics/SceneController';
+import type { EffectKind, PlacedEffect } from '@/lib/scenarioFile';
 import { draftText, edgeId, type TopologyDraft } from '@/lib/topologyFile';
 
 /** How many steps can be undone. */
@@ -38,7 +39,12 @@ export interface Origin {
 export type Carrying =
   | { kind: 'new'; type: ServiceType }
   | { kind: 'move'; id: string }
-  | { kind: 'connect'; from: string };
+  | { kind: 'connect'; from: string }
+  /** An effect from the incident's palette, to be placed in the phase in hand. */
+  | { kind: 'effect'; effect: EffectKind };
+
+/** What the editor has in hand: the platform, or the incident written on it. */
+export type EditorTab = 'platform' | 'incident';
 
 /** What the engine made of one text of the file. */
 export type Answer =
@@ -57,6 +63,10 @@ export interface Drag {
   slot: DropSlot | null;
   target: string | null;
   refusal: string | null;
+  /** The connection under the pointer, where an effect can be placed on one. */
+  edge?: string | null;
+  /** The effect a carried one would be placed as, and what it would be placed on. */
+  placing?: { effect: Omit<PlacedEffect, 'key'>; reach: { nodes: string[]; edges: string[] } };
 }
 
 /** A change that was not made, and why, as the editor says it. */
@@ -88,9 +98,10 @@ export interface EditorState {
    */
   lastRun: Extract<Answer, { state: 'ran' }> | null;
   paletteOpen: boolean;
+  tab: EditorTab;
 
   /** Opens the editor on a draft, with nothing to undo. */
-  open(draft: TopologyDraft, origin: Origin): void;
+  open(draft: TopologyDraft, origin: Origin, tab?: EditorTab): void;
   close(): void;
   /** Makes a change. One that changes nothing is not a step. */
   change(next: (draft: TopologyDraft) => TopologyDraft, key?: string): void;
@@ -104,6 +115,7 @@ export interface EditorState {
   /** Keeps what the engine said, when it is about the draft as it now is. */
   answered(answer: Answer): void;
   setPalette(open: boolean): void;
+  setTab(tab: EditorTab): void;
 }
 
 const CLOSED = {
@@ -120,6 +132,7 @@ const CLOSED = {
   answer: null,
   lastRun: null,
   paletteOpen: true,
+  tab: 'platform',
 } satisfies Partial<EditorState>;
 
 /** The selection, if what it names is still in the draft. */
@@ -134,7 +147,7 @@ function kept(selection: SceneSelection, draft: TopologyDraft): SceneSelection {
 export const useEditor = create<EditorState>((set, get) => ({
   ...CLOSED,
 
-  open: (draft, origin) => set({ ...CLOSED, draft, origin }),
+  open: (draft, origin, tab = 'platform') => set({ ...CLOSED, draft, origin, tab }),
   close: () => set({ ...CLOSED }),
 
   change: (next, key) => {
@@ -196,6 +209,7 @@ export const useEditor = create<EditorState>((set, get) => ({
     set(answer.state === 'ran' ? { answer, lastRun: answer } : { answer });
   },
   setPalette: (paletteOpen) => set({ paletteOpen }),
+  setTab: (tab) => set({ tab, carrying: null, drag: null, refused: null, lastKey: null }),
 }));
 
 export const selectEditing = (state: EditorState): boolean => state.draft !== null;

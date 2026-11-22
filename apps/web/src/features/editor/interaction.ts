@@ -18,10 +18,13 @@ import type { ServiceType } from '@aegis/contracts';
 
 import { sceneHandle } from '@/graphics/handle';
 import { t } from '@/i18n';
+import { EFFECT, placeEffect, reachOf, type EffectKind } from '@/lib/scenarioFile';
 import { connect, edgeId, type Refusal, type TopologyDraft } from '@/lib/topologyFile';
 import { editing, useEditor, type Carrying, type Drag } from '@/stores/editor';
+import { useIncident } from '@/stores/incident';
 
 import { addNear, dropMove, dropNew } from './drop';
+import { placementAt, type Under } from './incident/effects';
 
 /** How far a press has to move, in pixels, before it is a carry and not a click. */
 const CLICK_SLOP = 5;
@@ -49,6 +52,27 @@ function aimAt(carrying: Carrying, x: number, y: number): Drag {
   const draft = useEditor.getState().draft;
   if (!stage || !draft) return { x, y, slot: null, target: null, refusal: null };
   const hit = stage.pointAt(x, y);
+  if (carrying.kind === 'effect') {
+    const placement = placementAt(draft, carrying.effect, {
+      node: hit.node,
+      edge: hit.edge,
+      region: hit.region ?? hit.slot?.region ?? null,
+    });
+    if (!placement) return { x, y, slot: null, target: null, refusal: null };
+    if ('refusal' in placement) {
+      return { x, y, slot: null, target: hit.node, edge: hit.edge, refusal: placement.refusal };
+    }
+    const { nodes, edges } = reachOf(draft, { key: '', ...placement.effect });
+    return {
+      x,
+      y,
+      slot: null,
+      target: placement.on.node,
+      edge: placement.on.edge,
+      refusal: null,
+      placing: { effect: placement.effect, reach: { nodes, edges } },
+    };
+  }
   if (carrying.kind === 'move' && hit.node !== null && hit.node !== carrying.id) {
     const outcome = connect(draft, carrying.id, hit.node);
     return {
@@ -66,11 +90,30 @@ function aimAt(carrying: Carrying, x: number, y: number): Drag {
   return { x, y, slot: hit.slot, target: null, refusal: null };
 }
 
+/** Places an effect in the phase in hand, and opens it in the card. */
+function place(effect: NonNullable<Drag['placing']>['effect']): void {
+  const incident = useIncident.getState();
+  const phase = incident.phase;
+  if (!incident.scenario || phase === null) return;
+  let key = '';
+  incident.change((scenario) => {
+    const placed = placeEffect(scenario, phase, effect);
+    key = placed.key;
+    return placed.draft;
+  });
+  if (key) useIncident.getState().selectItem(key);
+}
+
 /** Does what letting go at `drag` means. */
 function release(carrying: Carrying, drag: Drag): void {
   const editor = useEditor.getState();
   const draft = editor.draft;
   if (!draft) return;
+  if (carrying.kind === 'effect') {
+    if (drag.placing) place(drag.placing.effect);
+    else if (drag.refusal) editor.refuse({ message: drag.refusal, circle: [] });
+    return;
+  }
   if (carrying.kind === 'move' && drag.target !== null) {
     const outcome = connect(draft, carrying.id, drag.target);
     if ('refused' in outcome) {
@@ -185,6 +228,37 @@ export function pressTile(event: PointerEvent, element: HTMLElement, type: Servi
   follow(event, element, { kind: 'new', type }, () => addKind(type));
 }
 
+/** A press on an effect of the palette: carried onto the model, or clicked to place it on what is selected. */
+export function pressEffect(event: PointerEvent, element: HTMLElement, effect: EffectKind): void {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  follow(event, element, { kind: 'effect', effect }, () => addEffect(effect));
+}
+
+/**
+ * Places an effect in the phase in hand on what is selected on the model.
+ * With nothing selected, or something it cannot be placed on, it is placed
+ * on nothing yet: the card asks what it acts on.
+ */
+export function addEffect(effect: EffectKind): void {
+  const editor = useEditor.getState();
+  const draft = editor.draft;
+  if (!draft) return;
+  const selection = editor.selection;
+  const under: Under = {
+    node: selection?.kind === 'node' ? selection.id : null,
+    edge: selection?.kind === 'edge' ? selection.id : null,
+    region: null,
+  };
+  const placement = selection ? placementAt(draft, effect, under) : null;
+  if (placement && 'effect' in placement) {
+    place(placement.effect);
+    return;
+  }
+  if (placement) editor.refuse({ message: placement.refusal, circle: [] });
+  place({ kind: effect, target: '', value: EFFECT[effect].start });
+}
+
 /** Adds a service of `type` next to what is selected, and selects it. */
 export function addKind(type: ServiceType): void {
   const editor = useEditor.getState();
@@ -206,7 +280,9 @@ export function addKind(type: ServiceType): void {
  */
 export function attachEditor(stage: HTMLElement): () => void {
   const down = (event: PointerEvent) => {
-    if (!editing() || event.button !== 0 || !event.isPrimary) return;
+    // On the incident the platform stands as it is: a piece is selected, not carried.
+    if (!editing() || useEditor.getState().tab !== 'platform') return;
+    if (event.button !== 0 || !event.isPrimary) return;
     const hit = sceneHandle.current?.pointAt(event.clientX, event.clientY);
     if (!hit?.node) return;
     const id = hit.node;
